@@ -1,0 +1,286 @@
+<?php // phpcs:disable WordPress.Files.FileName.NotHyphenatedLowercase,WordPress.Files.FileName.InvalidClassFileName -- PSR-4 naming used throughout this plugin.
+/**
+ * Account-lifecycle emails for the admin-approval registration flow.
+ *
+ * The registration hooks fired but had no listeners, so neither the new member
+ * nor the administrator was ever notified:
+ *   - buddynext_registration_pending — fired when approval-mode registration
+ *     creates a held account (AuthController + SocialLogin). Emails the new
+ *     member ("awaiting approval") and the site admin ("review needed").
+ *   - buddynext_member_approved       — fired by ApprovalManager / AuthController
+ *     when an admin approves the account. Emails the member ("you can sign in").
+ *   - buddynext_member_rejected       — fired by ApprovalManager on rejection.
+ *     Emails the member ("not approved").
+ *
+ * These are transactional account emails (not preference-gated notifications),
+ * so they route through EmailSender::send_with_identity() directly — carrying
+ * the same From identity (Settings → Email) as every other BuddyNext email.
+ *
+ * @package BuddyNext\Auth
+ */
+
+declare( strict_types=1 );
+
+namespace BuddyNext\Auth;
+
+use BuddyNext\Notifications\EmailSender;
+use BuddyNext\Core\PageRouter;
+
+/**
+ * Sends the admin-approval registration lifecycle emails.
+ */
+class RegistrationEmailListener {
+
+	/**
+	 * Hook the registration lifecycle actions.
+	 *
+	 * @return void
+	 */
+	public function register(): void {
+		add_action( 'buddynext_registration_pending', array( $this, 'on_registration_pending' ), 10, 2 );
+		add_action( 'buddynext_member_approved', array( $this, 'on_member_approved' ) );
+		add_action( 'buddynext_member_rejected', array( $this, 'on_member_rejected' ) );
+
+		// Welcome email — smart timing, sent exactly once per active member:
+		// - verification OFF + non-approval mode → on registration (priority 20,
+		// after VerificationListener so we can read whether a token was made);
+		// - verification ON  → after the member confirms (buddynext_user_verified);
+		// - approval mode    → the on_member_approved email above IS the welcome.
+		// A one-time usermeta guard (bn_welcome_sent) makes it idempotent.
+		add_action( 'user_register', array( $this, 'maybe_welcome_on_register' ), 20 );
+		add_action( 'buddynext_user_verified', array( $this, 'send_welcome' ) );
+
+		// Brand WordPress core's password-reset email on EVERY reset path
+		// (wp-login.php, the BN REST endpoint, programmatic). Scoped to the reset
+		// email's own headers so the HTML content-type never leaks to other mail.
+		add_filter( 'retrieve_password_notification_email', array( AuthController::class, 'brand_reset_notification_email' ), 10, 4 );
+	}
+
+	/**
+	 * Send the welcome email on registration when the account is immediately
+	 * usable — i.e. email verification is not required and registration is not
+	 * held for admin approval. The verified + approved paths are handled by
+	 * their own hooks.
+	 *
+	 * @param int $user_id New user ID.
+	 * @return void
+	 */
+	public function maybe_welcome_on_register( int $user_id ): void {
+		$reg_mode = (string) get_option( 'buddynext_reg_mode', function_exists( 'buddynext_default_reg_mode' ) ? buddynext_default_reg_mode() : 'open' );
+		if ( 'approval' === $reg_mode ) {
+			return;
+		}
+		if ( (bool) get_option( 'buddynext_email_verify', false ) ) {
+			return;
+		}
+		$this->send_welcome( $user_id );
+	}
+
+	/**
+	 * Send the branded welcome email once per member (guarded by the
+	 * bn_welcome_sent usermeta flag, so the register/verify/approved paths can
+	 * never double-send).
+	 *
+	 * @param int $user_id Member user ID.
+	 * @return void
+	 */
+	public function send_welcome( int $user_id ): void {
+		$user = get_userdata( $user_id );
+		if ( ! $user ) {
+			return;
+		}
+		if ( '' !== (string) get_user_meta( $user_id, 'bn_welcome_sent', true ) ) {
+			return;
+		}
+
+		// Render from the owner-editable 'welcome' template row (subject, body,
+		// tokens, brand wrap, sender identity) via the transactional email path —
+		// previously this method hardcoded both subject and body, so editing the
+		// Welcome template in admin changed nothing (Basecamp 10056336232). The
+		// template's enabled=0 suppresses the send (owner turned welcome off);
+		// the hardcoded copy below survives only as the no-row fallback so a
+		// deleted template can never silently kill the welcome email.
+		global $wpdb;
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$has_template = (bool) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*) FROM {$wpdb->prefix}bn_email_templates WHERE type = %s",
+				'welcome'
+			)
+		);
+
+		if ( $has_template && function_exists( 'buddynext_service' ) ) {
+			try {
+				buddynext_service( 'email_sender' )->send(
+					$user_id,
+					'welcome',
+					array(
+						'action_url' => PageRouter::activity_url(),
+					)
+				);
+				update_user_meta( $user_id, 'bn_welcome_sent', '1' );
+				return;
+			} catch ( \RuntimeException $e ) {
+				// Container key not found — fall through to the direct mail below.
+				unset( $e );
+			}
+		}
+
+		$site    = $this->site_name();
+		$subject = sprintf(
+			/* translators: %s: site name */
+			__( 'Welcome to %s', 'buddynext' ),
+			$site
+		);
+		$body = sprintf(
+			/* translators: 1: display name, 2: site name, 3: community URL */
+			__( 'Welcome aboard, %1$s! Your account at %2$s is ready. Jump in, complete your profile, and start connecting with the community: %3$s', 'buddynext' ),
+			$user->display_name,
+			$site,
+			PageRouter::activity_url()
+		);
+
+		$this->mail( (string) $user->user_email, $subject, $body );
+		update_user_meta( $user_id, 'bn_welcome_sent', '1' );
+	}
+
+	/**
+	 * Email the new member + the site admin when a held registration is created.
+	 *
+	 * @param int    $user_id New (pending) user ID.
+	 * @param string $email   Registered email address.
+	 * @return void
+	 */
+	public function on_registration_pending( int $user_id, string $email ): void {
+		$user = get_userdata( $user_id );
+		if ( ! $user ) {
+			return;
+		}
+
+		$site  = $this->site_name();
+		$email = '' !== $email ? sanitize_email( $email ) : (string) $user->user_email;
+
+		// 1) The new member — confirm receipt, set the "awaiting approval" expectation.
+		$member_subject = sprintf(
+			/* translators: %s: site name */
+			__( 'Your registration at %s is awaiting approval', 'buddynext' ),
+			$site
+		);
+		$member_body = sprintf(
+			/* translators: 1: display name, 2: site name */
+			__( 'Hi %1$s, thanks for registering at %2$s. An administrator needs to review your account before you can sign in — we will email you as soon as it is approved.', 'buddynext' ),
+			$user->display_name,
+			$site
+		);
+		$this->mail( $email, $member_subject, $member_body );
+
+		// 2) The site admin — prompt a review.
+		$admin_email = sanitize_email( (string) get_option( 'admin_email' ) );
+		if ( '' !== $admin_email ) {
+			$admin_subject = sprintf(
+				/* translators: %s: site name */
+				__( 'New registration awaiting approval — %s', 'buddynext' ),
+				$site
+			);
+			$admin_body = sprintf(
+				/* translators: 1: username, 2: email, 3: review URL */
+				__( '%1$s (%2$s) has registered and is awaiting your approval. Review pending members here: %3$s', 'buddynext' ),
+				$user->user_login,
+				$email,
+				admin_url( 'admin.php?page=buddynext-members&tab=invites' )
+			);
+			$this->mail( $admin_email, $admin_subject, $admin_body );
+		}
+	}
+
+	/**
+	 * Email the member that their account was approved.
+	 *
+	 * @param int $user_id Approved user ID.
+	 * @return void
+	 */
+	public function on_member_approved( int $user_id ): void {
+		$user = get_userdata( $user_id );
+		if ( ! $user ) {
+			return;
+		}
+
+		$site    = $this->site_name();
+		$subject = sprintf(
+			/* translators: %s: site name */
+			__( 'Your account at %s is approved', 'buddynext' ),
+			$site
+		);
+		$body = sprintf(
+			/* translators: 1: display name, 2: site name, 3: sign-in URL */
+			__( 'Good news, %1$s — your account at %2$s has been approved. You can now sign in: %3$s', 'buddynext' ),
+			$user->display_name,
+			$site,
+			PageRouter::auth_url()
+		);
+		$this->mail( (string) $user->user_email, $subject, $body );
+
+		// This approval email is the welcome in approval mode — mark the guard so
+		// a verify-then-approve combo never sends a second welcome.
+		update_user_meta( $user_id, 'bn_welcome_sent', '1' );
+	}
+
+	/**
+	 * Email the member that their registration was not approved.
+	 *
+	 * @param int $user_id Rejected user ID.
+	 * @return void
+	 */
+	public function on_member_rejected( int $user_id ): void {
+		$user = get_userdata( $user_id );
+		if ( ! $user ) {
+			return;
+		}
+
+		$site    = $this->site_name();
+		$subject = sprintf(
+			/* translators: %s: site name */
+			__( 'Your registration at %s', 'buddynext' ),
+			$site
+		);
+		$body = sprintf(
+			/* translators: 1: display name, 2: site name */
+			__( 'Hi %1$s, thank you for your interest in %2$s. Unfortunately your registration was not approved at this time.', 'buddynext' ),
+			$user->display_name,
+			$site
+		);
+		$this->mail( (string) $user->user_email, $subject, $body );
+	}
+
+	/**
+	 * Send a transactional HTML email with the BuddyNext From identity.
+	 *
+	 * @param string $to      Recipient address.
+	 * @param string $subject Subject line.
+	 * @param string $body    Plain message (escaped + wrapped in minimal HTML).
+	 * @param string $type    bn_email_log type label (default 'registration').
+	 * @return void
+	 */
+	private function mail( string $to, string $subject, string $body, string $type = 'registration' ): void {
+		if ( '' === $to || ! is_email( $to ) ) {
+			return;
+		}
+		EmailSender::send_with_identity(
+			$to,
+			$subject,
+			EmailSender::brand_wrap( '<p>' . esc_html( $body ) . '</p>', $subject ),
+			EmailSender::build_identity_headers(),
+			$type
+		);
+	}
+
+	/**
+	 * Resolve the site name for email copy.
+	 *
+	 * @return string
+	 */
+	private function site_name(): string {
+		$name = (string) get_bloginfo( 'name' );
+		return '' !== $name ? $name : __( 'our community', 'buddynext' );
+	}
+}

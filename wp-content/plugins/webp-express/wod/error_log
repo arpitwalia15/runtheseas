@@ -1,0 +1,44 @@
+[07-Aug-2026 13:15:31 UTC] PHP Fatal error:  Uncaught DivisionByZeroError: Division by zero in /home/uelyxf3avkm6/public_html/wp-content/plugins/webp-express/vendor/rosell-dk/webp-convert/src/Convert/Converters/AbstractConverter.php:217
+Stack trace:
+#0 /home/uelyxf3avkm6/public_html/wp-content/plugins/webp-express/vendor/rosell-dk/webp-convert/src/Convert/Converters/ConverterTraits/EncodingAutoTrait.php(67): WebPConvert\Convert\Converters\AbstractConverter->logReduction()
+#1 /home/uelyxf3avkm6/public_html/wp-content/plugins/webp-express/vendor/rosell-dk/webp-convert/src/Convert/Converters/ConverterTraits/EncodingAutoTrait.php(86): WebPConvert\Convert\Converters\ImageMagick->convertTwoAndSelectSmallest()
+#2 /home/uelyxf3avkm6/public_html/wp-content/plugins/webp-express/vendor/rosell-dk/webp-convert/src/Convert/Converters/AbstractConverter.php(255): WebPConvert\Convert\Converters\ImageMagick->runActualConvert()
+#3 /home/uelyxf3avkm6/public_html/wp-content/plugins/webp-express/vendor/rosell-dk/webp-convert/src/Convert/Converters/AbstractConverter.php(294): WebPConvert\Convert\Converters\AbstractConverter->doConvertImplementation()
+#4 /home/uelyxf3avkm6/public_html/wp-content/plugins/webp-express/vendor/rosell-dk/webp-convert/src/Convert/Converters/Stack.php(244): WebPConvert\Convert\Converters\AbstractConverter->doConvert()
+#5 /home/uelyxf3avkm6/public_html/wp-content/plugins/webp-express/vendor/rosell-dk/webp-convert/src/Convert/Converters/AbstractConverter.php(348): WebPConvert\Convert\Converters\Stack->doActualConvert()
+#6 /home/uelyxf3avkm6/public_html/wp-content/plugins/webp-express/vendor/rosell-dk/webp-convert/src/Convert/Converters/AbstractConverter.php(255): WebPConvert\Convert\Converters\AbstractConverter->runActualConvert()
+#7 /home/uelyxf3avkm6/public_html/wp-content/plugins/webp-express/vendor/rosell-dk/webp-convert/src/Convert/Converters/AbstractConverter.php(294): WebPConvert\Convert\Converters\AbstractConverter->doConvertImplementation()
+#8 /home/uelyxf3avkm6/public_html/wp-content/plugins/webp-express/vendor/rosell-dk/webp-convert/src/Convert/Converters/AbstractConverter.php(366): WebPConvert\Convert\Converters\AbstractConverter->doConvert()
+#9 /home/uelyxf3avkm6/public_html/wp-content/plugins/webp-express/vendor/rosell-dk/webp-convert/src/WebPConvert.php(50): WebPConvert\Convert\Converters\AbstractConverter::convert()
+#10 /home/uelyxf3avkm6/public_html/wp-content/plugins/webp-express/vendor/rosell-dk/webp-convert/src/Serve/ServeConvertedWebP.php(168): WebPConvert\WebPConvert::convert()
+#11 [internal function]: WebPConvert\Serve\ServeConvertedWebP::serve()
+#12 /home/uelyxf3avkm6/public_html/wp-content/plugins/webp-express/vendor/rosell-dk/webp-convert/src/Serve/ServeConvertedWebPWithErrorHandling.php(143): call_user_func()
+#13 /home/uelyxf3avkm6/public_html/wp-content/plugins/webp-express/vendor/rosell-dk/webp-convert/src/WebPConvert.php(81): WebPConvert\Serve\ServeConvertedWebPWithErrorHandling::serve()
+#14 /home/uelyxf3avkm6/public_html/wp-content/plugins/webp-express/lib/classes/ConvertHelperIndependent.php(720): WebPConvert\WebPConvert::serveConverted()
+#15 /home/uelyxf3avkm6/public_html/wp-content/plugins/webp-express/lib/classes/WebPOnDemand.php(250): WebPExpress\ConvertHelperIndependent::serveConverted()
+#16 /home/uelyxf3avkm6/public_html/wp-content/plugins/webp-express/lib/classes/WebPOnDemand.php(272): WebPExpress\WebPOnDemand::processRequestNoTryCatch()
+#17 /home/uelyxf3avkm6/public_html/wp-content/plugins/webp-express/wod/webp-on-demand.php(8): WebPExpress\WebPOnDemand::processRequest()
+#18 {main}
+  thrown in /home/uelyxf3avkm6/public_html/wp-content/plugins/webp-express/vendor/rosell-dk/webp-convert/src/Convert/Converters/AbstractConverter.php on line 217
+[07-Aug-2026 13:15:53 UTC] PHP Fatal error:  Uncaught DivisionByZeroError: Division by zero in /home/uelyxf3avkm6/public_html/wp-content/plugins/webp-express/vendor/rosell-dk/webp-convert/src/Convert/Converters/AbstractConverter.php:217
+Stack trace:
+#0 /home/uelyxf3avkm6/public_html/wp-content/plugins/webp-express/vendor/rosell-dk/webp-convert/src/Convert/Converters/ConverterTraits/EncodingAutoTrait.php(67): WebPConvert\Convert\Converters\AbstractConverter->logReduction()
+#1 /home/uelyxf3avkm6/public_html/wp-content/plugins/webp-express/vendor/rosell-dk/webp-convert/src/Convert/Converters/ConverterTraits/EncodingAutoTrait.php(86): WebPConvert\Convert\Converters\ImageMagick->convertTwoAndSelectSmallest()
+#2 /home/uelyxf3avkm6/public_html/wp-content/plugins/webp-express/vendor/rosell-dk/webp-convert/src/Convert/Converters/AbstractConverter.php(255): WebPConvert\Convert\Converters\ImageMagick->runActualConvert()
+#3 /home/uelyxf3avkm6/public_html/wp-content/plugins/webp-express/vendor/rosell-dk/webp-convert/src/Convert/Converters/AbstractConverter.php(294): WebPConvert\Convert\Converters\AbstractConverter->doConvertImplementation()
+#4 /home/uelyxf3avkm6/public_html/wp-content/plugins/webp-express/vendor/rosell-dk/webp-convert/src/Convert/Converters/Stack.php(244): WebPConvert\Convert\Converters\AbstractConverter->doConvert()
+#5 /home/uelyxf3avkm6/public_html/wp-content/plugins/webp-express/vendor/rosell-dk/webp-convert/src/Convert/Converters/AbstractConverter.php(348): WebPConvert\Convert\Converters\Stack->doActualConvert()
+#6 /home/uelyxf3avkm6/public_html/wp-content/plugins/webp-express/vendor/rosell-dk/webp-convert/src/Convert/Converters/AbstractConverter.php(255): WebPConvert\Convert\Converters\AbstractConverter->runActualConvert()
+#7 /home/uelyxf3avkm6/public_html/wp-content/plugins/webp-express/vendor/rosell-dk/webp-convert/src/Convert/Converters/AbstractConverter.php(294): WebPConvert\Convert\Converters\AbstractConverter->doConvertImplementation()
+#8 /home/uelyxf3avkm6/public_html/wp-content/plugins/webp-express/vendor/rosell-dk/webp-convert/src/Convert/Converters/AbstractConverter.php(366): WebPConvert\Convert\Converters\AbstractConverter->doConvert()
+#9 /home/uelyxf3avkm6/public_html/wp-content/plugins/webp-express/vendor/rosell-dk/webp-convert/src/WebPConvert.php(50): WebPConvert\Convert\Converters\AbstractConverter::convert()
+#10 /home/uelyxf3avkm6/public_html/wp-content/plugins/webp-express/vendor/rosell-dk/webp-convert/src/Serve/ServeConvertedWebP.php(168): WebPConvert\WebPConvert::convert()
+#11 [internal function]: WebPConvert\Serve\ServeConvertedWebP::serve()
+#12 /home/uelyxf3avkm6/public_html/wp-content/plugins/webp-express/vendor/rosell-dk/webp-convert/src/Serve/ServeConvertedWebPWithErrorHandling.php(143): call_user_func()
+#13 /home/uelyxf3avkm6/public_html/wp-content/plugins/webp-express/vendor/rosell-dk/webp-convert/src/WebPConvert.php(81): WebPConvert\Serve\ServeConvertedWebPWithErrorHandling::serve()
+#14 /home/uelyxf3avkm6/public_html/wp-content/plugins/webp-express/lib/classes/ConvertHelperIndependent.php(720): WebPConvert\WebPConvert::serveConverted()
+#15 /home/uelyxf3avkm6/public_html/wp-content/plugins/webp-express/lib/classes/WebPOnDemand.php(250): WebPExpress\ConvertHelperIndependent::serveConverted()
+#16 /home/uelyxf3avkm6/public_html/wp-content/plugins/webp-express/lib/classes/WebPOnDemand.php(272): WebPExpress\WebPOnDemand::processRequestNoTryCatch()
+#17 /home/uelyxf3avkm6/public_html/wp-content/plugins/webp-express/wod/webp-on-demand.php(8): WebPExpress\WebPOnDemand::processRequest()
+#18 {main}
+  thrown in /home/uelyxf3avkm6/public_html/wp-content/plugins/webp-express/vendor/rosell-dk/webp-convert/src/Convert/Converters/AbstractConverter.php on line 217

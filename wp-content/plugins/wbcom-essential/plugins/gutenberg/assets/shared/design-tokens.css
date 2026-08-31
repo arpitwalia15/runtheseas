@@ -1,0 +1,88 @@
+:root {
+	/* Spacing scale (used by SpacingControl) */
+	--wbe-space-0: 0;
+	--wbe-space-xs: 4px;
+	--wbe-space-sm: 8px;
+	--wbe-space-md: 16px;
+	--wbe-space-lg: 24px;
+	--wbe-space-xl: 32px;
+	--wbe-space-2xl: 48px;
+	--wbe-space-3xl: 64px;
+
+	/* Border radius scale */
+	--wbe-radius-none: 0;
+	--wbe-radius-sm: 4px;
+	--wbe-radius-md: 8px;
+	--wbe-radius-lg: 12px;
+	--wbe-radius-xl: 16px;
+	--wbe-radius-full: 9999px;
+
+	/* Shadow presets */
+	--wbe-shadow-none: none;
+	--wbe-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+	--wbe-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+	--wbe-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+	--wbe-shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+
+	/* Typography scale */
+	--wbe-font-xs: 12px;
+	--wbe-font-sm: 14px;
+	--wbe-font-md: 16px;
+	--wbe-font-lg: 18px;
+	--wbe-font-xl: 20px;
+	--wbe-font-2xl: 24px;
+	--wbe-font-3xl: 30px;
+	--wbe-font-4xl: 36px;
+	--wbe-font-5xl: 48px;
+
+	/* Font weights */
+	--wbe-weight-normal: 400;
+	--wbe-weight-medium: 500;
+	--wbe-weight-semibold: 600;
+	--wbe-weight-bold: 700;
+
+	/* Line heights */
+	--wbe-leading-tight: 1.25;
+	--wbe-leading-normal: 1.5;
+	--wbe-leading-relaxed: 1.75;
+
+	/* Colors — neutral palette */
+	--wbe-color-white: #ffffff;
+	--wbe-color-text: #1e293b;
+	--wbe-color-text-muted: #475569;
+	--wbe-color-text-light: #64748b;
+	--wbe-color-border: #e2e8f0;
+	--wbe-color-surface: #f8fafc;
+	--wbe-color-surface-alt: #f1f5f9;
+	--wbe-color-accent: var(--wbcom-link-color, #0073aa);
+	--wbe-color-accent-hover: var(--wbcom-link-hover-color, #005a87);
+	--wbe-color-accent-light: rgba(0, 115, 170, 0.08);
+	--wbe-color-accent-ring: rgba(0, 115, 170, 0.2);
+
+	/* Colors — semantic */
+	--wbe-color-success: #16a34a;
+	--wbe-color-success-bg: #dcfce7;
+	--wbe-color-warning: #d97706;
+	--wbe-color-warning-bg: #fef3c7;
+	--wbe-color-danger: #ef4444;
+	--wbe-color-danger-bg: #fef2f2;
+	--wbe-color-info: #2563eb;
+	--wbe-color-info-bg: #eff6ff;
+
+	/* Responsive breakpoints (used by CSS generation utility) */
+	--wbe-bp-tablet: 1024px;
+	--wbe-bp-mobile: 767px;
+
+	/* Transition */
+	--wbe-transition-fast: 150ms ease;
+	--wbe-transition-normal: 300ms ease;
+	--wbe-transition-slow: 500ms ease;
+
+	/* Z-index scale */
+	--wbe-z-below: -1;
+	--wbe-z-base: 0;
+	--wbe-z-above: 1;
+	--wbe-z-dropdown: 10;
+	--wbe-z-overlay: 100;
+	--wbe-z-modal: 1000;
+}

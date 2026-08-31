@@ -1,0 +1,125 @@
+.wbcom-progress-bar-wrapper {
+    position: relative;
+    display: -webkit-box;
+    display: -ms-flexbox;
+    display: flex;
+    border-radius: 4px;
+    -ms-flex-wrap: nowrap;
+    flex-wrap: nowrap;
+    -webkit-box-pack: justify;
+    -ms-flex-pack: justify;
+    justify-content: space-between;
+    -webkit-box-align: center;
+    -ms-flex-align: center;
+    align-items: center
+}
+
+.wbcom-progress-bar-wrapper .wbcom-progress-bar {
+    position: relative;
+    display: -webkit-box;
+    display: -ms-flexbox;
+    display: flex;
+    -webkit-box-orient: horizontal;
+    -webkit-box-direction: normal;
+    -ms-flex-direction: row;
+    flex-direction: row;
+    -ms-flex-wrap: nowrap;
+    flex-wrap: nowrap;
+    width: 0;
+    color: #fff;
+    padding: 10px;
+    border-radius: 4px;
+    -webkit-box-pack: justify;
+    -ms-flex-pack: justify;
+    justify-content: space-between;
+    font-size: 14px;
+    line-height: 1;
+    -webkit-box-align: center;
+    -ms-flex-align: center;
+    align-items: center;
+    z-index: 2
+}
+
+.wbcom-progress-bar-wrapper .wbcom-progress-bar.stripes {
+    background-image: linear-gradient(-45deg, rgba(255, 255, 255, .125) 25%, transparent 25%, transparent 50%, rgba(255, 255, 255, .125) 50%, rgba(255, 255, 255, .125) 75%, transparent 75%, transparent);
+    background-size: 35px 35px;
+    -webkit-animation: wbstripes 2s linear infinite;
+    animation: wbstripes 2s linear infinite
+}
+
+.wbcom-progress-bar-wrapper .wbcom-progress-bar-percent {
+    position: relative;
+    opacity: 0;
+    -webkit-transition: opacity .2s ease-in-out;
+    transition: opacity .2s ease-in-out
+}
+
+.wbcom-progress-bar-wrapper .wbcom-progress-bar-percent:after {
+    top: 100%;
+    left: 50%;
+    border: solid transparent;
+    content: " ";
+    height: 0;
+    width: 0;
+    position: absolute;
+    pointer-events: none;
+    border-color: rgba(10, 170, 198, 0);
+    border-width: 5px;
+    margin-left: -5px
+}
+
+.wbcom-progress-bar-wrapper .wbcom-progress-bar-percent-out {
+    position: relative;
+    opacity: 0;
+    -webkit-transition: opacity .2s ease-in-out;
+    transition: opacity .2s ease-in-out
+}
+
+.wbcom-progress-bar-wrapper .wbcom-progress-bar-percent-out:after {
+    top: 100%;
+    left: 50%;
+    border: solid transparent;
+    content: " ";
+    height: 0;
+    width: 0;
+    position: absolute;
+    pointer-events: none;
+    border-color: rgba(10, 170, 198, 0);
+    border-width: 5px;
+    margin-left: -5px
+}
+
+.wbcom-progress-bar-overlay {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 1;
+    width: 0;
+    height: 100%
+}
+
+body.rtl .wbcom-progress-bar-overlay {
+    left: auto;
+    right: 0
+}
+
+@-webkit-keyframes wbstripes {
+    0% {
+        background-position: 0 0
+    }
+
+    100% {
+        background-position: 35px 35px
+    }
+}
+
+@keyframes wbstripes {
+    0% {
+        background-position: 0 0
+    }
+
+    100% {
+        background-position: 35px 35px
+    }
+}

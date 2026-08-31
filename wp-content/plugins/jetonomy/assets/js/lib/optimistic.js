@@ -1,0 +1,126 @@
+/**
+ * Jetonomy Optimistic Action Helper
+ *
+ * Tiny apply/revert wrapper around fetch() for optimistic UI updates.
+ * Exposes window.jetonomyOptimistic = { run, gen }.
+ *
+ *   run( opts )  — Promise-based variant (async/await callers, non-Interactivity)
+ *   gen( opts )  — generator variant for the WordPress Interactivity API store
+ *                  (matches view.js's *voteUp/*voteReplyUp pattern: yield fetch + json)
+ *
+ * Both share the same options object:
+ *   {
+ *     apply,         // () => snapshot                              (sync, required)
+ *     fetch,         // () => Promise<Response>                      (required)
+ *     onSuccess,     // (data, response, snapshot) => void           (optional)
+ *     revert,        // (snapshot, errOrResponse) => void            (required)
+ *     onError,       // (errOrResponse, snapshot) => void            (optional)
+ *     onFinally,     // (snapshot) => void                           (optional)
+ *     toastOnError,  // boolean, default true
+ *     errorFallback, // string, optional
+ *   }
+ *
+ * Foundation for WS3-A; callsites migrate in WS3-B.
+ */
+( function ( window ) {
+	'use strict';
+
+	function isJson( response ) {
+		var ct = response && response.headers && response.headers.get
+			? response.headers.get( 'content-type' )
+			: '';
+		return !! ct && ct.indexOf( 'application/json' ) !== -1;
+	}
+
+	function maybeToast( opts, data, errOrResponse ) {
+		if ( opts.toastOnError === false ) return;
+		if ( typeof window.bnToast !== 'function' ) return;
+		var msg = ( data && data.message ) || opts.errorFallback || 'Something went wrong';
+		try {
+			window.bnToast( msg, 'error' );
+		} catch ( _e ) {
+			/* toast failure is non-fatal */
+		}
+	}
+
+	function callSafe( fn ) {
+		if ( typeof fn !== 'function' ) return;
+		var args = Array.prototype.slice.call( arguments, 1 );
+		try {
+			fn.apply( null, args );
+		} catch ( e ) {
+			/* eslint-disable-next-line no-console */
+			if ( window.console && console.error ) console.error( '[jetonomyOptimistic]', e );
+		}
+	}
+
+	/**
+	 * Promise-based variant.
+	 *
+	 * @param {Object} opts See module header.
+	 * @return {Promise<void>}
+	 */
+	async function run( opts ) {
+		opts = opts || {};
+		var snapshot;
+		try {
+			snapshot = opts.apply ? opts.apply() : null;
+		} catch ( e ) {
+			if ( window.console && console.error ) console.error( '[jetonomyOptimistic] apply threw', e );
+			return;
+		}
+
+		try {
+			var response = await opts.fetch();
+			var data = null;
+			if ( response && typeof response.json === 'function' ) {
+				// Native fetch Response — parse the JSON body if present.
+				if ( isJson( response ) ) {
+					try {
+						data = await response.json();
+					} catch ( _e ) {
+						data = null;
+					}
+				}
+			} else if ( response && typeof response === 'object' && 'data' in response ) {
+				// restFetch-style result: { ok, status, data } already parsed.
+				data = response.data;
+			}
+			if ( response.ok ) {
+				callSafe( opts.onSuccess, data, response, snapshot );
+			} else {
+				callSafe( opts.revert, snapshot, response );
+				callSafe( opts.onError, response, snapshot );
+				maybeToast( opts, data, response );
+			}
+		} catch ( err ) {
+			callSafe( opts.revert, snapshot, err );
+			callSafe( opts.onError, err, snapshot );
+			maybeToast( opts, null, err );
+		} finally {
+			callSafe( opts.onFinally, snapshot );
+		}
+	}
+
+	/**
+	 * Interactivity-API-friendly variant.
+	 *
+	 * Originally this was a generator that yielded the fetch + response.json()
+	 * Promises so WP IA could resume on resolve. That contract is wrong:
+	 * IA only awaits values yielded by the action generator itself. A nested
+	 * generator object (`yield gen({...})`) is yielded as a plain value — IA
+	 * never iterates it, so apply/fetch never run. Discovered during 1.4.3
+	 * browser verification (vote buttons silently no-op'd).
+	 *
+	 * Returning a Promise instead — `yield Promise<void>` is awaited by IA
+	 * as expected. All WS3-B callsites keep working unchanged.
+	 *
+	 * @param {Object} opts See module header.
+	 * @return {Promise<void>}
+	 */
+	function gen( opts ) {
+		return run( opts );
+	}
+
+	window.jetonomyOptimistic = { run: run, gen: gen };
+} )( window );

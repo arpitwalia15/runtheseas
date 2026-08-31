@@ -1,0 +1,585 @@
+<?php // phpcs:disable WordPress.Files.FileName.NotHyphenatedLowercase,WordPress.Files.FileName.InvalidClassFileName -- PSR-4 naming used throughout this plugin.
+/**
+ * Comment REST controller.
+ *
+ * Routes (all under buddynext/v1):
+ *   POST   /comments                — create a comment (auth required)
+ *   GET    /comments                — list comments for an object (public)
+ *   PUT    /comments/{id}           — update a comment (owner or admin)
+ *   DELETE /comments/{id}           — delete a comment (owner or admin)
+ *   POST   /comments/{id}/pin       — pin a comment (moderator only)
+ *   DELETE /comments/{id}/pin       — unpin a comment (moderator only)
+ *
+ * @package BuddyNext\Comments
+ */
+
+declare( strict_types=1 );
+
+namespace BuddyNext\Comments;
+
+use BuddyNext\Comments\CommentService;
+use BuddyNext\Reactions\ReactionService;
+use WP_Error;
+use WP_REST_Request;
+use WP_REST_Response;
+use WP_REST_Server;
+use BuddyNext\REST\BaseRestController;
+
+/**
+ * Handles comment CRUD and listing over REST.
+ */
+class CommentController extends BaseRestController {
+
+	/**
+	 * Register the controller's routes.
+	 */
+	public function register_routes(): void {
+		register_rest_route(
+			'buddynext/v1',
+			'/comments',
+			array(
+				array(
+					'methods'             => WP_REST_Server::CREATABLE,
+					'callback'            => array( $this, 'create' ),
+					'permission_callback' => array( $this, 'require_auth' ),
+					'args'                => array(
+						'object_type' => array(
+							'required'          => true,
+							'type'              => 'string',
+							'sanitize_callback' => 'sanitize_key',
+						),
+						'object_id'   => array(
+							'required' => true,
+							'type'     => 'integer',
+							'minimum'  => 1,
+						),
+						'content'     => array(
+							'required' => true,
+							'type'     => 'string',
+						),
+						'parent_id'   => array(
+							'required' => false,
+							'type'     => 'integer',
+							'minimum'  => 1,
+						),
+					),
+				),
+				array(
+					'methods'             => WP_REST_Server::READABLE,
+					'callback'            => array( $this, 'list_comments' ),
+					'permission_callback' => '__return_true',
+					'args'                => array(
+						'object_type' => array(
+							'required'          => true,
+							'type'              => 'string',
+							'sanitize_callback' => 'sanitize_key',
+						),
+						'object_id'   => array(
+							'required' => true,
+							'type'     => 'integer',
+							'minimum'  => 1,
+						),
+						'per_page'    => array(
+							'type'    => 'integer',
+							'default' => 20,
+							'minimum' => 1,
+							'maximum' => 50,
+						),
+						'page'        => array(
+							'type'    => 'integer',
+							'default' => 1,
+							'minimum' => 1,
+						),
+					),
+				),
+			)
+		);
+
+		register_rest_route(
+			'buddynext/v1',
+			'/comments/(?P<id>[\d]+)',
+			array(
+				array(
+					'methods'             => WP_REST_Server::EDITABLE,
+					'callback'            => array( $this, 'update' ),
+					'permission_callback' => array( $this, 'require_auth' ),
+					'args'                => array(
+						'id'      => array(
+							'required' => true,
+							'type'     => 'integer',
+							'minimum'  => 1,
+						),
+						'content' => array(
+							'required' => true,
+							'type'     => 'string',
+						),
+					),
+				),
+				array(
+					'methods'             => WP_REST_Server::DELETABLE,
+					'callback'            => array( $this, 'delete' ),
+					'permission_callback' => array( $this, 'require_auth' ),
+					'args'                => array(
+						'id' => array(
+							'required' => true,
+							'type'     => 'integer',
+							'minimum'  => 1,
+						),
+					),
+				),
+			)
+		);
+
+		// Pin/unpin: login is the only route-level gate. Fine-grained authorization
+		// is the service's job — CommentService::can_pin_comment() grants pin rights
+		// to site admins AND to moderators of the post's space, and pin()/unpin()
+		// below turn a denial into a 403 (404-before-403 for a missing comment).
+		// require_moderator() here would be require_admin() (manage_options), which
+		// 403'd space moderators at the permission callback even though the service
+		// — and the can_pin flag that renders their pin button — allow them.
+		register_rest_route(
+			'buddynext/v1',
+			'/comments/(?P<id>[\d]+)/pin',
+			array(
+				array(
+					'methods'             => WP_REST_Server::CREATABLE,
+					'callback'            => array( $this, 'pin' ),
+					'permission_callback' => array( $this, 'require_auth' ),
+					'args'                => array(
+						'id' => array(
+							'required' => true,
+							'type'     => 'integer',
+							'minimum'  => 1,
+						),
+					),
+				),
+				array(
+					'methods'             => WP_REST_Server::DELETABLE,
+					'callback'            => array( $this, 'unpin' ),
+					'permission_callback' => array( $this, 'require_auth' ),
+					'args'                => array(
+						'id' => array(
+							'required' => true,
+							'type'     => 'integer',
+							'minimum'  => 1,
+						),
+					),
+				),
+			)
+		);
+	}
+
+	/**
+	 * Create a comment.
+	 *
+	 * @param WP_REST_Request $request Request object.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function create( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+		$gate = $this->comments_enabled_gate();
+		if ( is_wp_error( $gate ) ) {
+			return $gate;
+		}
+
+		// Enforce the "Comment on posts" minimum-role setting (Settings → Roles &
+		// Capabilities). The route's require_auth permission_callback only checks
+		// that the user is logged in; without this gate the configured role was
+		// resolved by PermissionService but never applied, so any member could
+		// comment regardless of the setting.
+		$cap_gate = $this->require_cap( 'buddynext-comments/create' );
+		if ( is_wp_error( $cap_gate ) ) {
+			return $cap_gate;
+		}
+
+		$service     = new CommentService();
+		$user_id     = get_current_user_id();
+		$object_type = (string) ( $request->get_param( 'object_type' ) ?? '' );
+		$object_id   = (int) $request->get_param( 'object_id' );
+		$content     = wp_kses_post( (string) ( $request->get_param( 'content' ) ?? '' ) );
+		$parent_id   = $request->get_param( 'parent_id' ) !== null ? (int) $request->get_param( 'parent_id' ) : null;
+
+		$result = $service->create( $user_id, $object_type, $object_id, $content, $parent_id );
+
+		if ( is_wp_error( $result ) ) {
+			// Preserve a status the service already set (suspension / blocked IP /
+			// archived space = 403, rate-limit = 429); only default to 400 when
+			// none was given. WP_Error::add_data() REPLACES the data array, so an
+			// unconditional re-stamp would flatten those to a wrong HTTP 400.
+			$data = $result->get_error_data();
+			if ( ! is_array( $data ) || empty( $data['status'] ) ) {
+				$result->add_data( array( 'status' => 400 ) );
+			}
+			return $result;
+		}
+
+		$created = $service->get( $result );
+		if ( null === $created ) {
+			return new WP_Error( 'create_failed', __( 'Comment could not be retrieved after creation.', 'buddynext' ), array( 'status' => 500 ) );
+		}
+
+		// Match the shape returned by list_comments() so the JS can drop the
+		// new comment node into the tree without a second round-trip.
+		$created['author_name']       = (string) get_the_author_meta( 'display_name', $created['user_id'] );
+		$created['author_avatar_url'] = (string) get_avatar_url( $created['user_id'], array( 'size' => 40 ) );
+		$created['like_count']        = 0;
+		$created['viewer_liked']      = false;
+		$created['viewer_reaction']   = null;
+		$created['can_edit']          = true;
+		$created['can_delete']        = true;
+		$created['can_pin']           = $service->can_pin_comment( $user_id, (string) ( $created['object_type'] ?? '' ), (int) ( $created['object_id'] ?? 0 ) );
+		$created['replies']           = array();
+		$created['is_pinned']         = false;
+		$created['author_meta_html']  = wp_kses_post(
+			(string) apply_filters(
+				'buddynext_comment_author_meta_html',
+				'',
+				(int) $created['user_id'],
+				(int) $created['id']
+			)
+		);
+		// Display-ready HTML (linkified @mentions / #hashtags), same as
+		// list_comments(); without it the JS renders the raw text and a fresh
+		// comment's mentions stay plain until the page is reloaded.
+		$created['content_html'] = buddynext_format_content( (string) $created['content'] );
+
+		return new WP_REST_Response( $created, 201 );
+	}
+
+	/**
+	 * List top-level comments for an object.
+	 *
+	 * @param WP_REST_Request $request Request object.
+	 * @return WP_REST_Response
+	 */
+	public function list_comments( WP_REST_Request $request ): WP_REST_Response {
+		$service     = new CommentService();
+		$object_type = (string) ( $request->get_param( 'object_type' ) ?? '' );
+		$object_id   = (int) $request->get_param( 'object_id' );
+		$per_page    = (int) ( $request->get_param( 'per_page' ) ?? 20 );
+		$page        = (int) ( $request->get_param( 'page' ) ?? 1 );
+
+		// Privacy gate: never leak a private/secret/followers-only post's comment
+		// thread to a viewer who could not read the post itself. Resolve the target
+		// to its owning post and, when that post is not viewable, return an empty
+		// thread instead of the comments.
+		if ( $this->is_post_hidden_from_viewer( $object_type, $object_id ) ) {
+			return new WP_REST_Response(
+				array(
+					'items' => array(),
+					'total' => 0,
+				),
+				200
+			);
+		}
+
+		$result = $service->list(
+			$object_type,
+			$object_id,
+			array(
+				'per_page' => $per_page,
+				'page'     => $page,
+			)
+		);
+
+		$reactions = new ReactionService();
+		$viewer_id = get_current_user_id();
+
+		// Single option lookup for the pinned comment id of this object.
+		// Resolved once, not per-comment.
+		$pinned_id = (int) get_option(
+			'bn_pinned_comment_' . sanitize_key( $object_type ) . '_' . $object_id,
+			0
+		);
+
+		// Soft-deleted comments — anonymize author + avatar so the thread
+		// keeps its shape (nested replies stay attached) without leaking
+		// the original author's identity.
+		$anonymize = static function ( array &$c ): void {
+			$c['author_name']       = __( 'Deleted user', 'buddynext' );
+			$c['author_avatar_url'] = '';
+			$c['content']           = __( '[deleted]', 'buddynext' );
+		};
+
+		// Enrich each comment with author display name, avatar URL, like
+		// metadata, viewer permissions, and pinned state. Like fields drive
+		// the heart toggle in the threaded UI; can_edit / can_delete /
+		// can_pin let the JS decide which action buttons to render without
+		// re-hitting the server on every paint. is_pinned drives the
+		// "Pinned" badge in the thread head.
+		// Pinning is per-object, so resolve it once (all comments hang on the same
+		// object): admins, plus moderators of the post's space, may pin.
+		$can_pin_object = $service->can_pin_comment( $viewer_id, $object_type, $object_id );
+
+		$enrich = function ( array $comment ) use ( $reactions, $viewer_id, $pinned_id, $anonymize, $can_pin_object ): array {
+			$comment['author_name']       = (string) get_the_author_meta( 'display_name', $comment['user_id'] );
+			$comment['author_avatar_url'] = (string) get_avatar_url( $comment['user_id'], array( 'size' => 40 ) );
+			$comment['like_count']        = $reactions->count( 'comment', (int) $comment['id'] );
+			$comment['viewer_liked']      = $viewer_id > 0
+				? $reactions->has_reacted( $viewer_id, 'comment', (int) $comment['id'] )
+				: false;
+			// Carry the specific emoji the viewer reacted with so the client can
+			// render the right icon instead of always falling back to 'like'.
+			$comment['viewer_reaction'] = $viewer_id > 0
+				? $reactions->get_user_emoji( $viewer_id, 'comment', (int) $comment['id'] )
+				: null;
+			$comment['can_edit']        = $viewer_id > 0
+				&& ( (int) $comment['user_id'] === $viewer_id || user_can( $viewer_id, 'manage_options' ) );
+			$comment['can_delete']      = $comment['can_edit'];
+			$comment['can_pin']         = $can_pin_object;
+			$comment['is_pinned']       = ( $pinned_id > 0 && (int) $comment['id'] === $pinned_id );
+
+			$comment['author_meta_html'] = wp_kses_post(
+				(string) apply_filters(
+					'buddynext_comment_author_meta_html',
+					'',
+					(int) $comment['user_id'],
+					(int) $comment['id']
+				)
+			);
+
+			if ( ! empty( $comment['is_deleted'] ) ) {
+				$anonymize( $comment );
+				// A deleted comment can never be edited, pinned, or react'd to.
+				$comment['can_edit']        = false;
+				$comment['can_delete']      = false;
+				$comment['can_pin']         = false;
+				$comment['like_count']      = 0;
+				$comment['viewer_liked']    = false;
+				$comment['viewer_reaction'] = null;
+			}
+
+			// Display-ready HTML: escapes the user content, then linkifies
+			// @mentions and #hashtags via the same formatter the post body uses,
+			// so the client renders comment bodies with markup instead of raw
+			// text. The raw `content` field is kept for the edit textarea.
+			$comment['content_html'] = buddynext_format_content( (string) $comment['content'] );
+
+			return $comment;
+		};
+
+		// Recurse through the full reply tree (N-deep up to the
+		// CommentService::MAX_REPLY_DEPTH cap) so every node — including
+		// the cap-level flattened leaves — gets the same enrichment.
+		$walk = function ( array $comment ) use ( $enrich, &$walk ): array {
+			$comment = $enrich( $comment );
+			if ( ! empty( $comment['replies'] ) ) {
+				$comment['replies'] = array_map( $walk, $comment['replies'] );
+			}
+			return $comment;
+		};
+
+		// Batch-prime the whole thread before enriching so the per-comment reaction
+		// lookups below (count + has_reacted + get_user_emoji) are cache hits, not
+		// ~3 queries per comment on a cold cache (C9.3). Collect every id first,
+		// including nested replies.
+		$bn_comment_ids = array();
+		$bn_author_ids  = array();
+		$collect        = function ( array $comment ) use ( &$collect, &$bn_comment_ids, &$bn_author_ids ): void {
+			$bn_comment_ids[] = (int) $comment['id'];
+			$bn_author_ids[]  = (int) $comment['user_id'];
+			if ( ! empty( $comment['replies'] ) ) {
+				array_map( $collect, $comment['replies'] );
+			}
+		};
+		array_map( $collect, $result['items'] );
+
+		if ( ! empty( $bn_author_ids ) ) {
+			cache_users( array_values( array_unique( array_filter( $bn_author_ids ) ) ) );
+		}
+		if ( $viewer_id > 0 ) {
+			$reactions->get_user_emoji_map( $viewer_id, 'comment', $bn_comment_ids );
+		}
+		$reactions->count_map( 'comment', $bn_comment_ids );
+
+		$result['items'] = array_map( $walk, $result['items'] );
+
+		return new WP_REST_Response( $result, 200 );
+	}
+
+	/**
+	 * Update a comment's content.
+	 *
+	 * @param WP_REST_Request $request Request object.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function update( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+		$gate = $this->comments_enabled_gate();
+		if ( is_wp_error( $gate ) ) {
+			return $gate;
+		}
+
+		$service    = new CommentService();
+		$comment_id = (int) $request->get_param( 'id' );
+		$user_id    = get_current_user_id();
+		$content    = wp_kses_post( (string) ( $request->get_param( 'content' ) ?? '' ) );
+
+		$result = $service->update( $comment_id, $user_id, $content );
+
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		$updated = $service->get( $comment_id );
+		if ( null === $updated ) {
+			return new WP_Error( 'update_failed', __( 'Comment could not be retrieved after update.', 'buddynext' ), array( 'status' => 500 ) );
+		}
+
+		$reactions                    = new ReactionService();
+		$updated['author_name']       = (string) get_the_author_meta( 'display_name', $updated['user_id'] );
+		$updated['author_avatar_url'] = (string) get_avatar_url( $updated['user_id'], array( 'size' => 40 ) );
+		$updated['like_count']        = $reactions->count( 'comment', $comment_id );
+		$updated['viewer_liked']      = $user_id > 0 && $reactions->has_reacted( $user_id, 'comment', $comment_id );
+		$updated['viewer_reaction']   = $user_id > 0 ? $reactions->get_user_emoji( $user_id, 'comment', $comment_id ) : null;
+		$updated['can_edit']          = true;
+		$updated['can_delete']        = true;
+		$updated['can_pin']           = $service->can_pin_comment( $user_id, (string) ( $updated['object_type'] ?? '' ), (int) ( $updated['object_id'] ?? 0 ) );
+		$updated['is_pinned']         = ( (int) get_option(
+			'bn_pinned_comment_' . sanitize_key( (string) $updated['object_type'] ) . '_' . (int) $updated['object_id'],
+			0
+		) === $comment_id );
+		$updated['author_meta_html']  = wp_kses_post(
+			(string) apply_filters(
+				'buddynext_comment_author_meta_html',
+				'',
+				(int) $updated['user_id'],
+				$comment_id
+			)
+		);
+		// Display-ready HTML so an edited mention linkifies immediately (same as
+		// create()/list_comments()), not only after a reload.
+		$updated['content_html'] = buddynext_format_content( (string) $updated['content'] );
+
+		return new WP_REST_Response( $updated, 200 );
+	}
+
+	/**
+	 * Delete a comment.
+	 *
+	 * @param WP_REST_Request $request Request object.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function delete( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+		$service    = new CommentService();
+		$comment_id = (int) $request->get_param( 'id' );
+		$user_id    = get_current_user_id();
+
+		$result = $service->delete( $comment_id, $user_id );
+
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		return new WP_REST_Response( null, 204 );
+	}
+
+	/**
+	 * Pin a comment.
+	 *
+	 * @param WP_REST_Request $request Request object.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function pin( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+		$service    = new CommentService();
+		$comment_id = (int) $request->get_param( 'id' );
+		$user_id    = get_current_user_id();
+
+		// Resolve first so a missing comment is a 404, not a 403 — the service
+		// returns a bare false for both not-found and no-permission. Mirrors unpin().
+		if ( null === $service->get( $comment_id ) ) {
+			return new WP_Error( 'not_found', __( 'Comment not found.', 'buddynext' ), array( 'status' => 404 ) );
+		}
+
+		if ( ! $service->pin( $comment_id, $user_id ) ) {
+			return new WP_Error( 'rest_forbidden', __( 'You cannot pin this comment.', 'buddynext' ), array( 'status' => 403 ) );
+		}
+
+		return new WP_REST_Response( array( 'pinned' => true ), 200 );
+	}
+
+	/**
+	 * Unpin the pinned comment on a comment's parent object.
+	 *
+	 * @param WP_REST_Request $request Request object.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function unpin( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+		$service    = new CommentService();
+		$comment_id = (int) $request->get_param( 'id' );
+		$user_id    = get_current_user_id();
+
+		$comment = $service->get( $comment_id );
+		if ( null === $comment ) {
+			return new WP_Error( 'not_found', __( 'Comment not found.', 'buddynext' ), array( 'status' => 404 ) );
+		}
+
+		$result = $service->unpin( (string) $comment['object_type'], (int) $comment['object_id'], $user_id );
+
+		if ( ! $result ) {
+			return new WP_Error( 'rest_forbidden', __( 'You cannot unpin this comment.', 'buddynext' ), array( 'status' => 403 ) );
+		}
+
+		return new WP_REST_Response( array( 'pinned' => false ), 200 );
+	}
+
+	/**
+	 * Whether the post behind an engagement target is hidden from the current viewer.
+	 *
+	 * Resolves the (object_type, object_id) target to its owning post via
+	 * PostService::resolve_post_id() and applies the single shared visibility gate
+	 * (PostService::visibility_error()). Targets with no gateable post (e.g. a
+	 * comment on a non-post object) are treated as visible — there is no post-privacy
+	 * gate to apply. Degrades to "visible" when the service container is unavailable.
+	 *
+	 * @param string $object_type Engagement object type ('post', 'comment', …).
+	 * @param int    $object_id   Engagement object ID.
+	 * @return bool True when the owning post is not viewable by the current user.
+	 */
+	private function is_post_hidden_from_viewer( string $object_type, int $object_id ): bool {
+		if ( ! function_exists( 'buddynext_service' ) ) {
+			return false;
+		}
+
+		$posts = buddynext_service( 'post_service' );
+		if ( ! $posts instanceof \BuddyNext\Feed\PostService ) {
+			return false;
+		}
+
+		$post_id = $posts->resolve_post_id( $object_type, $object_id );
+		if ( $post_id <= 0 ) {
+			return false;
+		}
+
+		return $posts->visibility_error( $post_id, get_current_user_id() ) instanceof WP_Error;
+	}
+
+	/**
+	 * Block comment writes when the site owner has disabled the Comments feature.
+	 *
+	 * The canonical on/off switch is the FeatureRegistry 'comments' feature
+	 * (Settings → Features, default on). When it is off the frontend hides the
+	 * comment button + composer; this enforces the same gate on the API so writes
+	 * cannot be driven directly. The comment LIST (GET) stays readable. Returns a
+	 * 403 WP_Error when disabled, true otherwise.
+	 *
+	 * @return true|WP_Error
+	 */
+	private function comments_enabled_gate() {
+		$features = function_exists( 'buddynext_service' ) ? buddynext_service( 'features' ) : null;
+
+		if ( is_object( $features ) && method_exists( $features, 'is_enabled' ) && ! $features->is_enabled( 'comments' ) ) {
+			return new WP_Error(
+				'comments_disabled',
+				__( 'Comments are turned off on this community.', 'buddynext' ),
+				array( 'status' => 403 )
+			);
+		}
+
+		return true;
+	}
+
+	/**
+	 * Require the user to be logged in.
+	 *
+	 * @return bool|WP_Error
+	 */
+}

@@ -1,0 +1,204 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "wbcom-essential/faq-accordion",
+  "version": "1.0.0",
+  "title": "FAQ Accordion",
+  "category": "essential-content",
+  "icon": "editor-help",
+  "description": "Collapsible Q&A accordion with JSON-LD FAQPage schema output for SEO.",
+  "keywords": [
+    "faq",
+    "accordion",
+    "questions",
+    "answers",
+    "schema",
+    "collapse",
+    "essential",
+    "wbcom"
+  ],
+  "textdomain": "wbcom-essential",
+  "example": {
+    "attributes": {
+      "faqs": [
+        {
+          "question": "What is this product?",
+          "answer": "A comprehensive solution for your needs."
+        },
+        {
+          "question": "How does pricing work?",
+          "answer": "We offer flexible monthly and annual plans."
+        }
+      ]
+    }
+  },
+  "attributes": {
+    "uniqueId": {
+      "type": "string",
+      "default": ""
+    },
+    "faqs": {
+      "type": "array",
+      "default": [
+        {
+          "question": "What is this product?",
+          "answer": "A comprehensive solution for your needs."
+        },
+        {
+          "question": "How does pricing work?",
+          "answer": "We offer flexible monthly and annual plans."
+        },
+        {
+          "question": "Is there a free trial?",
+          "answer": "Yes, we offer a 14-day free trial with full access."
+        }
+      ]
+    },
+    "allowMultiOpen": {
+      "type": "boolean",
+      "default": false
+    },
+    "iconStyle": {
+      "type": "string",
+      "default": "chevron"
+    },
+    "firstOpen": {
+      "type": "boolean",
+      "default": true
+    },
+    "enableSchema": {
+      "type": "boolean",
+      "default": true
+    },
+    "questionColor": {
+      "type": "string",
+      "default": "#1e1e2e"
+    },
+    "answerColor": {
+      "type": "string",
+      "default": "#6c757d"
+    },
+    "questionBg": {
+      "type": "string",
+      "default": "#f8f9fa"
+    },
+    "borderColor": {
+      "type": "string",
+      "default": "#e9ecef"
+    },
+    "iconColor": {
+      "type": "string",
+      "default": "#667eea"
+    },
+    "padding": {
+      "type": "object",
+      "default": {
+        "top": 24,
+        "right": 24,
+        "bottom": 24,
+        "left": 24
+      }
+    },
+    "paddingTablet": {
+      "type": "object",
+      "default": null
+    },
+    "paddingMobile": {
+      "type": "object",
+      "default": null
+    },
+    "paddingUnit": {
+      "type": "string",
+      "default": "px"
+    },
+    "margin": {
+      "type": "object",
+      "default": {
+        "top": 0,
+        "right": 0,
+        "bottom": 0,
+        "left": 0
+      }
+    },
+    "marginTablet": {
+      "type": "object",
+      "default": null
+    },
+    "marginMobile": {
+      "type": "object",
+      "default": null
+    },
+    "marginUnit": {
+      "type": "string",
+      "default": "px"
+    },
+    "boxShadow": {
+      "type": "boolean",
+      "default": false
+    },
+    "shadowHorizontal": {
+      "type": "number",
+      "default": 0
+    },
+    "shadowVertical": {
+      "type": "number",
+      "default": 4
+    },
+    "shadowBlur": {
+      "type": "number",
+      "default": 8
+    },
+    "shadowSpread": {
+      "type": "number",
+      "default": 0
+    },
+    "shadowColor": {
+      "type": "string",
+      "default": "rgba(0, 0, 0, 0.12)"
+    },
+    "borderRadius": {
+      "type": "object",
+      "default": {
+        "top": 0,
+        "right": 0,
+        "bottom": 0,
+        "left": 0
+      }
+    },
+    "borderRadiusUnit": {
+      "type": "string",
+      "default": "px"
+    },
+    "hideOnDesktop": {
+      "type": "boolean",
+      "default": false
+    },
+    "hideOnTablet": {
+      "type": "boolean",
+      "default": false
+    },
+    "hideOnMobile": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "supports": {
+    "html": false,
+    "align": [
+      "wide",
+      "full"
+    ],
+    "color": {
+      "background": true,
+      "text": true
+    },
+    "spacing": {
+      "margin": true,
+      "padding": true
+    }
+  },
+  "editorScript": "file:./index.js",
+  "editorStyle": "file:./index.css",
+  "style": "file:./style-index.css",
+  "viewScript": "file:./view.js"
+}

@@ -1,0 +1,64 @@
+<?php
+/**
+ * API bootstrap — registers all REST controllers.
+ *
+ * @package Jetonomy
+ */
+
+namespace Jetonomy\API;
+
+defined( 'ABSPATH' ) || exit;
+
+class Api {
+
+	private array $controllers = [];
+
+	public function __construct() {
+		add_action( 'rest_api_init', [ $this, 'register_routes' ] );
+	}
+
+	public function register_routes(): void {
+		$dir = JETONOMY_DIR . 'includes/api/';
+
+		$classes = [
+			'categories'       => 'Categories_Controller',
+			'spaces'           => 'Spaces_Controller',
+			'posts'            => 'Posts_Controller',
+			'replies'          => 'Replies_Controller',
+			'votes'            => 'Votes_Controller',
+			'users'            => 'Users_Controller',
+			'notifications'    => 'Notifications_Controller',
+			'subscriptions'    => 'Subscriptions_Controller',
+			'search'           => 'Search_Controller',
+			'moderation'       => 'Moderation_Controller',
+			'space-moderation' => 'Space_Moderation_Controller',
+			'tags'             => 'Tags_Controller',
+			'updates'          => 'Updates_Controller',
+			'leaderboards'     => 'Leaderboards_Controller',
+			'bookmarks'        => 'Bookmarks_Controller',
+			'blocks'           => 'Blocks_Controller',
+			'oembed'           => 'OEmbed_Controller',
+			'admin'            => 'Admin_Controller',
+			'media'            => 'Media_Controller',
+			'auth'             => 'Auth_Controller',
+			// 1.6.0 mobile-API additions. `app-config` powers pre-login app
+			// theming + feature flags; `feed` is the global cross-space home
+			// feed. Keys are kebab → class-<key>-controller.php.
+			'app-config'       => 'App_Config_Controller',
+			'feed'             => 'Feed_Controller',
+		];
+
+		require_once $dir . 'class-base-controller.php';
+
+		foreach ( $classes as $key => $class ) {
+			$file = $dir . 'class-' . str_replace( '_', '-', strtolower( $key ) ) . '-controller.php';
+			if ( file_exists( $file ) ) {
+				require_once $file;
+				$fqn        = __NAMESPACE__ . '\\' . $class;
+				$controller = new $fqn();
+				$controller->register_routes();
+				$this->controllers[ $key ] = $controller;
+			}
+		}
+	}
+}

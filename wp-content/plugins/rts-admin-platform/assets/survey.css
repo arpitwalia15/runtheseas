@@ -1,0 +1,15 @@
+#rts-survey-app, #rts-unsubscribe-app { max-width: 640px; margin: 0 auto; font-family: -apple-system, sans-serif; }
+.rts-progress { height: 6px; background: #E3E6EA; border-radius: 3px; overflow: hidden; margin-bottom: 24px; }
+.rts-progress-bar { height: 100%; background: linear-gradient(90deg, #E4C77A, #C9A24B); transition: width .3s; }
+.rts-card { background: #fff; border: 1px solid #E3E6EA; border-radius: 10px; padding: 28px 32px; box-shadow: 0 1px 6px rgba(11,20,32,0.06); margin-bottom: 20px; }
+.rts-qcounter { font-size: 12px; color: #6B7686; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px; }
+.rts-qprompt { font-size: 19px; font-weight: 600; color: #0B1420; margin: 0 0 20px; }
+.rts-options { display: flex; flex-direction: column; gap: 10px; margin-bottom: 24px; }
+.rts-option { border: 1.5px solid #C7CDD6; border-radius: 8px; padding: 14px 16px; cursor: pointer; font-size: 15px; }
+.rts-option:hover { border-color: #C9A24B; background: #FBF7EE; }
+.rts-option.selected { border-color: #C9A24B; background: #FBF3DD; font-weight: 600; }
+#rts-survey-app input, #rts-survey-app textarea { width: 100%; border: 1.5px solid #C7CDD6; border-radius: 7px; padding: 11px 13px; font-size: 14px; margin-bottom: 16px; }
+.rts-btn { display: inline-block; border: none; border-radius: 7px; padding: 12px 26px; font-size: 14px; font-weight: 700; cursor: pointer; background: #0B1420; color: #E4C77A; }
+.rts-btn.rts-secondary { background: #fff; color: #0E1A2B; border: 1.5px solid #C7CDD6; }
+.rts-btnrow { display: flex; justify-content: space-between; margin-top: 8px; }
+.rts-sub-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #E3E6EA; }

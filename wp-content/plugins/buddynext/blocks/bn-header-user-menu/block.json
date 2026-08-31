@@ -1,0 +1,43 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "buddynext/header-user-menu",
+	"title": "Header User Menu",
+	"icon": "menu",
+	"category": "buddynext",
+	"description": "Logged-in header section: notification bell, messages icon, and avatar with a profile dropdown + log out. Works as a block-based widget in any theme's header.",
+	"keywords": [
+		"buddynext",
+		"header",
+		"user",
+		"menu",
+		"avatar",
+		"notifications",
+		"messages"
+	],
+	"textdomain": "buddynext",
+	"editorScript": "buddynext-blocks-editor",
+	"style": "bn-header",
+	"supports": {
+		"inserter": false,
+		"html": false,
+		"align": false,
+		"color": {
+			"background": true,
+			"text": true
+		},
+		"typography": {
+			"fontSize": true
+		},
+		"spacing": {
+			"margin": true,
+			"padding": true
+		}
+	},
+	"attributes": {},
+	"example": {},
+	"editorStyle": [
+		"file:../../assets/css/blocks.css",
+		"bn-header"
+	]
+}

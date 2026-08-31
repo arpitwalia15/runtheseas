@@ -1,0 +1,268 @@
+<?php
+/**
+ * BuddyNext template part: member-directory-grid.
+ *
+ * Renders the directory grid wrapper (`.bn-md-grid`) and iterates the
+ * member list, delegating each row to `parts/member-card.php`. Per-member
+ * state — follow / connection / mutual / muted — is resolved here so
+ * `member-card.php` remains a pure render unit reusable by other
+ * surfaces (search results, space members, etc.).
+ *
+ * Used by: templates/directory/members.php.
+ *
+ * @package BuddyNext
+ *
+ * @var array    $members        Required. Array of WP_User objects to render.
+ * @var int      $viewer_id      Optional. Currently-viewing user ID. Default 0.
+ * @var string   $view_mode      Optional. Reserved for future grid/list view modes. Default 'grid'.
+ * @var array    $avatar_tones   Optional. Avatar tone palette cycled by user ID. Default [].
+ * @var array    $type_map       Optional. slug => member_type data map. Default [].
+ * @var string   $messages_base  Optional. Base messages URL. Default ''.
+ * @var callable $initials_fn    Required. Helper that returns initials for a display name.
+ * @var callable $is_online_fn   Required. Helper that returns bool for a user ID.
+ * @var callable $is_following_fn Required. Helper that returns bool for a target user ID.
+ * @var callable $mutual_ids_fn  Required. Helper that returns int[] mutual-connection IDs for (viewer, target). Count + avatar pile are both derived from this single call.
+ * @var array    $classes        Optional. Extra CSS classes appended to `.bn-md-grid`.
+ * @var bool     $compact        Optional. Forwarded to each card: drop the cover band. Default false.
+ * @var bool     $show_actions   Optional. Forwarded to each card: render Follow / Connect. Default true.
+ * @var bool     $show_stats     Optional. Forwarded to each card: render the mutuals line. Default true.
+ *
+ * Fires:
+ *   - do_action( 'buddynext_part_member_directory_grid_before', $args )
+ *   - do_action( 'buddynext_part_member_directory_grid_after',  $args )
+ *
+ * Filters:
+ *   - apply_filters( 'buddynext_part_member_directory_grid_args',    array $args )
+ *   - apply_filters( 'buddynext_part_member_directory_grid_classes', array $classes, array $args )
+ */
+
+declare( strict_types=1 );
+
+defined( 'ABSPATH' ) || exit;
+
+$args = array(
+	'members'         => isset( $members ) ? (array) $members : array(),
+	'viewer_id'       => isset( $viewer_id ) ? (int) $viewer_id : 0,
+	'view_mode'       => isset( $view_mode ) ? (string) $view_mode : 'grid',
+	'avatar_tones'    => isset( $avatar_tones ) ? (array) $avatar_tones : array(),
+	'type_map'        => isset( $type_map ) ? (array) $type_map : array(),
+	'messages_base'   => isset( $messages_base ) ? (string) $messages_base : '',
+	'initials_fn'     => isset( $initials_fn ) && is_callable( $initials_fn ) ? $initials_fn : null,
+	'is_online_fn'    => isset( $is_online_fn ) && is_callable( $is_online_fn ) ? $is_online_fn : null,
+	'is_following_fn' => isset( $is_following_fn ) && is_callable( $is_following_fn ) ? $is_following_fn : null,
+	'mutual_ids_fn'   => isset( $mutual_ids_fn ) && is_callable( $mutual_ids_fn ) ? $mutual_ids_fn : null,
+	'classes'         => isset( $classes ) ? (array) $classes : array(),
+	// Per-card presentation, forwarded verbatim. The grid holds no opinion on
+	// them; it exists here so a caller that renders through the grid (the
+	// featured-member block) can reach the card's knobs without a second copy
+	// of the card markup.
+	'compact'         => ! empty( $compact ),
+	'show_actions'    => ! isset( $show_actions ) || (bool) $show_actions,
+	'show_stats'      => ! isset( $show_stats ) || (bool) $show_stats,
+);
+
+/** Sanitized partial arguments. @var array<string,mixed> $args */
+$args = (array) apply_filters( 'buddynext_part_member_directory_grid_args', $args );
+
+$bn_classes = array_merge( array( 'bn-md-grid' ), array_filter( (array) $args['classes'], 'is_string' ) );
+/** Computed root-class list. @var array<int,string> $bn_classes */
+$bn_classes = (array) apply_filters( 'buddynext_part_member_directory_grid_classes', $bn_classes, $args );
+$bn_class   = trim(
+	implode(
+		' ',
+		array_unique(
+			array_filter(
+				$bn_classes,
+				static function ( $c ) {
+					return is_string( $c ) && '' !== $c;
+				}
+			)
+		)
+	)
+);
+
+// Owner-configurable desktop column count (Settings > General > Member directory).
+// 'auto' keeps the responsive auto-fill; 2/3/4 cap the desktop row via [data-cols].
+$bn_md_cols = (string) get_option( 'buddynext_member_dir_columns', '3' );
+$bn_md_cols = in_array( $bn_md_cols, array( '2', '3', '4' ), true ) ? $bn_md_cols : 'auto';
+
+$bn_members       = (array) $args['members'];
+$bn_viewer_id     = (int) $args['viewer_id'];
+$bn_messages_base = '' !== (string) $args['messages_base'] ? (string) $args['messages_base'] : \BuddyNext\Core\PageRouter::messages_url();
+
+// Batch-prime every per-member relationship signal in a handful of queries up
+// front, instead of the N+1 a per-card service lookup per member would fire.
+// These maps are keyed by member ID and read inside the loop below; the default
+// callables further down close over them, and caller-supplied callables still
+// override. statuses_for() also encodes pending direction and primes the
+// per-pair cache, so connection_state needs no per-row pending_sent() lookup.
+// That lookup was previously capped at 20 and mislabelled sent/received past it.
+$bn_member_ids = array();
+foreach ( $bn_members as $bn_m ) {
+	if ( isset( $bn_m->ID ) ) {
+		$bn_member_ids[] = (int) $bn_m->ID;
+	}
+}
+$bn_member_ids = array_values( array_unique( array_filter( $bn_member_ids ) ) );
+
+// Prime the usermeta cache once for the whole page so each card's public @handle
+// lookup (PageRouter::member_handle -> bn_profile_slug) is a cache hit, not a
+// query per card (no N+1 across the grid).
+if ( ! empty( $bn_member_ids ) ) {
+	update_meta_cache( 'user', $bn_member_ids );
+}
+
+$bn_status_map    = array();
+$bn_following_map = array();
+$bn_mutual_map    = array();
+$bn_muted_set     = array();
+if ( $bn_viewer_id > 0 && ! empty( $bn_member_ids ) && function_exists( 'buddynext_service' ) ) {
+	$bn_conn_service = buddynext_service( 'connections' );
+	$bn_status_map   = $bn_conn_service->statuses_for( $bn_viewer_id, $bn_member_ids );
+	// Only when the caller has NOT supplied its own mutual map. The directory passes
+	// mutual_ids_fn (see :135, which prefers it), so this ran a full derived-table join over
+	// the viewer's entire peer set on every directory page view and threw the result away.
+	if ( ! is_callable( $args['mutual_ids_fn'] ?? null ) ) {
+		$bn_mutual_map = $bn_conn_service->mutual_ids_for( $bn_viewer_id, $bn_member_ids );
+	}
+	$bn_following_map  = buddynext_service( 'follows' )->following_map( $bn_viewer_id, $bn_member_ids );
+	$bn_blocks_service = buddynext_service( 'blocks' );
+	$bn_blocks_service->prime_restricted_cache( $bn_viewer_id, $bn_member_ids );
+	$bn_muted_set = array_fill_keys( $bn_blocks_service->muted_users( $bn_viewer_id ), true );
+}
+
+// Per-member state is read straight from the relevant services here, so a
+// caller only needs to pass `members` (+ optionally `viewer_id`). Callers that
+// already have cached lookups (the directory) may still pass their own
+// callables/maps to override. Centralising the wiring keeps every call site
+// small and consistent.
+$bn_tones = ! empty( $args['avatar_tones'] )
+	? (array) $args['avatar_tones']
+	: array( 'accent', 'success', 'jetonomy', 'media', 'events', 'warn', 'danger', 'info' );
+
+$bn_type_map = (array) $args['type_map'];
+if ( empty( $bn_type_map ) && function_exists( 'buddynext_service' ) ) {
+	foreach ( (array) buddynext_service( 'member_types' )->get_all_with_counts() as $bn_mt ) {
+		if ( isset( $bn_mt['slug'] ) ) {
+			$bn_type_map[ (string) $bn_mt['slug'] ] = $bn_mt;
+		}
+	}
+}
+
+$bn_initials_fn     = is_callable( $args['initials_fn'] )
+	? $args['initials_fn']
+	: static fn( string $name ): string => \BuddyNext\Profile\AvatarService::initials_for( $name );
+$bn_is_online_fn    = is_callable( $args['is_online_fn'] ) ? $args['is_online_fn'] : static fn( int $uid ): bool => (bool) buddynext_service( 'blocks' )->is_user_online( $bn_viewer_id, $uid );
+$bn_is_following_fn = is_callable( $args['is_following_fn'] ) ? $args['is_following_fn'] : static fn( int $uid ): bool => ! empty( $bn_following_map[ $uid ] );
+$bn_mutual_fn       = is_callable( $args['mutual_ids_fn'] ) ? $args['mutual_ids_fn'] : static function ( int $a, int $b ) use ( $bn_mutual_map ): array {
+	return (array) ( $bn_mutual_map[ $b ] ?? array() );
+};
+
+do_action( 'buddynext_part_member_directory_grid_before', $args );
+?>
+<div
+	class="<?php echo esc_attr( $bn_class ); ?>"
+	role="list"
+	<?php echo 'auto' !== $bn_md_cols ? 'data-cols="' . esc_attr( $bn_md_cols ) . '"' : ''; ?>
+	data-wp-bind--hidden="state.gridHidden"
+	data-wp-on--click="actions.onGridClick"
+	<?php echo empty( $bn_members ) ? 'hidden' : ''; ?>
+>
+	<?php foreach ( $bn_members as $bn_member_obj ) : ?>
+		<?php
+		$bn_member_id    = (int) $bn_member_obj->ID;
+		$bn_display_name = (string) $bn_member_obj->display_name;
+		$bn_bio          = (string) get_user_meta( $bn_member_id, 'bn_field_bio', true );
+		if ( '' === $bn_bio ) {
+			$bn_bio = (string) get_user_meta( $bn_member_id, 'description', true );
+		}
+		$bn_profile_url  = \BuddyNext\Core\PageRouter::profile_url( $bn_member_id );
+		$bn_cover_url    = buddynext_user_cover_url( $bn_member_id );
+		$bn_avatar_url   = (string) get_avatar_url( $bn_member_id, array( 'size' => 96 ) );
+		$bn_is_online    = (bool) $bn_is_online_fn( $bn_member_id );
+		$bn_is_following = (bool) $bn_is_following_fn( $bn_member_id );
+		// Single mutual-connections lookup feeds both the count and the
+		// avatar pile — no double query per card.
+		$bn_mutual_ids     = array_values( array_filter( array_map( 'intval', (array) $bn_mutual_fn( $bn_viewer_id, $bn_member_id ) ) ) );
+		$bn_mutual         = count( $bn_mutual_ids );
+		$bn_mutual_avatars = array();
+		foreach ( array_slice( $bn_mutual_ids, 0, 3 ) as $bn_mu_id ) {
+			$bn_mu_user = get_userdata( $bn_mu_id );
+			if ( ! $bn_mu_user ) {
+				continue;
+			}
+			$bn_mutual_avatars[] = array(
+				'name'       => (string) $bn_mu_user->display_name,
+				'avatar_url' => (string) get_avatar_url( $bn_mu_id, array( 'size' => 40 ) ),
+			);
+		}
+		// Direction-aware status from the primed map: 'accepted', 'pending-sent',
+		// 'pending-received', another raw status, or null. Degree mirrors
+		// connection_degree(): connected => 1, share a mutual => 2, else 3.
+		$bn_status     = $bn_status_map[ $bn_member_id ] ?? null;
+		$bn_degree     = ( $bn_viewer_id > 0 && $bn_viewer_id !== $bn_member_id )
+			? ( 'accepted' === $bn_status ? 1 : ( ! empty( $bn_mutual_ids ) ? 2 : 3 ) )
+			: 0;
+		$bn_type_slug  = (string) get_user_meta( $bn_member_id, 'bn_member_type', true );
+		$bn_type_data  = '' !== $bn_type_slug ? ( $bn_type_map[ $bn_type_slug ] ?? null ) : null;
+		$bn_type_label = ( is_array( $bn_type_data ) && isset( $bn_type_data['name'] ) ) ? (string) $bn_type_data['name'] : '';
+		$bn_type_icon  = ( is_array( $bn_type_data ) && isset( $bn_type_data['icon_svg'] ) ) ? (string) $bn_type_data['icon_svg'] : '';
+		// Open (or start) a native DM with this member — /messages/?to={id}
+		// find-or-creates the conversation and opens it.
+		$bn_messages_url = add_query_arg( 'to', $bn_member_id, $bn_messages_base );
+		// Reduce the direction-encoded status to the raw value the card expects
+		// ('accepted' | 'pending' | other | null).
+		$bn_conn_status = null;
+		if ( null !== $bn_status ) {
+			$bn_conn_status = ( 0 === strpos( $bn_status, 'pending' ) ) ? 'pending' : $bn_status;
+		}
+		$bn_tone_count    = max( 1, count( $bn_tones ) );
+		$bn_avatar_tone   = ! empty( $bn_tones ) ? (string) $bn_tones[ $bn_member_id % $bn_tone_count ] : 'accent';
+		$bn_presence_attr = $bn_is_online ? 'online' : 'offline';
+		$bn_initials_text = (string) $bn_initials_fn( $bn_display_name );
+
+		// 5-state Connect button — the primed map already carries the pending
+		// direction, so no per-row pending_sent() lookup is needed.
+		$bn_conn_state = 'none';
+		if ( 'accepted' === $bn_status ) {
+			$bn_conn_state = 'accepted';
+		} elseif ( 'pending-sent' === $bn_status ) {
+			$bn_conn_state = 'pending-sent';
+		} elseif ( 'pending-received' === $bn_status ) {
+			$bn_conn_state = 'pending-received';
+		}
+
+		$bn_is_muted = isset( $bn_muted_set[ $bn_member_id ] );
+
+		buddynext_get_template(
+			'parts/member-card.php',
+			array(
+				'member'            => $bn_member_obj,
+				'viewer_id'         => $bn_viewer_id,
+				'is_following'      => $bn_is_following,
+				'connection_state'  => $bn_conn_state,
+				'connection_status' => null === $bn_conn_status ? 'none' : (string) $bn_conn_status,
+				'is_muted'          => $bn_is_muted,
+				'mutual_count'      => $bn_mutual,
+				'mutual_avatars'    => $bn_mutual_avatars,
+				'degree'            => $bn_degree,
+				'presence'          => $bn_presence_attr,
+				'member_type_label' => $bn_type_label,
+				'member_type_icon'  => $bn_type_icon,
+				'avatar_tone'       => $bn_avatar_tone,
+				'bio'               => $bn_bio,
+				'profile_url'       => $bn_profile_url,
+				'cover_url'         => $bn_cover_url,
+				'avatar_url'        => $bn_avatar_url,
+				'initials'          => $bn_initials_text,
+				'messages_url'      => $bn_messages_url,
+				'compact'           => (bool) $args['compact'],
+				'show_actions'      => (bool) $args['show_actions'],
+				'show_stats'        => (bool) $args['show_stats'],
+			)
+		);
+		?>
+	<?php endforeach; ?>
+</div>
+<?php
+do_action( 'buddynext_part_member_directory_grid_after', $args );

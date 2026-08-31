@@ -1,0 +1,33 @@
+/*--------------------------------------------------------------
+# Member Carousel — Widget-Specific Styles
+# Swiper base CSS is in swiper-base.css (registered as wbe-swiper)
+--------------------------------------------------------------*/
+.elementor-member-carousel .swiper-slide {
+    text-align: center;
+}
+
+.elementor-member-carousel .item-container {
+    padding-bottom: 30px;
+}
+
+.elementor-member-carousel .item-title {
+    margin-top: 15px;
+    margin-bottom: 5px;
+}
+
+.elementor-member-carousel .last-activity {
+    display: block;
+    font-size: 13px;
+}
+
+.elementor-member-carousel .member-avatar img {
+    margin: auto;
+    width: 100%;
+    max-width: 150px;
+    border-radius: 100%;
+}
+
+.swiper-container:not(.swiper-container-initialized)>.swiper-wrapper.elementor-member-carousel,
+.swiper:not(.swiper-initialized)>.swiper-wrapper.elementor-member-carousel {
+    overflow: visible;
+}

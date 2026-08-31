@@ -1,0 +1,128 @@
+/* Cache-independent frame and typography layer for the luxury survey. */
+.rts-luxury-survey__sidebar {
+	border: 1px solid rgba(216, 154, 37, .72);
+	box-shadow: inset 0 0 0 4px rgba(1, 12, 22, .82), inset 0 0 0 5px rgba(216, 154, 37, .22);
+}
+
+.rts-luxury-survey__section-hero {
+	border: 1px solid rgba(216, 154, 37, .78);
+	box-shadow: inset 0 0 0 4px rgba(1, 12, 22, .72), inset 0 0 0 5px rgba(216, 154, 37, .2), inset 0 -30px 55px rgba(0, 0, 0, .34);
+}
+
+.rts-luxury-survey__form {
+	position: relative;
+	border: 1px solid rgba(216, 154, 37, .62);
+	box-shadow: inset 0 0 0 4px rgba(1, 11, 20, .75), inset 0 0 0 5px rgba(216, 154, 37, .16);
+}
+
+.rts-luxury-survey__form .frm-fluent-form {
+	font-family: "Palatino Linotype", Palatino, Georgia, serif;
+}
+
+.rts-luxury-survey__form .fluentform-step .rts-luxury-survey__numbered-question {
+	position: relative;
+	isolation: isolate;
+	min-height: 96px;
+	padding: 22px 24px 22px 74px !important;
+	border: 0 !important;
+	margin-bottom: 18px !important;
+	background: linear-gradient(115deg, #8c5a0d, #f0bd4f 45%, #80500a) !important;
+	box-shadow: 0 7px 18px rgba(0, 0, 0, .28);
+	clip-path: polygon(10px 0, calc(100% - 10px) 0, 100% 10px, 100% calc(100% - 10px), calc(100% - 10px) 100%, 10px 100%, 0 calc(100% - 10px), 0 10px) !important;
+}
+
+.rts-luxury-survey__form .fluentform-step .rts-luxury-survey__numbered-question::before {
+	position: absolute;
+	inset: 1px;
+	z-index: 0;
+	background-color: #021522;
+	background-image: linear-gradient(120deg, rgba(2, 18, 31, .9), rgba(3, 28, 43, .78)), var(--rts-survey-question-background, linear-gradient(135deg, #041d30, #02101d));
+	background-position: center;
+	background-size: cover;
+	clip-path: polygon(9px 0, calc(100% - 9px) 0, 100% 9px, 100% calc(100% - 9px), calc(100% - 9px) 100%, 9px 100%, 0 calc(100% - 9px), 0 9px);
+	content: "";
+}
+
+.rts-luxury-survey__form .fluentform-step .rts-luxury-survey__numbered-question::after {
+	position: absolute;
+	inset: 7px;
+	z-index: 0;
+	border-top: 1px solid rgba(216, 154, 37, .16);
+	border-bottom: 1px solid rgba(216, 154, 37, .16);
+	content: "";
+	pointer-events: none;
+}
+
+.rts-luxury-survey__numbered-question > .ff-el-input--label,
+.rts-luxury-survey__numbered-question > .ff-el-input--content {
+	position: relative;
+	z-index: 1;
+}
+
+.rts-luxury-survey__question-number {
+	top: 17px !important;
+	left: 14px !important;
+	z-index: 2;
+	display: flex !important;
+	width: 46px !important;
+	height: 46px !important;
+	border: 1px solid var(--rts-survey-gold) !important;
+	border-radius: 50% !important;
+	background: #031827 !important;
+	color: #fff0bd !important;
+	font-family: Arial, Helvetica, sans-serif !important;
+	font-size: 1rem !important;
+	font-weight: 600 !important;
+	line-height: 1 !important;
+	align-items: center !important;
+	justify-content: center !important;
+	opacity: 1 !important;
+	text-indent: 0 !important;
+	visibility: visible !important;
+}
+
+.rts-luxury-survey__question-number-text {
+	display: flex !important;
+	width: 100% !important;
+	height: 100% !important;
+	padding: 0 !important;
+	margin: 0 !important;
+	color: #fff0bd !important;
+	font-family: Arial, Helvetica, sans-serif !important;
+	font-size: inherit !important;
+	font-weight: 600 !important;
+	line-height: 1 !important;
+	align-items: center !important;
+	justify-content: center !important;
+	opacity: 1 !important;
+	transform: translateY(-1px);
+	text-indent: 0 !important;
+	visibility: visible !important;
+}
+
+.rts-luxury-survey__numbered-question.has-long-question-code .rts-luxury-survey__question-number {
+	font-size: .72rem !important;
+}
+
+.rts-luxury-survey__form .ff-el-input--label label {
+	font-family: "Palatino Linotype", Palatino, Georgia, serif !important;
+	font-size: clamp(.98rem, 1.25vw, 1.12rem) !important;
+	font-weight: 400 !important;
+	line-height: 1.42 !important;
+}
+
+.rts-luxury-survey__form .ff-el-form-check-label {
+	font-family: "Palatino Linotype", Palatino, Georgia, serif !important;
+	font-size: .98rem !important;
+}
+
+@media (max-width: 520px) {
+	.rts-luxury-survey__form .fluentform-step .rts-luxury-survey__numbered-question {
+		padding: 70px 15px 18px !important;
+	}
+
+	.rts-luxury-survey__question-number {
+		top: 15px !important;
+		left: 15px !important;
+	}
+}

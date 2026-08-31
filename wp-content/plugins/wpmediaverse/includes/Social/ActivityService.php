@@ -1,0 +1,282 @@
+<?php
+/**
+ * Activity service.
+ *
+ * Native activity feed — works standalone, uses BuddyPress activity when available.
+ *
+ * @package    WPMediaVerse
+ * @subpackage Social
+ * @since      1.1.0
+ */
+
+namespace WPMediaVerse\Social;
+
+defined( 'ABSPATH' ) || exit;
+
+
+/**
+ * Records and queries activity feed items.
+ */
+class ActivityService {
+
+	/**
+	 * Activity types.
+	 *
+	 * @var string[]
+	 */
+	const TYPES = array(
+		'media_upload',
+		'media_reaction',
+		'media_comment',
+		'user_follow',
+	);
+
+	/**
+	 * Register hooks to auto-record activities.
+	 *
+	 * @since 1.1.0
+	 */
+	public function init(): void {
+		add_action( 'mvs_media_uploaded', array( $this, 'on_upload' ), 10, 2 );
+		add_action( 'mvs_reaction_added', array( $this, 'on_reaction' ), 10, 3 );
+		add_action( 'mvs_comment_created', array( $this, 'on_comment' ), 10, 3 );
+		add_action( 'mvs_user_followed', array( $this, 'on_follow' ), 10, 2 );
+	}
+
+	/**
+	 * Record an activity.
+	 *
+	 * @since 1.1.0
+	 *
+	 * @param int    $user_id  User who performed the action.
+	 * @param string $type     Activity type.
+	 * @param int    $media_id Related media ID (0 if none).
+	 * @param int    $album_id Related album ID (0 if none).
+	 * @param string $content  Optional text content.
+	 * @return int|false Activity ID or false.
+	 */
+	public function record( int $user_id, string $type, int $media_id = 0, int $album_id = 0, string $content = '' ) {
+		$allowed_types = apply_filters( 'mvs_activity_types', self::TYPES );
+		if ( ! in_array( $type, $allowed_types, true ) ) {
+			return false;
+		}
+
+		global $wpdb;
+
+		$wpdb->insert( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			$wpdb->prefix . 'mvs_activity',
+			array(
+				'user_id'    => $user_id,
+				'type'       => $type,
+				'media_id'   => $media_id,
+				'album_id'   => $album_id,
+				'content'    => sanitize_text_field( $content ),
+				'created_at' => current_time( 'mysql', true ),
+			),
+			array( '%d', '%s', '%d', '%d', '%s', '%s' )
+		);
+
+		return $wpdb->insert_id ? $wpdb->insert_id : false;
+	}
+
+	/**
+	 * Get activity feed.
+	 *
+	 * @since 1.1.0
+	 *
+	 * @param array $args {
+	 *     Query arguments.
+	 *     @type string $scope    'public' (all), 'following' (followed users), 'user' (single user).
+	 *     @type int    $user_id  For 'user' scope or 'following' scope base.
+	 *     @type int    $per_page Results per page.
+	 *     @type int    $page     Page number.
+	 * }
+	 * @return array { activities: array, total: int }
+	 */
+	public function get_feed( array $args = array() ): array {
+		global $wpdb;
+
+		$scope    = isset( $args['scope'] ) ? $args['scope'] : 'public';
+		$user_id  = isset( $args['user_id'] ) ? (int) $args['user_id'] : 0;
+		$per_page = isset( $args['per_page'] ) ? (int) $args['per_page'] : 20;
+		$page     = isset( $args['page'] ) ? (int) $args['page'] : 1;
+		$offset   = ( $page - 1 ) * $per_page;
+
+		$where  = '1=1';
+		$params = array();
+
+		if ( 'user' === $scope && $user_id ) {
+			$where   .= ' AND a.user_id = %d';
+			$params[] = $user_id;
+		} elseif ( 'following' === $scope && $user_id ) {
+			$follows = \WPMediaVerse\Core\Plugin::container()->get( 'follows' );
+			$ids     = $follows->get_following_ids( $user_id );
+
+			if ( empty( $ids ) ) {
+				return array(
+					'activities' => array(),
+					'total'      => 0,
+				);
+			}
+
+			$placeholders = implode( ',', array_fill( 0, count( $ids ), '%d' ) );
+			$where       .= " AND a.user_id IN ({$placeholders})"; // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$params       = array_merge( $params, $ids );
+		}
+
+		// Exclude blocked users if viewer is logged in.
+		$viewer_id = get_current_user_id();
+		if ( $viewer_id ) {
+			$reports = \WPMediaVerse\Core\Plugin::container()->get( 'reports' );
+			$blocked = $reports->get_blocked_ids( $viewer_id );
+			if ( ! empty( $blocked ) ) {
+				$block_placeholders = implode( ',', array_fill( 0, count( $blocked ), '%d' ) );
+				$where             .= " AND a.user_id NOT IN ({$block_placeholders})"; // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				$params             = array_merge( $params, $blocked );
+			}
+		}
+
+		// Privacy gate: a media-referencing activity must not surface a private
+		// or members-only item (title, thumbnail, permalink) to a viewer who
+		// can't see that media (audit 2026-06-04). Non-media activities
+		// (media_id = 0, e.g. follows) always pass. LEFT JOIN so a since-deleted
+		// media's orphan activity is hidden rather than erroring.
+		$index_table                                    = $wpdb->prefix . 'mvs_media_index';
+		list( $mvs_act_priv_sql, $mvs_act_priv_params ) = \WPMediaVerse\Core\Plugin::container()
+			->get( 'media_repository' )->explore_privacy_clause( 'mi', $viewer_id );
+		$privacy_join                                   = " LEFT JOIN {$index_table} mi ON mi.media_id = a.media_id";
+		$privacy_where                                  = " AND ( a.media_id = 0 OR a.media_id IS NULL OR {$mvs_act_priv_sql} )";
+
+		// On an unfiltered anonymous feed (scope 'all', no blocks, param-less
+		// privacy clause) the COUNT has zero placeholders — wpdb::prepare()
+		// raises a doing-it-wrong notice for placeholder-less queries, so only
+		// prepare when there is something to bind. Every fragment interpolated
+		// here is placeholder-built or table-prefix derived, never user input.
+		$count_params = array_merge( $params, $mvs_act_priv_params );
+		$count_sql    = "SELECT COUNT(*) FROM {$wpdb->prefix}mvs_activity a{$privacy_join} WHERE {$where}{$privacy_where}";
+		$total        = (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared
+			$count_params ? $wpdb->prepare( $count_sql, ...$count_params ) : $count_sql // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		);
+
+		$params   = array_merge( $params, $mvs_act_priv_params );
+		$params[] = $per_page;
+		$params[] = $offset;
+
+		$rows = $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			$wpdb->prepare(
+				"SELECT a.* FROM {$wpdb->prefix}mvs_activity a{$privacy_join} WHERE {$where}{$privacy_where} ORDER BY a.created_at DESC LIMIT %d OFFSET %d", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				...$params
+			)
+		);
+
+		$activities = array();
+		foreach ( $rows as $row ) {
+			$activities[] = $this->format_activity( $row );
+		}
+
+		return array(
+			'activities' => $activities,
+			'total'      => $total,
+		);
+	}
+
+	/**
+	 * Handle upload activity.
+	 *
+	 * @param int   $media_id Media ID.
+	 * @param array $file_data File data.
+	 */
+	public function on_upload( int $media_id, array $file_data ): void {
+		// Private and conversation-scoped ('dm') media never generate an activity
+		// record. 'dm' attachments are DM uploads and must stay entirely out of
+		// the activity stream / wall. Resolve the privacy from the upload args,
+		// falling back to the stored value so the gate holds even when callers
+		// omit it from $file_data.
+		$privacy = isset( $file_data['privacy'] )
+			? (string) $file_data['privacy']
+			: (string) \WPMediaVerse\Core\Plugin::container()->get( 'media_repository' )->get( $media_id, 'privacy' );
+		if ( in_array( $privacy, array( 'private', 'dm' ), true ) ) {
+			return;
+		}
+
+		$author = \WPMediaVerse\Core\Plugin::container()->get( 'media_repository' )->get_author( $media_id );
+		if ( $author ) {
+			$this->record( $author, 'media_upload', $media_id );
+		}
+	}
+
+	/**
+	 * Handle reaction activity.
+	 *
+	 * @param int    $media_id Media ID.
+	 * @param int    $user_id  Reactor.
+	 * @param string $type     Reaction type.
+	 */
+	public function on_reaction( int $media_id, int $user_id, string $type ): void {
+		$this->record( $user_id, 'media_reaction', $media_id, 0, $type );
+	}
+
+	/**
+	 * Handle comment activity.
+	 *
+	 * @param int $media_id   Media ID.
+	 * @param int $user_id    Commenter.
+	 * @param int $comment_id Comment ID.
+	 */
+	public function on_comment( int $media_id, int $user_id, int $comment_id ): void {
+		$this->record( $user_id, 'media_comment', $media_id );
+	}
+
+	/**
+	 * Handle follow activity.
+	 *
+	 * @param int $follower_id Follower.
+	 * @param int $following_id Followed.
+	 */
+	public function on_follow( int $follower_id, int $following_id ): void {
+		$this->record( $follower_id, 'user_follow', 0, 0, (string) $following_id );
+	}
+
+	/**
+	 * Format an activity row for REST output.
+	 *
+	 * @param object $row Database row.
+	 * @return array
+	 */
+	private function format_activity( object $row ): array {
+		$user = get_userdata( (int) $row->user_id );
+
+		$activity = array(
+			'id'         => (int) $row->id,
+			'type'       => $row->type,
+			'user'       => array(
+				'id'          => (int) $row->user_id,
+				'name'        => $user ? $user->display_name : '',
+				'avatar'      => get_avatar_url( (int) $row->user_id, array( 'size' => 48 ) ),
+				'profile_url' => \WPMediaVerse\Core\Plugin::container()->get( 'template_helpers' )->get_user_profile_url( (int) $row->user_id ),
+			),
+			'media_id'   => (int) $row->media_id,
+			'album_id'   => (int) $row->album_id,
+			'content'    => $row->content,
+			'created_at' => $row->created_at,
+		);
+
+		// Attach media summary if present.
+		if ( $row->media_id ) {
+			$media_row = \WPMediaVerse\Core\Plugin::container()->get( 'media_repository' )->get_all( (int) $row->media_id );
+			if ( ! empty( $media_row ) && ! empty( $media_row['media_id'] ) ) {
+				$mid       = (int) $media_row['media_id'];
+				$thumb_url = \WPMediaVerse\Core\Plugin::container()->get( 'template_helpers' )->get_thumb_url( $mid, 'thumbnail' );
+
+				$activity['media'] = array(
+					'title'     => $media_row['title'] ?? '',
+					'type'      => $media_row['media_type'] ?? '',
+					'thumbnail' => $thumb_url,
+					'link'      => \WPMediaVerse\Core\Plugin::container()->get( 'media_repository' )->get_permalink( $mid ),
+				);
+			}
+		}
+
+		return $activity;
+	}
+}

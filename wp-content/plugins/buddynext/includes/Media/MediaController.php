@@ -1,0 +1,1158 @@
+<?php // phpcs:disable WordPress.Files.FileName.NotHyphenatedLowercase,WordPress.Files.FileName.InvalidClassFileName -- PSR-4 naming used throughout this plugin.
+/**
+ * Member-facing media REST controller (buddynext/v1).
+ *
+ * Powers the BuddyNext-native upload + gallery experience on a member's own
+ * profile Media tab. Members upload to their OWN profile only; the engine's own
+ * upload REST is NOT used (it requires the upload_mvs_media capability that most
+ * members lack). Instead this controller consumes the WPMediaVerse engine purely
+ * through the BuddyNext\Media\MediaClient seam, server-side, and BuddyNext's own
+ * ownership gate (logged-in + acting on own media) is the authority.
+ *
+ *   POST   /me/media               — upload one file to own profile (auth)
+ *   GET    /users/{id}/media       — paginated gallery HTML for a profile (auth)
+ *   DELETE /me/media/{media_id}    — trash own media (auth + owner)
+ *
+ * @package BuddyNext\Media
+ */
+
+declare( strict_types=1 );
+
+namespace BuddyNext\Media;
+
+use BuddyNext\REST\BaseRestController;
+use WP_Error;
+use WP_REST_Request;
+use WP_REST_Response;
+
+/**
+ * REST endpoints for member media upload + gallery on the profile Media tab.
+ */
+class MediaController extends BaseRestController {
+
+	/**
+	 * Map the feed/post privacy vocabulary the composer offers
+	 * (public/followers/connections/private) to the engine's media-file privacy.
+	 * A batch upload becomes a feed post, so the member picks the POST audience;
+	 * the media file's engine privacy is derived to roughly match. The engine
+	 * has no followers/connections concept, so both collapse to logged-in
+	 * 'members' — the post's own privacy is what gates the feed surface.
+	 *
+	 * @var array<string,string>
+	 */
+	private const PRIVACY_MAP = array(
+		'public'      => 'public',
+		'followers'   => 'members',
+		'connections' => 'members',
+		'private'     => 'private',
+	);
+
+	/**
+	 * Register routes under buddynext/v1.
+	 */
+	public function register_routes(): void {
+		register_rest_route(
+			'buddynext/v1',
+			'/me/media',
+			array(
+				array(
+					'methods'             => 'POST',
+					'callback'            => array( $this, 'upload_own_media' ),
+					'permission_callback' => array( $this, 'require_auth' ),
+				),
+			)
+		);
+
+		register_rest_route(
+			'buddynext/v1',
+			'/users/(?P<id>[\d]+)/media',
+			array(
+				array(
+					'methods'             => 'GET',
+					'callback'            => array( $this, 'list_user_media' ),
+					'permission_callback' => array( $this, 'require_auth' ),
+					'args'                => array(
+						'id'       => array(
+							'sanitize_callback' => 'absint',
+						),
+						'page'     => array(
+							'sanitize_callback' => 'absint',
+							'default'           => 1,
+						),
+						'per_page' => array(
+							'sanitize_callback' => 'absint',
+							'default'           => 24,
+						),
+					),
+				),
+			)
+		);
+
+		register_rest_route(
+			'buddynext/v1',
+			'/me/media/(?P<media_id>[\d]+)',
+			array(
+				array(
+					'methods'             => 'DELETE',
+					'callback'            => array( $this, 'delete_own_media' ),
+					'permission_callback' => array( $this, 'require_auth' ),
+					'args'                => array(
+						'media_id' => array(
+							'sanitize_callback' => 'absint',
+						),
+					),
+				),
+			)
+		);
+
+		register_rest_route(
+			'buddynext/v1',
+			'/me/media/(?P<media_id>[\d]+)/usage',
+			array(
+				array(
+					'methods'             => 'GET',
+					'callback'            => array( $this, 'media_usage' ),
+					'permission_callback' => array( $this, 'require_auth' ),
+					'args'                => array(
+						'media_id' => array( 'sanitize_callback' => 'absint' ),
+					),
+				),
+			)
+		);
+
+		// ── Albums ────────────────────────────────────────────────────────────
+		register_rest_route(
+			'buddynext/v1',
+			'/users/(?P<id>[\d]+)/albums',
+			array(
+				array(
+					'methods'             => 'GET',
+					'callback'            => array( $this, 'list_user_albums' ),
+					'permission_callback' => array( $this, 'require_auth' ),
+					'args'                => array(
+						'id'       => array( 'sanitize_callback' => 'absint' ),
+						'page'     => array(
+							'sanitize_callback' => 'absint',
+							'default'           => 1,
+						),
+						'per_page' => array(
+							'sanitize_callback' => 'absint',
+							'default'           => 24,
+						),
+					),
+				),
+			)
+		);
+
+		// Space albums. Mirrors the two member-level routes above rather than
+		// introducing a parallel album model: same summaries, same item/reorder/
+		// delete routes afterwards, only the listing and creation differ because
+		// the owner is a space rather than a person.
+		register_rest_route(
+			'buddynext/v1',
+			'/spaces/(?P<id>[\d]+)/albums',
+			array(
+				array(
+					'methods'             => 'GET',
+					'callback'            => array( $this, 'list_space_albums' ),
+					// Anonymous-readable, gated in the handler - the same shape as
+					// the sibling /spaces/{id}/media route. require_auth here meant
+					// a logged-out visitor got 401 on a FULLY OPEN space while that
+					// route served them its photos: the Albums toggle rendered and
+					// its data call always failed, so an open space's albums read
+					// as "none yet" to every guest. Same space, two audiences,
+					// which is exactly what "the space decides" rules out.
+					'permission_callback' => '__return_true',
+					'args'                => array(
+						'id'       => array( 'sanitize_callback' => 'absint' ),
+						'page'     => array(
+							'sanitize_callback' => 'absint',
+							'default'           => 1,
+						),
+						'per_page' => array(
+							'sanitize_callback' => 'absint',
+							'default'           => 24,
+						),
+					),
+				),
+				array(
+					'methods'             => 'POST',
+					'callback'            => array( $this, 'create_space_album' ),
+					'permission_callback' => array( $this, 'require_auth' ),
+					'args'                => array(
+						'id' => array( 'sanitize_callback' => 'absint' ),
+					),
+				),
+			)
+		);
+
+		register_rest_route(
+			'buddynext/v1',
+			'/me/albums',
+			array(
+				array(
+					'methods'             => 'POST',
+					'callback'            => array( $this, 'create_album' ),
+					'permission_callback' => array( $this, 'require_auth' ),
+				),
+			)
+		);
+
+		register_rest_route(
+			'buddynext/v1',
+			'/albums/(?P<id>[\d]+)',
+			array(
+				array(
+					'methods'             => 'GET',
+					'callback'            => array( $this, 'get_album' ),
+					'permission_callback' => array( $this, 'require_auth' ),
+					'args'                => array(
+						'id'       => array( 'sanitize_callback' => 'absint' ),
+						'page'     => array(
+							'sanitize_callback' => 'absint',
+							'default'           => 1,
+						),
+						'per_page' => array(
+							'sanitize_callback' => 'absint',
+							'default'           => 24,
+						),
+					),
+				),
+			)
+		);
+
+		register_rest_route(
+			'buddynext/v1',
+			'/me/albums/(?P<id>[\d]+)/items',
+			array(
+				array(
+					'methods'             => 'POST',
+					'callback'            => array( $this, 'add_album_items' ),
+					'permission_callback' => array( $this, 'require_auth' ),
+					'args'                => array(
+						'id' => array( 'sanitize_callback' => 'absint' ),
+					),
+				),
+			)
+		);
+
+		register_rest_route(
+			'buddynext/v1',
+			'/me/albums/(?P<id>[\d]+)/items/(?P<media_id>[\d]+)',
+			array(
+				array(
+					'methods'             => 'DELETE',
+					'callback'            => array( $this, 'remove_album_item' ),
+					'permission_callback' => array( $this, 'require_auth' ),
+					'args'                => array(
+						'id'       => array( 'sanitize_callback' => 'absint' ),
+						'media_id' => array( 'sanitize_callback' => 'absint' ),
+					),
+				),
+			)
+		);
+
+		register_rest_route(
+			'buddynext/v1',
+			'/me/albums/(?P<id>[\d]+)',
+			array(
+				array(
+					'methods'             => 'PUT',
+					'callback'            => array( $this, 'update_album' ),
+					'permission_callback' => array( $this, 'require_auth' ),
+					'args'                => array(
+						'id' => array( 'sanitize_callback' => 'absint' ),
+					),
+				),
+				array(
+					'methods'             => 'DELETE',
+					'callback'            => array( $this, 'delete_album' ),
+					'permission_callback' => array( $this, 'require_auth' ),
+					'args'                => array(
+						'id' => array( 'sanitize_callback' => 'absint' ),
+					),
+				),
+			)
+		);
+
+		register_rest_route(
+			'buddynext/v1',
+			'/me/albums/(?P<id>[\d]+)/reorder',
+			array(
+				array(
+					'methods'             => 'PUT',
+					'callback'            => array( $this, 'reorder_album' ),
+					'permission_callback' => array( $this, 'require_auth' ),
+					'args'                => array(
+						'id' => array( 'sanitize_callback' => 'absint' ),
+					),
+				),
+			)
+		);
+	}
+
+	/**
+	 * Upload a single file to the current member's own profile media.
+	 *
+	 * @param WP_REST_Request $request Request (multipart/form-data).
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function upload_own_media( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+		$upload = MediaClient::upload();
+		if ( ! $upload || ! method_exists( $upload, 'handle' ) ) {
+			return new WP_Error(
+				'bn_media_unavailable',
+				__( 'Media uploads are unavailable right now.', 'buddynext' ),
+				array( 'status' => 503 )
+			);
+		}
+
+		/*
+		 * The REST layer already verified the X-WP-Nonce header before this
+		 * callback fires, so the $_FILES read below is authenticated. WPCS cannot
+		 * see the REST auth layer, hence the scoped suppressions.
+		 *
+		 * phpcs:disable WordPress.Security.NonceVerification.Missing
+		 * phpcs:disable WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+		 * phpcs:disable WordPress.Security.ValidatedSanitizedInput.MissingUnslash
+		 */
+		$file = isset( $_FILES['file'] ) && is_array( $_FILES['file'] )
+			? $_FILES['file']
+			: array();
+		// phpcs:enable WordPress.Security.NonceVerification.Missing
+		// phpcs:enable WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+		// phpcs:enable WordPress.Security.ValidatedSanitizedInput.MissingUnslash
+
+		if ( empty( $file ) || UPLOAD_ERR_OK !== (int) ( $file['error'] ?? UPLOAD_ERR_NO_FILE ) ) {
+			return new WP_Error(
+				'bn_media_missing',
+				__( 'No file uploaded, or the upload failed.', 'buddynext' ),
+				array( 'status' => 422 )
+			);
+		}
+
+		$user_id = get_current_user_id();
+
+		$file_data = array(
+			'name'     => sanitize_file_name( (string) ( $file['name'] ?? '' ) ),
+			'type'     => (string) ( $file['type'] ?? '' ),
+			'tmp_name' => (string) ( $file['tmp_name'] ?? '' ),
+			'error'    => (int) ( $file['error'] ?? UPLOAD_ERR_NO_FILE ),
+			'size'     => (int) ( $file['size'] ?? 0 ),
+		);
+
+		$args = array(
+			'title'       => sanitize_text_field( (string) $request->get_param( 'title' ) ),
+			'description' => sanitize_textarea_field( (string) $request->get_param( 'description' ) ),
+			'privacy'     => $this->sanitize_privacy( (string) $request->get_param( 'privacy' ) ),
+		);
+
+		// The engine validates MIME, size, duplicates, strips EXIF, optimizes and
+		// generates thumbnails; we hand it the file and the member as author so the
+		// new media surfaces in their own gallery (Galleries::user_media_ids).
+		//
+		// Suppress the WPMediaVerse bridge's standalone-upload feed sync for the
+		// duration of this call: BuddyNext surfaces (composer, avatar, cover,
+		// comment media) decide their own posting on submit, so an abandoned or
+		// removed composer photo must never auto-publish. `mvs_media_uploaded`
+		// fires synchronously inside handle(), so the flag scope is this request.
+		$bridge = '\\BuddyNext\\Bridges\\WPMediaVerseBridge';
+		if ( class_exists( $bridge ) ) {
+			$bridge::suppress_upload_activity( true );
+		}
+		try {
+			$media_id = $upload->handle( $file_data, $user_id, $args );
+		} finally {
+			if ( class_exists( $bridge ) ) {
+				$bridge::suppress_upload_activity( false );
+			}
+		}
+
+		if ( is_wp_error( $media_id ) ) {
+			return $media_id;
+		}
+
+		// A video the engine cannot extract an embedded poster from otherwise shows
+		// the bundled default poster in the feed, even though the composer already
+		// captured a real frame. When the client posts that frame as a `thumbnail`
+		// file, stage it through the engine so the feed and Explore use it — the same
+		// mechanism WPMediaVerse's own upload endpoint uses. Best-effort; a genuine
+		// engine poster always wins (see MediaClient::apply_client_poster()).
+		$thumb_file = $request->get_file_params()['thumbnail'] ?? null;
+		if ( is_array( $thumb_file ) && ! empty( $thumb_file['tmp_name'] ) && empty( $thumb_file['error'] ) ) {
+			MediaClient::apply_client_poster( (int) $media_id, (string) $thumb_file['tmp_name'] );
+		}
+
+		$descriptor = MediaUrlResolver::descriptor( (int) $media_id );
+
+		$duplicate_id = method_exists( $upload, 'get_last_duplicate_warning' )
+			? (int) $upload->get_last_duplicate_warning()
+			: 0;
+
+		return new WP_REST_Response(
+			array(
+				'media'             => $descriptor,
+				'duplicate_warning' => $duplicate_id > 0,
+				'existing_media_id' => $duplicate_id,
+			),
+			201
+		);
+	}
+
+	/**
+	 * Return a page of a member's gallery as rendered tile HTML.
+	 *
+	 * Returns the SAME markup the profile template renders (MediaRenderer), so
+	 * the client can swap the grid in place after an upload/delete without a
+	 * second tile renderer drifting out of sync. Privacy is enforced per-viewer
+	 * inside Galleries.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response
+	 */
+	public function list_user_media( WP_REST_Request $request ): WP_REST_Response {
+		$owner    = (int) $request->get_param( 'id' );
+		$viewer   = get_current_user_id();
+		$page     = max( 1, (int) $request->get_param( 'page' ) );
+		$per_page = min( 60, max( 1, (int) $request->get_param( 'per_page' ) ) );
+		$offset   = ( $page - 1 ) * $per_page;
+
+		$ids   = Galleries::user_media_ids( $owner, $viewer, $per_page, $offset );
+		$total = Galleries::user_media_count( $owner, $viewer );
+
+		$response = new WP_REST_Response(
+			array(
+				'html'        => MediaRenderer::gallery( array_map( 'absint', $ids ), array( 'user_id' => $owner ) ),
+				'ids'         => array_map( 'absint', $ids ),
+				'total'       => $total,
+				'page'        => $page,
+				'per_page'    => $per_page,
+				'total_pages' => (int) ceil( $total / $per_page ),
+			),
+			200
+		);
+		$response->header( 'X-WP-Total', (string) $total );
+		$response->header( 'X-WP-TotalPages', (string) (int) ceil( $total / $per_page ) );
+
+		return $response;
+	}
+
+	/**
+	 * Trash a media item the current member owns.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function delete_own_media( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+		$repo = MediaClient::repo();
+		if ( ! $repo || ! method_exists( $repo, 'trash' ) ) {
+			return new WP_Error(
+				'bn_media_unavailable',
+				__( 'Media is unavailable right now.', 'buddynext' ),
+				array( 'status' => 503 )
+			);
+		}
+
+		$media_id = (int) $request->get_param( 'media_id' );
+		$user_id  = get_current_user_id();
+		$author   = method_exists( $repo, 'get_author' ) ? (int) $repo->get_author( $media_id ) : 0;
+
+		// Owner-only: the member can delete their own media; site managers may
+		// moderate any media. No other member can delete it.
+		if ( $author !== $user_id && ! current_user_can( 'manage_options' ) ) {
+			return new WP_Error(
+				'bn_media_forbidden',
+				__( 'You can only remove your own media.', 'buddynext' ),
+				array( 'status' => current_user_can( 'read' ) ? 403 : 401 )
+			);
+		}
+
+		if ( $author <= 0 ) {
+			// Already gone / never existed — report success so the UI converges.
+			return new WP_REST_Response(
+				array(
+					'deleted' => true,
+					'id'      => $media_id,
+				),
+				200
+			);
+		}
+
+		$trashed = (bool) $repo->trash( $media_id );
+
+		if ( ! $trashed ) {
+			return new WP_Error(
+				'bn_media_delete_failed',
+				__( 'Could not remove that media. Please try again.', 'buddynext' ),
+				array( 'status' => 500 )
+			);
+		}
+
+		return new WP_REST_Response(
+			array(
+				'deleted' => true,
+				'id'      => $media_id,
+			),
+			200
+		);
+	}
+
+	/**
+	 * GET /me/media/{id}/usage — what else this photo is part of.
+	 *
+	 * Asked immediately before a delete is confirmed, so the member is told that
+	 * removing their photo also removes it from a space's shared album. It stays
+	 * their photo and they may still delete it; they just find out first rather
+	 * than the space quietly losing a picture.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function media_usage( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+		$media_id = (int) $request->get_param( 'media_id' );
+		$repo     = MediaClient::repo();
+		$author   = ( $repo && method_exists( $repo, 'get_author' ) ) ? (int) $repo->get_author( $media_id ) : 0;
+
+		// Same owner gate as the delete this precedes - the answer names spaces,
+		// so it must not be readable for somebody else's media.
+		if ( get_current_user_id() !== $author && ! current_user_can( 'manage_options' ) ) {
+			return new WP_Error(
+				'bn_media_forbidden',
+				__( 'You can only remove your own media.', 'buddynext' ),
+				array( 'status' => current_user_can( 'read' ) ? 403 : 401 )
+			);
+		}
+
+		return new WP_REST_Response(
+			array(
+				'media_id'     => $media_id,
+				'space_albums' => Galleries::space_albums_for_media( $media_id ),
+			),
+			200
+		);
+	}
+
+	/**
+	 * GET /users/{id}/albums — a user's albums, privacy-filtered for the viewer.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response
+	 */
+	public function list_user_albums( WP_REST_Request $request ): WP_REST_Response {
+		$owner    = (int) $request->get_param( 'id' );
+		$viewer   = get_current_user_id();
+		$page     = max( 1, (int) $request->get_param( 'page' ) );
+		$per_page = min( 60, max( 1, (int) $request->get_param( 'per_page' ) ) );
+		$offset   = ( $page - 1 ) * $per_page;
+
+		return new WP_REST_Response(
+			array(
+				'albums'   => Galleries::user_albums( $owner, $viewer, $per_page, $offset ),
+				'page'     => $page,
+				'per_page' => $per_page,
+			),
+			200
+		);
+	}
+
+	/**
+	 * GET /spaces/{id}/albums — albums belonging to a space.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response
+	 */
+	public function list_space_albums( WP_REST_Request $request ): WP_REST_Response {
+		$space_id = (int) $request->get_param( 'id' );
+		$viewer   = get_current_user_id();
+		$page     = max( 1, (int) $request->get_param( 'page' ) );
+		$per_page = min( 60, max( 1, (int) $request->get_param( 'per_page' ) ) );
+		$offset   = ( $page - 1 ) * $per_page;
+
+		// Galleries::space_albums() gates on the space itself and returns an
+		// empty list to anyone who cannot see it, so a secret space's albums are
+		// indistinguishable from a space with none.
+		return new WP_REST_Response(
+			array(
+				'albums'   => Galleries::space_albums( $space_id, $viewer, $per_page, $offset ),
+				'page'     => $page,
+				'per_page' => $per_page,
+			),
+			200
+		);
+	}
+
+	/**
+	 * POST /spaces/{id}/albums — create an album owned by a space.
+	 *
+	 * Creating an empty album posts nothing to the feed; that happens when
+	 * photos are added, which is the moment there is something to see.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function create_space_album( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+		$space_id = (int) $request->get_param( 'id' );
+
+		$svc = MediaClient::albums();
+		if ( ! $svc || ! method_exists( $svc, 'create' ) ) {
+			return new WP_Error( 'bn_albums_unavailable', __( 'Albums are unavailable right now.', 'buddynext' ), array( 'status' => 503 ) );
+		}
+
+		if ( ! Galleries::can_view_space( $space_id, get_current_user_id() ) ) {
+			// 404 rather than 403 for a space the viewer cannot see: confirming it
+			// exists would leak a secret space.
+			return new WP_Error( 'bn_space_not_found', __( 'Space not found.', 'buddynext' ), array( 'status' => 404 ) );
+		}
+
+		if ( ! Galleries::can_create_space_album( $space_id, get_current_user_id() ) ) {
+			return new WP_Error(
+				'bn_album_forbidden',
+				__( 'You cannot create an album in this space.', 'buddynext' ),
+				array( 'status' => current_user_can( 'read' ) ? 403 : 401 )
+			);
+		}
+
+		$title = sanitize_text_field( (string) $request->get_param( 'title' ) );
+		if ( '' === $title ) {
+			return new WP_Error( 'bn_album_title_required', __( 'An album needs a name.', 'buddynext' ), array( 'status' => 422 ) );
+		}
+
+		$album_id = $svc->create(
+			get_current_user_id(),
+			array(
+				'title'       => $title,
+				'description' => sanitize_textarea_field( (string) $request->get_param( 'description' ) ),
+				// Privacy is NOT taken from the request: a space album's audience
+				// is the space's audience, and a per-album setting on top of that
+				// is a second privacy system to leak through.
+				'privacy'     => 'private',
+			)
+		);
+		if ( is_wp_error( $album_id ) ) {
+			return $album_id;
+		}
+
+		// The meta IS the space association - written straight after creation so
+		// the album is never briefly a personal album on someone's profile.
+		update_post_meta( (int) $album_id, Galleries::SPACE_META, $space_id );
+
+		return new WP_REST_Response( Galleries::album_summary( (int) $album_id ), 201 );
+	}
+
+	/**
+	 * POST /me/albums — create an album owned by the current member.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function create_album( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+		$svc = MediaClient::albums();
+		if ( ! $svc || ! method_exists( $svc, 'create' ) ) {
+			return new WP_Error( 'bn_albums_unavailable', __( 'Albums are unavailable right now.', 'buddynext' ), array( 'status' => 503 ) );
+		}
+
+		$title = sanitize_text_field( (string) $request->get_param( 'title' ) );
+		if ( '' === $title ) {
+			return new WP_Error( 'bn_album_title_required', __( 'An album needs a name.', 'buddynext' ), array( 'status' => 422 ) );
+		}
+
+		$album_id = $svc->create(
+			get_current_user_id(),
+			array(
+				'title'       => $title,
+				'description' => sanitize_textarea_field( (string) $request->get_param( 'description' ) ),
+				'privacy'     => $this->sanitize_album_privacy( (string) $request->get_param( 'privacy' ) ),
+			)
+		);
+		if ( is_wp_error( $album_id ) ) {
+			return $album_id;
+		}
+
+		return new WP_REST_Response( Galleries::album_summary( (int) $album_id ), 201 );
+	}
+
+	/**
+	 * GET /albums/{id} — album detail + a page of its media (privacy-checked).
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function get_album( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+		$album_id = (int) $request->get_param( 'id' );
+		$viewer   = get_current_user_id();
+
+		if ( 'mvs_album' !== get_post_type( $album_id ) ) {
+			return new WP_Error( 'bn_album_not_found', __( 'Album not found.', 'buddynext' ), array( 'status' => 404 ) );
+		}
+
+		$is_owner = $this->album_owned_by_current( $album_id );
+		if ( ! $is_owner && ! Galleries::can_view_album( $album_id, $viewer ) ) {
+			// Do not disclose existence of a private album.
+			return new WP_Error( 'bn_album_not_found', __( 'Album not found.', 'buddynext' ), array( 'status' => 404 ) );
+		}
+
+		$page     = max( 1, (int) $request->get_param( 'page' ) );
+		$per_page = min( 60, max( 1, (int) $request->get_param( 'per_page' ) ) );
+		$offset   = ( $page - 1 ) * $per_page;
+
+		$ids     = Galleries::album_media_ids( $album_id, $per_page, $offset );
+		$summary = Galleries::album_summary( $album_id );
+
+		return new WP_REST_Response(
+			array_merge(
+				$summary,
+				array(
+					'is_owner'    => $is_owner,
+					'html'        => MediaRenderer::gallery( array_map( 'absint', $ids ), array( 'user_id' => (int) $summary['owner'] ) ),
+					'ids'         => array_map( 'absint', $ids ),
+					'page'        => $page,
+					'per_page'    => $per_page,
+					'total_pages' => (int) ceil( max( 1, (int) $summary['media_count'] ) / $per_page ),
+				)
+			),
+			200
+		);
+	}
+
+	/**
+	 * POST /me/albums/{id}/items — add media (owner only).
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function add_album_items( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+		$album_id = (int) $request->get_param( 'id' );
+
+		// Contributing to a SPACE album is not the same as managing it. Any
+		// member of the space may add photos, even where the owner has
+		// restricted who can create albums - that is the shape people already
+		// know, and an album nobody but its creator can fill is not a shared
+		// album at all. Managing it (rename, delete, reorder) still needs the
+		// creator or a space admin, via require_album_owner() below.
+		$space_id = Galleries::album_space( $album_id );
+		if ( $space_id > 0 ) {
+			if ( 'mvs_album' !== get_post_type( $album_id ) ) {
+				return new WP_Error( 'bn_album_not_found', __( 'Album not found.', 'buddynext' ), array( 'status' => 404 ) );
+			}
+			if ( ! $this->can_contribute_to_space( $space_id ) ) {
+				return new WP_Error(
+					'bn_album_forbidden',
+					__( 'You need to be a member of this space to add photos.', 'buddynext' ),
+					array( 'status' => current_user_can( 'read' ) ? 403 : 401 )
+				);
+			}
+		} else {
+			$gate = $this->require_album_owner( $album_id );
+			if ( is_wp_error( $gate ) ) {
+				return $gate;
+			}
+		}
+
+		$media_ids = array_values( array_unique( array_filter( array_map( 'absint', (array) $request->get_param( 'media_ids' ) ) ) ) );
+		if ( empty( $media_ids ) ) {
+			return new WP_Error( 'bn_album_no_media', __( 'No media to add.', 'buddynext' ), array( 'status' => 422 ) );
+		}
+
+		$svc   = MediaClient::albums();
+		$added = ( $svc && method_exists( $svc, 'add_items' ) ) ? (int) $svc->add_items( $album_id, $media_ids ) : 0;
+
+		if ( $space_id > 0 ) {
+			// Clamp whatever was ASKED for, not only what was newly inserted. A
+			// photo already sitting in the album still has to obey the space's
+			// privacy, and add_items() reports 0 for a re-add - so gating this on
+			// the insert count left an already-present photo public forever.
+			$this->clamp_media_to_space_privacy( $space_id, $media_ids );
+
+			// The feed post is different: announcing a no-op would put "Added
+			// photos" in the space every time somebody re-submitted the same set.
+			if ( $added > 0 ) {
+				$this->announce_space_album_upload( $space_id, $album_id, $media_ids );
+			}
+		}
+
+		return new WP_REST_Response(
+			array(
+				'added'       => $added,
+				'media_count' => ( $svc && method_exists( $svc, 'get_item_count' ) ) ? (int) $svc->get_item_count( $album_id ) : 0,
+			),
+			200
+		);
+	}
+
+	/**
+	 * Stop a restricted space's photos being publicly listed elsewhere.
+	 *
+	 * The album is gated by the space, but the PHOTO is not: a member's profile
+	 * gallery lists their media by the media's own privacy, so a picture whose
+	 * only home is a private space album was still reachable by a logged-out
+	 * stranger on that member's profile. The album was private and the content
+	 * was not, which is precisely the leak "the space decides the audience" is
+	 * supposed to rule out.
+	 *
+	 * Only restricted spaces clamp. A photo in an open space is public content
+	 * and there is nothing to protect it from.
+	 *
+	 * @param int   $space_id  Space the album belongs to.
+	 * @param int[] $media_ids Media just added.
+	 * @return void
+	 */
+	private function clamp_media_to_space_privacy( int $space_id, array $media_ids ): void {
+		$space = function_exists( 'buddynext_service' ) ? buddynext_service( 'spaces' )->get( $space_id ) : null;
+		if ( null === $space ) {
+			return;
+		}
+
+		if ( ! \BuddyNext\Spaces\SpaceTypeRegistry::instance()->content_requires_membership( (string) $space['type'] ) ) {
+			return;
+		}
+
+		$repo = MediaClient::repo();
+		if ( ! $repo || ! method_exists( $repo, 'set' ) ) {
+			return;
+		}
+
+		foreach ( $media_ids as $media_id ) {
+			$repo->set( (int) $media_id, 'privacy', 'private' );
+		}
+	}
+
+	/**
+	 * Post to the space when photos land in one of its albums.
+	 *
+	 * Album content is otherwise invisible until somebody thinks to open the
+	 * Albums tab, which is not how members find anything. One post per upload,
+	 * not per photo - a batch of twelve is one thing that happened, and twelve
+	 * posts is how a feed becomes unreadable.
+	 *
+	 * Creating an EMPTY album announces nothing: there is nothing to look at
+	 * yet, and an album is often made minutes before it is filled.
+	 *
+	 * A migration never reaches this: the importer files album contents through
+	 * the engine's add_items() directly, not through this REST handler, so
+	 * replaying years of uploads cannot manufacture a feed full of upload
+	 * notices. Worth knowing before anyone routes the importer through here.
+	 *
+	 * @param int   $space_id  Space the album belongs to.
+	 * @param int   $album_id  Album id.
+	 * @param int[] $media_ids Media just added.
+	 * @return void
+	 */
+	private function announce_space_album_upload( int $space_id, int $album_id, array $media_ids ): void {
+		if ( ! function_exists( 'buddynext_service' ) ) {
+			return;
+		}
+
+		/**
+		 * Filter whether adding photos to a space album posts to that space.
+		 *
+		 * @since 1.1.1
+		 *
+		 * @param bool $announce Default true.
+		 * @param int  $space_id Space id.
+		 * @param int  $album_id Album id.
+		 */
+		if ( ! (bool) apply_filters( 'buddynext_announce_space_album_upload', true, $space_id, $album_id ) ) {
+			return;
+		}
+
+		$posts = buddynext_service( 'post_service' );
+		if ( ! $posts || ! method_exists( $posts, 'create' ) ) {
+			return;
+		}
+
+		$posts->create(
+			get_current_user_id(),
+			array(
+				'type'      => 'media',
+				'content'   => sprintf(
+					/* translators: %s: album name. */
+					__( 'Added photos to %s', 'buddynext' ),
+					get_the_title( $album_id )
+				),
+				'space_id'  => $space_id,
+				'media_ids' => $media_ids,
+			)
+		);
+	}
+
+	/**
+	 * DELETE /me/albums/{id}/items/{media_id} — remove media from album (owner only).
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function remove_album_item( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+		$album_id = (int) $request->get_param( 'id' );
+		$gate     = $this->require_album_owner( $album_id );
+		if ( is_wp_error( $gate ) ) {
+			return $gate;
+		}
+
+		$media_id = (int) $request->get_param( 'media_id' );
+		$svc      = MediaClient::albums();
+		if ( $svc && method_exists( $svc, 'remove_item' ) ) {
+			$svc->remove_item( $album_id, $media_id );
+		}
+
+		return new WP_REST_Response(
+			array(
+				'removed'     => true,
+				'media_count' => ( $svc && method_exists( $svc, 'get_item_count' ) ) ? (int) $svc->get_item_count( $album_id ) : 0,
+			),
+			200
+		);
+	}
+
+	/**
+	 * PUT /me/albums/{id} — update title/description/privacy/cover (owner only).
+	 *
+	 * Mirrors the engine's own update: post fields via wp_update_post, privacy via
+	 * the media repo (album privacy is keyed by album id), cover via set_cover.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function update_album( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+		$album_id = (int) $request->get_param( 'id' );
+		$gate     = $this->require_album_owner( $album_id );
+		if ( is_wp_error( $gate ) ) {
+			return $gate;
+		}
+
+		// An album is a WPMediaVerse post type (mvs_album); WPMediaVerse owns its
+		// storage. This used to build a wp_update_post() array here and write the
+		// description to post_excerpt - a key WPMediaVerse never reads. Its own
+		// AlbumService::create() writes post_content and its REST reader takes
+		// post_content, so a description typed in BuddyNext was stored somewhere
+		// nothing would look, and came back blank on the very next read.
+		//
+		// Route the write through the owner's service instead. It maps
+		// description -> post_content in one place, so the two plugins cannot drift
+		// apart again, and it only writes the keys actually supplied.
+		$album_fields = array();
+
+		$title = $request->get_param( 'title' );
+		if ( null !== $title ) {
+			$title = sanitize_text_field( (string) $title );
+			if ( '' === $title ) {
+				return new WP_Error( 'bn_album_title_required', __( 'An album needs a name.', 'buddynext' ), array( 'status' => 422 ) );
+			}
+			$album_fields['title'] = $title;
+		}
+
+		$desc = $request->get_param( 'description' );
+		if ( null !== $desc ) {
+			$album_fields['description'] = sanitize_textarea_field( (string) $desc );
+		}
+
+		if ( ! empty( $album_fields ) ) {
+			$album_service = class_exists( '\\WPMediaVerse\\Core\\Plugin' )
+				? \WPMediaVerse\Core\Plugin::container()->get( 'albums' )
+				: null;
+
+			if ( is_object( $album_service ) && method_exists( $album_service, 'update' ) ) {
+				$saved = $album_service->update( $album_id, $album_fields );
+				if ( is_wp_error( $saved ) ) {
+					return $saved;
+				}
+			} else {
+				// WPMediaVerse absent or older than the release that added
+				// AlbumService::update(). Write the same fields it would, so the
+				// mapping still matches its reader rather than reverting to the
+				// post_excerpt key that caused this.
+				$fallback = array( 'ID' => $album_id );
+				if ( isset( $album_fields['title'] ) ) {
+					$fallback['post_title'] = $album_fields['title'];
+				}
+				if ( isset( $album_fields['description'] ) ) {
+					$fallback['post_content'] = $album_fields['description'];
+				}
+				wp_update_post( $fallback );
+			}
+		}
+
+		// A SPACE album has no privacy of its own: its audience is the space's, and
+		// Galleries::space_albums() gates on the space alone and never reads this
+		// value. Accepting one here stored a setting that could not do anything,
+		// and album_summary() then reported it back as if it were in force - a
+		// member could mark a space album "Only me", be told it saved, and have it
+		// served to whoever can see the space.
+		//
+		// This is the write that actually persisted it. create_space_album()
+		// already discards the request value and hardcodes 'private'; the edit
+		// modal PUTs to /me/albums/{id}, which is this handler, so the create path
+		// looked correct while the edit path wrote through.
+		$privacy = $request->get_param( 'privacy' );
+		if ( null !== $privacy && Galleries::album_space( $album_id ) <= 0 ) {
+			$repo = MediaClient::repo();
+			if ( $repo && method_exists( $repo, 'set' ) ) {
+				$repo->set( $album_id, 'privacy', $this->sanitize_album_privacy( (string) $privacy ) );
+			}
+		}
+
+		$cover = $request->get_param( 'cover_media_id' );
+		if ( null !== $cover ) {
+			$svc = MediaClient::albums();
+			if ( $svc && method_exists( $svc, 'set_cover' ) ) {
+				$svc->set_cover( $album_id, (int) $cover );
+			}
+		}
+
+		return new WP_REST_Response( Galleries::album_summary( $album_id ), 200 );
+	}
+
+	/**
+	 * DELETE /me/albums/{id} — delete an album + its item links (owner only).
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function delete_album( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+		$album_id = (int) $request->get_param( 'id' );
+		$gate     = $this->require_album_owner( $album_id );
+		if ( is_wp_error( $gate ) ) {
+			return $gate;
+		}
+
+		$svc = MediaClient::albums();
+		if ( $svc && method_exists( $svc, 'delete_all_items' ) ) {
+			$svc->delete_all_items( $album_id );
+		}
+		wp_delete_post( $album_id, true );
+
+		return new WP_REST_Response(
+			array(
+				'deleted' => true,
+				'id'      => $album_id,
+			),
+			200
+		);
+	}
+
+	/**
+	 * PUT /me/albums/{id}/reorder — set item order (owner only).
+	 *
+	 * @param WP_REST_Request $request Request. Body: order[] (media ids, new order).
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function reorder_album( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+		$album_id = (int) $request->get_param( 'id' );
+		$gate     = $this->require_album_owner( $album_id );
+		if ( is_wp_error( $gate ) ) {
+			return $gate;
+		}
+
+		// Numeric keys become the 0-indexed positions the engine expects.
+		$order = array_values( array_filter( array_map( 'absint', (array) $request->get_param( 'order' ) ) ) );
+
+		$svc = MediaClient::albums();
+		if ( $svc && method_exists( $svc, 'reorder' ) ) {
+			$svc->reorder( $album_id, $order );
+		}
+
+		return new WP_REST_Response( array( 'reordered' => true ), 200 );
+	}
+
+	/**
+	 * Whether the current user may write to the album.
+	 *
+	 * Its creator, a site manager, or - for a SPACE album - anyone who manages
+	 * or moderates that space. A space album belongs to the space, so the people
+	 * responsible for the space can tidy it without having to be the member who
+	 * happened to create it.
+	 *
+	 * @param int $album_id Album id.
+	 * @return bool
+	 */
+	private function album_owned_by_current( int $album_id ): bool {
+		if ( 'mvs_album' !== get_post_type( $album_id ) ) {
+			return false;
+		}
+
+		$author = (int) get_post_field( 'post_author', $album_id );
+		if ( get_current_user_id() === $author || current_user_can( 'manage_options' ) ) {
+			return true;
+		}
+
+		$space_id = Galleries::album_space( $album_id );
+		if ( $space_id <= 0 || ! function_exists( 'buddynext_can' ) ) {
+			return false;
+		}
+
+		$viewer  = get_current_user_id();
+		$context = array( 'space_id' => $space_id );
+
+		return (bool) buddynext_can( $viewer, 'buddynext-manage-space', $context )
+			|| (bool) buddynext_can( $viewer, 'buddynext-moderate-space', $context );
+	}
+
+	/**
+	 * Whether the current user may put content into a space.
+	 *
+	 * Uploading into an existing space album is a contribution, so it asks the
+	 * same question the space feed asks - not the stricter "can create an album
+	 * here", which an owner may have restricted to admins.
+	 *
+	 * @param int $space_id Space id.
+	 * @return bool
+	 */
+	private function can_contribute_to_space( int $space_id ): bool {
+		if ( $space_id <= 0 ) {
+			return false;
+		}
+
+		if ( current_user_can( 'manage_options' ) ) {
+			return true;
+		}
+
+		$viewer = get_current_user_id();
+
+		return $viewer > 0
+			&& ( new \BuddyNext\Spaces\SpaceMemberService() )->is_member( $space_id, $viewer );
+	}
+
+	/**
+	 * Owner gate for album write operations.
+	 *
+	 * @param int $album_id Album id.
+	 * @return true|WP_Error
+	 */
+	private function require_album_owner( int $album_id ): bool|WP_Error {
+		if ( 'mvs_album' !== get_post_type( $album_id ) ) {
+			return new WP_Error( 'bn_album_not_found', __( 'Album not found.', 'buddynext' ), array( 'status' => 404 ) );
+		}
+		if ( ! $this->album_owned_by_current( $album_id ) ) {
+			return new WP_Error(
+				'bn_album_forbidden',
+				__( 'You can only manage your own albums.', 'buddynext' ),
+				array( 'status' => current_user_can( 'read' ) ? 403 : 401 )
+			);
+		}
+		return true;
+	}
+
+	/**
+	 * Map a composer (post) privacy choice to the engine media-file privacy.
+	 * Unknown values fall back to public.
+	 *
+	 * @param string $privacy Post-vocabulary privacy (public/followers/connections/private).
+	 * @return string Engine media privacy (public/members/private).
+	 */
+	private function sanitize_privacy( string $privacy ): string {
+		$privacy = sanitize_key( $privacy );
+
+		return self::PRIVACY_MAP[ $privacy ] ?? 'public';
+	}
+
+	/**
+	 * Clamp an album privacy choice to the engine's album vocabulary.
+	 *
+	 * @param string $privacy Raw privacy.
+	 * @return string public|members|private (default public).
+	 */
+	private function sanitize_album_privacy( string $privacy ): string {
+		$privacy = sanitize_key( $privacy );
+
+		return in_array( $privacy, array( 'public', 'members', 'private' ), true ) ? $privacy : 'public';
+	}
+}

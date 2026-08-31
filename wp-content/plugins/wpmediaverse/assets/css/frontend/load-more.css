@@ -1,0 +1,82 @@
+/**
+ * Load More button — shared across all layouts.
+ *
+ * @package WPMediaVerse
+ */
+
+.mvs-load-more {
+	text-align: center;
+	padding: 24px 0;
+}
+
+.mvs-load-more-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	height: 40px;
+	padding: 0 24px;
+	font-size: 14px;
+	font-weight: 500;
+	border-radius: 6px;
+	border: 1px solid var(--mvs-border-light);
+	background: var(--mvs-surface);
+	color: var(--mvs-text);
+	cursor: pointer;
+	text-decoration: none;
+	transition: background 0.15s, border-color 0.15s;
+}
+
+.mvs-load-more-btn:hover {
+	background: var(--mvs-surface-2);
+	color: var(--mvs-text);
+	border-color: var(--mvs-border);
+}
+
+.mvs-load-more-btn.is-loading {
+	opacity: 0.7;
+	cursor: wait;
+}
+
+.mvs-load-more-spinner {
+	display: none;
+	width: 16px;
+	height: 16px;
+	border: 2px solid var(--mvs-border);
+	border-top-color: var(--mvs-primary);
+	border-radius: 50%;
+	animation: mvs-spin 0.6s linear infinite;
+}
+
+.mvs-load-more-btn.is-loading .mvs-load-more-spinner {
+	display: inline-block;
+}
+
+.mvs-load-more-btn.is-loading .mvs-load-more-label {
+	display: none;
+}
+
+@keyframes mvs-spin {
+	to { transform: rotate(360deg); }
+}
+
+.mvs-load-more-end {
+	text-align: center;
+	padding: 24px 0;
+	color: var(--mvs-text-secondary);
+	font-size: 14px;
+}
+
+@media (max-width: 640px) {
+	.mvs-load-more-btn {
+		padding: 0 16px;
+		height: 36px;
+		font-size: 13px;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.mvs-load-more-spinner {
+		animation: none;
+		opacity: 0.5;
+	}
+}

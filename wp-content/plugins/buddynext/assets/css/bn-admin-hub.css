@@ -1,0 +1,1127 @@
+/* ────────────────────────────────────────────────────────────────────────
+ * BuddyNext — Admin Hub chrome (horizontal tab strip)
+ *
+ * Painted by includes/Admin/AdminHub.php which owns every BuddyNext
+ * section page (?page=buddynext, ?page=buddynext-members, etc.).
+ *
+ * Layout:
+ *   .bn-admin-hub
+ *     .bn-admin-hub__header         (page H1)
+ *     .bn-admin-hub__tabs           (horizontal tab strip)
+ *     .bn-admin-hub__main--full     (full-width tab body)
+ *
+ * Sections are capped at a few tabs, so the strip stays on one row and the
+ * body uses the full content width (no wasted left column). Single-tab
+ * sections skip the strip and render the body inside .bn-admin-hub__body.
+ *
+ * Chrome stays neutral: accent only on the active tab + badge. Token-driven.
+ *
+ * Loaded only on Hub-owned pages by AdminHub::enqueue_assets().
+ * ──────────────────────────────────────────────────────────────────────── */
+
+.bn-admin-hub {
+	max-width: none;
+}
+
+.bn-admin-hub__header {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: var(--bn-s4);
+	margin: 0 0 var(--bn-s4);
+	padding: var(--bn-s4) 0 0;
+}
+.bn-admin-hub__title {
+	margin: 0;
+	font-family: var(--bn-font-display, var(--bn-font-ui, inherit));
+	font-size: clamp(20px, 2vw, 26px);
+	font-weight: 700;
+	letter-spacing: -0.015em;
+	line-height: 1.2;
+	color: var(--bn-ink, #1f2937);
+	padding: 0;
+}
+
+/* ── Section tab strip (horizontal) ──────────────────────────────────── */
+
+.bn-admin-hub__tabs {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--bn-s1, 4px);
+	margin: 0 0 var(--bn-s4, 16px);
+	border-bottom: 1px solid var(--bn-line);
+}
+
+/* WordPress core `.notice` flash boxes that section pages echo at the top of
+   their content sit directly beneath the section tab strip. Core's zeroed /
+   negative notice margins let them ride up and overlap the tabs (e.g. the Push
+   and Push Preferences tabs vanished behind the "saved" notice). Give echoed
+   notices breathing room and force them to clear so the tab strip stays visible. */
+.bn-admin-hub__main .notice {
+	margin: var(--bn-s3, 12px) 0 var(--bn-s4, 16px);
+	clear: both;
+}
+
+.bn-admin-hub__tab {
+	box-sizing: border-box;
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	padding: 10px 14px;
+	margin-bottom: -1px;
+	border: 0;
+	border-bottom: 2px solid transparent;
+	background: none;
+	font-size: var(--bn-text-sm, 13px);
+	font-weight: var(--bn-fw-medium, 500);
+	line-height: 1.2;
+	color: var(--bn-ink-2);
+	text-decoration: none;
+	transition: color var(--bn-dur-fast, 120ms) var(--bn-ease, ease),
+		border-color var(--bn-dur-fast, 120ms) var(--bn-ease, ease);
+}
+.bn-admin-hub__tab:hover {
+	color: var(--bn-ink);
+}
+.bn-admin-hub__tab:focus-visible {
+	outline: 2px solid transparent;
+	outline-offset: 2px;
+	box-shadow: 0 0 0 2px color-mix(in oklch, var(--bn-accent) 45%, transparent);
+	border-radius: var(--bn-r-sm, 4px);
+	color: var(--bn-ink);
+}
+.bn-admin-hub__tab.is-active {
+	color: var(--bn-accent);
+	border-bottom-color: var(--bn-accent);
+	font-weight: var(--bn-fw-semibold, 600);
+}
+
+.bn-admin-hub__tab-icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 16px;
+	height: 16px;
+	flex-shrink: 0;
+	color: var(--bn-ink-3);
+	transition: color var(--bn-dur-fast, 120ms) var(--bn-ease, ease);
+}
+.bn-admin-hub__tab-icon .bn-icon {
+	width: 16px;
+	height: 16px;
+}
+.bn-admin-hub__tab:hover .bn-admin-hub__tab-icon { color: var(--bn-ink-2); }
+.bn-admin-hub__tab.is-active .bn-admin-hub__tab-icon { color: var(--bn-accent); }
+
+.bn-admin-hub__tab-label {
+	white-space: nowrap;
+}
+
+.bn-admin-hub__tab-badge {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 18px;
+	height: 18px;
+	padding: 0 6px;
+	background: var(--bn-accent);
+	color: var(--bn-accent-fg, #fff);
+	border-radius: 999px;
+	font-family: var(--bn-font-mono, var(--bn-font-ui));
+	font-size: 11px;
+	font-weight: var(--bn-fw-semibold, 600);
+	line-height: 1;
+	flex-shrink: 0;
+}
+
+/* ── Main content area ───────────────────────────────────────────────── */
+
+.bn-admin-hub__main {
+	min-width: 0;
+}
+.bn-admin-hub__main--full {
+	width: 100%;
+}
+
+/* Subtitle paragraph emitted by render methods */
+.bn-admin-hub__subtitle {
+	margin: 0 0 var(--bn-s4, 16px);
+	font-size: var(--bn-text-sm, 14px);
+	color: var(--bn-ink-2, #4b5563);
+	line-height: 1.5;
+}
+
+/* ── Standardized sub-header bar ──────────────────────────────────────────
+ *
+ * Emitted by AdminHub::render_subhead() right under the tab strip when the
+ * active tab declares a subtitle and/or a primary action. One consistent bar
+ * on every screen: subtitle left, action(s) right. Reuses .bn-admin-hub__subtitle
+ * for the text (its bottom margin is zeroed here so the bar controls rhythm).
+ * ───────────────────────────────────────────────────────────────────────── */
+
+.bn-admin-hub__subhead {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--bn-s3, 12px);
+	flex-wrap: wrap;
+	margin: 0 0 var(--bn-s4, 16px);
+}
+.bn-admin-hub__subhead .bn-admin-hub__subtitle {
+	margin: 0;
+}
+.bn-admin-hub__subhead-actions {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2, 8px);
+	margin-inline-start: auto;
+}
+
+/* ── Shared segmented control (range / segment filters) ───────────────────
+ *
+ * For range or segment filters (7/30/90, All/Active) — NOT navigation. A single
+ * rounded pill-group on a subtle track; the active item is filled with a soft
+ * accent so it reads as a "selected segment", visually distinct from the
+ * underline section tabs (which carry navigation). Token-driven + dark-safe.
+ *
+ * Markup:
+ *   <div class="bn-segment" role="group" aria-label="Range">
+ *     <a class="bn-segment__item is-active" aria-selected="true" ...>30 days</a>
+ *     <a class="bn-segment__item" ...>90 days</a>
+ *   </div>
+ * Items may be <a> or <button>. Active state: .is-active OR [aria-selected="true"].
+ * ───────────────────────────────────────────────────────────────────────── */
+
+.bn-segment {
+	display: inline-flex;
+	align-items: stretch;
+	gap: var(--bn-s1, 4px);
+	padding: var(--bn-s1, 4px);
+	background: var(--bn-sunken);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-full, 9999px);
+	/* Wrap by default rather than run off the card.
+	 *
+	 * inline-flex with no max-width and nowrap meant a segment holding more
+	 * chips than the card is wide simply overflowed, and .bn-settings-section
+	 * has overflow:hidden - so the last filters were CUT OFF, not merely tight.
+	 * Measured at 390px: Subscriptions 479px of chips in a 366px body,
+	 * Spaces 383px, Invitations 63px past the edge. The status filters an admin
+	 * needs on a phone were the ones that disappeared.
+	 *
+	 * .bn-segment--wrap already existed for exactly this, but it was opt-in and
+	 * used on one screen out of seven, so every screen that forgot it shipped
+	 * the bug. Safe-by-default belongs in the base: a filter group that cannot
+	 * fit should reflow, never hide options. Wrapping (not scrolling) is the
+	 * documented house preference for filters - see B5 in bn-admin.css. */
+	max-width: 100%;
+	flex-wrap: wrap;
+}
+
+/* A wrapped segment is a tall box, and the pill radius reads as an odd oval on
+   one - so soften it at the widths where wrapping actually happens. Same
+   reasoning as .bn-segment--wrap, which keeps overriding this explicitly for
+   segments that wrap at any width. */
+@media (max-width: 782px) {
+	.bn-segment {
+		border-radius: var(--bn-r-lg, 12px);
+	}
+}
+
+.bn-segment__item {
+	box-sizing: border-box;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: var(--bn-s1, 4px);
+	padding: 6px 14px;
+	border: 0;
+	background: none;
+	border-radius: var(--bn-r-full, 9999px);
+	font-size: var(--bn-text-sm, 13px);
+	font-weight: var(--bn-fw-medium, 500);
+	line-height: 1.2;
+	color: var(--bn-ink-2);
+	text-decoration: none;
+	white-space: nowrap;
+	cursor: pointer;
+	transition: color var(--bn-dur-fast, 120ms) var(--bn-ease, ease),
+		background-color var(--bn-dur-fast, 120ms) var(--bn-ease, ease);
+}
+.bn-segment__item:hover {
+	color: var(--bn-ink);
+	background: var(--bn-surface);
+}
+.bn-segment__item:focus-visible {
+	outline: 2px solid transparent;
+	outline-offset: 2px;
+	box-shadow: 0 0 0 2px color-mix(in oklch, var(--bn-accent) 45%, transparent);
+}
+.bn-segment__item.is-active,
+.bn-segment__item[aria-selected="true"] {
+	color: var(--bn-accent-700);
+	background: var(--bn-accent-100);
+	font-weight: var(--bn-fw-semibold, 600);
+}
+.bn-segment__item.is-active:hover,
+.bn-segment__item[aria-selected="true"]:hover {
+	color: var(--bn-accent-700);
+	background: var(--bn-accent-100);
+}
+
+[data-bn-theme="dark"] .bn-segment__item.is-active,
+[data-theme="dark"] .bn-segment__item.is-active,
+[data-bx-mode="dark"] .bn-segment__item.is-active,
+[data-bn-theme="dark"] .bn-segment__item[aria-selected="true"],
+[data-theme="dark"] .bn-segment__item[aria-selected="true"],
+[data-bx-mode="dark"] .bn-segment__item[aria-selected="true"] {
+	color: var(--bn-accent-200);
+	background: color-mix(in oklch, var(--bn-accent) 22%, transparent);
+}
+
+.bn-admin-hub__sub-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--bn-s3, 12px);
+	flex-wrap: wrap;
+	margin: 0 0 var(--bn-s4, 16px);
+}
+.bn-admin-hub__sub-row .bn-admin-hub__subtitle { margin: 0; }
+
+/* Single-tab section fallback (no tab strip) */
+.bn-admin-hub__body { margin-top: 0; }
+
+/* ── Recommended-defaults prompt (General tab) ───────────────────────── */
+
+.bn-recommended-card {
+	margin: 0 0 var(--bn-s4, 16px);
+	padding: var(--bn-s4, 16px) var(--bn-s5, 20px);
+	background: var(--bn-accent-50, var(--bn-sunken));
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-md, 8px);
+}
+.bn-recommended-card__title {
+	margin: 0 0 var(--bn-s2, 8px);
+	font-size: var(--bn-text-md, 15px);
+	font-weight: var(--bn-fw-semibold, 600);
+	color: var(--bn-ink);
+}
+.bn-recommended-card__text {
+	margin: 0 0 var(--bn-s3, 12px);
+	font-size: var(--bn-text-sm, 13px);
+	color: var(--bn-ink-2);
+	line-height: 1.5;
+}
+.bn-recommended-card__actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--bn-s2, 8px);
+	margin: 0;
+}
+
+/* ── Auto-card pattern ────────────────────────────────────────────────
+ *
+ * Pro admin pages haven't been migrated to the .bn-settings-card vocabulary
+ * Free Settings uses. Rather than rewriting every render_content() (16
+ * classes, 50+ LOC each), these rules style their bare <h2> + <form> +
+ * .form-table markup to look card-wrapped automatically.
+ *
+ * Scoped tight to .bn-admin-hub__main so non-Hub admin pages aren't
+ * affected. Skill gate F6 — "Auto-card wrapping" — calls for exactly
+ * this pattern.
+ * ───────────────────────────────────────────────────────────────────── */
+
+/* H2 as a section-eyebrow above the card below it. Visually groups with
+   the next form/table without trying to fragile `h2 + form` adjacency
+   tricks (Pro pages mix H2 → form, H2 → p → form, H2 → table). */
+.bn-admin-hub__main h2,
+.bn-admin-hub__main--wide h2 {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	margin: var(--bn-s4, 16px) 0 var(--bn-s2, 8px);
+	padding: 6px 10px;
+	background: var(--bn-sunken);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-sm, 4px);
+	font-family: var(--bn-font-mono, var(--bn-font-ui));
+	font-size: 11px;
+	font-weight: var(--bn-fw-semibold, 600);
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--bn-ink-2);
+	line-height: 1.2;
+}
+.bn-admin-hub__main h2:first-child,
+.bn-admin-hub__main--wide h2:first-child { margin-top: 0; }
+/* H3 below remains a "subsection title inside the card". */
+.bn-admin-hub__main h3,
+.bn-admin-hub__main--wide h3 {
+	font-size: 14px;
+	font-weight: var(--bn-fw-semibold, 600);
+	color: var(--bn-ink);
+	margin: var(--bn-s4, 16px) 0 var(--bn-s2, 8px);
+}
+
+/* Wrap every <form> + standalone <table.wp-list-table> in a card chrome.
+   Excludes the .bn-admin-hub__picker (the wide-layout select) and the
+   .bn-admin-search stub (handled separately). Structural exclusions: a form
+   containing a .bn-settings-section is already carded by its sections, and a
+   form inside a table cell or an existing card is an INLINE CONTROL (the
+   Profile Fields per-row Required/visibility forms) - carding those produced
+   box-in-box rows. */
+.bn-admin-hub__main form:not(.bn-admin-hub__form-bare):not(.bn-admin-hub__picker):not(.bn-modal__panel):not(:has(.bn-settings-section)):not(td form):not(th form):not(.bn-card form):not(.bn-settings-section form),
+.bn-admin-hub__main--wide form:not(.bn-admin-hub__form-bare):not(.bn-admin-hub__picker):not(.bn-modal__panel):not(:has(.bn-settings-section)):not(td form):not(th form):not(.bn-card form):not(.bn-settings-section form),
+.bn-admin-hub__main > table.wp-list-table,
+.bn-admin-hub__main--wide > table.wp-list-table {
+	background: var(--bn-surface, #fff);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-md, 8px);
+	padding: var(--bn-s4, 16px) var(--bn-s5, 20px);
+	margin: 0 0 var(--bn-s4, 16px);
+	box-shadow: var(--bn-shadow-sm);
+}
+
+/* Tables already inside our card don't get double chrome. */
+.bn-admin-hub__main form .form-table,
+.bn-admin-hub__main form .wp-list-table,
+.bn-admin-hub__main--wide form .form-table,
+.bn-admin-hub__main--wide form .wp-list-table {
+	background: transparent;
+	border: 0;
+	box-shadow: none;
+	padding: 0;
+	margin: 0;
+}
+
+/* ── Auto-card corrections ────────────────────────────────────────────────
+ *
+ * The auto-card above is for un-migrated bare Pro forms. Two cases must NOT
+ * get a card, or they look like stray boxes / double containers:
+ *
+ *   1. Action forms — a form whose only controls are buttons (Export, Delete,
+ *      a lone Save). They carry no field inputs, so we detect "no real field"
+ *      via :has() and strip the chrome, laying them out inline instead.
+ *   2. Forms inside our .bn-settings-section card vocabulary — the section is
+ *      already the card; a second card is the "double container" bug.
+ *
+ * Dropdown menus are excluded (:not(.bn-more-dropdown form)): a row-action
+ * form inside a .bn-more-dropdown IS a button-only form, but the inline-block
+ * + 6px margins meant its button never filled the menu row and left stray
+ * space under itself (card 10097295370). Those forms are full-width blocks,
+ * styled where the dropdown lives (bn-admin-members.css).
+ *
+ * The .bn-pf-head-actions toolbar is excluded for the same reason: its
+ * reorder/delete forms are button-only and sit in a compact flex row, so the
+ * inline-block + 6px block margin inflated the row and pushed those buttons
+ * ~3px above the sibling selects. They are sized by the header rules in
+ * bn-admin-members.css instead. */
+.bn-admin-hub__main form:not(.bn-more-dropdown form):not(.bn-pf-head-actions form):not(.bn-modal__panel):not(.bn-admin-hub__picker):not(:has(.form-table)):not(:has(textarea)):not(:has(select)):not(:has(input[type="text"])):not(:has(input[type="email"])):not(:has(input[type="url"])):not(:has(input[type="number"])):not(:has(input[type="search"])):not(:has(input[type="password"])):not(:has(input[type="checkbox"])):not(:has(input[type="radio"])):not(:has(input[type="file"])):not(:has(input[type="color"])),
+.bn-admin-hub__main--wide form:not(.bn-more-dropdown form):not(.bn-pf-head-actions form):not(.bn-modal__panel):not(.bn-admin-hub__picker):not(:has(.form-table)):not(:has(textarea)):not(:has(select)):not(:has(input[type="text"])):not(:has(input[type="email"])):not(:has(input[type="url"])):not(:has(input[type="number"])):not(:has(input[type="search"])):not(:has(input[type="password"])):not(:has(input[type="checkbox"])):not(:has(input[type="radio"])):not(:has(input[type="file"])):not(:has(input[type="color"])) {
+	background: none;
+	border: 0;
+	box-shadow: none;
+	padding: 0;
+	margin: 0 6px 6px 0;
+	display: inline-block;
+	vertical-align: top;
+}
+
+/* Forms inside ANY admin card wrapper already sit in a card — never give them
+   a second one (the "double container" bug). Covers every card vocabulary in
+   use: .bn-settings-section (Settings + new screens), .bn-card / .bn-admin-section
+   (Invites, legacy), .bn-pf-card / .bn-pf-af-panel (Profile Fields, Member Types),
+   .bn-table-wrap (Members, Spaces).
+   The :not(.bn-modal__panel) is a deliberate specificity bump (0-4-1): the
+   auto-card rule above is also 0-4-1, so without it this later reset LOST the
+   cascade and every inline control (visibility select, Required toggle,
+   delete) rendered inside its own floating card. */
+.bn-admin-hub .bn-admin-hub__main :is(.bn-settings-section, .bn-card, .bn-admin-section, .bn-pf-card, .bn-pf-af-panel, .bn-table-wrap) form:not(.bn-modal__panel),
+.bn-admin-hub .bn-admin-hub__main--wide :is(.bn-settings-section, .bn-card, .bn-admin-section, .bn-pf-card, .bn-pf-af-panel, .bn-table-wrap) form:not(.bn-modal__panel) {
+	background: none;
+	border: 0;
+	box-shadow: none;
+	padding: 0;
+	margin: 0;
+}
+
+/* Documented exception to the reset above.
+
+   A filter bar IS a form, so the blanket `margin: 0` flattened it against the
+   list it filters. That is why the moderation queue carried an inline
+   `style="margin-bottom:…"` — an inline style was the only thing that could
+   outrank a four-class selector. The exception lives here, next to the rule it
+   excepts, so the two cannot drift apart and nobody has to reach for an inline
+   style again.
+
+   Scoped by POSITION, not by class name. It previously read
+   `:is(form[class*="-filter"], form[class*="-toolbar"])`, which is a guess about
+   what a form in a listing header will be called — and the guess was wrong for
+   `form.bn-analytics-range` on Campaigns and Drip, which sat flush against the
+   stat grid below it with a measured 0px gap.
+
+   A form that is a DIRECT CHILD of a section body is a block in that body's stack
+   and takes the stack's rhythm, whatever it is named. The reset still applies in
+   full to the forms it was written for — the inline per-row controls (visibility
+   select, Required toggle, delete) live inside table cells, several levels down,
+   so they are not direct children of anything here and keep `margin: 0`. */
+.bn-admin-hub .bn-admin-hub__main :is(.bn-settings-section, .bn-card, .bn-admin-section, .bn-pf-card, .bn-pf-af-panel, .bn-table-wrap) :is(.bn-ss-body, .bn-card__body) > form:not(.bn-modal__panel),
+.bn-admin-hub .bn-admin-hub__main--wide :is(.bn-settings-section, .bn-card, .bn-admin-section, .bn-pf-card, .bn-pf-af-panel, .bn-table-wrap) :is(.bn-ss-body, .bn-card__body) > form:not(.bn-modal__panel),
+.bn-admin-hub .bn-admin-hub__main :is(.bn-settings-section, .bn-card, .bn-admin-section, .bn-pf-card, .bn-pf-af-panel, .bn-table-wrap) > form:not(.bn-modal__panel),
+.bn-admin-hub .bn-admin-hub__main--wide :is(.bn-settings-section, .bn-card, .bn-admin-section, .bn-pf-card, .bn-pf-af-panel, .bn-table-wrap) > form:not(.bn-modal__panel) {
+	/* --bn-a-s4, not s3: every other block in a listing header (the stat grid, the
+	   filter tab pills) is spaced 16px, and 12px here made the filter row sit
+	   visibly tighter to its table than the pills above it did. Uniform beats
+	   individually-tuned when the whole point is that they read as one stack. */
+	margin-bottom: var(--bn-a-s4);
+	margin-top: 0;
+}
+
+/* The last block in a body still gets no bottom margin, forms included — the
+   container's padding is the edge. Mirrors the :last-child rule in bn-admin.css,
+   repeated here only because the form reset's specificity requires it. */
+.bn-admin-hub .bn-admin-hub__main :is(.bn-settings-section, .bn-card, .bn-admin-section, .bn-pf-card, .bn-pf-af-panel, .bn-table-wrap) :is(.bn-ss-body, .bn-card__body) > form:not(.bn-modal__panel):last-child,
+.bn-admin-hub .bn-admin-hub__main--wide :is(.bn-settings-section, .bn-card, .bn-admin-section, .bn-pf-card, .bn-pf-af-panel, .bn-table-wrap) :is(.bn-ss-body, .bn-card__body) > form:not(.bn-modal__panel):last-child {
+	margin-bottom: 0;
+}
+
+/* WP default form-table cell padding is tight — bump for readability. */
+.bn-admin-hub__main .form-table th,
+.bn-admin-hub__main .form-table td,
+.bn-admin-hub__main--wide .form-table th,
+.bn-admin-hub__main--wide .form-table td {
+	padding: var(--bn-s3, 12px) var(--bn-s3, 12px) var(--bn-s3, 12px) 0;
+}
+
+/* Submit row visually separates from the form body. */
+.bn-admin-hub__main p.submit,
+.bn-admin-hub__main--wide p.submit {
+	margin: var(--bn-s4, 16px) 0 0;
+	padding-top: var(--bn-s3, 12px);
+	border-top: 1px solid var(--bn-line);
+}
+
+/* WP default blue primary button → BN accent. Same density / radius as the
+   bn-btn primary so admins don't see two different "Save" buttons depending
+   on which Pro page they're on. */
+.bn-admin-hub__main .button-primary,
+.bn-admin-hub__main--wide .button-primary,
+.bn-admin-hub__main input[type="submit"].button-primary,
+.bn-admin-hub__main--wide input[type="submit"].button-primary {
+	background: var(--bn-accent);
+	border-color: var(--bn-accent);
+	color: var(--bn-accent-fg, #fff);
+	box-shadow: none;
+	text-shadow: none;
+	min-height: 36px;
+	padding: 0 14px;
+	border-radius: var(--bn-r-md, 6px);
+	font-weight: var(--bn-fw-semibold, 600);
+}
+.bn-admin-hub__main .button-primary:hover,
+.bn-admin-hub__main--wide .button-primary:hover,
+.bn-admin-hub__main .button-primary:focus,
+.bn-admin-hub__main--wide .button-primary:focus {
+	background: color-mix(in oklch, var(--bn-accent) 88%, black);
+	border-color: color-mix(in oklch, var(--bn-accent) 88%, black);
+	color: var(--bn-accent-fg, #fff);
+	box-shadow: none;
+}
+.bn-admin-hub__main .button-primary:focus-visible,
+.bn-admin-hub__main--wide .button-primary:focus-visible {
+	box-shadow: 0 0 0 3px color-mix(in oklch, var(--bn-accent) 35%, transparent);
+}
+
+/* Danger / link-delete variant stays red so destruction reads. */
+.bn-admin-hub__main .button-link-delete,
+.bn-admin-hub__main--wide .button-link-delete {
+	color: var(--bn-danger, oklch(58% 0.20 25));
+}
+
+/* ── Wide layout (list-detail editors: Navigation, Email Templates) ─── */
+
+.bn-admin-hub.is-wide {
+	max-width: none;
+}
+
+.bn-admin-hub__main--wide {
+	display: block;
+	width: 100%;
+	min-width: 0;
+}
+
+/* Stat-card rows need breathing room before the panel/table that follows, so
+   the boxes never butt up against each other. */
+.bn-admin-hub .bn-stat-grid {
+	margin-bottom: var(--bn-s4, 16px);
+}
+
+/* ── Mobile — tab strip becomes a horizontal scroller ────────────────── */
+
+@media (max-width: 782px) {
+	.bn-admin-hub__tabs {
+		flex-wrap: nowrap;
+		overflow-x: auto;
+		overflow-y: hidden;
+	}
+	.bn-admin-hub__tab {
+		flex-shrink: 0;
+	}
+}
+
+/* --------------------------------------------------------------------------
+   Unified left navigation panel (paneled layout)
+   One in-page rail: every section as a group, its tabs as links.
+   -------------------------------------------------------------------------- */
+.bn-admin-hub--paneled .bn-admin-hub__shell {
+	display: grid;
+	grid-template-columns: 248px minmax( 0, 1fr );
+	gap: var(--bn-s5, 20px);
+	align-items: start;
+}
+.bn-admin-hub__panel {
+	/* Sticky rail. Sections are collapsible and only the active one opens by
+	   default, so on a fresh profile this is ~728px against a 900px viewport and
+	   the rail follows the normal page scroll with no scrollbar in the gutter.
+	   That default is not a guarantee, though, and the ceiling below is the
+	   difference between the two.
+	   The accordion REMEMBERS manual expansions (localStorage bnAdminNavOpen), so
+	   an owner comparing settings across four groups keeps those groups open on
+	   every subsequent page load. Measured with six groups expanded the rail is
+	   1501px — it ran past the fold with no way to reach the last group except
+	   scrolling the whole document, because the rail had no max-height and
+	   overflow-y: visible. The same happens on a 1280x720 laptop, or when a
+	   third-party plugin registers its own section.
+	   So: keep the page scroll for the common case, and give the rail its own
+	   scroll only once it would otherwise overflow the window. The responsive
+	   block already switches this off at narrow widths, where the rail stacks
+	   above the content and a ceiling would be wrong. */
+	position: sticky;
+	top: var(--bn-s8, 32px);
+	max-height: calc( 100vh - var(--bn-s8, 32px) - var(--bn-s8, 32px) - var(--bn-s4, 16px) );
+	overflow-y: auto;
+	/* A rail that has hit its ceiling must not hand the scroll back to the
+	   document mid-gesture; the owner is reading the nav, not the page. */
+	overscroll-behavior: contain;
+	align-self: start;
+	padding: var(--bn-s2, 8px);
+	background: var(--bn-surface);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-lg, 12px);
+	box-shadow: var(--bn-shadow-xs, 0 1px 2px rgba( 0, 0, 0, 0.04 ));
+}
+.bn-hub-nav-group { margin-bottom: var(--bn-s2, 8px); }
+.bn-hub-nav-group:last-child { margin-bottom: 0; }
+
+/* Collapsible section header (native <details>/<summary> accordion). Only the
+   section owning the current page is open by default, so the panel stays short. */
+.bn-hub-nav-group__label {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--bn-s2, 8px);
+	/* Symmetric vertical padding, on the same 8px/16px rhythm as .bn-hub-nav-link
+	   below. This was 12px top / 4px bottom, which left the label's own hover +
+	   focus-visible pill (it has a background and a radius) sitting off-centre on
+	   its content - the one element in the rail whose highlight didn't line up with
+	   its text. Section separation is the group's margin-bottom, not a lopsided pad. */
+	padding: var(--bn-s2, 8px) var(--bn-s4, 16px);
+	border-radius: var(--bn-r-md, 8px);
+	cursor: pointer;
+	/* Kicker treatment (main level): sections and tabs used to share the same
+	   size/weight, so the rail read as one flat list with no main-vs-sub
+	   hierarchy (owner). Uppercase small muted = unmistakably a header; tabs
+	   below keep full-size labels + a deeper indent (sub level).
+	   The step is --bn-text-xs, the admin's small-label size: at --bn-text-2xs this
+	   header was the only 11px text in the hub chrome and read undersized next to
+	   its own 15px icon + chevron. Uppercase + semibold + tracking still carry the
+	   hierarchy against the 14px (--bn-text-sm) tab labels. */
+	color: var(--bn-ink-3);
+	font-size: var(--bn-text-xs, 12px);
+	font-weight: var(--bn-fw-semibold, 600);
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	line-height: 1.3;
+	list-style: none;
+	user-select: none;
+}
+.bn-hub-nav-group__label::-webkit-details-marker { display: none; }
+.bn-hub-nav-group__label::marker { content: ''; }
+.bn-hub-nav-group__label:hover { background: var(--bn-sunken); color: var(--bn-ink); }
+.bn-hub-nav-group__label:focus-visible {
+	outline: 2px solid transparent;
+	outline-offset: 2px;
+	box-shadow: 0 0 0 2px color-mix( in oklch, var(--bn-accent) 45%, transparent );
+}
+.bn-hub-nav-group.is-current > .bn-hub-nav-group__label { color: var(--bn-ink); }
+.bn-hub-nav-group__name {
+	min-width: 0;
+	margin-inline-end: auto; /* icon + name sit left; chevron pushed to the right */
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.bn-hub-nav-group__label svg,
+.bn-hub-nav-group__icon,
+.bn-hub-nav-group__chevron {
+	width: 15px;
+	height: 15px;
+	flex: none;
+	color: var(--bn-ink-3);
+	transition: transform 0.15s ease;
+}
+/* Section icon matches the section state; the chevron stays neutral. */
+.bn-hub-nav-group.is-current > .bn-hub-nav-group__label > .bn-hub-nav-group__icon {
+	color: var(--bn-accent-600, var(--bn-accent));
+}
+/* Only the chevron rotates when the group is open — not the section icon. */
+.bn-hub-nav-group[open] > .bn-hub-nav-group__label > .bn-hub-nav-group__chevron { transform: rotate( 180deg ); }
+.bn-hub-nav-group__items { padding-top: var(--bn-s1, 4px); }
+/* Explicitly collapse closed groups. Giving <summary> display:flex can defeat the
+   UA's native closed-content hiding, so drive it from the [open] state directly. */
+.bn-hub-nav-group:not( [open] ) > .bn-hub-nav-group__items { display: none; }
+.bn-hub-nav-link {
+	display: flex;
+	align-items: center;
+	gap: 9px;
+	/* Loosened from 7px/--bn-s2 (owner card 10056978256), then nested one
+	   level deeper than the section kicker so main-vs-sub reads instantly. */
+	padding: var(--bn-s2, 8px) var(--bn-s4, 16px);
+	padding-inline-start: var(--bn-s6, 24px);
+	border-radius: var(--bn-r-md, 8px);
+	color: var(--bn-ink-2);
+	text-decoration: none;
+	font-size: var(--bn-text-sm);
+	font-weight: var(--bn-fw-medium, 500);
+	line-height: 1.3;
+}
+.bn-hub-nav-link:hover { background: var(--bn-sunken); color: var(--bn-ink); }
+.bn-hub-nav-link:focus-visible {
+	outline: 2px solid transparent;
+	outline-offset: 2px;
+	box-shadow: 0 0 0 2px color-mix( in oklch, var(--bn-accent) 45%, transparent );
+}
+.bn-hub-nav-link.is-active {
+	background: var(--bn-accent-100, var(--bn-sunken));
+	color: var(--bn-accent-700, var(--bn-accent));
+	font-weight: var(--bn-fw-semibold, 600);
+}
+.bn-hub-nav-link svg,
+.bn-hub-nav-link .bn-icon { width: 15px; height: 15px; flex: none; color: var(--bn-ink-3); }
+.bn-hub-nav-link.is-active svg,
+.bn-hub-nav-link.is-active .bn-icon { color: var(--bn-accent-600, var(--bn-accent)); }
+.bn-admin-hub--paneled .bn-admin-hub__header { padding-top: 0; }
+
+/* iPad portrait + narrow: panel stacks above content */
+/* iPad landscape/portrait (admin target floor is 768 - owner: admin is
+   desktop + iPad only): keep the two-column layout with a narrower rail
+   instead of stacking the full nav above the content, which buried every
+   screen below the fold on tablets. */
+@media ( max-width: 1024px ) {
+	.bn-admin-hub--paneled .bn-admin-hub__shell { grid-template-columns: 200px minmax( 0, 1fr ); }
+	.bn-hub-nav-link { padding-inline-start: var(--bn-s4, 16px); }
+}
+
+/* Below the iPad floor (out of admin scope, kept usable): stack, with the
+   nav sections all collapsed so content stays within one swipe.
+
+   782px, not 768px: WP-admin collapses its own menu at 782px and the rest of
+   this admin follows it. At 768 there was a 14px dead zone (769-782) where
+   every other component had gone mobile while the hub shell was still
+   two-column, so the content well was squeezed from both sides at once. iPad
+   portrait is 768, so it still stacks there — the change only removes the
+   sliver, it does not move the tablet behaviour. */
+@media ( max-width: 782px ) {
+	/*
+	 * minmax(0, 1fr), not a bare 1fr. `1fr` floors at the track's MIN-CONTENT
+	 * width, and the nav's longest labels ("Registration & Login", "Roles &
+	 * Capabilities") do not wrap — so the stacked column resolved to 618px
+	 * inside a 458px container and pushed the whole document into a horizontal
+	 * scroll. Every admin screen inherited it, which is why the overflow was
+	 * reported against Broadcasts, Drip Sequences and three Moderation tabs
+	 * independently: none of them was the cause, the shared nav rail was.
+	 */
+	.bn-admin-hub--paneled .bn-admin-hub__shell { grid-template-columns: minmax( 0, 1fr ); }
+	/* Stacked above the content, the rail is not competing with the window for
+	   height — a ceiling here would put a scrollbar inside a nav that has the
+	   whole page to grow into. overflow-y goes back with it, or the ceiling's
+	   absence just clips. */
+	.bn-admin-hub__panel { position: static; max-height: none; overflow-y: visible; }
+}
+
+/* --------------------------------------------------------------------------
+   Branded top bar (every admin page) — mark + name + version + search
+   -------------------------------------------------------------------------- */
+.bn-admin-hub__brand {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s3, 12px);
+	padding: var(--bn-s2, 8px) 0 var(--bn-s4, 16px);
+	margin-bottom: var(--bn-s4, 16px);
+	border-bottom: 1px solid var(--bn-line);
+	/* Wrap, because five items do not fit a phone and one of them was being cut in
+	   half against the viewport edge.
+	 *
+	 * At 390px this row holds the wordmark (123px), a version chip (59), a flexible
+	 * spacer, Search (96) and Docs (54) with 12px gaps, inside 368px of content
+	 * width. As `nowrap` it overflowed its own box by 13px and the Docs pill's right
+	 * edge landed at 391 against a 390 viewport, so it rendered flush and shaved.
+	 *
+	 * It did NOT produce a page scrollbar, and a card reporting one (every admin
+	 * screen, 15px at 390) does not reproduce: measured 0 across 390/600/782/783/
+	 * 800/1024 on Members, Moderation, Settings and Spaces. It cannot, either -
+	 * WordPress core sets `body { overflow-x: hidden }` inside
+	 * `@media (max-width: 782px)` (wp-admin/css/common.css), which is exactly the
+	 * range where this row overflows, so core clips it before it reaches the
+	 * document. Above 782 the row fits with 20px to spare and there is nothing to
+	 * clip. The visible defect was the clipped pill, not the scrollbar.
+	 *
+	 * Wrapping unconditionally rather than at a breakpoint: the row only ever wraps
+	 * when the items genuinely do not fit, so there is no width at which this
+	 * changes the desktop layout, and no second breakpoint to keep in sync with the
+	 * one core already owns. */
+	flex-wrap: wrap;
+}
+/* The wordmark is an <img> and will happily refuse to shrink below its intrinsic
+   width, which is what pushed the row over in the first place. */
+.bn-admin-hub__brand-logo {
+	max-width: 100%;
+	height: auto;
+	min-width: 0;
+}
+.bn-admin-hub__brand-mark {
+	width: 30px;
+	height: 30px;
+	border-radius: var(--bn-r-md, 8px);
+	display: grid;
+	place-items: center;
+	background: var(--bn-accent);
+	color: var(--bn-accent-fg, #fff);
+	font-family: var(--bn-font-display, var(--bn-font-ui));
+	font-weight: var(--bn-fw-bold, 700);
+	font-size: 12px;
+	letter-spacing: -0.02em;
+}
+.bn-admin-hub__brand-name {
+	font-family: var(--bn-font-display, var(--bn-font-ui));
+	font-weight: var(--bn-fw-bold, 700);
+	font-size: var(--bn-text-lg);
+	letter-spacing: -0.01em;
+	color: var(--bn-ink);
+}
+.bn-admin-hub__brand-ver {
+	font-family: var(--bn-font-mono);
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+	background: var(--bn-sunken);
+	padding: 2px 8px;
+	border-radius: var(--bn-r-full, 999px);
+}
+.bn-admin-hub__brand-spacer { flex: 1; }
+.bn-admin-hub__brand-search,
+.bn-admin-hub__brand-link {
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+	font-size: var(--bn-text-xs);
+	font-weight: var(--bn-fw-semibold, 600);
+	padding: 6px 11px;
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-md, 8px);
+	color: var(--bn-ink-2);
+	background: var(--bn-surface);
+	cursor: pointer;
+	text-decoration: none;
+}
+.bn-admin-hub__brand-search:hover,
+.bn-admin-hub__brand-link:hover { background: var(--bn-sunken); color: var(--bn-ink); }
+.bn-admin-hub__brand-search kbd {
+	font-family: var(--bn-font-mono);
+	font-size: 10px;
+	background: var(--bn-sunken);
+	border: 1px solid var(--bn-line);
+	border-radius: 4px;
+	padding: 0 4px;
+	color: var(--bn-ink-3);
+}
+.bn-admin-hub__brand-logo { height: 28px; width: auto; display: block; flex: none; }
+
+/* ── Bulk-select for admin list tables (Members, Spaces) ─────────────── */
+.bn-bulk-bar {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2, 8px);
+	margin: 0 0 var(--bn-s3, 12px);
+	flex-wrap: wrap;
+}
+.bn-table__cb {
+	width: 2.5rem;
+}
+.bn-table__cb input[type="checkbox"] {
+	margin: 0;
+	vertical-align: middle;
+}
+
+/* ── First-run setup checklist card ──────────────────────────────────────── */
+.bn-setup-card {
+	background: var(--bn-a-bg);
+	border: 1px solid var(--bn-a-border);
+	border-radius: var(--bn-a-r-md, 10px);
+	padding: var(--bn-a-s4);
+	margin-bottom: var(--bn-a-s4);
+	box-shadow: var(--bn-a-shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.06));
+}
+
+.bn-setup-card__head {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: var(--bn-a-s3);
+}
+
+.bn-setup-card__title {
+	margin: 0;
+	font-size: var(--bn-a-text-lg, 1.05rem);
+	font-weight: var(--bn-a-fw-semibold);
+	color: var(--bn-a-text-1);
+}
+
+.bn-setup-card__sub {
+	margin: 2px 0 0;
+	font-size: var(--bn-a-text-xs);
+	color: var(--bn-a-text-3);
+}
+
+.bn-setup-card__dismiss {
+	margin: 0;
+	line-height: 1;
+}
+
+.bn-setup-card__dismiss-btn {
+	background: none;
+	border: none;
+	cursor: pointer;
+	font-size: var(--bn-a-text-lg, 1.1rem);
+	line-height: 1;
+	color: var(--bn-a-text-3);
+	padding: 2px var(--bn-a-s1);
+	border-radius: var(--bn-a-r-sm);
+}
+
+.bn-setup-card__dismiss-btn:hover {
+	color: var(--bn-a-text-1);
+	background: var(--bn-a-sunken);
+}
+
+.bn-setup-card__progress {
+	height: 6px;
+	background: var(--bn-a-sunken);
+	border-radius: var(--bn-a-r-full, 999px);
+	overflow: hidden;
+	margin: var(--bn-a-s3) 0;
+}
+
+.bn-setup-card__progress-bar {
+	display: block;
+	height: 100%;
+	background: var(--bn-a-brand);
+	border-radius: inherit;
+	transition: width 0.3s ease;
+}
+
+.bn-setup-list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-a-s1);
+}
+
+.bn-setup-step {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-a-s3);
+	padding: var(--bn-a-s2) var(--bn-a-s2);
+	border-radius: var(--bn-a-r-sm);
+}
+
+.bn-setup-step:hover {
+	background: var(--bn-a-sunken);
+}
+
+.bn-setup-step__check {
+	flex-shrink: 0;
+	width: 22px;
+	height: 22px;
+	border-radius: var(--bn-a-r-full, 999px);
+	border: 1.5px solid var(--bn-a-border);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	color: var(--bn-a-on-accent, #fff);
+}
+
+.bn-setup-step__check svg {
+	width: 14px;
+	height: 14px;
+}
+
+.bn-setup-step.is-done .bn-setup-step__check {
+	background: var(--bn-a-green, #1a7f37);
+	border-color: var(--bn-a-green, #1a7f37);
+}
+
+.bn-setup-step__body {
+	display: flex;
+	flex-direction: column;
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.bn-setup-step__label {
+	font-weight: var(--bn-a-fw-semibold);
+	color: var(--bn-a-text-1);
+	font-size: var(--bn-a-text-sm);
+}
+
+.bn-setup-step.is-done .bn-setup-step__label {
+	color: var(--bn-a-text-3);
+}
+
+.bn-setup-step__desc {
+	font-size: var(--bn-a-text-xs);
+	color: var(--bn-a-text-3);
+}
+
+.bn-setup-step__cta {
+	flex-shrink: 0;
+	font-size: var(--bn-a-text-xs);
+	font-weight: var(--bn-a-fw-semibold);
+	color: var(--bn-a-brand);
+	text-decoration: none;
+	border: 1px solid var(--bn-a-border);
+	border-radius: var(--bn-a-r-sm);
+	padding: 5px var(--bn-a-s3);
+	white-space: nowrap;
+}
+
+.bn-setup-step__cta:hover {
+	border-color: var(--bn-a-brand);
+	background: var(--bn-a-bg);
+}
+
+/* A step's action cluster: the primary CTA plus an optional muted opt-out
+   (the theme step's "Keep my theme"), so the recommendation never traps an
+   owner who runs another theme. */
+.bn-setup-step__actions {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-a-s2);
+	flex-shrink: 0;
+}
+
+.bn-setup-step__ack {
+	margin: 0;
+}
+
+.bn-setup-step__ack-btn {
+	background: none;
+	border: none;
+	padding: 5px var(--bn-a-s2);
+	font-size: var(--bn-a-text-xs);
+	color: var(--bn-a-text-2);
+	cursor: pointer;
+	text-decoration: underline;
+	text-underline-offset: 2px;
+}
+
+.bn-setup-step__ack-btn:hover {
+	color: var(--bn-a-text-1);
+}
+
+.bn-setup-step__status {
+	flex-shrink: 0;
+	font-size: var(--bn-a-text-xs);
+	color: var(--bn-a-green, #1a7f37);
+	font-weight: var(--bn-a-fw-semibold);
+}
+
+@media (max-width: 640px) {
+	.bn-setup-step {
+		flex-wrap: wrap;
+	}
+
+	.bn-setup-step__cta,
+	.bn-setup-step__status {
+		margin-inline-start: calc(22px + var(--bn-a-s3));
+	}
+}
+
+/* ── Get Started (Home) theme recommendation ─────────────────────────────── */
+.bn-home-theme__actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--bn-a-s2);
+	margin-top: var(--bn-a-s3);
+}
+
+/* ── Get Started (Home) orientation grid ─────────────────────────────────── */
+.bn-home-links {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+	gap: var(--bn-a-s3);
+}
+
+.bn-home-link {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--bn-a-s3);
+	padding: var(--bn-a-s4);
+	background: var(--bn-a-bg);
+	border: 1px solid var(--bn-a-border);
+	border-radius: var(--bn-a-r-md, 10px);
+	box-shadow: var(--bn-a-shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.06));
+	text-decoration: none;
+	color: inherit;
+	transition: border-color var(--bn-a-transition, 0.15s ease), box-shadow var(--bn-a-transition, 0.15s ease);
+}
+
+.bn-home-link:hover,
+.bn-home-link:focus {
+	border-color: var(--bn-a-brand);
+	box-shadow: var(--bn-a-shadow-md, 0 2px 8px rgba(0, 0, 0, 0.1));
+}
+
+.bn-home-link__icon {
+	flex: 0 0 auto;
+	width: 22px;
+	height: 22px;
+	color: var(--bn-a-brand);
+}
+
+.bn-home-link__body {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+}
+
+.bn-home-link__title {
+	font-size: var(--bn-a-text-sm);
+	font-weight: var(--bn-a-fw-semibold);
+	color: var(--bn-a-text-1);
+}
+
+.bn-home-link__desc {
+	font-size: var(--bn-a-text-xs);
+	color: var(--bn-a-text-3);
+	line-height: 1.5;
+}
+
+@media (max-width: 640px) {
+	.bn-home-links {
+		grid-template-columns: 1fr;
+	}
+}

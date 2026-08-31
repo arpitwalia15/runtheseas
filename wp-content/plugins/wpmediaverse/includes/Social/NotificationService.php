@@ -1,0 +1,550 @@
+<?php
+/**
+ * Notification service.
+ *
+ * Native notification center — works standalone, optionally syncs with BuddyPress.
+ *
+ * @package    WPMediaVerse
+ * @subpackage Social
+ * @since      1.1.0
+ */
+
+namespace WPMediaVerse\Social;
+
+defined( 'ABSPATH' ) || exit;
+
+/**
+ * Handles notification creation, listing, read status, and counts.
+ */
+class NotificationService {
+
+	/**
+	 * Notification types.
+	 *
+	 * @var string[]
+	 */
+	const TYPES = array(
+		'new_follower',
+		'media_reaction',
+		'media_comment',
+		'media_mention',
+		'media_favorite',
+		'new_message',
+	);
+
+	/**
+	 * Register hooks for auto-creating notifications.
+	 *
+	 * Guarded with a static flag so accidental double-instantiation (via the
+	 * service container or a stray `new NotificationService()`) cannot register
+	 * the same callbacks twice — which would produce duplicate rows.
+	 *
+	 * @since 1.1.0
+	 */
+	public function init(): void {
+		static $registered = false;
+		if ( $registered ) {
+			return;
+		}
+		$registered = true;
+
+		add_action( 'mvs_user_followed', array( $this, 'on_follow' ), 10, 2 );
+		add_action( 'mvs_reaction_added', array( $this, 'on_reaction' ), 10, 3 );
+		add_action( 'mvs_comment_created', array( $this, 'on_comment' ), 10, 3 );
+		add_action( 'mvs_mentions_created', array( $this, 'on_mentions' ), 10, 4 );
+		add_action( 'mvs_favorite_added', array( $this, 'on_favorite' ), 10, 2 );
+		// `mvs_message_sent` is handled by Messaging\NotificationListener (mute,
+		// coalescing, BuddyNext routing, unread-cache). This service used to
+		// ALSO hook it via on_message(), producing a second, un-muted,
+		// un-coalesced notification for every DM (audit 2026-06-04). Listener
+		// owns it; on_message() removed.
+	}
+
+	/**
+	 * Create a notification.
+	 *
+	 * @since 1.1.0
+	 *
+	 * @param int    $user_id    Recipient user ID.
+	 * @param string $type       Notification type.
+	 * @param int    $actor_id   User who triggered it.
+	 * @param int    $media_id   Related media ID (0 if none).
+	 * @param int    $comment_id Related comment ID (0 if none).
+	 * @param bool   $allow_self Allow recipient === actor (system events
+	 *                            announcing the recipient's own milestone).
+	 *                            Default false. Added 1.3.0.
+	 * @return int|false Notification ID or false.
+	 */
+	public function create( int $user_id, string $type, int $actor_id, int $media_id = 0, int $comment_id = 0, bool $allow_self = false ) {
+		// Don't notify yourself unless explicitly opted in. Pro challenge /
+		// tournament announcements ("you placed 2nd") use $allow_self=true
+		// because user_id === actor_id by design — the system IS notifying
+		// the user about THEIR own milestone.
+		if ( ! $allow_self && $user_id === $actor_id ) {
+			return false;
+		}
+
+		/**
+		 * Filters the allowed notification type list.
+		 *
+		 * Pro extensions hook this to register additional notification types
+		 * (e.g. challenge_entry_received) without having to fork the service.
+		 *
+		 * @since 1.1.2
+		 *
+		 * @param string[] $types Allowed notification type strings.
+		 */
+		$allowed_types = (array) apply_filters( 'mvs_notification_types', self::TYPES );
+
+		if ( ! in_array( $type, $allowed_types, true ) ) {
+			return false;
+		}
+
+		/**
+		 * Filters whether a notification should be sent.
+		 *
+		 * Return false to suppress the notification.
+		 *
+		 * @since 1.1.0
+		 *
+		 * @param bool   $should_send Whether to send the notification.
+		 * @param int    $user_id     Recipient user ID.
+		 * @param string $type        Notification type.
+		 * @param int    $actor_id    User who triggered it.
+		 * @param int    $media_id    Related media ID (0 if none).
+		 */
+		if ( ! apply_filters( 'mvs_should_send_notification', true, $user_id, $type, $actor_id, $media_id ) ) {
+			return false;
+		}
+
+		/**
+		 * Filters the notification data before it is stored.
+		 *
+		 * @since 1.1.0
+		 *
+		 * @param array  $data Notification data array.
+		 * @param string $type Notification type.
+		 */
+		$notification_data = apply_filters(
+			'mvs_notification_data',
+			array(
+				'user_id'    => $user_id,
+				'type'       => $type,
+				'actor_id'   => $actor_id,
+				'media_id'   => $media_id,
+				'comment_id' => $comment_id,
+				'created_at' => current_time( 'mysql', true ),
+			),
+			$type
+		);
+
+		global $wpdb;
+
+		$wpdb->insert( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			$wpdb->prefix . 'mvs_notifications',
+			$notification_data,
+			array( '%d', '%s', '%d', '%d', '%d', '%s' )
+		);
+
+		if ( $wpdb->insert_id ) {
+			wp_cache_delete( 'mvs_notif_count_' . $user_id, 'mvs' );
+
+			/**
+			 * Fires after a notification is created.
+			 *
+			 * @since 1.1.0
+			 * @since 1.7.0 Added $message and $link (appended, backward-compatible)
+			 *              so consumers such as BuddyNext's central notification
+			 *              center can mirror the exact notification 1:1 without
+			 *              re-deriving it from IDs (which drifts from our wording).
+			 *
+			 * @param int    $notification_id New notification ID.
+			 * @param int    $user_id         Recipient user ID.
+			 * @param string $type            Notification type.
+			 * @param int    $actor_id        User who triggered it.
+			 * @param int    $media_id        Related media ID.
+			 * @param string $message         Rendered notification text — identical to
+			 *                                the plugin's own notifications menu.
+			 * @param string $link            Deep link to the media / conversation /
+			 *                                profile the notification points at.
+			 */
+			$rendered = $this->build_message_and_link( $type, $actor_id, $media_id );
+			do_action( 'mvs_notification_created', $wpdb->insert_id, $user_id, $type, $actor_id, $media_id, $rendered['message'], $rendered['link'] );
+
+			return $wpdb->insert_id;
+		}
+
+		return false;
+	}
+
+	/**
+	 * Get notifications for a user.
+	 *
+	 * @since 1.1.0
+	 *
+	 * @param int    $user_id  User ID.
+	 * @param int    $per_page Results per page.
+	 * @param int    $page     Page number.
+	 * @param string $filter   'all', 'unread', or a specific type.
+	 * @return array { notifications: array, total: int }
+	 */
+	public function get_notifications( int $user_id, int $per_page = 20, int $page = 1, string $filter = 'all' ): array {
+		global $wpdb;
+
+		$offset = ( $page - 1 ) * $per_page;
+		$where  = 'user_id = %d';
+		$params = array( $user_id );
+
+		if ( 'unread' === $filter ) {
+			$where .= ' AND read_at IS NULL';
+		} elseif ( in_array( $filter, self::TYPES, true ) ) {
+			$where   .= ' AND type = %s';
+			$params[] = $filter;
+		}
+
+		$total = (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			$wpdb->prepare(
+				"SELECT COUNT(*) FROM {$wpdb->prefix}mvs_notifications WHERE {$where}", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				...$params
+			)
+		);
+
+		$params[] = $per_page;
+		$params[] = $offset;
+
+		$rows = $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			$wpdb->prepare(
+				"SELECT * FROM {$wpdb->prefix}mvs_notifications WHERE {$where} ORDER BY created_at DESC LIMIT %d OFFSET %d", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				...$params
+			)
+		);
+
+		// Prime caches in bulk to avoid N+1 queries.
+		$actor_ids = array();
+		$media_ids = array();
+		foreach ( $rows as $row ) {
+			$actor_ids[] = (int) $row->actor_id;
+			if ( $row->media_id ) {
+				$media_ids[] = (int) $row->media_id;
+			}
+		}
+		if ( $actor_ids ) {
+			// Pre-load all actor user objects in one query.
+			new \WP_User_Query(
+				array(
+					'include' => array_unique( $actor_ids ),
+					'fields'  => 'all',
+				)
+			);
+		}
+		if ( $media_ids ) {
+			_prime_post_caches( array_unique( $media_ids ), false, false );
+		}
+
+		$notifications = array();
+		foreach ( $rows as $row ) {
+			$notifications[] = $this->format_notification( $row );
+		}
+
+		return array(
+			'notifications' => $notifications,
+			'total'         => $total,
+		);
+	}
+
+	/**
+	 * Get unread notification count for a user.
+	 *
+	 * @since 1.1.0
+	 *
+	 * @param int $user_id User ID.
+	 * @return int
+	 */
+	public function get_unread_count( int $user_id ): int {
+		$cached = wp_cache_get( 'mvs_notif_count_' . $user_id, 'mvs' );
+		if ( false !== $cached ) {
+			return (int) $cached;
+		}
+
+		global $wpdb;
+
+		$count = (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			$wpdb->prepare(
+				"SELECT COUNT(*) FROM {$wpdb->prefix}mvs_notifications WHERE user_id = %d AND read_at IS NULL",
+				$user_id
+			)
+		);
+
+		wp_cache_set( 'mvs_notif_count_' . $user_id, $count, 'mvs', 300 );
+
+		return $count;
+	}
+
+	/**
+	 * Mark notifications as read.
+	 *
+	 * @since 1.1.0
+	 *
+	 * @param int   $user_id User ID.
+	 * @param int[] $ids     Notification IDs to mark read. Empty = mark all.
+	 * @return int Number of notifications marked.
+	 */
+	public function mark_read( int $user_id, array $ids = array() ): int {
+		global $wpdb;
+
+		$now = current_time( 'mysql', true );
+
+		if ( empty( $ids ) ) {
+			$updated = $wpdb->query( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+				$wpdb->prepare(
+					"UPDATE {$wpdb->prefix}mvs_notifications SET read_at = %s WHERE user_id = %d AND read_at IS NULL",
+					$now,
+					$user_id
+				)
+			);
+		} else {
+			$id_list = implode( ',', array_map( 'absint', $ids ) );
+			$updated = $wpdb->query( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+				$wpdb->prepare(
+					"UPDATE {$wpdb->prefix}mvs_notifications SET read_at = %s WHERE user_id = %d AND id IN ({$id_list})", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+					$now,
+					$user_id
+				)
+			);
+		}
+
+		wp_cache_delete( 'mvs_notif_count_' . $user_id, 'mvs' );
+
+		return (int) $updated;
+	}
+
+	/**
+	 * Handle follow notification.
+	 *
+	 * @param int $follower_id  Follower.
+	 * @param int $following_id Followed user.
+	 */
+	public function on_follow( int $follower_id, int $following_id ): void {
+		$this->create( $following_id, 'new_follower', $follower_id );
+	}
+
+	/**
+	 * Handle reaction notification.
+	 *
+	 * @param int    $media_id Media ID.
+	 * @param int    $user_id  Reactor.
+	 * @param string $type     Reaction type.
+	 */
+	public function on_reaction( int $media_id, int $user_id, string $type ): void {
+		$owner = (int) \WPMediaVerse\Core\Plugin::container()->get( 'media_repository' )->get( $media_id, 'post_author' );
+		$this->create( $owner, 'media_reaction', $user_id, $media_id );
+	}
+
+	/**
+	 * Handle comment notification.
+	 *
+	 * @param int $media_id   Media ID.
+	 * @param int $user_id    Commenter.
+	 * @param int $comment_id Comment ID.
+	 */
+	public function on_comment( int $media_id, int $user_id, int $comment_id ): void {
+		$owner = (int) \WPMediaVerse\Core\Plugin::container()->get( 'media_repository' )->get( $media_id, 'post_author' );
+		$this->create( $owner, 'media_comment', $user_id, $media_id, $comment_id );
+	}
+
+	/**
+	 * Handle mention notifications.
+	 *
+	 * @param int    $media_id      Media ID.
+	 * @param int[]  $mentioned_ids Mentioned user IDs.
+	 * @param string $context      Context.
+	 * @param int    $comment_id    Comment ID.
+	 */
+	public function on_mentions( int $media_id, array $mentioned_ids, string $context, int $comment_id ): void {
+		$actor = get_current_user_id();
+
+		// For comment mentions, the media owner already receives a
+		// media_comment row from on_comment() for the SAME comment — sending
+		// a media_mention too means two notifications for one action (QA
+		// 2026-06-05, card 9962124853). Same one-owner-per-path rule as the
+		// DM fix above: on_comment() owns the media owner; on_mentions()
+		// owns everyone else.
+		$owner = 0;
+		if ( 'comment' === $context ) {
+			$owner = (int) \WPMediaVerse\Core\Plugin::container()->get( 'media_repository' )->get( $media_id, 'post_author' );
+		}
+
+		foreach ( $mentioned_ids as $uid ) {
+			if ( $owner && (int) $uid === $owner ) {
+				continue;
+			}
+			$this->create( (int) $uid, 'media_mention', $actor, $media_id, $comment_id );
+		}
+	}
+
+	/**
+	 * Handle favorite notification.
+	 *
+	 * @param int $media_id Media ID.
+	 * @param int $user_id  User who favorited.
+	 */
+	public function on_favorite( int $media_id, int $user_id ): void {
+		$owner = (int) \WPMediaVerse\Core\Plugin::container()->get( 'media_repository' )->get( $media_id, 'post_author' );
+		$this->create( $owner, 'media_favorite', $user_id, $media_id );
+	}
+
+	/**
+	 * Handle new DM sent event.
+	 *
+	 * @param int   $message_id      Message ID.
+	 * @param int   $conversation_id Conversation ID.
+	 * @param int   $sender_id       Sender user ID.
+	 * @param int[] $recipient_ids   Recipient user IDs.
+	 */
+	/**
+	 * Format a notification row for REST output.
+	 *
+	 * @param object $row Database row.
+	 * @return array
+	 */
+	private function format_notification( object $row ): array {
+		$actor      = get_userdata( (int) $row->actor_id );
+		$actor_name = $actor ? $actor->display_name : __( 'Someone', 'wpmediaverse' );
+
+		// Message + deep link come from the single shared builder so REST
+		// output and the mvs_notification_created hook never drift apart.
+		$rendered = $this->build_message_and_link( (string) $row->type, (int) $row->actor_id, (int) $row->media_id );
+
+		return array(
+			'id'         => (int) $row->id,
+			'type'       => $row->type,
+			'message'    => $rendered['message'],
+			'url'        => $rendered['link'],
+			'actor'      => array(
+				'id'          => (int) $row->actor_id,
+				'name'        => $actor_name,
+				'avatar'      => get_avatar_url( (int) $row->actor_id, array( 'size' => 48 ) ),
+				'profile_url' => \WPMediaVerse\Core\Plugin::container()->get( 'template_helpers' )->get_user_profile_url( (int) $row->actor_id ),
+			),
+			'media_id'   => (int) $row->media_id,
+			'comment_id' => (int) $row->comment_id,
+			'is_read'    => ! empty( $row->read_at ),
+			'created_at' => $row->created_at,
+		);
+	}
+
+	/**
+	 * Build the rendered message + deep link for a notification.
+	 *
+	 * Single source of truth shared by format_notification() (REST output)
+	 * and the mvs_notification_created hook, so the plugin's own notifications
+	 * menu and any external consumer (e.g. BuddyNext's central notification
+	 * center) always show identical wording + destination.
+	 *
+	 * @since 1.7.0
+	 *
+	 * @param string $type     Notification type.
+	 * @param int    $actor_id User who triggered it.
+	 * @param int    $media_id Related media ID (0 if none).
+	 * @return array{message:string,link:string}
+	 */
+	private function build_message_and_link( string $type, int $actor_id, int $media_id ): array {
+		$actor       = get_userdata( $actor_id );
+		$actor_name  = $actor ? $actor->display_name : __( 'Someone', 'wpmediaverse' );
+		$media_title = '';
+		if ( $media_id ) {
+			$media_title = \WPMediaVerse\Core\Plugin::container()->get( 'media_repository' )->get( $media_id, 'title' ) ?: '';
+		}
+
+		$message = $this->build_notification_message( $type, $actor_name, $media_title );
+
+		$link = '';
+		if ( $media_id ) {
+			$link = \WPMediaVerse\Core\Plugin::container()->get( 'media_repository' )->get_permalink( $media_id );
+		} elseif ( 'new_follower' === $type ) {
+			// Route to the canonical author-profile URL — BP profile when BP
+			// is active, plugin's /media/@user/ otherwise. NEVER hard-code
+			// `/media/@` here: when the notification text is rendered into a
+			// BP content path, `bp_activity_at_name_filter` rewrites the
+			// `@user` substring into mention HTML and corrupts the URL.
+			$tpl  = \WPMediaVerse\Core\Plugin::container()->get( 'template_helpers' );
+			$link = ( $actor_id > 0 ) ? $tpl->get_user_profile_url( $actor_id ) : '';
+		} elseif ( 'new_message' === $type ) {
+			$link = home_url( '/messages/' );
+		}
+
+		return array(
+			'message' => $message,
+			'link'    => $link,
+		);
+	}
+
+	/**
+	 * Build a human-readable notification message.
+	 *
+	 * @param string $type       Notification type.
+	 * @param string $actor_name Actor display name.
+	 * @param string $media_title Media title (if applicable).
+	 * @return string
+	 */
+	private function build_notification_message( string $type, string $actor_name, string $media_title ): string {
+		/**
+		 * Allows Pro / extensions to supply a label for custom notification types
+		 * without having to extend the switch below. Return a non-empty string to
+		 * override the default label; return null to fall through.
+		 *
+		 * @since 1.1.2
+		 *
+		 * @param string|null $label       Custom label or null to use the default switch.
+		 * @param string      $type        Notification type.
+		 * @param string      $actor_name  Actor display name.
+		 * @param string      $media_title Media title (if any).
+		 */
+		$custom_label = apply_filters( 'mvs_notification_message', null, $type, $actor_name, $media_title );
+		if ( is_string( $custom_label ) && '' !== $custom_label ) {
+			return $custom_label;
+		}
+
+		switch ( $type ) {
+			case 'new_follower':
+				/* translators: %s: user name */
+				return sprintf( __( '%s started following you', 'wpmediaverse' ), $actor_name );
+
+			case 'media_reaction':
+				if ( $media_title ) {
+					/* translators: 1: user name, 2: media title */
+					return sprintf( __( '%1$s reacted to %2$s', 'wpmediaverse' ), $actor_name, $media_title );
+				}
+				/* translators: %s: user name */
+				return sprintf( __( '%s reacted to your media', 'wpmediaverse' ), $actor_name );
+
+			case 'media_comment':
+				if ( $media_title ) {
+					/* translators: 1: user name, 2: media title */
+					return sprintf( __( '%1$s commented on %2$s', 'wpmediaverse' ), $actor_name, $media_title );
+				}
+				/* translators: %s: user name */
+				return sprintf( __( '%s commented on your media', 'wpmediaverse' ), $actor_name );
+
+			case 'media_mention':
+				/* translators: %s: user name */
+				return sprintf( __( '%s mentioned you', 'wpmediaverse' ), $actor_name );
+
+			case 'media_favorite':
+				if ( $media_title ) {
+					/* translators: 1: user name, 2: media title */
+					return sprintf( __( '%1$s favorited %2$s', 'wpmediaverse' ), $actor_name, $media_title );
+				}
+				/* translators: %s: user name */
+				return sprintf( __( '%s favorited your media', 'wpmediaverse' ), $actor_name );
+
+			case 'new_message':
+				/* translators: %s: user name */
+				return sprintf( __( '%s sent you a message', 'wpmediaverse' ), $actor_name );
+
+			default:
+				/* translators: %s: user name */
+				return sprintf( __( '%s interacted with your content', 'wpmediaverse' ), $actor_name );
+		}
+	}
+}

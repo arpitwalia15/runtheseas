@@ -1,0 +1,776 @@
+<?php
+/**
+ * Explore discovery service — the community "heartbeat" deck.
+ *
+ * Explore is not a post feed: it is a single "what's going on" surface that
+ * blends everything new across the community — new members, new spaces, hot
+ * discussions, popular posts and shared media — into one masonry grid, with a
+ * filter row that narrows the same grid by entity type.
+ *
+ * This service is the single source of truth for that deck. Both the SSR
+ * template (templates/feed/explore.php) and the REST pagination endpoint
+ * (FeedController::explore_feed_page) call deck(), so the first paint and every
+ * appended page render from identical data and ordering.
+ *
+ * Post querying (privacy, suspension/shadow-ban exclusion, viewer block/mute,
+ * cursor pagination, impression events) is delegated to FeedService so there is
+ * one post-feed implementation; ExploreService adds the member + space queries
+ * and the blended ordering on top.
+ *
+ * @package BuddyNext
+ * @since   1.6.0
+ */
+
+declare( strict_types=1 );
+
+namespace BuddyNext\Feed;
+
+use BuddyNext\SocialGraph\FollowService;
+
+defined( 'ABSPATH' ) || exit;
+
+/**
+ * Builds the unified Explore discovery deck and its per-type filtered views.
+ */
+class ExploreService {
+
+	/**
+	 * Valid filter facets for the Explore grid.
+	 *
+	 * @var string[]
+	 */
+	public const FILTERS = array( 'all', 'members', 'spaces', 'posts', 'discussions', 'media' );
+
+	/**
+	 * Object-cache group for the Explore decks.
+	 */
+	private const CACHE_GROUP = 'buddynext_explore';
+
+	/**
+	 * Deck TTL. A backstop — the events that matter (a block, a new post) bust explicitly.
+	 */
+	private const CACHE_TTL = 300;
+
+	/**
+	 * Version counter for every cached deck.
+	 */
+	private const DECK_VERSION_KEY = 'explore_deck_version';
+
+	/**
+	 * How many new members to weave into the blended "all" first page.
+	 */
+	private const DISCOVERY_MEMBERS = 4;
+
+	/**
+	 * How many new spaces to weave into the blended "all" first page.
+	 */
+	private const DISCOVERY_SPACES = 2;
+
+	/**
+	 * Post-feed engine (delegated for all post querying).
+	 *
+	 * @var FeedService
+	 */
+	private FeedService $feed;
+
+	/**
+	 * Constructor.
+	 *
+	 * @param FeedService|null $feed Optional feed service; resolved from the
+	 *                               container when omitted so any Pro rebind
+	 *                               (AI-ranked feed) is honoured.
+	 */
+	public function __construct( ?FeedService $feed = null ) {
+		if ( $feed instanceof FeedService ) {
+			$this->feed = $feed;
+			return;
+		}
+
+		if ( function_exists( 'buddynext_service' ) ) {
+			$resolved = buddynext_service( 'feed' );
+			if ( $resolved instanceof FeedService ) {
+				$this->feed = $resolved;
+				return;
+			}
+		}
+
+		$this->feed = new FeedService( new FollowService(), new PostService() );
+	}
+
+	/**
+	 * Build the discovery deck for a filter facet.
+	 *
+	 * @param string      $filter   One of self::FILTERS.
+	 * @param string|null $cursor   Opaque pagination cursor.
+	 * @param int         $per_page Cards per page.
+	 * @return array{items: array<int,array<string,mixed>>, next_cursor: string|null, filter: string}
+	 */
+	public function deck( string $filter, ?string $cursor = null, int $per_page = 12 ): array {
+		$filter   = in_array( $filter, self::FILTERS, true ) ? $filter : 'all';
+		$per_page = max( 1, min( $per_page, FeedService::MAX_PER_PAGE ) );
+
+		// The deck IS viewer-dependent, even though nothing in the signature says so: it
+		// drops users the viewer has blocked (in either direction) and it garnishes the
+		// "all" deck with spaces picked from the viewer's own interests. A cache key
+		// without the viewer in it would show a member the content of somebody they
+		// blocked — the one thing a block is for. Logged-out viewers all share key 0,
+		// which is correct: no blocks, no interests, one identical deck.
+		$viewer    = get_current_user_id();
+		$cache_key = sprintf(
+			'deck_v%d_%s_%s_%d_u%d',
+			self::deck_version(),
+			$filter,
+			null === $cursor ? '' : md5( $cursor ),
+			$per_page,
+			$viewer
+		);
+
+		$cached = wp_cache_get( $cache_key, self::CACHE_GROUP );
+
+		if ( is_array( $cached ) ) {
+			return $cached;
+		}
+
+		switch ( $filter ) {
+			case 'members':
+				$result = $this->members_deck( $cursor, $per_page );
+				break;
+			case 'spaces':
+				$result = $this->spaces_deck( $cursor, $per_page );
+				break;
+			case 'posts':
+			case 'discussions':
+			case 'media':
+				$result = $this->posts_deck( $filter, $cursor, $per_page );
+				break;
+			default:
+				$result = $this->all_deck( $cursor, $per_page );
+				break;
+		}
+
+		$result['filter'] = $filter;
+
+		wp_cache_set( $cache_key, $result, self::CACHE_GROUP, self::CACHE_TTL );
+
+		return $result;
+	}
+
+	/**
+	 * Current version of the Explore decks.
+	 *
+	 * @return int
+	 */
+	private static function deck_version(): int {
+		$version = wp_cache_get( self::DECK_VERSION_KEY, self::CACHE_GROUP );
+
+		if ( false === $version ) {
+			$version = 1;
+			wp_cache_set( self::DECK_VERSION_KEY, $version, self::CACHE_GROUP );
+		}
+
+		return (int) $version;
+	}
+
+	/**
+	 * Invalidate every cached Explore deck, for every viewer, in O(1).
+	 *
+	 * Explore is a discovery surface, so a short TTL would mostly do — but not for the two
+	 * things that must never lag:
+	 *
+	 *   - a BLOCK. Blocking someone and still being shown their posts for the next five
+	 *     minutes is the block failing at the only job it has.
+	 *   - a member's OWN new post. Posting and not seeing it on the landing surface reads
+	 *     as the post having been lost.
+	 *
+	 * So the deck is busted on those events rather than left to expire. It is a global
+	 * bump (every viewer's decks) rather than a per-viewer one: blocks are rare, and a
+	 * bump costs one cache write.
+	 *
+	 * @return void
+	 */
+	public static function flush_decks(): void {
+		wp_cache_set( self::DECK_VERSION_KEY, self::deck_version() + 1, self::CACHE_GROUP );
+	}
+
+	/**
+	 * Community "pulse" counts for the Explore hero (members, spaces, posts).
+	 *
+	 * Cached for five minutes so the hero never adds query load on a busy
+	 * discovery surface. count_users() is itself WP-cached; the space + post
+	 * COUNTs are bundled into the same transient.
+	 *
+	 * @return array{members:int, spaces:int, posts:int}
+	 */
+	public function pulse(): array {
+		$cached = get_transient( 'buddynext_explore_pulse' );
+		if ( is_array( $cached ) ) {
+			return $cached;
+		}
+
+		global $wpdb;
+
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared
+		$spaces = (int) $wpdb->get_var(
+			"SELECT COUNT(*) FROM {$wpdb->prefix}bn_spaces WHERE type IN ('open','private') AND is_archived = 0"
+		);
+		// Count only the posts the deck would actually surface (same guard as
+		// FeedService::explore_feed) so the pulse stat matches the grid: no reshares,
+		// no authorless rows, nothing blank.
+		$posts = (int) $wpdb->get_var(
+			"SELECT COUNT(*) FROM {$wpdb->prefix}bn_posts
+			  WHERE privacy = 'public' AND status = 'published'" . $this->feed->explore_renderable_where()
+		);
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared
+
+		$user_counts = count_users();
+		$pulse       = array(
+			'members' => (int) ( $user_counts['total_users'] ?? 0 ),
+			'spaces'  => $spaces,
+			'posts'   => $posts,
+		);
+
+		set_transient( 'buddynext_explore_pulse', $pulse, 5 * MINUTE_IN_SECONDS );
+		return $pulse;
+	}
+
+	/**
+	 * Newest member IDs for the "people to discover" aside.
+	 *
+	 * Reuses the same exclusion rules as the grid (suspended / shadow-banned /
+	 * blocked / self) so the aside never surfaces someone the grid hides.
+	 *
+	 * @param int $limit Maximum IDs.
+	 * @return array<int,int>
+	 */
+	public function suggested_member_ids( int $limit = 3 ): array {
+		$limit     = max( 1, $limit );
+		$pool_size = $limit * 4;
+
+		// Cache the wider newest-members POOL (not the display slice) and rotate the
+		// shown set each load via buddynext_sample_ranked — the aside stays "newest"
+		// but never shows identical faces on every page view within the TTL. The
+		// sample runs OUTSIDE the cache, so the pool query runs at most once per TTL
+		// yet the display still rotates on every load (matches the who-to-follow and
+		// suggested-spaces asides). Without this the viewer saw a static list.
+		$cache_key = 'discover-pool-v1:' . $pool_size;
+		$pool      = wp_cache_get( $cache_key, self::CACHE_GROUP );
+		if ( ! is_array( $pool ) ) {
+			$pool = array();
+			foreach ( $this->newest_members( $pool_size, null )['items'] as $card ) {
+				if ( ! empty( $card['user_id'] ) ) {
+					$pool[] = (int) $card['user_id'];
+				}
+			}
+			wp_cache_set( $cache_key, $pool, self::CACHE_GROUP, self::CACHE_TTL );
+		}
+
+		return buddynext_sample_ranked( $pool, $limit );
+	}
+
+	/**
+	 * Blended "all" deck — the heartbeat view.
+	 *
+	 * Page one weaves a handful of the newest members and spaces into the post
+	 * stream so the grid reads as "what's happening" rather than "latest posts".
+	 * Subsequent pages (cursor present) return posts only, so cursor pagination
+	 * stays anchored to a single backbone.
+	 *
+	 * @param string|null $cursor   Post cursor (null on the first page).
+	 * @param int         $per_page Posts per page.
+	 * @return array{items: array<int,array<string,mixed>>, next_cursor: string|null}
+	 */
+	private function all_deck( ?string $cursor, int $per_page ): array {
+		$post_result = $this->feed->explore_feed( $cursor, $per_page, 'all' );
+		$post_cards  = $this->wrap_posts( (array) ( $post_result['items'] ?? array() ) );
+
+		// Discovery garnish only on the first page.
+		if ( null !== $cursor && '' !== $cursor ) {
+			return array(
+				'items'       => $post_cards,
+				'next_cursor' => $post_result['next_cursor'] ?? null,
+			);
+		}
+
+		// "Spaces you might like": when the viewer has picked interests, the
+		// space garnish is drawn from open spaces in those categories (most
+		// members first, minus spaces already joined) instead of plain newest —
+		// the Explore listing itself stays chronological by design. Blank
+		// interests (or no matches) fall back to newest, so guests and
+		// non-pickers see exactly the previous deck (additive signal).
+		$discovery     = array();
+		$space_garnish = $this->interest_spaces( get_current_user_id(), self::DISCOVERY_SPACES );
+		if ( array() === $space_garnish ) {
+			$space_garnish = $this->newest_spaces( self::DISCOVERY_SPACES, null )['items'];
+		}
+		foreach ( $space_garnish as $space_card ) {
+			$discovery[] = $space_card;
+		}
+		foreach ( $this->newest_members( self::DISCOVERY_MEMBERS, null )['items'] as $member_card ) {
+			$discovery[] = $member_card;
+		}
+
+		$items = $this->interleave( $post_cards, $discovery );
+
+		/**
+		 * Filter the blended Explore first-page deck.
+		 *
+		 * Pro can inject community-pulse / AI-digest cards here (the wireframe's
+		 * speculative card types) without the free build fabricating data.
+		 *
+		 * @since 1.6.0
+		 *
+		 * @param array<int,array<string,mixed>> $items     Ordered card payloads.
+		 * @param array<int,array<string,mixed>> $post_cards Post cards only.
+		 */
+		$items = (array) apply_filters( 'buddynext_explore_all_deck', $items, $post_cards );
+
+		return array(
+			'items'       => $items,
+			'next_cursor' => $post_result['next_cursor'] ?? null,
+		);
+	}
+
+	/**
+	 * Homogeneous post deck for the posts / discussions / media facets.
+	 *
+	 * @param string      $filter   posts|discussions|media.
+	 * @param string|null $cursor   Post cursor.
+	 * @param int         $per_page Posts per page.
+	 * @return array{items: array<int,array<string,mixed>>, next_cursor: string|null}
+	 */
+	private function posts_deck( string $filter, ?string $cursor, int $per_page ): array {
+		$post_filter = 'all';
+		if ( 'discussions' === $filter ) {
+			$post_filter = 'discussions';
+		} elseif ( 'media' === $filter ) {
+			$post_filter = 'media';
+		} elseif ( 'posts' === $filter ) {
+			$post_filter = 'posts';
+		}
+
+		$post_result = $this->feed->explore_feed( $cursor, $per_page, $post_filter );
+
+		return array(
+			'items'       => $this->wrap_posts( (array) ( $post_result['items'] ?? array() ) ),
+			'next_cursor' => $post_result['next_cursor'] ?? null,
+		);
+	}
+
+	/**
+	 * Newest-members deck (offset paginated).
+	 *
+	 * @param string|null $cursor   Offset cursor ("off:N").
+	 * @param int         $per_page Members per page.
+	 * @return array{items: array<int,array<string,mixed>>, next_cursor: string|null}
+	 */
+	private function members_deck( ?string $cursor, int $per_page ): array {
+		return $this->newest_members( $per_page, $cursor );
+	}
+
+	/**
+	 * Newest-spaces deck (offset paginated).
+	 *
+	 * @param string|null $cursor   Offset cursor ("off:N").
+	 * @param int         $per_page Spaces per page.
+	 * @return array{items: array<int,array<string,mixed>>, next_cursor: string|null}
+	 */
+	private function spaces_deck( ?string $cursor, int $per_page ): array {
+		return $this->newest_spaces( $per_page, $cursor );
+	}
+
+	/**
+	 * Resolve the newest members as card payloads.
+	 *
+	 * @param int         $limit  Maximum members.
+	 * @param string|null $cursor Offset cursor (null = first page).
+	 * @return array{items: array<int,array<string,mixed>>, next_cursor: string|null}
+	 */
+	private function newest_members( int $limit, ?string $cursor ): array {
+		$offset = $this->decode_offset( $cursor );
+
+		$query = new \WP_User_Query(
+			array(
+				'number'      => $limit + 1,
+				'offset'      => $offset,
+				'orderby'     => 'registered',
+				'order'       => 'DESC',
+				'fields'      => 'all',
+				'exclude'     => $this->excluded_member_ids(),
+				'count_total' => false,
+			)
+		);
+
+		$users    = (array) $query->get_results();
+		$has_more = count( $users ) > $limit;
+		if ( $has_more ) {
+			array_pop( $users );
+		}
+
+		$items = array();
+		foreach ( $users as $user ) {
+			if ( ! $user instanceof \WP_User ) {
+				continue;
+			}
+			$items[] = array(
+				'kind'       => 'member',
+				'user_id'    => (int) $user->ID,
+				'registered' => (string) $user->user_registered,
+			);
+		}
+
+		return array(
+			'items'       => $items,
+			'next_cursor' => $has_more ? $this->encode_offset( $offset + $limit ) : null,
+		);
+	}
+
+	/**
+	 * Resolve the newest discoverable spaces as card payloads.
+	 *
+	 * Open + private spaces are discoverable (secret never appears); archived
+	 * spaces are excluded.
+	 *
+	 * @param int         $limit  Maximum spaces.
+	 * @param string|null $cursor Offset cursor (null = first page).
+	 * @return array{items: array<int,array<string,mixed>>, next_cursor: string|null}
+	 */
+	private function newest_spaces( int $limit, ?string $cursor ): array {
+		global $wpdb;
+
+		$offset = $this->decode_offset( $cursor );
+
+		// Static columns + bound LIMIT/OFFSET — no user data interpolated.
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT id, name, slug, description, avatar_url, member_count, type, created_at
+				   FROM {$wpdb->prefix}bn_spaces
+				  WHERE type IN ('open','private')
+				    AND is_archived = 0
+				  ORDER BY created_at DESC, id DESC
+				  LIMIT %d OFFSET %d",
+				$limit + 1,
+				$offset
+			),
+			ARRAY_A
+		);
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+
+		$rows     = (array) $rows;
+		$has_more = count( $rows ) > $limit;
+		if ( $has_more ) {
+			array_pop( $rows );
+		}
+
+		$items = array();
+		foreach ( $rows as $row ) {
+			$items[] = array(
+				'kind'  => 'space',
+				'space' => array(
+					'id'           => (int) $row['id'],
+					'name'         => (string) $row['name'],
+					'slug'         => (string) $row['slug'],
+					'description'  => (string) ( $row['description'] ?? '' ),
+					'avatar_url'   => (string) ( $row['avatar_url'] ?? '' ),
+					'member_count' => (int) ( $row['member_count'] ?? 0 ),
+					'type'         => (string) ( $row['type'] ?? 'open' ),
+					'created_at'   => (string) ( $row['created_at'] ?? '' ),
+				),
+			);
+		}
+
+		return array(
+			'items'       => $items,
+			'next_cursor' => $has_more ? $this->encode_offset( $offset + $limit ) : null,
+		);
+	}
+
+	/**
+	 * "Spaces you might like" — open spaces in the viewer's picked interest
+	 * categories, most members first, minus spaces already joined.
+	 *
+	 * Bounded by the pick cap (10) and the card limit; both subqueries ride
+	 * existing indexes (bn_spaces.category, bn_space_members.user_feed).
+	 * Returns an empty array for guests, blank interests, or no matches — the
+	 * caller falls back to the newest-spaces garnish (additive signal, plan
+	 * §4.3 in docs/plans/interests-personalization.md).
+	 *
+	 * @param int $user_id Viewing user ID (0 = guest).
+	 * @param int $limit   Max cards.
+	 * @return array<int,array<string,mixed>> Space card payloads.
+	 */
+	private function interest_spaces( int $user_id, int $limit ): array {
+		if ( $user_id <= 0 ) {
+			return array();
+		}
+
+		$picks = array_slice(
+			( new \BuddyNext\Onboarding\OnboardingService() )->get_interest_ids( $user_id ),
+			0,
+			10
+		);
+		if ( array() === $picks ) {
+			return array();
+		}
+
+		global $wpdb;
+
+		$in = implode( ',', array_map( 'absint', $picks ) );
+
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT id, name, slug, description, avatar_url, member_count, type, created_at
+				   FROM {$wpdb->prefix}bn_spaces
+				  WHERE type = 'open'
+				    AND is_archived = 0
+				    AND category_id IN ({$in})
+				    AND id NOT IN (
+						SELECT space_id FROM {$wpdb->prefix}bn_space_members
+						 WHERE user_id = %d AND status = 'active'
+				    )
+				  ORDER BY member_count DESC, id DESC
+				  LIMIT %d",
+				$user_id,
+				$limit
+			),
+			ARRAY_A
+		);
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+
+		$items = array();
+		foreach ( (array) $rows as $row ) {
+			$items[] = array(
+				'kind'  => 'space',
+				'space' => array(
+					'id'           => (int) $row['id'],
+					'name'         => (string) $row['name'],
+					'slug'         => (string) $row['slug'],
+					'description'  => (string) ( $row['description'] ?? '' ),
+					'avatar_url'   => (string) ( $row['avatar_url'] ?? '' ),
+					'member_count' => (int) ( $row['member_count'] ?? 0 ),
+					'type'         => (string) ( $row['type'] ?? 'open' ),
+					'created_at'   => (string) ( $row['created_at'] ?? '' ),
+				),
+			);
+		}
+
+		return $items;
+	}
+
+	/**
+	 * Wrap raw post rows as classified card payloads, batching the hashtag
+	 * lookup so the grid never runs a per-card query.
+	 *
+	 * @param array<int,array<string,mixed>> $posts Post rows from FeedService.
+	 * @return array<int,array<string,mixed>>
+	 */
+	private function wrap_posts( array $posts ): array {
+		if ( empty( $posts ) ) {
+			return array();
+		}
+
+		$ids     = array();
+		$authors = array();
+
+		foreach ( $posts as $post ) {
+			$pid = (int) ( $post['id'] ?? 0 );
+			if ( $pid > 0 ) {
+				$ids[] = $pid;
+			}
+
+			$author = (int) ( $post['user_id'] ?? 0 );
+			if ( $author > 0 ) {
+				$authors[] = $author;
+			}
+		}
+
+		// Prime the author users in ONE query. Each card renders its author's avatar, and
+		// get_avatar_url() resolves the user behind the id — so a 12-card deck was up to 12
+		// separate user lookups on the busiest discovery surface on the site. This is the
+		// same batch-prime the comment and reaction lists already do.
+		$authors = array_values( array_unique( $authors ) );
+		if ( ! empty( $authors ) ) {
+			cache_users( $authors );
+		}
+
+		$hashtags = $this->first_hashtags_map( $ids );
+
+		$cards = array();
+		foreach ( $posts as $post ) {
+			if ( ! is_array( $post ) ) {
+				continue;
+			}
+			$pid     = (int) ( $post['id'] ?? 0 );
+			$cards[] = array(
+				'kind'    => function_exists( 'buddynext_explore_card_kind' )
+					? buddynext_explore_card_kind( $post )
+					: 'post-text',
+				'post'    => $post,
+				'hashtag' => $hashtags[ $pid ] ?? '',
+			);
+		}
+
+		return $cards;
+	}
+
+	/**
+	 * Map post IDs to their first hashtag slug in one query (no N+1).
+	 *
+	 * @param array<int,int> $post_ids Post IDs.
+	 * @return array<int,string> post_id => slug.
+	 */
+	private function first_hashtags_map( array $post_ids ): array {
+		$post_ids = array_values( array_unique( array_filter( array_map( 'intval', $post_ids ) ) ) );
+		if ( empty( $post_ids ) ) {
+			return array();
+		}
+
+		global $wpdb;
+		$placeholders = implode( ',', array_fill( 0, count( $post_ids ), '%d' ) );
+
+		// $placeholders is built from a counted %d list — safe to interpolate.
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT ph.post_id, h.slug
+				   FROM {$wpdb->prefix}bn_post_hashtags ph
+				   JOIN {$wpdb->prefix}bn_hashtags h ON h.id = ph.hashtag_id
+				  WHERE ph.post_id IN ({$placeholders})
+				  ORDER BY ph.post_id ASC, ph.created_at ASC, ph.hashtag_id ASC",
+				...$post_ids
+			),
+			ARRAY_A
+		);
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
+
+		$map = array();
+		foreach ( (array) $rows as $row ) {
+			$pid = (int) $row['post_id'];
+			if ( ! isset( $map[ $pid ] ) ) {
+				$map[ $pid ] = (string) $row['slug'];
+			}
+		}
+		return $map;
+	}
+
+	/**
+	 * Interleave discovery cards (members/spaces) into the post stream.
+	 *
+	 * Inserts one discovery card after roughly every third post so the mix reads
+	 * naturally without burying posts. Any leftover discovery cards are appended.
+	 *
+	 * @param array<int,array<string,mixed>> $posts     Post cards.
+	 * @param array<int,array<string,mixed>> $discovery Member/space cards.
+	 * @return array<int,array<string,mixed>>
+	 */
+	private function interleave( array $posts, array $discovery ): array {
+		if ( empty( $discovery ) ) {
+			return $posts;
+		}
+		if ( empty( $posts ) ) {
+			return $discovery;
+		}
+
+		$out   = array();
+		$queue = array_values( $discovery );
+		$slot  = 2; // First discovery card lands after the 2nd post.
+
+		foreach ( $posts as $i => $post ) {
+			$out[] = $post;
+			if ( ( $i + 1 ) >= $slot && ! empty( $queue ) ) {
+				$out[] = array_shift( $queue );
+				$slot += 3;
+			}
+		}
+
+		// Append any discovery cards that didn't fit.
+		while ( ! empty( $queue ) ) {
+			$out[] = array_shift( $queue );
+		}
+
+		return $out;
+	}
+
+	/**
+	 * User IDs to exclude from member discovery: active suspensions,
+	 * shadow-banned users, and (for a logged-in viewer) blocked users.
+	 *
+	 * @return array<int,int>
+	 */
+	private function excluded_member_ids(): array {
+		global $wpdb;
+
+		// This is the shared discovery gate (ANY active suspension + shadow-ban — see
+		// ModerationService::discovery_exclude_sql(), NOT the hide_posts content gate),
+		// but resolved to an ID list here on purpose: Explore merges it with the
+		// viewer's bidirectional blocks into one exclusion set, which the deck applies
+		// as IDs. Same gate, materialised differently — do not converge onto the SQL
+		// helper, and never onto moderation_exclude_sql() (wrong, hide_posts, gate).
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$suspended = $wpdb->get_col(
+			"SELECT user_id FROM {$wpdb->prefix}bn_user_suspensions
+			 WHERE lifted_at IS NULL AND (expires_at IS NULL OR expires_at > UTC_TIMESTAMP())"
+		);
+		$shadow    = $wpdb->get_col(
+			$wpdb->prepare(
+				"SELECT user_id FROM {$wpdb->usermeta} WHERE meta_key = %s AND meta_value = '1'",
+				'bn_shadow_banned'
+			)
+		);
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+
+		$viewer  = get_current_user_id();
+		$blocked = array();
+		if ( $viewer > 0 && function_exists( 'buddynext_service' ) ) {
+			$blocks = buddynext_service( 'blocks' );
+			// Bidirectional block exclusion (the canonical helper the member directory
+			// uses) — a user who blocked the viewer must also drop out of the viewer's
+			// Explore deck, not only users the viewer blocked.
+			if ( $blocks && method_exists( $blocks, 'block_related_ids' ) ) {
+				$blocked = (array) $blocks->block_related_ids( $viewer );
+			}
+		}
+
+		return array_values(
+			array_unique(
+				array_map(
+					'intval',
+					array_merge(
+						(array) $suspended,
+						(array) $shadow,
+						$blocked,
+						$viewer > 0 ? array( $viewer ) : array()
+					)
+				)
+			)
+		);
+	}
+
+	/**
+	 * Encode an offset cursor.
+	 *
+	 * @param int $offset Row offset.
+	 * @return string Opaque cursor.
+	 */
+	private function encode_offset( int $offset ): string {
+		return base64_encode( 'off:' . $offset ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
+	}
+
+	/**
+	 * Decode an offset cursor.
+	 *
+	 * @param string|null $cursor Opaque cursor.
+	 * @return int Row offset (0 when absent/invalid).
+	 */
+	private function decode_offset( ?string $cursor ): int {
+		if ( null === $cursor || '' === $cursor ) {
+			return 0;
+		}
+		$raw = base64_decode( $cursor, true ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode
+		if ( false === $raw || 0 !== strpos( $raw, 'off:' ) ) {
+			return 0;
+		}
+		return max( 0, (int) substr( $raw, 4 ) );
+	}
+}

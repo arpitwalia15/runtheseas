@@ -1,0 +1,97 @@
+/* Submit Achievement — block styles. */
+
+.wb-gam-submit-achievement {
+	background: var(--wb-gam-color-white);
+	border: 1px solid var(--wb-gam-color-border);
+	border-radius: var(--wb-gam-radius-md);
+	padding: 20px;
+}
+
+.wb-gam-submit-achievement__guest {
+	margin: 0;
+	color: var(--wb-gam-color-text-muted);
+	font-size: 14px;
+}
+
+.wb-gam-submit-achievement__form {
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+	margin: 0;
+}
+
+.wb-gam-submit-achievement__field {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	font-size: 14px;
+}
+
+.wb-gam-submit-achievement__field span {
+	font-weight: 500;
+	color: var(--wb-gam-color-text);
+}
+
+.wb-gam-submit-achievement__field select,
+.wb-gam-submit-achievement__field input,
+.wb-gam-submit-achievement__field textarea {
+	width: 100%;
+	padding: 10px 12px;
+	border: 1px solid var(--wb-gam-color-border);
+	border-radius: 8px;
+	background: var(--wb-gam-color-white);
+	font-size: 14px;
+	font-family: inherit;
+}
+
+.wb-gam-submit-achievement__field textarea { resize: vertical; min-height: 72px; }
+
+.wb-gam-submit-achievement__field select:focus,
+.wb-gam-submit-achievement__field input:focus,
+.wb-gam-submit-achievement__field textarea:focus {
+	outline: 2px solid var(--wb-gam-color-accent-ring);
+	border-color: var(--wb-gam-color-accent);
+}
+
+.wb-gam-submit-achievement__submit {
+	align-self: flex-start;
+	background: var(--wb-gam-color-accent);
+	color: var(--wb-gam-color-white);
+	border: none;
+	padding: 10px 20px;
+	border-radius: 8px;
+	font-size: 14px;
+	font-weight: 600;
+	cursor: pointer;
+	min-height: 40px;
+}
+
+.wb-gam-submit-achievement__submit:hover:not(:disabled) {
+	filter: brightness(0.95);
+}
+
+.wb-gam-submit-achievement__submit:focus-visible {
+	outline: 2px solid var(--wb-gam-color-accent);
+	outline-offset: 2px;
+}
+
+.wb-gam-submit-achievement__submit:disabled {
+	opacity: 0.6;
+	cursor: not-allowed;
+}
+
+.wb-gam-submit-achievement__status {
+	margin: 0;
+	font-size: 13px;
+	min-height: 18px;
+}
+
+/* Status-state colours — set by view.js via classList instead of inline
+ * style.color, so themes / dark mode can override via token. */
+.wb-gam-submit-achievement__status--error {
+	color: var(--wb-gam-color-danger-strong);
+}
+
+.wb-gam-submit-achievement__status--success {
+	color: var(--wb-gam-color-success-strong);
+}

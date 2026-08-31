@@ -1,0 +1,420 @@
+/**
+ * Single Post Base Styles
+ *
+ * Maps --sp-* custom properties from --wbcom-* tokens.
+ * Dark mode works automatically via theme-colors.css.
+ *
+ * @package wbcom-essential
+ * @since 4.3.0
+ */
+
+/* Token mapping */
+.wbcom-sp {
+	--sp-primary: var(--wbcom-color-primary, #0073aa);
+	--sp-primary-hover: var(--wbcom-color-primary-hover, #005177);
+	--sp-bg: var(--wbcom-color-base, #ffffff);
+	--sp-bg-alt: var(--wbcom-color-base-2, #f8f9fa);
+	--sp-text: var(--wbcom-color-contrast, #1e1e1e);
+	--sp-text-muted: var(--wbcom-color-contrast-2, #636363);
+	--sp-border: var(--wbcom-color-border, #e3e3e3);
+	--sp-heading: var(--wbcom-heading-color, inherit);
+	--sp-link: var(--wbcom-link-color, var(--sp-primary));
+	--sp-white: #ffffff;
+	--sp-black: #000000;
+}
+
+/* Container */
+.wbcom-sp__container {
+	max-width: 1200px;
+	margin: 0 auto;
+	padding: 0 24px;
+}
+
+.wbcom-sp__container--narrow {
+	max-width: 740px;
+}
+
+/* Title */
+.wbcom-sp__title {
+	font-size: clamp(1.75rem, 4vw, 2.5rem);
+	line-height: 1.25;
+	font-weight: 700;
+	color: var(--sp-heading);
+	margin: 0 0 16px;
+}
+
+/* Meta */
+.wbcom-sp__meta {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 16px;
+	font-size: 0.875rem;
+	color: var(--sp-text-muted);
+}
+
+.wbcom-sp__meta a {
+	color: inherit;
+	text-decoration: none;
+}
+
+.wbcom-sp__meta a:hover {
+	color: var(--sp-primary);
+}
+
+.wbcom-sp__meta-author {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.wbcom-sp__meta-author img {
+	border-radius: 50%;
+}
+
+.wbcom-sp__meta-reading {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.wbcom-sp__meta-reading::before {
+	content: "";
+	display: inline-block;
+	width: 4px;
+	height: 4px;
+	border-radius: 50%;
+	background: currentColor;
+	opacity: 0.5;
+}
+
+/* Content */
+.wbcom-sp__content {
+	font-size: 1.0625rem;
+	line-height: 1.75;
+	color: var(--sp-text);
+}
+
+.wbcom-sp__content > *:first-child {
+	margin-top: 0;
+}
+
+.wbcom-sp__content a {
+	color: var(--sp-link);
+}
+
+.wbcom-sp__content img {
+	max-width: 100%;
+	height: auto;
+	border-radius: 4px;
+}
+
+.wbcom-sp__content blockquote {
+	border-left: 3px solid var(--sp-primary);
+	margin: 1.5em 0;
+	padding: 0.5em 0 0.5em 1.25em;
+	color: var(--sp-text-muted);
+	font-style: italic;
+}
+
+/* Featured Image */
+.wbcom-sp__featured-image {
+	margin: 0 0 24px;
+}
+
+.wbcom-sp__featured-image img {
+	width: 100%;
+	height: auto;
+	border-radius: 6px;
+	display: block;
+}
+
+.wbcom-sp__featured-caption {
+	font-size: 0.8125rem;
+	color: var(--sp-text-muted);
+	text-align: center;
+	margin-top: 8px;
+}
+
+/* Tags */
+.wbcom-sp__tags {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	align-items: center;
+	padding-top: 24px;
+	border-top: 1px solid var(--sp-border);
+	margin-top: 32px;
+}
+
+.wbcom-sp__tags-label {
+	font-weight: 600;
+	font-size: 0.875rem;
+	color: var(--sp-text-muted);
+}
+
+.wbcom-sp__tags a {
+	display: inline-block;
+	padding: 4px 12px;
+	font-size: 0.8125rem;
+	border-radius: 3px;
+	background: var(--sp-bg-alt);
+	color: var(--sp-text-muted);
+	text-decoration: none;
+	transition: background 0.2s, color 0.2s;
+}
+
+.wbcom-sp__tags a:hover {
+	background: var(--sp-primary);
+	color: var(--sp-white);
+}
+
+/* Page links */
+.wbcom-sp__page-links {
+	margin: 24px 0;
+	padding: 16px 0;
+	border-top: 1px solid var(--sp-border);
+	font-size: 0.875rem;
+}
+
+/* Author Bio */
+.wbcom-sp-author-bio {
+	display: flex;
+	gap: 20px;
+	padding: 24px;
+	margin: 40px 0;
+	background: var(--sp-bg-alt);
+	border-radius: 8px;
+}
+
+.wbcom-sp-author-bio__avatar img {
+	border-radius: 50%;
+	display: block;
+}
+
+.wbcom-sp-author-bio__name {
+	margin: 0 0 4px;
+	font-size: 1rem;
+	font-weight: 600;
+}
+
+.wbcom-sp-author-bio__name a {
+	color: var(--sp-heading);
+	text-decoration: none;
+}
+
+.wbcom-sp-author-bio__name a:hover {
+	color: var(--sp-primary);
+}
+
+.wbcom-sp-author-bio__text {
+	margin: 0;
+	font-size: 0.875rem;
+	line-height: 1.6;
+	color: var(--sp-text-muted);
+}
+
+/* Post Navigation — Basic clean style */
+.wbcom-sp-nav {
+	margin: 40px 0;
+	padding: 24px 0;
+	border-top: 1px solid var(--sp-border);
+}
+
+.wbcom-sp-nav__links {
+	display: flex;
+	justify-content: space-between;
+	gap: 24px;
+}
+
+.wbcom-sp-nav__prev,
+.wbcom-sp-nav__next {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 0.9375rem;
+	color: var(--sp-text);
+	text-decoration: none;
+	max-width: 48%;
+	transition: color 0.2s;
+}
+
+.wbcom-sp-nav__prev:hover,
+.wbcom-sp-nav__next:hover {
+	color: var(--sp-primary);
+}
+
+.wbcom-sp-nav__next {
+	margin-left: auto;
+	text-align: right;
+}
+
+.wbcom-sp-nav__arrow {
+	flex-shrink: 0;
+	font-size: 1.125rem;
+	opacity: 0.6;
+}
+
+.wbcom-sp-nav__text {
+	overflow: hidden;
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	line-height: 1.4;
+}
+
+/* Related Posts */
+.wbcom-sp-related {
+	margin: 40px 0;
+}
+
+.wbcom-sp-related__title {
+	font-size: 1.25rem;
+	font-weight: 700;
+	margin: 0 0 20px;
+	color: var(--sp-heading);
+}
+
+.wbcom-sp-related__grid {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 24px;
+}
+
+.wbcom-sp-related__card {
+	border-radius: 8px;
+	overflow: hidden;
+	background: var(--sp-bg-alt);
+	transition: box-shadow 0.2s;
+}
+
+.wbcom-sp-related__card:hover {
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.wbcom-sp-related__image {
+	display: block;
+	aspect-ratio: 16 / 10;
+	overflow: hidden;
+}
+
+.wbcom-sp-related__image img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+}
+
+.wbcom-sp-related__card-content {
+	padding: 16px;
+}
+
+.wbcom-sp-related__card-title {
+	margin: 0 0 8px;
+	font-size: 0.9375rem;
+	font-weight: 600;
+	line-height: 1.4;
+}
+
+.wbcom-sp-related__card-title a {
+	color: var(--sp-heading);
+	text-decoration: none;
+}
+
+.wbcom-sp-related__card-title a:hover {
+	color: var(--sp-primary);
+}
+
+.wbcom-sp-related__date {
+	font-size: 0.8125rem;
+	color: var(--sp-text-muted);
+}
+
+/* Share Buttons */
+.wbcom-sp-share {
+	display: flex;
+	gap: 12px;
+}
+
+.wbcom-sp-share__link {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 40px;
+	height: 40px;
+	border-radius: 50%;
+	color: var(--sp-text-muted);
+	background: var(--sp-bg-alt);
+	text-decoration: none;
+	transition: background 0.2s, color 0.2s;
+}
+
+.wbcom-sp-share__link:hover {
+	background: var(--sp-primary);
+	color: var(--sp-white);
+}
+
+/* Inline Share Section */
+.wbcom-sp__share-inline {
+	display: flex;
+	align-items: center;
+	gap: 16px;
+	margin: 32px 0;
+	padding: 20px 0;
+	border-top: 1px solid var(--sp-border);
+	border-bottom: 1px solid var(--sp-border);
+}
+
+.wbcom-sp__share-inline-label {
+	font-size: 0.875rem;
+	font-weight: 600;
+	color: var(--sp-text-muted);
+	white-space: nowrap;
+}
+
+.wbcom-sp__share-inline .wbcom-sp-share {
+	flex-direction: row;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+	.wbcom-sp__container {
+		padding: 0 16px;
+	}
+
+	.wbcom-sp-author-bio {
+		flex-direction: column;
+		text-align: center;
+		align-items: center;
+	}
+
+	.wbcom-sp-related__grid {
+		grid-template-columns: 1fr;
+	}
+
+	.wbcom-sp-nav__links {
+		flex-direction: column;
+		gap: 16px;
+	}
+
+	.wbcom-sp-nav__prev,
+	.wbcom-sp-nav__next {
+		max-width: 100%;
+	}
+
+	.wbcom-sp-nav__next {
+		text-align: left;
+	}
+
+	.wbcom-sp__share-inline {
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 12px;
+	}
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+	.wbcom-sp-related__grid {
+		grid-template-columns: repeat(2, 1fr);
+	}
+}

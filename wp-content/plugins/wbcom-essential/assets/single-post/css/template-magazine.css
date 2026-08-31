@@ -1,0 +1,98 @@
+/**
+ * Template: Magazine
+ *
+ * Full-width hero, gradient overlay, 740px content, related posts grid.
+ * Inline share section below content.
+ *
+ * @package wbcom-essential
+ * @since 4.3.0
+ */
+
+/* Hero */
+.wbcom-sp--magazine .wbcom-sp__hero {
+	position: relative;
+	min-height: 70vh;
+	background-size: cover;
+	background-position: center;
+	display: flex;
+	align-items: flex-end;
+}
+
+.wbcom-sp--magazine .wbcom-sp__hero-overlay {
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(to top, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0.2) 50%, transparent 100%);
+	display: flex;
+	align-items: flex-end;
+}
+
+.wbcom-sp--magazine .wbcom-sp__hero-content {
+	max-width: 740px;
+	padding: 48px 24px;
+	margin: 0 auto;
+	width: 100%;
+}
+
+.wbcom-sp--magazine .wbcom-sp__hero .wbcom-sp__title {
+	color: var(--sp-white);
+	font-size: clamp(2rem, 5vw, 3rem);
+	text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.wbcom-sp--magazine .wbcom-sp__hero .wbcom-sp__meta {
+	color: rgba(255, 255, 255, 0.85);
+}
+
+.wbcom-sp--magazine .wbcom-sp__hero .wbcom-sp__meta a {
+	color: rgba(255, 255, 255, 0.85);
+}
+
+.wbcom-sp--magazine .wbcom-sp__hero .wbcom-sp__meta a:hover {
+	color: var(--sp-white);
+}
+
+/* Category badges (shared between hero and no-hero) */
+.wbcom-sp--magazine .wbcom-sp__hero-cats {
+	margin-bottom: 12px;
+}
+
+.wbcom-sp--magazine .wbcom-sp__hero-cats a {
+	display: inline-block;
+	padding: 4px 12px;
+	background: var(--sp-primary);
+	color: var(--sp-white);
+	font-size: 0.75rem;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	border-radius: 3px;
+	text-decoration: none;
+	margin-right: 6px;
+}
+
+/* No-hero fallback */
+.wbcom-sp--magazine .wbcom-sp__header--no-hero {
+	padding: 48px 0 24px;
+	text-align: center;
+	border-bottom: 1px solid var(--sp-border);
+}
+
+.wbcom-sp--magazine .wbcom-sp__header--no-hero .wbcom-sp__meta {
+	justify-content: center;
+}
+
+/* Content area */
+.wbcom-sp--magazine .wbcom-sp__main {
+	padding: 48px 0;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+	.wbcom-sp--magazine .wbcom-sp__hero {
+		min-height: 50vh;
+	}
+
+	.wbcom-sp--magazine .wbcom-sp__hero-content {
+		padding: 32px 16px;
+	}
+}

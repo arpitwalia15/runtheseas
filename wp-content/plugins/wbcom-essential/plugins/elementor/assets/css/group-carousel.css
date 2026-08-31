@@ -1,0 +1,24 @@
+/*--------------------------------------------------------------
+# Group Carousel — Widget-Specific Styles
+# Swiper base CSS is in swiper-base.css (registered as wbe-swiper)
+--------------------------------------------------------------*/
+.elementor-group-carousel .swiper-slide {
+	text-align: center;
+}
+
+.elementor-group-carousel .item-title {
+	margin-top: 15px;
+	margin-bottom: 30px;
+}
+
+.elementor-group-carousel .group-avatar img {
+	margin: auto;
+	width: 100%;
+	max-width: 150px;
+	border-radius: 100%;
+}
+
+.swiper-container:not(.swiper-container-initialized)>.swiper-wrapper.elementor-group-carousel,
+.swiper:not(.swiper-initialized)>.swiper-wrapper.elementor-group-carousel {
+    overflow: visible;
+}

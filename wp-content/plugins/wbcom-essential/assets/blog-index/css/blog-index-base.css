@@ -1,0 +1,52 @@
+/**
+ * Blog Index Base Styles
+ *
+ * Shared styles for all blog index layouts.
+ *
+ * @package Wbcom_Essential
+ * @since   4.3.0
+ */
+
+.wbcom-blog {
+	padding: 0;
+	margin: 0 auto;
+}
+
+.wbcom-blog__container {
+	max-width: 1200px;
+	margin: 0 auto;
+	padding: 32px 20px;
+}
+
+.wbcom-blog__section {
+	margin-bottom: 48px;
+}
+
+.wbcom-blog__section:last-child {
+	margin-bottom: 0;
+}
+
+/* Category nav spacing */
+.wbcom-blog__category-nav {
+	margin-bottom: 32px;
+}
+
+/* Ticker spacing */
+.wbcom-blog__ticker {
+	margin-bottom: 24px;
+}
+
+/* Hero slider spacing */
+.wbcom-blog__hero {
+	margin-bottom: 40px;
+}
+
+@media (max-width: 782px) {
+	.wbcom-blog__container {
+		padding: 20px 16px;
+	}
+
+	.wbcom-blog__section {
+		margin-bottom: 32px;
+	}
+}

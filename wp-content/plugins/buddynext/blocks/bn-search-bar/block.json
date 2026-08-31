@@ -1,0 +1,49 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "buddynext/search-bar",
+	"title": "Search Bar",
+	"icon": "search",
+	"category": "buddynext",
+	"description": "Unified BuddyNext search input that opens grouped results.",
+	"keywords": [
+		"buddynext",
+		"search",
+		"bar",
+		"unified"
+	],
+	"textdomain": "buddynext",
+	"editorScript": "buddynext-blocks-editor",
+	"style": [
+		"file:../../assets/css/blocks.css",
+		"bn-base"
+	],
+	"supports": {
+		"color": {
+			"background": true,
+			"text": true
+		},
+		"typography": {
+			"fontSize": true
+		},
+		"spacing": {
+			"padding": true,
+			"margin": true
+		}
+	},
+	"attributes": {
+		"placeholder": {
+			"type": "string",
+			"default": ""
+		},
+		"searchIn": {
+			"type": "string",
+			"default": "all"
+		}
+	},
+	"example": {},
+	"editorStyle": [
+		"file:../../assets/css/blocks.css",
+		"bn-base"
+	]
+}

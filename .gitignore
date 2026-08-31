@@ -1,0 +1,47 @@
+# WordPress core
+/wp-admin/
+/wp-includes/
+
+# Main config and secrets
+/wp-config.php
+/.env
+
+# Updraft backups
+/wp-content/updraft/
+/wp-content/*updraft*/
+/wp-content/backups/
+/wp-content/backup*/
+
+# Database files
+*.sql
+*.sql.gz
+*.gz
+*.zip
+*.tar
+*.tar.gz
+
+# Cache
+/wp-content/cache/
+/wp-content/litespeed/
+/wp-content/wflogs/
+
+# Temporary/upgrade files
+/wp-content/upgrade/
+/wp-content/upgrade-temp-backup/
+
+# Logs
+*.log
+debug.log
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Keep WordPress uploads in GitHub
+# Do NOT ignore /wp-content/uploads/
+
+# Keep themes and plugins in GitHub
+# /wp-content/themes/
+# /wp-content/plugins/

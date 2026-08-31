@@ -1,0 +1,372 @@
+/* Full-width Elementor frame and custom HTML rating-field refinements. */
+.rts-luxury-survey {
+	--rts-survey-ornate-frame: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cg fill='none' stroke='%23d89a25' stroke-width='1'%3E%3Cpath d='M0 30V10Q0 0 10 0H30M5 35V15Q5 5 15 5H35M10 30Q10 10 30 10M30 0H90M90 0h20q10 0 10 10v20M85 5h20q10 0 10 10v20M90 10q20 0 20 20M120 30V90M120 90v20q0 10-10 10H90M115 85v20q0 10-10 10H85M110 90q0 20-20 20M90 120H30M30 120H10q-10 0-10-10V90M35 115H15Q5 115 5 105V85M30 110q-20 0-20-20M0 90V30'/%3E%3Cpath d='M13 13l7-7 7 7-7 7zM107 13l-7-7-7 7 7 7zM107 107l-7 7-7-7 7-7zM13 107l7 7 7-7-7-7z'/%3E%3Cpath d='M20 3h14M86 3h14M117 20v14M117 86v14M100 117H86M34 117H20M3 100V86M3 34V20' stroke='%23f6cf75'/%3E%3C/g%3E%3C/svg%3E");
+	left: 50%;
+	width: min(1240px, calc(100vw - 32px)) !important;
+	max-width: none !important;
+	border: 14px solid transparent !important;
+	border-image-source: var(--rts-survey-ornate-frame) !important;
+	border-image-slice: 40 !important;
+	border-image-width: 14px !important;
+	border-image-repeat: stretch !important;
+	margin-right: 0 !important;
+	margin-left: 0 !important;
+	box-shadow: 0 18px 42px rgba(0, 0, 0, .38) !important;
+	clip-path: polygon(13px 0, calc(100% - 13px) 0, 100% 13px, 100% calc(100% - 13px), calc(100% - 13px) 100%, 13px 100%, 0 calc(100% - 13px), 0 13px);
+	transform: translateX(-50%);
+}
+
+.rts-luxury-survey::before {
+	position: absolute;
+	inset: 5px;
+	z-index: 0;
+	padding: 1px;
+	background: linear-gradient(115deg, rgba(112, 70, 12, .75), rgba(242, 189, 76, .9) 25%, rgba(112, 70, 12, .68) 55%, rgba(230, 170, 56, .86));
+	clip-path: polygon(9px 0, calc(100% - 9px) 0, 100% 9px, 100% calc(100% - 9px), calc(100% - 9px) 100%, 9px 100%, 0 calc(100% - 9px), 0 9px);
+	content: "";
+	pointer-events: none;
+	-webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+	-webkit-mask-composite: xor;
+	mask-composite: exclude;
+}
+
+.rts-luxury-survey > * {
+	position: relative;
+	z-index: 1;
+}
+
+.rts-luxury-survey__layout {
+	width: 100%;
+	max-width: 1210px;
+	padding: 10px !important;
+	border: 0 !important;
+	grid-template-columns: minmax(220px, 260px) minmax(0, 1fr);
+	box-shadow: none !important;
+}
+
+.rts-luxury-survey__content {
+	padding: 6px !important;
+	border: 0 !important;
+	box-shadow: none !important;
+}
+
+.rts-luxury-survey__form {
+	padding: 18px 10px !important;
+	border: 0 !important;
+	background: transparent !important;
+	box-shadow: none !important;
+}
+
+.rts-luxury-survey__content,
+.rts-luxury-survey__form,
+.rts-luxury-survey__form .fluentform,
+.rts-luxury-survey__form .frm-fluent-form,
+.rts-luxury-survey__form .ff-step-body,
+.rts-luxury-survey__form .fluentform-step {
+	min-width: 0;
+	width: 100%;
+}
+
+/* Custom HTML questions have no Fluent Forms label, so frame the containing
+ * field whenever the block contains numeric 1-to-10 rating inputs. */
+.rts-luxury-survey__form .fluentform-step .ff-el-group.rts-luxury-survey__rating-question {
+	position: relative;
+	isolation: isolate;
+	width: 100% !important;
+	max-width: none !important;
+	padding: 30px 34px 30px 74px !important;
+	border: 10px solid transparent !important;
+	margin: 0 0 18px !important;
+	border-image-source: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='30' height='30' viewBox='0 0 30 30'%3E%3Cpath d='M0.5 9.5L9.5 0.5H20.5L29.5 9.5V20.5L20.5 29.5H9.5L0.5 20.5Z' fill='none' stroke='%23d89a25' stroke-width='1'/%3E%3C/svg%3E") !important;
+	border-image-slice: 10 !important;
+	border-image-width: 10px !important;
+	border-image-repeat: stretch !important;
+	background-color: #010913 !important;
+	background-image: linear-gradient(120deg, rgba(1, 9, 19, .98), rgba(3, 25, 39, .94)), var(--rts-survey-question-background, none) !important;
+	background-position: center !important;
+	background-size: cover !important;
+	box-shadow: 0 7px 18px rgba(0, 0, 0, .28);
+	box-sizing: border-box;
+}
+
+.rts-luxury-survey__rating-question > .rts-luxury-survey__question-number {
+	top: 22px !important;
+	left: 16px !important;
+}
+
+.rts-luxury-survey__rating-question .ff-el-input--content,
+.rts-luxury-survey__rating-question .ff-custom_html,
+.rts-luxury-survey__rating-question.ff-custom_html {
+	width: 100%;
+	max-width: none;
+}
+
+.rts-luxury-survey__rating-question table {
+	width: 100% !important;
+	max-width: 720px;
+	border: 0 !important;
+	border-collapse: separate !important;
+	border-spacing: 0 10px !important;
+	background: transparent !important;
+}
+
+.rts-luxury-survey__rating-question table th,
+.rts-luxury-survey__rating-question table td {
+	padding: 6px 12px !important;
+	border: 0 !important;
+	background: transparent !important;
+	color: #f6e7c1 !important;
+	vertical-align: middle !important;
+}
+
+.rts-luxury-survey__rating-question table th:first-child,
+.rts-luxury-survey__rating-question table td:first-child {
+	width: 52%;
+	padding-left: 0 !important;
+}
+
+.rts-luxury-survey__rating-question table th:not(:first-child),
+.rts-luxury-survey__rating-question table td:not(:first-child) {
+	width: auto;
+	white-space: nowrap;
+}
+
+.rts-luxury-survey__form .rts-luxury-survey__rating-input {
+	display: inline-block !important;
+	width: 58px !important;
+	min-width: 58px !important;
+	max-width: 58px !important;
+	height: 46px !important;
+	padding: 6px 8px !important;
+	border: 1px solid #d89a25 !important;
+	border-radius: 2px !important;
+	margin: 0 8px 0 0 !important;
+	background: #061827 !important;
+	box-shadow: inset 0 0 0 3px #010913;
+	color: #fff4d7 !important;
+	font: 600 1rem/1 Arial, sans-serif !important;
+	text-align: center !important;
+	vertical-align: middle;
+	-moz-appearance: textfield;
+}
+
+.rts-luxury-survey__rating-input::-webkit-inner-spin-button,
+.rts-luxury-survey__rating-input::-webkit-outer-spin-button {
+	margin: 0;
+	-webkit-appearance: none;
+}
+
+.rts-luxury-survey__rating-input:focus {
+	border-color: #f6cf75 !important;
+	box-shadow: inset 0 0 0 3px #010913, 0 0 0 2px rgba(246, 207, 117, .24) !important;
+	outline: none !important;
+}
+
+/* Fluent Forms renders this matrix as separate sibling column containers.
+ * Present those siblings as one question instead of framing each input field. */
+.rts-luxury-survey__form .fluentform-step.rts-luxury-survey__rating-matrix {
+	position: relative;
+	isolation: isolate;
+	padding: clamp(30px, 3.2vw, 46px) clamp(28px, 4vw, 58px) !important;
+	border: 0 !important;
+	background:
+		linear-gradient(135deg, rgba(2, 18, 31, .99), rgba(2, 26, 41, .97)) !important;
+	box-shadow: 0 10px 24px rgba(0, 0, 0, .28) !important;
+	clip-path: polygon(12px 0, calc(100% - 12px) 0, 100% 12px, 100% calc(100% - 12px), calc(100% - 12px) 100%, 12px 100%, 0 calc(100% - 12px), 0 12px);
+}
+
+.rts-luxury-survey__form .fluentform-step.rts-luxury-survey__rating-matrix::before {
+	position: absolute;
+	inset: 0;
+	z-index: 0;
+	padding: 1px;
+	background: linear-gradient(115deg, #70460c, #efb846 36%, #80500a 70%, #d89a25);
+	clip-path: polygon(12px 0, calc(100% - 12px) 0, 100% 12px, 100% calc(100% - 12px), calc(100% - 12px) 100%, 12px 100%, 0 calc(100% - 12px), 0 12px);
+	content: "";
+	pointer-events: none;
+	-webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+	-webkit-mask-composite: xor;
+	mask-composite: exclude;
+}
+
+.rts-luxury-survey__form .fluentform-step.rts-luxury-survey__rating-matrix::after {
+	display: none !important;
+	content: none !important;
+}
+
+.rts-luxury-survey__form .fluentform-step.rts-luxury-survey__rating-matrix > * {
+	position: relative;
+	z-index: 1;
+}
+
+.rts-luxury-survey__rating-matrix-heading {
+	position: relative;
+	min-height: 72px;
+	padding: 3px 0 12px 62px !important;
+	margin: 0 auto 10px !important;
+	max-width: 800px;
+	color: #f6e7c1;
+}
+
+.rts-luxury-survey__rating-matrix-heading > .rts-luxury-survey__question-number {
+	top: 0 !important;
+	left: 0 !important;
+}
+
+.rts-luxury-survey__rating-matrix-heading p {
+	margin: 0 0 10px !important;
+	color: #f6e7c1 !important;
+	font-size: 1rem;
+	line-height: 1.55;
+}
+
+.rts-luxury-survey__rating-matrix-heading p:first-of-type {
+	color: #f9edcf !important;
+	font-size: clamp(1rem, 1.3vw, 1.15rem);
+}
+
+.rts-luxury-survey__rating-header,
+.rts-luxury-survey__rating-row {
+	width: 100% !important;
+	max-width: 800px;
+	margin-right: auto !important;
+	margin-left: auto !important;
+	box-sizing: border-box;
+}
+
+.rts-luxury-survey__rating-header {
+	display: grid !important;
+	grid-template-columns: 48% 124px;
+	gap: 12px;
+	padding: 8px 14px 10px !important;
+	border-top: 1px solid rgba(216, 154, 37, .28);
+	border-bottom: 1px solid rgba(216, 154, 37, .28);
+	color: #f6cf75;
+	font-weight: 700;
+	justify-content: start;
+}
+
+.rts-luxury-survey__rating-row {
+	display: grid !important;
+	grid-template-columns: 48% 64px 48px;
+	gap: 12px;
+	min-height: 62px;
+	padding: 8px 14px !important;
+	border-bottom: 1px solid rgba(216, 154, 37, .16);
+	align-items: center;
+	justify-content: start;
+}
+
+.rts-luxury-survey__rating-header > .ff-t-cell,
+.rts-luxury-survey__rating-row > .ff-t-cell {
+	width: auto !important;
+	min-width: 0 !important;
+	padding: 0 !important;
+	flex: none !important;
+	flex-basis: auto !important;
+}
+
+.rts-luxury-survey__form .fluentform-step.rts-luxury-survey__rating-matrix .rts-luxury-survey__rating-header .ff-el-group,
+.rts-luxury-survey__form .fluentform-step.rts-luxury-survey__rating-matrix .rts-luxury-survey__rating-row .ff-el-group {
+	position: relative !important;
+	width: 100% !important;
+	max-width: none !important;
+	min-height: 0 !important;
+	padding: 0 !important;
+	border: 0 !important;
+	margin: 0 !important;
+	background: transparent !important;
+	box-shadow: none !important;
+	clip-path: none !important;
+}
+
+.rts-luxury-survey__form .fluentform-step.rts-luxury-survey__rating-matrix .rts-luxury-survey__rating-header .ff-el-group::before,
+.rts-luxury-survey__form .fluentform-step.rts-luxury-survey__rating-matrix .rts-luxury-survey__rating-header .ff-el-group::after,
+.rts-luxury-survey__form .fluentform-step.rts-luxury-survey__rating-matrix .rts-luxury-survey__rating-row .ff-el-group::before,
+.rts-luxury-survey__form .fluentform-step.rts-luxury-survey__rating-matrix .rts-luxury-survey__rating-row .ff-el-group::after {
+	display: none !important;
+	content: none !important;
+}
+
+.rts-luxury-survey__rating-row p,
+.rts-luxury-survey__rating-header p {
+	padding: 0 !important;
+	margin: 0 !important;
+	color: #f6e7c1 !important;
+	line-height: 1.4;
+}
+
+.rts-luxury-survey__rating-field > .ff-el-input--label {
+	display: none !important;
+}
+
+.rts-luxury-survey__rating-field > .ff-el-input--content {
+	display: flex;
+	width: 64px !important;
+	min-height: 0 !important;
+	padding: 0 !important;
+	border: 0 !important;
+	background: transparent !important;
+	box-shadow: none !important;
+	align-items: center;
+	justify-content: center;
+}
+
+@media (max-width: 840px) {
+	.rts-luxury-survey {
+		width: min(100%, calc(100vw - 20px)) !important;
+	}
+
+	.rts-luxury-survey__layout {
+		grid-template-columns: 1fr;
+	}
+}
+
+@media (max-width: 520px) {
+	.rts-luxury-survey {
+		border-width: 10px !important;
+		border-image-width: 10px !important;
+	}
+
+	.rts-luxury-survey__form .fluentform-step.rts-luxury-survey__rating-matrix {
+		padding: 28px 14px !important;
+	}
+
+	.rts-luxury-survey__form .fluentform-step .ff-el-group.rts-luxury-survey__rating-question {
+		padding: 72px 14px 20px !important;
+	}
+
+	.rts-luxury-survey__rating-question table,
+	.rts-luxury-survey__rating-question tbody,
+	.rts-luxury-survey__rating-question tr,
+	.rts-luxury-survey__rating-question th,
+	.rts-luxury-survey__rating-question td {
+		display: block;
+		width: 100% !important;
+	}
+
+	.rts-luxury-survey__rating-question tr {
+		padding: 10px 0;
+		border-bottom: 1px solid rgba(216, 154, 37, .18);
+	}
+
+	.rts-luxury-survey__rating-question td:not(:first-child) {
+		display: inline-block;
+		width: auto !important;
+		padding-left: 0 !important;
+	}
+
+	.rts-luxury-survey__rating-matrix-heading {
+		padding: 60px 0 8px !important;
+	}
+
+	.rts-luxury-survey__rating-header {
+		display: none !important;
+	}
+
+	.rts-luxury-survey__rating-row {
+		grid-template-columns: minmax(0, 1fr) 58px 40px;
+		gap: 8px;
+		padding: 10px 0 !important;
+	}
+}

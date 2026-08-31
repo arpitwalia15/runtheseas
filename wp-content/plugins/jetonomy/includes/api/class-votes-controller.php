@@ -1,0 +1,349 @@
+<?php
+/**
+ * Votes REST API controller.
+ *
+ * @package Jetonomy
+ */
+
+namespace Jetonomy\API;
+
+defined( 'ABSPATH' ) || exit;
+
+use WP_REST_Request;
+use WP_REST_Response;
+use WP_Error;
+use Jetonomy\API\REST_Auth;
+use Jetonomy\Models\Post;
+use Jetonomy\Models\Reply;
+use Jetonomy\Models\Vote;
+use Jetonomy\Models\UserProfile;
+use Jetonomy\Trust\Reputation;
+
+class Votes_Controller extends Base_Controller {
+
+	protected $rest_base = 'votes';
+
+	/**
+	 * Register all REST routes for votes.
+	 */
+	public function register_routes() {
+		$ns = $this->namespace;
+
+		register_rest_route(
+			$ns,
+			'/posts/(?P<id>\d+)/vote',
+			[
+				[
+					'methods'             => \WP_REST_Server::CREATABLE,
+					'callback'            => [ $this, 'vote_post' ],
+					'permission_callback' => REST_Auth::auth_mutation( 'read' ),
+					'args'                => $this->get_vote_args(),
+				],
+				[
+					'methods'             => \WP_REST_Server::DELETABLE,
+					'callback'            => [ $this, 'unvote_post' ],
+					'permission_callback' => REST_Auth::auth_mutation( 'read' ),
+				],
+			]
+		);
+
+		register_rest_route(
+			$ns,
+			'/replies/(?P<id>\d+)/vote',
+			[
+				[
+					'methods'             => \WP_REST_Server::CREATABLE,
+					'callback'            => [ $this, 'vote_reply' ],
+					'permission_callback' => REST_Auth::auth_mutation( 'read' ),
+					'args'                => $this->get_vote_args(),
+				],
+				[
+					'methods'             => \WP_REST_Server::DELETABLE,
+					'callback'            => [ $this, 'unvote_reply' ],
+					'permission_callback' => REST_Auth::auth_mutation( 'read' ),
+				],
+			]
+		);
+	}
+
+	/**
+	 * POST /posts/{id}/vote
+	 */
+	public function vote_post( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+		return $this->handle_vote( 'post', absint( $request->get_param( 'id' ) ), $request );
+	}
+
+	/**
+	 * DELETE /posts/{id}/vote — toggle off by re-casting the same value.
+	 */
+	public function unvote_post( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+		return $this->handle_unvote( 'post', absint( $request->get_param( 'id' ) ) );
+	}
+
+	/**
+	 * POST /replies/{id}/vote
+	 */
+	public function vote_reply( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+		return $this->handle_vote( 'reply', absint( $request->get_param( 'id' ) ), $request );
+	}
+
+	/**
+	 * DELETE /replies/{id}/vote — toggle off by re-casting the same value.
+	 */
+	public function unvote_reply( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+		return $this->handle_unvote( 'reply', absint( $request->get_param( 'id' ) ) );
+	}
+
+	/**
+	 * Shared vote handler for both posts and replies.
+	 *
+	 * @param string          $type    'post' or 'reply'.
+	 * @param int             $id      Object ID.
+	 * @param WP_REST_Request $request
+	 */
+	private function handle_vote( string $type, int $id, WP_REST_Request $request ): WP_REST_Response|WP_Error {
+		$user_id = $this->require_auth();
+		if ( is_wp_error( $user_id ) ) {
+			return $user_id;
+		}
+
+		$object = $this->load_object( $type, $id );
+		if ( is_wp_error( $object ) ) {
+			return $object;
+		}
+
+		// Resolve space_id — replies don't have space_id directly.
+		if ( 'reply' === $type ) {
+			$parent_post = Post::find( (int) $object->post_id );
+			$space_id    = $parent_post ? (int) $parent_post->space_id : 0;
+		} else {
+			$space_id = (int) ( $object->space_id ?? 0 );
+		}
+
+		if ( ! $this->check_permission( 'vote', $space_id ) ) {
+			return $this->permission_error();
+		}
+
+		// Rate limit check.
+		$profile = UserProfile::find_or_create( $user_id );
+		$trust   = (int) ( $profile->trust_level ?? 0 );
+		if ( ! \Jetonomy\Permissions\Rate_Limiter::check( $user_id, 'vote', $trust ) ) {
+			return $this->validation_error( __( 'Rate limit exceeded. Please try again later.', 'jetonomy' ) );
+		}
+
+		$value = (int) $request->get_param( 'value' );
+		if ( ! in_array( $value, [ 1, -1 ], true ) ) {
+			return $this->validation_error( __( 'Vote value must be 1 or -1.', 'jetonomy' ) );
+		}
+
+		$is_self = (int) ( $object->author_id ?? 0 ) === $user_id;
+
+		// Self-downvote block: an author downvoting their own post or reply
+		// drives the displayed score negative in a way that contradicts "I'm
+		// posting my view" (see Basecamp 9803889865 — admin voting down own
+		// topic left it at −1).
+		if ( -1 === $value && $is_self ) {
+			return $this->validation_error( __( 'You cannot downvote your own content.', 'jetonomy' ) );
+		}
+
+		// Self-upvote is allowed by default — a valid "I stand behind this"
+		// gesture. Site owners who run a stricter rep economy can block it.
+		/**
+		 * Whether a member may upvote their own content.
+		 *
+		 * @param bool   $allowed Default true.
+		 * @param int    $user_id Voting user.
+		 * @param string $type    'post' or 'reply'.
+		 * @param int    $id      Object ID.
+		 */
+		if ( 1 === $value && $is_self
+			&& ! apply_filters( 'jetonomy_allow_self_upvote', true, $user_id, $type, $id ) ) {
+			return $this->validation_error( __( 'You cannot upvote your own content.', 'jetonomy' ) );
+		}
+
+		$result = Vote::cast( $user_id, $type, $id, $value );
+		if ( is_wp_error( $result ) ) {
+			return new WP_REST_Response(
+				[
+					'code'    => $result->get_error_code(),
+					'message' => $result->get_error_message(),
+				],
+				403
+			);
+		}
+
+		// Increment rate limit counter.
+		\Jetonomy\Permissions\Rate_Limiter::increment( $user_id, 'vote' );
+
+		// Fire action for Notifier. Pass the vote value so listeners can tell an
+		// upvote from a downvote — the author should not get an encouraging
+		// "voted on your post" notification when someone downvotes.
+		do_action( 'jetonomy_after_vote', $type, $id, $user_id, $value );
+
+		// Award or adjust reputation on the object author.
+		$this->maybe_adjust_reputation( $type, $value, $result, (int) $object->author_id );
+
+		// Re-fetch current score.
+		$updated = $this->load_object( $type, $id );
+		$score   = is_wp_error( $updated ) ? 0 : (int) ( $updated->vote_score ?? 0 );
+
+		return new WP_REST_Response(
+			array_merge( $result, [ 'score' => $score ] ),
+			200
+		);
+	}
+
+	/**
+	 * Handle DELETE /vote by re-casting the existing vote value (toggle off).
+	 *
+	 * @param string $type 'post' or 'reply'.
+	 * @param int    $id   Object ID.
+	 */
+	private function handle_unvote( string $type, int $id ): WP_REST_Response|WP_Error {
+		$user_id = $this->require_auth();
+		if ( is_wp_error( $user_id ) ) {
+			return $user_id;
+		}
+
+		$object = $this->load_object( $type, $id );
+		if ( is_wp_error( $object ) ) {
+			return $object;
+		}
+
+		// Resolve space_id — replies don't have space_id directly.
+		if ( 'reply' === $type ) {
+			$parent_post = Post::find( (int) $object->post_id );
+			$space_id    = $parent_post ? (int) $parent_post->space_id : 0;
+		} else {
+			$space_id = (int) ( $object->space_id ?? 0 );
+		}
+
+		if ( ! $this->check_permission( 'vote', $space_id ) ) {
+			return $this->permission_error();
+		}
+
+		$existing = Vote::get_user_vote( $user_id, $type, $id );
+		if ( null === $existing ) {
+			return new WP_REST_Response(
+				[
+					'action' => 'none',
+					'score'  => (int) ( $object->vote_score ?? 0 ),
+				],
+				200
+			);
+		}
+
+		// Re-casting the same value toggles the vote off (handled in Vote::cast).
+		$result = Vote::cast( $user_id, $type, $id, $existing );
+		if ( is_wp_error( $result ) ) {
+			return new WP_REST_Response(
+				[
+					'code'    => $result->get_error_code(),
+					'message' => $result->get_error_message(),
+				],
+				403
+			);
+		}
+
+		$updated = $this->load_object( $type, $id );
+		$score   = is_wp_error( $updated ) ? 0 : (int) ( $updated->vote_score ?? 0 );
+
+		return new WP_REST_Response(
+			array_merge( $result, [ 'score' => $score ] ),
+			200
+		);
+	}
+
+	/**
+	 * Load a post or reply object by type and ID.
+	 *
+	 * @param string $type 'post' or 'reply'.
+	 * @param int    $id
+	 * @return object|WP_Error
+	 */
+	private function load_object( string $type, int $id ) {
+		if ( 'post' === $type ) {
+			$object = Post::find( $id );
+			$label  = 'Post';
+		} else {
+			$object = Reply::find( $id );
+			$label  = 'Reply';
+		}
+
+		if ( ! $object ) {
+			return $this->not_found( $label );
+		}
+
+		return $object;
+	}
+
+	/**
+	 * Apply reputation changes to the object author based on the vote result.
+	 *
+	 * Uses Reputation::award() to ensure the `jetonomy_reputation_changed` action
+	 * fires consistently and point values stay centralised.
+	 *
+	 * @param string $type      'post' or 'reply'.
+	 * @param int    $value     The vote value (1 or -1).
+	 * @param array  $result    The result from Vote::cast().
+	 * @param int    $author_id The object author's user ID.
+	 */
+	private function maybe_adjust_reputation( string $type, int $value, array $result, int $author_id ): void {
+		if ( ! $author_id ) {
+			return;
+		}
+
+		$action    = $result['action'];
+		$old_value = $result['old_value'] ?? null;
+
+		// No reputation change if nothing happened.
+		if ( 'none' === $action ) {
+			return;
+		}
+
+		if ( 'created' === $action ) {
+			// New vote: award via Reputation class.
+			Reputation::award( $author_id, self::reputation_action_for( $type, $value ) );
+			return;
+		}
+
+		if ( 'removed' === $action ) {
+			// Undo vote: revoke the original award.
+			Reputation::revoke( $author_id, self::reputation_action_for( $type, $value ) );
+			return;
+		}
+
+		if ( 'updated' === $action && null !== $old_value ) {
+			// Changed vote direction: revoke old award and apply new one.
+			Reputation::revoke( $author_id, self::reputation_action_for( $type, $old_value ) );
+			Reputation::award( $author_id, self::reputation_action_for( $type, $value ) );
+		}
+	}
+
+	/**
+	 * Map a vote type and direction to a Reputation action key.
+	 *
+	 * @param string $type  'post' or 'reply'.
+	 * @param int    $value 1 (upvote) or -1 (downvote).
+	 * @return string
+	 */
+	private static function reputation_action_for( string $type, int $value ): string {
+		if ( $value > 0 ) {
+			return 'post' === $type ? 'post_upvoted' : 'reply_upvoted';
+		}
+		return 'post' === $type ? 'post_downvoted' : 'reply_downvoted';
+	}
+
+	/**
+	 * Shared args for vote endpoints.
+	 */
+	private function get_vote_args(): array {
+		return [
+			'value' => [
+				'type'     => 'integer',
+				'required' => true,
+				'enum'     => [ 1, -1 ],
+			],
+		];
+	}
+}

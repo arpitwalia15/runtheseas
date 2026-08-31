@@ -1,0 +1,308 @@
+/* ==========================================================================
+   Email Templates Editor (v2 split-pane)
+   --------------------------------------------------------------------------
+   Renders inside .wrap.bn-email-editor. The chrome and structural primitives
+   come from bn-base.css (.adm-topbar, .bn-split, .bn-tabs, .bn-modal-*,
+   .bn-toggle, .bn-btn, .bn-input, .bn-textarea, .bn-badge, .bn-card). The
+   selectors below are EmailEditor-specific glue: composition shell, category
+   group headings inside the rail, token-picker chip grid, and email-frame
+   preview shell.
+   ========================================================================== */
+
+.bn-email-editor {
+	/* The .wrap inherits WP-admin's default 8px margin; reset to a v2-clean
+	 * canvas so .adm-topbar reaches the viewport edge. */
+	margin: 0;
+	padding: 0;
+	background: var(--bn-canvas);
+}
+
+/* Topbar: title + global actions for the editor surface. */
+.bn-email-editor .adm-topbar {
+	border-bottom: 1px solid var(--bn-line);
+}
+.bn-email-editor__title {
+	font-family: var(--bn-font-display);
+	font-size: var(--bn-text-lg);
+	font-weight: 600;
+	letter-spacing: -0.01em;
+	color: var(--bn-ink);
+}
+.bn-email-editor__actions {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	margin-inline-start: auto;
+}
+
+/* Outer split: BN-canon two-pane editor. Override min-height + border so the
+ * editor fills the available admin canvas. */
+.bn-email-editor .bn-split {
+	min-height: calc(100vh - 96px);
+	border-radius: 0;
+	border-inline: none;
+	border-bottom: none;
+}
+
+/* Search input at the top of the rail. Sticks to the top while scrolling. */
+.bn-email-editor__rail-search {
+	position: sticky;
+	top: 0;
+	z-index: 2;
+	padding: var(--bn-s3) var(--bn-s3);
+	background: var(--bn-surface, #fff);
+	border-bottom: 1px solid var(--bn-line);
+}
+.bn-email-editor__rail-search .bn-input { width: 100%; }
+
+.bn-email-editor__rail-list {
+	display: flex;
+	flex-direction: column;
+}
+
+/* Rail category headings sit between groups of .bn-split__rail-item. They
+   stick under the search input so the category context stays visible as
+   the rail scrolls. */
+.bn-email-editor__rail-group {
+	position: sticky;
+	top: 56px;
+	z-index: 1;
+	background: var(--bn-surface, #fff);
+	font-size: var(--bn-text-xs);
+	font-weight: 600;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--bn-ink-3);
+	padding: var(--bn-s4) var(--bn-s4) var(--bn-s2);
+}
+.bn-email-editor__rail-item-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--bn-s2);
+}
+
+/* Pane head: stacked title + meta on the left, actions on the right. */
+.bn-email-editor__pane-head {
+	flex-wrap: wrap;
+	gap: var(--bn-s3);
+}
+.bn-email-editor__pane-title {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+	/* A real basis, not a bare `flex: 1` (which is basis 0). With basis 0 the
+	   title had no width of its own to defend, so the action buttons — which do
+	   not shrink — squeezed it until "New Follower" broke across two lines and
+	   its description rendered as a one-word-per-line ribbon, on the DESKTOP
+	   layout as much as at tablet width. A basis makes the row wrap instead of
+	   crushing the only text on it. */
+	flex: 1 1 14rem;
+}
+.bn-email-editor__pane-name {
+	font-family: var(--bn-font-display);
+	font-size: var(--bn-text-base);
+	font-weight: 600;
+	color: var(--bn-ink);
+}
+.bn-email-editor__pane-trigger {
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+}
+.bn-email-editor__pane-actions {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	flex-wrap: wrap;
+}
+
+/* Below the two-pane threshold the head is the only row competing for width, so
+ * give the title the whole line and let the actions drop underneath. The head
+ * already had flex-wrap, but the title kept shrinking instead of forcing a wrap
+ * — "New Follower" broke to two lines beside the buttons while its own
+ * description rendered as a four-word-tall ribbon. A basis of 100% makes the
+ * wrap happen at the row level, where it belongs. */
+@media (max-width: 900px) {
+	.bn-email-editor__pane-title {
+		flex: 1 0 100%;
+	}
+	.bn-email-editor__pane-actions {
+		width: 100%;
+	}
+}
+
+/* Tab strip lives inside the pane head row of the editor. */
+.bn-email-editor .bn-tabs {
+	padding: 0 var(--bn-s5);
+	gap: var(--bn-s4);
+	background: var(--bn-surface);
+}
+.bn-email-editor__panel {
+	padding: var(--bn-s5);
+}
+.bn-email-editor__panel[hidden] { display: none; }
+
+/* Form row layout — label above input. */
+.bn-email-editor__field {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s2);
+	margin-bottom: var(--bn-s4);
+}
+.bn-email-editor__label {
+	font-size: var(--bn-text-sm);
+	font-weight: var(--bn-fw-medium-semibold);
+	color: var(--bn-ink);
+}
+.bn-email-editor__hint {
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+	font-weight: 400;
+	margin-inline-start: var(--bn-s2);
+}
+.bn-email-editor textarea.bn-textarea[data-bn-mono] {
+	font-family: var(--bn-font-mono);
+	font-size: var(--bn-text-xs);
+	min-height: 240px;
+}
+
+/* Token picker — chip grid below the body editor. */
+.bn-email-editor__tokens {
+	margin-top: var(--bn-s4);
+}
+.bn-email-editor__tokens-title {
+	font-size: var(--bn-text-sm);
+	font-weight: var(--bn-fw-medium-semibold);
+	color: var(--bn-ink);
+	margin-bottom: var(--bn-s2);
+}
+.bn-email-editor__tokens-grid {
+	display: grid;
+	/* min(220px, 100%) rather than a bare 220px: auto-fill still lays out 220px
+	   tracks when there is room, but in the narrow editor pane a hard 220px
+	   minimum made every chip wider than its own container - 220px inside 154px,
+	   at every viewport width including 1440. */
+	grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr));
+	gap: var(--bn-s2);
+}
+.bn-email-editor__token {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--bn-s2);
+	/* A token name is one unbreakable string - {{notification_message}} is 24
+	   characters with no break opportunity - so the chip could not be narrower
+	   than its longest token, and neither could the 1fr grid track holding it
+	   (a track's automatic minimum is min-content). The chip then overflowed its
+	   own grid at every width, including 1440.
+	   The name is allowed to WRAP rather than ellipsize: the owner has to be able
+	   to read and copy the whole token, so hiding the tail behind an ellipsis
+	   would trade one defect for a worse one. */
+	min-width: 0;
+	flex-wrap: wrap;
+	padding: var(--bn-s2) var(--bn-s3);
+	background: var(--bn-sunken);
+	border: 1px solid var(--bn-line-faint);
+	border-radius: var(--bn-r-sm);
+	font-family: var(--bn-font-mono);
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink);
+	cursor: pointer;
+	text-align: start;
+	transition: border-color var(--bn-dur-fast) var(--bn-ease), background var(--bn-dur-fast) var(--bn-ease);
+}
+.bn-email-editor__token:hover {
+	background: var(--bn-accent-100);
+	border-color: var(--bn-accent);
+	color: var(--bn-accent-700);
+}
+.bn-email-editor__token > :first-child {
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+.bn-email-editor__token-desc {
+	font-family: var(--bn-font-ui);
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+	text-transform: lowercase;
+}
+
+/* Preview panel — renders the real branded shell in an isolated iframe so the
+   preview is byte-identical to a genuine send (one uniform header + footer). */
+.bn-email-editor__preview-frame {
+	display: block;
+	width: 100%;
+	max-width: 680px;
+	min-height: 560px;
+	margin-inline: auto;
+	background: var(--bn-surface);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-lg);
+}
+
+/* Save bar at the bottom of the form panel. */
+.bn-email-editor__save-bar {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	margin-top: var(--bn-s4);
+	padding-top: var(--bn-s4);
+	border-top: 1px solid var(--bn-line-faint);
+}
+
+/* Hide the underlying checkbox when paired with a .bn-toggle visual.
+ * The checkbox is still keyboard-focusable for assistive tech. */
+.bn-email-editor__toggle-control {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	cursor: pointer;
+}
+.bn-email-editor__toggle-control input[type="checkbox"] {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	margin: 0;
+	opacity: 0;
+	cursor: pointer;
+}
+.bn-email-editor__toggle-control input[type="checkbox"]:focus-visible + .bn-toggle {
+	box-shadow: var(--bn-ring);
+}
+
+/* 782px to match WP-admin's own collapse point and the rest of this admin —
+   768 left the editor two-column in the 769-782 sliver where everything around
+   it had already stacked. */
+/* Stack the two panes below 900px, not at the shared .bn-split breakpoint of
+ * 768px.
+ *
+ * That 132px gap is the whole bug. Between 770 and 890 the split was still two
+ * columns while the editor pane's min-content (subject field, body textarea,
+ * token chips and the three pane actions) needed more room than was left, so
+ * the grid overflowed a container with overflow:hidden. Both panes were clipped
+ * in opposite directions - the rail lost its left edge, rendering as "ilter
+ * templates", "OCIAL", "w Follower", while the editor lost its right - and
+ * there was no scrollbar to reach either.
+ *
+ * This editor is the heaviest consumer of .bn-split, so it earns its own
+ * threshold rather than moving the shared one and disturbing the other screens
+ * that use it. */
+@media (max-width: 900px) {
+	.bn-email-editor .bn-split {
+		grid-template-columns: minmax(0, 1fr);
+		min-height: 0;
+	}
+	.bn-email-editor .bn-split__rail {
+		border-inline-end: none;
+		border-bottom: 1px solid var(--bn-line-faint);
+		max-height: 260px;
+	}
+}
+
+@media (max-width: 782px) {
+	.bn-email-editor__tokens-grid {
+		grid-template-columns: minmax(0, 1fr);
+	}
+}

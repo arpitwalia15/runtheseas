@@ -1,0 +1,121 @@
+/** common */
+.flex {
+    display: -webkit-box;
+    display: -ms-flexbox;
+    display: flex;
+}
+
+.align-items-center {
+    -webkit-box-align: center;
+    -ms-flex-align: center;
+    align-items: center;
+}
+
+/* widget */
+.wbcom-essential-dash__prior {
+    margin-bottom: 0;
+}
+
+.wbcom-essential-dash__avatar img {
+    height: auto;
+    padding: 3px;
+    border: 1px solid #e3e3e3;
+}
+
+.wbcom-essential-dash__intro {
+    font-weight: 400;
+}
+
+.wbcom-essential-dash__name {
+    font-weight: 600;
+}
+
+.elementor-cta--dash-intro-above .wbcom-essential-dash>.flex {
+    -webkit-box-orient: vertical;
+    -webkit-box-direction: normal;
+    -ms-flex-direction: column;
+    flex-direction: column;
+    -webkit-box-pack: center;
+    -ms-flex-pack: center;
+    justify-content: center;
+}
+
+.elementor-cta--dash-intro-right .wbcom-essential-dash>.flex {
+    -webkit-box-orient: horizontal;
+    -webkit-box-direction: reverse;
+    -ms-flex-direction: row-reverse;
+    flex-direction: row-reverse;
+}
+
+.elementor-cta-dash-intro-content-left {
+    text-align: left;
+}
+
+.elementor-cta-dash-intro-content-center {
+    text-align: center;
+}
+
+.elementor-cta-dash-intro-content-right {
+    text-align: right;
+}
+
+@media screen and (max-width: 1024px) {
+    .elementor-cta--tablet-dash-intro-left .wbcom-essential-dash>.flex {
+        -webkit-box-pack: start;
+        -ms-flex-pack: start;
+        justify-content: flex-start;
+        -ms-flex-direction: row;
+        -webkit-box-orient: horizontal;
+        -webkit-box-direction: normal;
+        flex-direction: row;
+    }
+
+    .elementor-cta--tablet-dash-intro-above .wbcom-essential-dash>.flex {
+        -webkit-box-orient: vertical;
+        -webkit-box-direction: normal;
+        -ms-flex-direction: column;
+        flex-direction: column;
+        -webkit-box-pack: center;
+        -ms-flex-pack: center;
+        justify-content: center;
+    }
+
+    .elementor-cta--tablet-dash-intro-right .wbcom-essential-dash>.flex {
+        -webkit-box-orient: horizontal;
+        -webkit-box-direction: reverse;
+        -ms-flex-direction: row-reverse;
+        flex-direction: row-reverse;
+        -webkit-box-pack: center;
+        -ms-flex-pack: center;
+        justify-content: center;
+    }
+}
+
+@media screen and (max-width: 767px) {
+    .elementor-cta--mobile-dash-intro-left .wbcom-essential-dash>.flex {
+        -webkit-box-pack: start;
+        -ms-flex-pack: start;
+        justify-content: flex-start;
+        -ms-flex-direction: row;
+        -webkit-box-orient: horizontal;
+        -webkit-box-direction: normal;
+        flex-direction: row;
+    }
+
+    .elementor-cta--mobile-dash-intro-above .wbcom-essential-dash>.flex {
+        -webkit-box-orient: vertical;
+        -webkit-box-direction: normal;
+        -ms-flex-direction: column;
+        flex-direction: column;
+        -webkit-box-pack: center;
+        -ms-flex-pack: center;
+        justify-content: center;
+    }
+
+    .elementor-cta--mobile-dash-intro-right .wbcom-essential-dash>.flex {
+        -webkit-box-orient: horizontal;
+        -webkit-box-direction: reverse;
+        -ms-flex-direction: row-reverse;
+        flex-direction: row-reverse;
+    }
+}

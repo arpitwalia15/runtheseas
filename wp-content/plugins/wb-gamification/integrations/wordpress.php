@@ -1,0 +1,237 @@
+<?php
+/**
+ * WB Gamification — WordPress Core Integration Manifest
+ *
+ * Auto-loaded by ManifestLoader. No dependency on WB Gamification at load time.
+ *
+ * Trigger flags:
+ *   standalone_only: false — always active regardless of BuddyPress.
+ *   standalone_only: true  — skipped when BuddyPress is active (BP covers the same event).
+ *   supersedes: [id, ...]  — when this trigger is registered, the listed trigger
+ *                            ids are dropped from the registry so the same
+ *                            real-world event isn't awarded twice. Resolved by
+ *                            ManifestLoader regardless of manifest load order.
+ *
+ * Design note (badge auto-award on BuddyPress sites):
+ *   Publishing a blog post and commenting on a post are CORE WordPress events.
+ *   BuddyPress activity-stream updates/comments (`bp_activity_update`,
+ *   `bp_activity_comment`) are a DIFFERENT event class and do NOT cover them.
+ *   Marking these triggers `standalone_only: true` left the default badges that
+ *   count `wp_publish_post` / `wp_leave_comment` (first_post, prolific_writer,
+ *   content_creator, first_comment, engaged_reader) permanently dead on every
+ *   BuddyPress site, because the actions they count were never registered.
+ *   These triggers are therefore always-on. The only genuine overlap is BP
+ *   Member Blog's `bp_publish_post` (also on a published `post`), resolved via
+ *   `wp_publish_post`'s `supersedes` so there is no double-award.
+ *
+ * @package WB_Gamification
+ */
+
+defined( 'ABSPATH' ) || exit;
+
+return [
+	'plugin'   => 'WordPress',
+	'version'  => '1.0.0',
+	'triggers' => [
+
+		// ── Always-on triggers (Standalone + Community + Full) ──────────────
+
+		[
+			'id'              => 'wp_user_register',
+			'label'           => 'Join the site',
+			'description'     => 'Awarded once when a user registers.',
+			'hook'            => 'user_register',
+			'user_callback'   => fn( int $user_id ) => $user_id,
+			'default_points'  => 15,
+			'category'        => 'wordpress',
+			'icon'            => 'icon-users',
+			'repeatable'      => false,
+			'standalone_only' => false,
+		],
+
+		[
+			'id'              => 'wp_first_login',
+			'label'           => 'First login',
+			'description'     => 'Awarded once on the very first login.',
+			'hook'            => 'wp_login',
+			'user_callback'   => fn( string $user_login, \WP_User $user ) => $user->ID,
+			'default_points'  => 10,
+			'category'        => 'wordpress',
+			'icon'            => 'icon-lock',
+			'repeatable'      => false,
+			'standalone_only' => false,
+		],
+
+		[
+			'id'              => 'wp_profile_complete',
+			'label'           => 'Complete WordPress profile',
+			'description'     => 'Awarded once when the user saves their WP profile with a bio.',
+			'hook'            => 'personal_options_update',
+			'user_callback'   => function ( int $user_id ): int {
+				return get_user_meta( $user_id, 'description', true ) ? $user_id : 0;
+			},
+			'default_points'  => 10,
+			'category'        => 'wordpress',
+			'icon'            => 'icon-user',
+			'repeatable'      => false,
+			'standalone_only' => false,
+		],
+
+		[
+			'id'              => 'wp_post_receives_comment',
+			'label'           => 'Post receives a comment',
+			'description'     => 'Post author earns points when an approved comment is left on their content.',
+			'hook'            => 'comment_post',
+			'user_callback'   => function ( int $comment_id, int|string $approved ): int {
+				if ( 1 !== (int) $approved ) {
+					return 0;
+				}
+				$comment = get_comment( $comment_id );
+				if ( ! $comment ) {
+					return 0;
+				}
+				// Skip product reviews — WooCommerce manifest handles those separately.
+				$post = get_post( (int) $comment->comment_post_ID );
+				if ( ! $post ) {
+					return 0;
+				}
+				if ( 'product' === $post->post_type ) {
+					return 0;
+				}
+				return (int) $post->post_author;
+			},
+			'default_points'  => 3,
+			'category'        => 'wordpress',
+			'icon'            => 'icon-message-circle',
+			'repeatable'      => true,
+			// Rate-limit: comment_post can be spammed by a single commenter
+			// hitting the same post repeatedly. Cap at 10 comment awards/day
+			// per author so a coordinated comment-spam ring can't grind.
+			'cooldown'        => 0,
+			'daily_cap'       => 10,
+			'standalone_only' => false,
+		],
+
+		// ── Core WordPress content triggers (always-on) ─────────────────────
+		//
+		// Core WordPress events with no BuddyPress equivalent (BP covers
+		// activity-stream updates/comments, not blog posts or post comments),
+		// so they register on BuddyPress sites too — otherwise the default
+		// badges that count them (first_post, prolific_writer, content_creator,
+		// first_comment, engaged_reader) are permanently dead on BP sites.
+
+		[
+			'id'              => 'wp_publish_post',
+			'label'           => 'Publish a blog post',
+			'description'     => 'Awarded when the author publishes a new post - once per transition into the published state. Editing an already-published post does NOT re-award.',
+			// `transition_post_status` (not `publish_post`) because the
+			// latter fires on every save where status ends as `publish` —
+			// including edits — so authors re-earned 25pts on every
+			// Update click. The transition hook gives us $new + $old so
+			// we can scope to "left an unpublished state to become
+			// published". Caught by audit/manifest.json (the awarded-points pipeline) §G9.
+			'hook'            => 'transition_post_status',
+			'user_callback'   => function ( string $new_status, string $old_status, $post ): int {
+				if ( 'publish' !== $new_status || 'publish' === $old_status ) {
+					return 0;
+				}
+				if ( ! ( $post instanceof \WP_Post ) || 'post' !== $post->post_type ) {
+					return 0;
+				}
+				return (int) $post->post_author;
+			},
+			'default_points'  => 25,
+			'category'        => 'wordpress',
+			'icon'            => 'icon-file-text',
+			'repeatable'      => true,
+			'standalone_only' => false,
+			// BP Member Blog's `bp_publish_post` awards on the same published
+			// `post`. This canonical core trigger supersedes it so a publish
+			// on a BuddyPress site awards once, not twice.
+			'supersedes'      => array( 'bp_publish_post' ),
+		],
+
+		[
+			'id'              => 'wp_first_post',
+			'label'           => 'Publish first post ever',
+			'description'     => "Awarded once on the author's very first transition-to-publish for a post.",
+			// Same transition_post_status pattern as wp_publish_post.
+			// Without this fix, the first-post check also re-ran on every
+			// update because `count_user_posts` returned 1 for a single
+			// post under repeated edits, so the engine would attempt to
+			// award again — `repeatable: false` would correctly veto
+			// after the first, but every subsequent update wasted a
+			// rate-limit/manifest evaluation cycle. The transition gate
+			// stops the wasted work at the integration boundary.
+			'hook'            => 'transition_post_status',
+			'user_callback'   => function ( string $new_status, string $old_status, $post ): int {
+				if ( 'publish' !== $new_status || 'publish' === $old_status ) {
+					return 0;
+				}
+				if ( ! ( $post instanceof \WP_Post ) || 'post' !== $post->post_type ) {
+					return 0;
+				}
+				$author_id  = (int) $post->post_author;
+				$post_count = (int) count_user_posts( $author_id, 'post' );
+				return 1 === $post_count ? $author_id : 0;
+			},
+			'default_points'  => 20,
+			'category'        => 'wordpress',
+			'icon'            => 'icon-star',
+			'repeatable'      => false,
+			'standalone_only' => false,
+		],
+
+		[
+			'id'              => 'wp_leave_comment',
+			'label'           => 'Leave a comment',
+			'description'     => 'Commenter earns points when their approved comment is posted.',
+			'hook'            => 'comment_post',
+			'user_callback'   => function ( int $comment_id, int|string $approved ): int {
+				if ( 1 !== (int) $approved ) {
+					return 0;
+				}
+				$comment = get_comment( $comment_id );
+				if ( ! $comment || empty( $comment->user_id ) ) {
+					return 0;
+				}
+				// Skip product reviews — WooCommerce manifest handles those separately.
+				$post = get_post( (int) $comment->comment_post_ID );
+				if ( $post && 'product' === $post->post_type ) {
+					return 0;
+				}
+				return (int) $comment->user_id;
+			},
+			'default_points'  => 5,
+			'category'        => 'wordpress',
+			'icon'            => 'icon-message-square',
+			'repeatable'      => true,
+			'cooldown'        => 60,
+			'standalone_only' => false,
+		],
+
+		[
+			'id'              => 'wp_comment_approved',
+			'label'           => 'Comment approved from moderation',
+			'description'     => 'Awarded when a previously pending comment gets approved.',
+			'hook'            => 'transition_comment_status',
+			'user_callback'   => function ( string $new_status, string $old_status, \WP_Comment $comment ): int {
+				if ( 'approved' !== $new_status || 'approved' === $old_status ) {
+					return 0;
+				}
+				// Skip product reviews — WooCommerce manifest handles those separately.
+				$post = get_post( (int) $comment->comment_post_ID );
+				if ( $post && 'product' === $post->post_type ) {
+					return 0;
+				}
+				return (int) $comment->user_id;
+			},
+			'default_points'  => 5,
+			'category'        => 'wordpress',
+			'icon'            => 'icon-circle-check',
+			'repeatable'      => true,
+			'standalone_only' => false,
+		],
+
+	],
+];

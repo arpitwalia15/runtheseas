@@ -1,0 +1,159 @@
+/*--------------------------------------------------------------
+>>> TABLE OF CONTENTS:
+----------------------------------------------------------------
+# Global
+--------------------------------------------------------------*/
+
+/*--------------------------------------------------------------
+# Global
+--------------------------------------------------------------*/
+.wbesntl-notification-area.header-right {
+    padding-right: 0px;
+}
+
+#masthead.wbcom-notification-area {
+    height: auto;
+}
+
+#masthead.wbcom-notification-area .header-notifications-dropdown-toggle a.rg-icon-wrap span::before {
+    color: inherit;
+}
+
+#masthead.wbcom-notification-area .wbcom-notification-area-navbar {
+    display: -webkit-box;
+    display: -ms-flexbox;
+    display: flex;
+    -webkit-box-align: center;
+    -ms-flex-align: center;
+    align-items: center;
+    -ms-flex-pack: distribute;
+    justify-content: space-around;
+}
+
+#masthead.wbcom-notification-area .wbcom-notification-area-navbar>div {
+    -webkit-box-flex: 1;
+    -ms-flex: auto;
+    flex: auto;
+}
+
+#masthead.wbcom-notification-area .header-notifications-dropdown-toggle {
+    position: static;
+}
+
+#masthead.wbcom-notification-area .user-link-main-wrap {
+    position: static;
+    height: 100%;
+    display: -webkit-box;
+    display: -ms-flexbox;
+    display: flex;
+    -webkit-box-align: center;
+    -ms-flex-align: center;
+    align-items: center;
+}
+
+#masthead.wbcom-notification-area .user-link-wrap {
+    -webkit-box-flex: 0;
+    -ms-flex: 0 0 auto;
+    flex: 0 0 auto;
+    position: static;
+}
+
+#masthead.wbcom-notification-area .user-profile-menu.header-notifications-dropdown-menu {
+    max-width: 250px;
+    padding: 10px;
+    bottom: auto;
+}
+
+#masthead.wbcom-notification-area .reign-friend-request .dropdown-item-inner {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+#masthead.wbcom-notification-area .reign-friend-request .item-info {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+#masthead.wbcom-notification-area .reign-friend-request .request-button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+#masthead.wbcom-notification-area .reign-friend-request .request-button .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 999px;
+    background: #f5f7fb;
+    color: #153045;
+}
+
+#masthead.wbcom-notification-area .reign-friend-request .request-button .btn.reject:hover {
+    color: #d63638;
+}
+
+@media screen and (max-width: 960px) {
+    .wbcom-notification-area-navbar>div {
+        position: static !important;
+    }
+
+    .elementor-widget.elementor-widget-wbcom-notification-area,
+    #masthead.wbcom-notification-area {
+        position: static;
+    }
+
+    body #masthead.wbcom-notification-area .header-notifications-dropdown-menu {
+        bottom: auto;
+    }
+}
+
+@media screen and (max-width: 479px) {
+    #masthead.wbcom-notification-area .rg-icon-wrap {
+        width: 36px;
+    }
+
+    #masthead.wbcom-notification-area .user-link.dropdown-toggle .rg-user {
+        display: none;
+    }
+
+    #masthead.wbcom-notification-area .user-link.dropdown-toggle:after {
+        color: inherit;
+        content: "\f107";
+        font-family: "Font Awesome 6 Pro", reign-icons;
+        font-weight: 400;
+        display: inline-block;
+        position: relative;
+        right: -5px;
+        font-size: inherit;
+        top: 0;
+        bottom: 0;
+        margin: auto;
+        margin-right: 10px;
+    }
+
+    #masthead.wbcom-notification-area .rg-woocommerce_mini_cart {
+        max-width: 285px;
+    }
+}
+
+@media (min-width: 768px) and (max-width: 1024px) {
+    .wbcom-notification-area .elementor-hidden-tablet {
+        display: none !important;
+    }
+}
+
+@media (min-width: 1025px) and (max-width: 99999px) {
+    .wbcom-notification-area .elementor-hidden-desktop {
+        display: none !important;
+    }
+}
+
+@media (max-width: 767px) {
+    .wbcom-notification-area .elementor-hidden-mobile {
+        display: none !important;
+    }
+}

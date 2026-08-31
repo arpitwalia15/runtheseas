@@ -1,0 +1,101 @@
+<?php // phpcs:disable WordPress.Files.FileName.NotHyphenatedLowercase,WordPress.Files.FileName.InvalidClassFileName -- PSR-4 naming used throughout this plugin.
+/**
+ * WP-CLI surface for the functional-certification engine.
+ *
+ * The single trustworthy gate: it asserts the plugin BEHAVES (toggles enforce,
+ * routes don't fatal), not that the code is well-formed. Registered in
+ * Plugin::init() under `wp buddynext cert` and invoked by bin/check.sh + CI.
+ *
+ *   wp buddynext cert              Run all functional checks; exit 1 on any fail.
+ *   wp buddynext cert contract     Only the dead-toggle (behaviour-flip) check.
+ *   wp buddynext cert boot         Only the REST boot-smoke (no route 500s).
+ *   wp buddynext cert --json       Machine-readable ledger (for the MCP / CI).
+ *
+ * @package BuddyNext\Cert
+ */
+
+declare( strict_types=1 );
+
+namespace BuddyNext\Cert;
+
+/**
+ * `wp buddynext cert` command handler.
+ */
+class CertCommand {
+
+	/**
+	 * Run the functional certification gate.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [<check>]
+	 * : Which check to run. One of: contract, boot. Omit to run all.
+	 *
+	 * [--porcelain]
+	 * : Emit the ledger as machine-readable JSON instead of a human summary.
+	 * (Named --porcelain, not --json: WP-CLI reserves --json for its own
+	 * formatter and rejects it as an unknown --format parameter.)
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp buddynext cert
+	 *     wp buddynext cert contract
+	 *     wp buddynext cert --porcelain
+	 *
+	 * @when after_wp_load
+	 *
+	 * @param array<int,string>    $args       Positional args.
+	 * @param array<string,string> $assoc_args Flags.
+	 * @return void
+	 */
+	public function __invoke( array $args, array $assoc_args ): void {
+		$checks = array();
+		if ( ! empty( $args[0] ) ) {
+			$checks = array( (string) $args[0] );
+		}
+
+		$result = ( new CertRunner() )->run( $checks );
+
+		if ( isset( $assoc_args['porcelain'] ) ) {
+			\WP_CLI::line( (string) wp_json_encode( $result, JSON_PRETTY_PRINT ) );
+			if ( ! $result['ok'] ) {
+				\WP_CLI::halt( 1 );
+			}
+			return;
+		}
+
+		foreach ( $result['rows'] as $row ) {
+			$status = (string) ( $row['status'] ?? '' );
+			$label  = sprintf( '%-9s %-22s %s', (string) ( $row['check'] ?? '' ), (string) ( $row['entity'] ?? '' ), (string) ( $row['detail'] ?? '' ) );
+			if ( 'pass' === $status ) {
+				\WP_CLI::log( '  ' . \WP_CLI::colorize( '%gPASS%n ' ) . $label );
+			} elseif ( 'fail' === $status ) {
+				\WP_CLI::log( '  ' . \WP_CLI::colorize( '%rFAIL%n ' ) . $label );
+			} else {
+				\WP_CLI::log( '  ' . \WP_CLI::colorize( '%yHOLE%n ' ) . $label );
+			}
+		}
+
+		$s = $result['summary'];
+		\WP_CLI::log( '' );
+		$line = sprintf( '%d passed, %d failed, %d holes (uncovered)', (int) $s['pass'], (int) $s['fail'], (int) $s['hole'] );
+
+		if ( $result['ok'] ) {
+			\WP_CLI::success( 'Functional certification passed — ' . $line );
+			return;
+		}
+
+		// Distinguish "the assertions failed" from "there were no assertions". A
+		// bare FAILED on an empty run sends the reader hunting for a broken check
+		// that does not exist, so name the cause instead.
+		$message = ( 0 === (int) $s['pass'] && 0 === (int) $s['fail'] )
+			? 'Functional certification proved NOTHING — ' . $line . '. No assertions ran, '
+				. 'so this gate is not evidence of anything. Its inputs (audit/manifest.json '
+				. 'and audit/cert-oracles.json) are gitignored by design, so a fresh clone or '
+				. 'CI runner has neither: restore audit/ from the private shelf before treating '
+				. 'a cert result as meaningful. See CLAUDE.md, "This repository is PUBLIC".'
+			: 'Functional certification FAILED — ' . $line;
+
+		\WP_CLI::error( $message ); // error() exits 1.
+	}
+}

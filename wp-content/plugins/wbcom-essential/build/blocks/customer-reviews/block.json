@@ -1,0 +1,203 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "wbcom-essential/customer-reviews",
+  "version": "1.0.0",
+  "title": "Customer Reviews",
+  "category": "essential-woocommerce",
+  "icon": "star-filled",
+  "description": "Display WooCommerce product reviews in a Swiper carousel with avatar, star rating, reviewer name, and product link.",
+  "keywords": [
+    "woocommerce",
+    "reviews",
+    "testimonials",
+    "ratings",
+    "customers",
+    "carousel",
+    "essential",
+    "wbcom"
+  ],
+  "textdomain": "wbcom-essential",
+  "example": {
+    "attributes": {
+      "reviewCount": 6,
+      "slidesPerView": 2
+    }
+  },
+  "attributes": {
+    "uniqueId": {
+      "type": "string",
+      "default": ""
+    },
+    "reviewCount": {
+      "type": "number",
+      "default": 6
+    },
+    "slidesPerView": {
+      "type": "number",
+      "default": 2
+    },
+    "autoplay": {
+      "type": "boolean",
+      "default": true
+    },
+    "autoplayDelay": {
+      "type": "number",
+      "default": 4000
+    },
+    "loop": {
+      "type": "boolean",
+      "default": true
+    },
+    "showDots": {
+      "type": "boolean",
+      "default": true
+    },
+    "showArrows": {
+      "type": "boolean",
+      "default": true
+    },
+    "showRating": {
+      "type": "boolean",
+      "default": true
+    },
+    "showProduct": {
+      "type": "boolean",
+      "default": true
+    },
+    "showAvatar": {
+      "type": "boolean",
+      "default": true
+    },
+    "quoteBg": {
+      "type": "string",
+      "default": "#ffffff"
+    },
+    "quoteColor": {
+      "type": "string",
+      "default": "#1e1e2e"
+    },
+    "nameColor": {
+      "type": "string",
+      "default": "#1e1e2e"
+    },
+    "ratingColor": {
+      "type": "string",
+      "default": "#f5a623"
+    },
+    "padding": {
+      "type": "object",
+      "default": {
+        "top": 0,
+        "right": 0,
+        "bottom": 0,
+        "left": 0
+      }
+    },
+    "paddingTablet": {
+      "type": "object",
+      "default": null
+    },
+    "paddingMobile": {
+      "type": "object",
+      "default": null
+    },
+    "paddingUnit": {
+      "type": "string",
+      "default": "px"
+    },
+    "margin": {
+      "type": "object",
+      "default": {
+        "top": 0,
+        "right": 0,
+        "bottom": 0,
+        "left": 0
+      }
+    },
+    "marginTablet": {
+      "type": "object",
+      "default": null
+    },
+    "marginMobile": {
+      "type": "object",
+      "default": null
+    },
+    "marginUnit": {
+      "type": "string",
+      "default": "px"
+    },
+    "boxShadow": {
+      "type": "boolean",
+      "default": false
+    },
+    "shadowHorizontal": {
+      "type": "number",
+      "default": 0
+    },
+    "shadowVertical": {
+      "type": "number",
+      "default": 8
+    },
+    "shadowBlur": {
+      "type": "number",
+      "default": 24
+    },
+    "shadowSpread": {
+      "type": "number",
+      "default": 0
+    },
+    "shadowColor": {
+      "type": "string",
+      "default": "rgba(0, 0, 0, 0.08)"
+    },
+    "borderRadius": {
+      "type": "object",
+      "default": {
+        "top": 12,
+        "right": 12,
+        "bottom": 12,
+        "left": 12
+      }
+    },
+    "borderRadiusUnit": {
+      "type": "string",
+      "default": "px"
+    },
+    "hideOnDesktop": {
+      "type": "boolean",
+      "default": false
+    },
+    "hideOnTablet": {
+      "type": "boolean",
+      "default": false
+    },
+    "hideOnMobile": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "supports": {
+    "html": false,
+    "align": [
+      "wide",
+      "full"
+    ],
+    "color": {
+      "background": true,
+      "text": false
+    },
+    "spacing": {
+      "margin": true,
+      "padding": true
+    }
+  },
+  "editorScript": "file:./index.js",
+  "editorStyle": "file:./index.css",
+  "style": "file:./style-index.css",
+  "viewScript": [
+    "file:./view.js",
+    "swiper"
+  ],
+  "render": "file:./render.php"
+}

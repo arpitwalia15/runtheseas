@@ -1,0 +1,202 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "wbcom-essential/text-rotator",
+  "version": "1.0.0",
+  "title": "Text Rotator",
+  "category": "essential-design",
+  "icon": "text",
+  "description": "Animated rotating text with fade, slide, or typewriter effects. Ideal for hero sections and taglines.",
+  "keywords": [
+    "text",
+    "rotator",
+    "typing",
+    "animation",
+    "heading",
+    "hero",
+    "typewriter",
+    "essential",
+    "wbcom"
+  ],
+  "textdomain": "wbcom-essential",
+  "example": {
+    "attributes": {
+      "beforeText": "We are",
+      "rotatingTexts": [
+        "Creative",
+        "Innovative",
+        "Passionate"
+      ],
+      "afterText": "designers.",
+      "animationType": "fade"
+    }
+  },
+  "attributes": {
+    "uniqueId": {
+      "type": "string",
+      "default": ""
+    },
+    "beforeText": {
+      "type": "string",
+      "default": "We are"
+    },
+    "rotatingTexts": {
+      "type": "array",
+      "default": [
+        "Creative",
+        "Innovative",
+        "Passionate"
+      ]
+    },
+    "afterText": {
+      "type": "string",
+      "default": "designers."
+    },
+    "animationType": {
+      "type": "string",
+      "default": "fade"
+    },
+    "speed": {
+      "type": "number",
+      "default": 2000
+    },
+    "textColor": {
+      "type": "string",
+      "default": "#1e1e2e"
+    },
+    "rotatingColor": {
+      "type": "string",
+      "default": "#667eea"
+    },
+    "fontSize": {
+      "type": "number",
+      "default": 36
+    },
+    "fontSizeTablet": {
+      "type": "number",
+      "default": 28
+    },
+    "fontSizeMobile": {
+      "type": "number",
+      "default": 22
+    },
+    "fontSizeUnit": {
+      "type": "string",
+      "default": "px"
+    },
+    "textAlign": {
+      "type": "string",
+      "default": "center"
+    },
+    "padding": {
+      "type": "object",
+      "default": {
+        "top": 24,
+        "right": 24,
+        "bottom": 24,
+        "left": 24
+      }
+    },
+    "paddingTablet": {
+      "type": "object",
+      "default": null
+    },
+    "paddingMobile": {
+      "type": "object",
+      "default": null
+    },
+    "paddingUnit": {
+      "type": "string",
+      "default": "px"
+    },
+    "margin": {
+      "type": "object",
+      "default": {
+        "top": 0,
+        "right": 0,
+        "bottom": 0,
+        "left": 0
+      }
+    },
+    "marginTablet": {
+      "type": "object",
+      "default": null
+    },
+    "marginMobile": {
+      "type": "object",
+      "default": null
+    },
+    "marginUnit": {
+      "type": "string",
+      "default": "px"
+    },
+    "boxShadow": {
+      "type": "boolean",
+      "default": false
+    },
+    "shadowHorizontal": {
+      "type": "number",
+      "default": 0
+    },
+    "shadowVertical": {
+      "type": "number",
+      "default": 4
+    },
+    "shadowBlur": {
+      "type": "number",
+      "default": 8
+    },
+    "shadowSpread": {
+      "type": "number",
+      "default": 0
+    },
+    "shadowColor": {
+      "type": "string",
+      "default": "rgba(0, 0, 0, 0.12)"
+    },
+    "borderRadius": {
+      "type": "object",
+      "default": {
+        "top": 0,
+        "right": 0,
+        "bottom": 0,
+        "left": 0
+      }
+    },
+    "borderRadiusUnit": {
+      "type": "string",
+      "default": "px"
+    },
+    "hideOnDesktop": {
+      "type": "boolean",
+      "default": false
+    },
+    "hideOnTablet": {
+      "type": "boolean",
+      "default": false
+    },
+    "hideOnMobile": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "supports": {
+    "html": false,
+    "align": [
+      "wide",
+      "full"
+    ],
+    "color": {
+      "background": true,
+      "text": true
+    },
+    "spacing": {
+      "margin": true,
+      "padding": true
+    }
+  },
+  "editorScript": "file:./index.js",
+  "editorStyle": "file:./index.css",
+  "style": "file:./style-index.css",
+  "viewScript": "file:./view.js"
+}

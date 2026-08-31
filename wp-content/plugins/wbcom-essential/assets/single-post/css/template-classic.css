@@ -1,0 +1,66 @@
+/**
+ * Template: Classic
+ *
+ * Content + right sidebar. CSS Grid 1fr 320px, single column on mobile.
+ * Falls back to full-width when sidebar has no widgets.
+ *
+ * @package wbcom-essential
+ * @since 4.3.0
+ */
+
+.wbcom-sp--classic {
+	padding: 40px 0;
+}
+
+.wbcom-sp--classic .wbcom-sp__grid {
+	display: grid;
+	grid-template-columns: 1fr 320px;
+	gap: 40px;
+	align-items: start;
+}
+
+/* No sidebar — full width content */
+.wbcom-sp--classic.wbcom-sp--no-sidebar .wbcom-sp__grid {
+	grid-template-columns: 1fr;
+	max-width: 800px;
+	margin: 0 auto;
+}
+
+.wbcom-sp--classic .wbcom-sp__header {
+	margin-bottom: 24px;
+}
+
+.wbcom-sp--classic .wbcom-sp__featured-image {
+	margin-bottom: 24px;
+}
+
+/* Sidebar */
+.wbcom-sp--classic .wbcom-sp__sidebar {
+	padding: 24px;
+	background: var(--sp-bg-alt);
+	border-radius: 8px;
+}
+
+.wbcom-sp--classic .wbcom-sp__sidebar .widget {
+	margin-bottom: 24px;
+}
+
+.wbcom-sp--classic .wbcom-sp__sidebar .widget:last-child {
+	margin-bottom: 0;
+}
+
+.wbcom-sp--classic .wbcom-sp__sidebar .widget-title {
+	font-size: 1rem;
+	font-weight: 700;
+	margin-bottom: 12px;
+	padding-bottom: 8px;
+	border-bottom: 2px solid var(--sp-primary);
+	color: var(--sp-heading);
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+	.wbcom-sp--classic .wbcom-sp__grid {
+		grid-template-columns: 1fr;
+	}
+}

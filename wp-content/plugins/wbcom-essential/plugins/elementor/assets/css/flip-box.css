@@ -1,0 +1,399 @@
+/* Button */
+.wbcom-btn-wrapper [class^=wbcom-btn-] {
+    position: relative;
+    text-decoration: none !important;
+    z-index: 0;
+    overflow: hidden;
+    display: inline-block;
+    line-height: 1;
+    max-width: 100%;
+    vertical-align: bottom
+}
+
+.wbcom-btn-sm {
+    padding: 8px;
+    font-size: .85em;
+    -webkit-transition: all .2s ease-in-out;
+    transition: all .2s ease-in-out
+}
+
+.wbcom-btn-md {
+    padding: 15px;
+    font-size: 1em;
+    -webkit-transition: all .2s ease-in-out;
+    transition: all .2s ease-in-out
+}
+
+.wbcom-btn-lg {
+    padding: 25px;
+    font-size: 1.15em;
+    -webkit-transition: all .2s ease-in-out;
+    transition: all .2s ease-in-out
+}
+
+.wbcom-btn-1:before {
+    position: absolute;
+    content: "";
+    z-index: -1;
+    width: 200%;
+    height: 150%;
+    opacity: 0;
+    left: -50%;
+    bottom: 0;
+    -webkit-transform-origin: left bottom;
+    transform-origin: left bottom;
+    -webkit-transform: rotate(-90deg) translateZ(0);
+    transform: rotate(-90deg) translateZ(0);
+    will-change: transform, opacity;
+    -webkit-transition-property: opacity, -webkit-transform;
+    transition-property: transform, opacity;
+    transition-property: transform, opacity, -webkit-transform;
+    -webkit-transition-duration: .6s;
+    transition-duration: .6s;
+    -webkit-transition-timing-function: cubic-bezier(0.01, -.24, 0, .68);
+    transition-timing-function: cubic-bezier(0.01, -.24, 0, .68)
+}
+
+.wbcom-btn-1:hover:before {
+    -webkit-transform: rotate(0deg) translateZ(0);
+    transform: rotate(0deg) translateZ(0);
+    opacity: 1;
+    -webkit-transition-duration: .2s;
+    transition-duration: .2s
+}
+
+.wbcom-btn-2:before {
+    position: absolute;
+    content: "";
+    z-index: -1;
+    width: 0;
+    height: 0;
+    padding: 50%;
+    border-radius: 50% !important;
+    left: 50%;
+    top: 50%;
+    -webkit-transform: translate3d(-50%, -50%, 0) scale(0);
+    transform: translate3d(-50%, -50%, 0) scale(0);
+    -webkit-transition: -webkit-transform .15s ease-out;
+    transition: transform .15s ease-out;
+    transition: transform .15s ease-out, -webkit-transform .15s ease-out
+}
+
+.wbcom-btn-2:hover:before {
+    -webkit-transition-duration: .3s;
+    transition-duration: .3s;
+    -webkit-transform: translate3d(-50%, -50%, 0) scale(1.5);
+    transform: translate3d(-50%, -50%, 0) scale(1.5);
+    width: 100%
+}
+
+.wbcom-btn-3:before {
+    position: absolute;
+    content: "";
+    z-index: -1;
+    width: 110%;
+    height: 0;
+    opacity: 0;
+    left: 50%;
+    top: 50%;
+    -webkit-transform: translate3d(-50%, -50%, 0);
+    transform: translate3d(-50%, -50%, 0);
+    will-change: opacity, height;
+    -webkit-transition-property: opacity, height;
+    transition-property: opacity, height;
+    -webkit-transition-duration: .25s, .25s;
+    transition-duration: .25s, .25s;
+    -webkit-transition-delay: .15s, 0s;
+    transition-delay: .15s, 0s;
+    -webkit-transition-timing-function: cubic-bezier(0, 0, .11, 1.24);
+    transition-timing-function: cubic-bezier(0, 0, .11, 1.24)
+}
+
+.wbcom-btn-3:hover:before {
+    opacity: 1;
+    height: 110%;
+    -webkit-transition-duration: .25s, .4s;
+    transition-duration: .25s, .4s;
+    -webkit-transition-delay: 0s;
+    transition-delay: 0s
+}
+
+.wbcom-btn-4:before {
+    position: absolute;
+    content: "";
+    z-index: -1;
+    width: 0;
+    height: 110%;
+    opacity: 0;
+    left: 50%;
+    top: 50%;
+    -webkit-transform: translate3d(-50%, -50%, 0);
+    transform: translate3d(-50%, -50%, 0);
+    will-change: opacity, width;
+    -webkit-transition-property: opacity, width;
+    transition-property: opacity, width;
+    -webkit-transition-duration: .25s, .25s;
+    transition-duration: .25s, .25s;
+    -webkit-transition-delay: .15s, 0s;
+    transition-delay: .15s, 0s;
+    -webkit-transition-timing-function: cubic-bezier(0, 0, .11, 1.24);
+    transition-timing-function: cubic-bezier(0, 0, .11, 1.24)
+}
+
+.wbcom-btn-4:hover:before {
+    opacity: 1;
+    width: 110%;
+    -webkit-transition-duration: .25s, .4s;
+    transition-duration: .25s, .4s;
+    -webkit-transition-delay: 0s;
+    transition-delay: 0s
+}
+
+.wbcom-btn-5:before,
+.wbcom-btn-7:before {
+    position: absolute;
+    content: "";
+    z-index: -1;
+    width: 0;
+    height: 110%;
+    opacity: 0;
+    left: 0;
+    top: 0;
+    will-change: opacity, width;
+    -webkit-transition-property: opacity, width;
+    transition-property: opacity, width;
+    -webkit-transition-duration: .25s, .25s;
+    transition-duration: .25s, .25s;
+    -webkit-transition-delay: .15s, 0s;
+    transition-delay: .15s, 0s;
+    -webkit-transition-timing-function: cubic-bezier(0, 0, .11, 1.24);
+    transition-timing-function: cubic-bezier(0, 0, .11, 1.24)
+}
+
+.wbcom-btn-5:hover:before,
+.wbcom-btn-7:hover:before {
+    opacity: 1;
+    width: 110%;
+    -webkit-transition-duration: .25s, .4s;
+    transition-duration: .25s, .4s;
+    -webkit-transition-delay: 0s;
+    transition-delay: 0s
+}
+
+.wbcom-btn-7:before {
+    left: auto;
+    right: 0
+}
+
+.wbcom-btn-6:before,
+.wbcom-btn-8:before {
+    position: absolute;
+    content: "";
+    z-index: -1;
+    width: 110%;
+    height: 0;
+    opacity: 0;
+    left: 0;
+    bottom: 0;
+    will-change: opacity, height;
+    -webkit-transition-property: opacity, height;
+    transition-property: opacity, height;
+    -webkit-transition-duration: .25s, .25s;
+    transition-duration: .25s, .25s;
+    -webkit-transition-delay: .15s, 0s;
+    transition-delay: .15s, 0s;
+    -webkit-transition-timing-function: cubic-bezier(0, 0, .11, 1.24);
+    transition-timing-function: cubic-bezier(0, 0, .11, 1.24)
+}
+
+.wbcom-btn-6:hover:before,
+.wbcom-btn-8:hover:before {
+    opacity: 1;
+    height: 110%;
+    -webkit-transition-duration: .25s, .4s;
+    transition-duration: .25s, .4s;
+    -webkit-transition-delay: 0s;
+    transition-delay: 0s
+}
+
+.wbcom-btn-8:before {
+    bottom: auto;
+    top: 0
+}
+
+/* Flip box */
+.wba-flip-card-outer {
+    display: -webkit-box;
+    display: -ms-flexbox;
+    display: flex;
+    -webkit-box-pack: center;
+    -ms-flex-pack: center;
+    justify-content: center;
+    -webkit-box-align: center;
+    -ms-flex-align: center;
+    align-items: center
+}
+
+.wba-flip-card-wrapper {
+    -webkit-perspective: 1000px;
+    perspective: 1000px;
+    width: 100%;
+    max-width: 300px;
+    height: auto;
+    min-height: 400px
+}
+
+.wba-flip-card-wrapper .wba-flip-card-inner {
+    position: relative;
+    cursor: pointer;
+    -webkit-transition-duration: .4s;
+    transition-duration: .4s;
+    -webkit-transform-style: preserve-3d;
+    transform-style: preserve-3d;
+    width: 100%;
+    max-width: 300px;
+    height: auto;
+    min-height: 400px;
+    margin: 0
+}
+
+.wba-flip-card-wrapper .wba-flip-card-inner .wba-flip-card-back-title,
+.wba-flip-card-wrapper .wba-flip-card-inner .wba-flip-card-front-title {
+    margin: 0;
+    padding: 0;
+    z-index: 2
+}
+
+.wba-flip-card-wrapper .wba-flip-card-inner .wba-flip-card-back-icon,
+.wba-flip-card-wrapper .wba-flip-card-inner .wba-flip-card-front-icon {
+    display: -webkit-box;
+    display: -ms-flexbox;
+    display: flex;
+    -webkit-box-align: center;
+    -ms-flex-align: center;
+    align-items: center;
+    -webkit-box-pack: center;
+    -ms-flex-pack: center;
+    justify-content: center;
+    z-index: 2
+}
+
+.wba-flip-card-wrapper .wba-flip-card-inner .wba-flip-card-back-content,
+.wba-flip-card-wrapper .wba-flip-card-inner .wba-flip-card-front-content {
+    z-index: 2
+}
+
+.wba-flip-card-wrapper .wba-flip-card-inner .back,
+.wba-flip-card-wrapper .wba-flip-card-inner .front {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+    -webkit-transform: rotateX(0deg);
+    transform: rotateX(0deg);
+    display: -webkit-box;
+    display: -ms-flexbox;
+    display: flex;
+    -webkit-box-align: center;
+    -ms-flex-align: center;
+    align-items: center;
+    -webkit-box-pack: center;
+    -ms-flex-pack: center;
+    justify-content: center;
+    -webkit-box-orient: vertical;
+    -webkit-box-direction: normal;
+    -ms-flex-direction: column;
+    flex-direction: column;
+    border-radius: 4px;
+    overflow: hidden
+}
+
+.wba-flip-card-wrapper .wba-flip-card-inner .back .wba-flip-card-overlay,
+.wba-flip-card-wrapper .wba-flip-card-inner .front .wba-flip-card-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1
+}
+
+.wba-flip-card-wrapper .wba-flip-card-inner .back .wbcom-btn-wrapper,
+.wba-flip-card-wrapper .wba-flip-card-inner .front .wbcom-btn-wrapper {
+    z-index: 2
+}
+
+.wba-flip-card-wrapper .wba-flip-card-inner .front {
+    z-index: 2;
+    color: #111;
+    background: #eee
+}
+
+.wba-flip-card-wrapper .wba-flip-card-inner .front .wba-flip-card-front-title,
+.wba-flip-card-wrapper .wba-flip-card-inner .front p {
+    color: #111
+}
+
+.wba-flip-card-wrapper .wba-flip-card-inner .back {
+    -webkit-transform: rotateY(180deg);
+    transform: rotateY(180deg);
+    color: #fff;
+    background: #FC545E
+}
+
+.wba-flip-card-wrapper .wba-flip-card-inner .back .wba-flip-card-back-title,
+.wba-flip-card-wrapper .wba-flip-card-inner .back p {
+    color: #fff
+}
+
+.wba-flip-card-wrapper.flip-right .wba-flip-card-inner .back,
+.wba-flip-card-wrapper.flip-right:hover .wba-flip-card-inner,
+.wba-flip-card-wrapper:hover .wba-flip-card-inner .back {
+    -webkit-transform: rotateY(180deg);
+    transform: rotateY(180deg)
+}
+
+.wba-flip-card-wrapper.flip-left .wba-flip-card-inner .back,
+.wba-flip-card-wrapper.flip-left:hover .wba-flip-card-inner {
+    -webkit-transform: rotateY(-180deg);
+    transform: rotateY(-180deg)
+}
+
+.wba-flip-card-wrapper.flip-up .wba-flip-card-inner .back,
+.wba-flip-card-wrapper.flip-up:hover .wba-flip-card-inner {
+    -webkit-transform: rotateX(180deg);
+    transform: rotateX(180deg)
+}
+
+.wba-flip-card-wrapper.flip-down .wba-flip-card-inner .back,
+.wba-flip-card-wrapper.flip-down:hover .wba-flip-card-inner {
+    -webkit-transform: rotateX(-180deg);
+    transform: rotateX(-180deg)
+}
+
+.wba-flip-card-wrapper.flip-diagonal-right .wba-flip-card-inner .back,
+.wba-flip-card-wrapper.flip-diagonal-right:hover .wba-flip-card-inner {
+    -webkit-transform: rotate3d(1, 1, 0, 180deg);
+    transform: rotate3d(1, 1, 0, 180deg)
+}
+
+.wba-flip-card-wrapper.flip-diagonal-left .wba-flip-card-inner .back,
+.wba-flip-card-wrapper.flip-diagonal-left:hover .wba-flip-card-inner {
+    -webkit-transform: rotate3d(1, 1, 0, -180deg);
+    transform: rotate3d(1, 1, 0, -180deg)
+}
+
+.wba-flip-card-wrapper.flip-inverted-diagonal-right .wba-flip-card-inner .back,
+.wba-flip-card-wrapper.flip-inverted-diagonal-right:hover .wba-flip-card-inner {
+    -webkit-transform: rotate3d(-1, 1, 0, 180deg);
+    transform: rotate3d(-1, 1, 0, 180deg)
+}
+
+.wba-flip-card-wrapper.flip-inverted-diagonal-left .wba-flip-card-inner .back,
+.wba-flip-card-wrapper.flip-inverted-diagonal-left:hover .wba-flip-card-inner {
+    -webkit-transform: rotate3d(1, -1, 0, 180deg);
+    transform: rotate3d(1, -1, 0, 180deg)
+}

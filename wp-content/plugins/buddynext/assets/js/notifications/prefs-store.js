@@ -1,0 +1,444 @@
+/**
+ * BuddyNext - Notification preferences Interactivity API store.
+ *
+ * Powers `/settings/notifications/` (and the alias `/notifications/preferences/`).
+ *
+ * The template inlines a context object with:
+ *   restPrefsUrl    string  GET + PUT /me/notification-prefs
+ *   restChannelsUrl string  GET + PUT /me/notification-channels
+ *   restSpacesUrl   string  GET + POST /me/space-notification-prefs
+ *   nonce           string  wp_rest nonce
+ *   prefs           map     { [type]: { on_site, email_freq } }
+ *   spacePrefs      map     { [space_id]: 'all'|'mentions_only'|'none' }
+ *   channels        map     { in_app, email, push }
+ *   pushAvailable   bool
+ *   catalogue       array   per-type defaults for resetToDefaults
+ *   digestsEnabled  bool    false when the owner disabled digest emails site-wide
+ *                           (Daily/Weekly then deliver nothing and are refused)
+ *   isDirty         bool    seeded false
+ *   isSaving        bool    seeded false
+ *   savedAt         number  unix seconds of last successful save (0 = never)
+ *   errors          map     { [type]: 'message' } keyed by row
+ *   openGroups      map     { [group]: bool } accordion state
+ *   resetConfirmOpen bool
+ *
+ * Companion service: includes/Notifications/NotificationPrefService.php +
+ * NotificationController endpoints.
+ */
+import { store, getContext } from '@wordpress/interactivity';
+import { restFetch } from '@buddynext/rest-client';
+
+/* -- i18n -------------------------------------------------------------- */
+/* Translated strings are injected server-side into the Interactivity state
+ * (AssetService::i18n_notification_prefs) because Script Modules cannot use
+ * wp_set_script_translations(). The dictionary is read once from the
+ * buddynext/notification-prefs namespace below; each lookup keeps the English
+ * literal as a fallback so the UI never breaks if the state is absent. fmt()
+ * fills sprintf-style '%s'/'%d' placeholders. */
+let I18N = {};
+function t( k, fb ) { return ( I18N && I18N[ k ] ) || fb; }
+function fmt( tpl, ...vals ) { let i = 0; return String( null == tpl ? '' : tpl ).replace( /%(?:(\d+)\$)?[sd]/g, ( m, pos ) => String( vals[ pos ? pos - 1 : i++ ] ?? '' ) ); }
+
+const VALID_FREQ = [ 'immediate', 'daily', 'weekly', 'off' ];
+
+/* Frequencies that only deliver when the daily/weekly digest crons run. When the
+ * owner sets Settings -> Notifications -> Digest frequency to "Disabled" these
+ * send nothing at all, so the template disables the chips and the store refuses
+ * them too (belt + braces, and it stops "Reset to defaults" from re-seeding a
+ * catalogue default of daily/weekly into a dead state). */
+const DIGEST_FREQ = [ 'daily', 'weekly' ];
+
+/**
+ * Toast helper - delegates to the shell-provided bnToast when available.
+ *
+ * @param {string} message
+ * @param {string} tone success|error|info
+ */
+function toast( message, tone ) {
+	if ( typeof window !== 'undefined' && typeof window.bnToast === 'function' ) {
+		window.bnToast( message, tone );
+		return;
+	}
+	if ( typeof window !== 'undefined' && window.console ) {
+		window.console.warn( '[buddynext]', tone, message );
+	}
+}
+
+/**
+ * Format a unix-second timestamp into "Just now", "1 min ago", etc.
+ *
+ * @param {number} ts
+ * @return {string}
+ */
+function formatSavedLabel( ts ) {
+	if ( ! ts ) { return ''; }
+	var diff = Math.floor( Date.now() / 1000 ) - ts;
+	if ( diff < 5 )     { return t( 'justNow', 'Just now' ); }
+	if ( diff < 60 )    { return fmt( t( 'secondsAgo', '%ds ago' ), diff ); }
+	if ( diff < 3600 )  { return fmt( t( 'minutesAgo', '%d min ago' ), Math.floor( diff / 60 ) ); }
+	return fmt( t( 'hoursAgo', '%dh ago' ), Math.floor( diff / 3600 ) );
+}
+
+/* Beforeunload guard - mirror the Profile edit pattern. */
+var unloadHandlerAttached = false;
+function ensureUnloadGuard() {
+	if ( unloadHandlerAttached ) { return; }
+	window.addEventListener( 'beforeunload', function ( event ) {
+		var wrap = document.querySelector( '[data-wp-interactive="buddynext/notification-prefs"]' );
+		if ( ! wrap ) { return; }
+		if ( wrap.dataset.bnDirty === '1' ) {
+			event.preventDefault();
+			event.returnValue = '';
+			return '';
+		}
+	} );
+	unloadHandlerAttached = true;
+}
+
+function syncDirtyAttr( dirty ) {
+	var wrap = document.querySelector( '[data-wp-interactive="buddynext/notification-prefs"]' );
+	if ( wrap ) { wrap.dataset.bnDirty = dirty ? '1' : '0'; }
+}
+
+/**
+ * Build the diff payload for PUT /me/notification-prefs by comparing the
+ * current prefs map against the snapshot captured at last save.
+ *
+ * @param {Object} current
+ * @param {Object} initial
+ * @return {Object} subset of types where anything changed
+ */
+function buildPrefsDiff( current, initial ) {
+	var diff = {};
+	Object.keys( current || {} ).forEach( function ( type ) {
+		var c = current[ type ] || {};
+		var i = ( initial && initial[ type ] ) || {};
+		if ( c.on_site !== i.on_site || c.email_freq !== i.email_freq ) {
+			diff[ type ] = {
+				on_site: !! c.on_site,
+				email_freq: c.email_freq || 'immediate',
+			};
+		}
+	} );
+	return diff;
+}
+
+const prefsStore = store( 'buddynext/notification-prefs', {
+	state: {
+		get savedLabel() {
+			var ctx = getContext();
+			return formatSavedLabel( ctx && ctx.savedAt ? ctx.savedAt : 0 );
+		},
+		get saveBarHidden() {
+			var ctx = getContext();
+			return ! ctx || ( ! ctx.isDirty && ! ctx.isSaving && ! ctx.savedAt );
+		},
+		get statusLabel() {
+			var ctx = getContext();
+			if ( ! ctx ) { return ''; }
+			if ( ctx.isSaving ) { return t( 'statusSaving', 'Saving...' ); }
+			if ( ctx.isDirty )  { return t( 'statusUnsavedChanges', 'Unsaved changes' ); }
+			if ( ctx.savedAt )  { return fmt( t( 'statusSaved', 'Saved %s' ), formatSavedLabel( ctx.savedAt ) ); }
+			return '';
+		},
+		// Visibility of the three save-bar status pills.
+		//
+		// These used to be inline expressions in the template:
+		//   data-wp-bind--hidden="!(context.isDirty && !context.isSaving)"
+		// The Interactivity API resolves a directive value as a PATH, not as
+		// JavaScript. It strips the leading "!", fails to resolve the remainder as a
+		// path, gets undefined, and negates it to true — so all three pills carried
+		// `hidden` permanently, in every state and at every viewport. The save bar
+		// appeared with no word about why, and "Saving..." and "Saved" never showed at
+		// all. Valid single-path bindings on the same bar (state.saveBarHidden,
+		// !context.isDirty) reacted correctly throughout, which is what isolated these.
+		get statusDirtyHidden() {
+			var ctx = getContext();
+			return ! ( ctx && ctx.isDirty && ! ctx.isSaving );
+		},
+		get statusSavingHidden() {
+			var ctx = getContext();
+			return ! ( ctx && ctx.isSaving );
+		},
+		get statusSavedHidden() {
+			var ctx = getContext();
+			return ! ( ctx && ctx.savedAt && ! ctx.isDirty && ! ctx.isSaving );
+		},
+		// Per-row reactive state — the row provides prefType, the chip provides
+		// chipFreq. Bound via data-wp-bind so toggling, and especially Reset to
+		// defaults (which rebuilds ctx.prefs), re-renders the controls instead of
+		// leaving the server-rendered checked/aria-pressed state stale.
+		get rowOnSite() {
+			var ctx = getContext();
+			var entry = ctx && ctx.prefs ? ctx.prefs[ ctx.prefType ] : null;
+			return !! ( entry && entry.on_site );
+		},
+		get rowFreqActive() {
+			var ctx = getContext();
+			var entry = ctx && ctx.prefs ? ctx.prefs[ ctx.prefType ] : null;
+			return !! ( entry && entry.email_freq === ctx.chipFreq );
+		},
+	},
+	callbacks: {
+		init() {
+			ensureUnloadGuard();
+			syncDirtyAttr( false );
+		},
+	},
+	actions: {
+		toggleGroup( event ) {
+			var ctx     = getContext();
+			var trigger = event.target.closest( '[data-group]' );
+			if ( ! trigger || ! ctx ) { return; }
+			var group = trigger.dataset.group;
+			var open  = Object.assign( {}, ctx.openGroups || {} );
+			open[ group ] = ! open[ group ];
+			ctx.openGroups = open;
+		},
+
+		setChannel( event ) {
+			var ctx = getContext();
+			var el  = event.target.closest( '[data-channel]' );
+			if ( ! ctx || ! el ) { return; }
+			var key = el.dataset.channel;
+			var channels = Object.assign( {}, ctx.channels || {} );
+			channels[ key ] = !! el.checked;
+			ctx.channels = channels;
+			ctx.isDirty  = true;
+			syncDirtyAttr( true );
+		},
+
+		setOnSite( event ) {
+			var ctx = getContext();
+			var el  = event.target.closest( '[data-type]' );
+			if ( ! ctx || ! el ) { return; }
+			var type = el.dataset.type;
+			var prefs = Object.assign( {}, ctx.prefs || {} );
+			var entry = Object.assign( {}, prefs[ type ] || {} );
+			entry.on_site = !! el.checked;
+			prefs[ type ] = entry;
+			ctx.prefs = prefs;
+			ctx.isDirty = true;
+			syncDirtyAttr( true );
+		},
+
+		setEmailFreq( event ) {
+			var ctx = getContext();
+			var btn = event.target.closest( '[data-type][data-freq]' );
+			if ( ! ctx || ! btn ) { return; }
+			var type = btn.dataset.type;
+			var freq = btn.dataset.freq;
+			if ( VALID_FREQ.indexOf( freq ) === -1 ) { return; }
+			// Digests off site-wide: never stage a choice that delivers nothing.
+			if ( ctx.digestsEnabled === false && DIGEST_FREQ.indexOf( freq ) !== -1 ) { return; }
+			var prefs = Object.assign( {}, ctx.prefs || {} );
+			var entry = Object.assign( {}, prefs[ type ] || {} );
+			entry.email_freq = freq;
+			prefs[ type ] = entry;
+			ctx.prefs = prefs;
+			ctx.isDirty = true;
+			syncDirtyAttr( true );
+
+			// Visual chip swap - update aria-pressed siblings without waiting
+			// for save. Interactivity bindings re-evaluate on context change
+			// but the chips read their pressed state from data-freq matching
+			// ctx.prefs[type].email_freq so we let the bindings do the work.
+		},
+
+		/**
+		 * Toggle the GLOBAL "all broadcast emails" opt-out.
+		 *
+		 * Bound by the Pro-rendered channel row (BroadcastUnsubscribe::render_prefs_optout)
+		 * which carries the endpoint on data-rest-url. Wires the EXISTING
+		 * POST buddynext-pro/v1/me/email-preferences endpoint — the same flag the
+		 * broadcast sender already checks — so a member can stop every future
+		 * newsletter, not just the one campaign the email footer covers.
+		 *
+		 * The checkbox is framed positively (checked = still receiving), matching the
+		 * other channel rows, so the payload is the inverse of its checked state.
+		 * Saves immediately (an unsubscribe must not wait on a Save button) and
+		 * reverts the checkbox if the request fails.
+		 *
+		 * @param {Event} event change event from the opt-out checkbox.
+		 */
+		async setBroadcastOptOut( event ) {
+			var ctx = getContext();
+			var el  = event.target.closest( '[data-bn-broadcast-optout]' );
+			if ( ! ctx || ! el ) { return; }
+			var url = el.dataset.restUrl || '';
+			if ( ! url ) { return; }
+
+			var optOut = ! el.checked;
+
+			try {
+				var res = await restFetch( '', {
+					base: url,
+					nonce: ctx.nonce,
+					method: 'POST',
+					body: { unsubscribed_all_broadcasts: optOut },
+					toastOnError: false,
+				} );
+				if ( ! res.ok ) {
+					throw new Error( 'http_' + res.status );
+				}
+				toast(
+					optOut
+						? t( 'broadcastsOptedOut', 'You will no longer receive newsletters or announcements.' )
+						: t( 'broadcastsOptedIn', 'You will receive newsletters and announcements again.' ),
+					'success'
+				);
+			} catch ( _e ) {
+				el.checked = ! el.checked;
+				toast( t( 'broadcastsFailed', 'Could not update your broadcast email preference.' ), 'error' );
+			}
+		},
+
+		async setSpacePref( event ) {
+			var ctx = getContext();
+			var btn = event.target.closest( '[data-space-id][data-pref]' );
+			if ( ! ctx || ! btn ) { return; }
+			var spaceId = parseInt( btn.dataset.spaceId, 10 );
+			var pref    = btn.dataset.pref;
+			if ( ! spaceId || [ 'all', 'mentions_only', 'none' ].indexOf( pref ) === -1 ) { return; }
+
+			var previous = Object.assign( {}, ctx.spacePrefs || {} );
+			var next     = Object.assign( {}, previous );
+			next[ spaceId ] = pref;
+			ctx.spacePrefs = next;
+
+			try {
+				var res = await restFetch( '', {
+					base: ctx.restSpacesUrl,
+					nonce: ctx.nonce,
+					method: 'POST',
+					body: { space_id: spaceId, pref: pref },
+					toastOnError: false,
+				} );
+				if ( ! res.ok ) {
+					throw new Error( 'http_' + res.status );
+				}
+				toast( t( 'spacePrefSaved', 'Space preference saved.' ), 'success' );
+			} catch ( _e ) {
+				ctx.spacePrefs = previous;
+				toast( t( 'spacePrefSaveFailed', 'Could not save space preference.' ), 'error' );
+			}
+		},
+
+		async saveAll() {
+			var ctx = getContext();
+			if ( ! ctx || ctx.isSaving ) { return; }
+
+			ctx.isSaving = true;
+			ctx.errors   = {};
+
+			var prefsDiff = buildPrefsDiff( ctx.prefs, ctx.initialPrefs );
+			var channelsChanged = (
+				! ctx.initialChannels ||
+				ctx.channels.in_app !== ctx.initialChannels.in_app ||
+				ctx.channels.email  !== ctx.initialChannels.email ||
+				ctx.channels.push   !== ctx.initialChannels.push   ||
+				ctx.channels.sound  !== ctx.initialChannels.sound
+			);
+
+			var ok = true;
+
+			if ( Object.keys( prefsDiff ).length > 0 ) {
+				try {
+					var res = await restFetch( '', {
+						base: ctx.restPrefsUrl,
+						nonce: ctx.nonce,
+						method: 'PUT',
+						body: prefsDiff,
+						toastOnError: false,
+					} );
+					if ( ! res.ok ) {
+						var err = res.data;
+						if ( err && err.data && err.data.params ) {
+							ctx.errors = err.data.params;
+						}
+						throw new Error( 'http_' + res.status );
+					}
+				} catch ( _e ) {
+					ok = false;
+				}
+			}
+
+			if ( ok && channelsChanged ) {
+				try {
+					var resCh = await restFetch( '', {
+						base: ctx.restChannelsUrl,
+						nonce: ctx.nonce,
+						method: 'PUT',
+						body: ctx.channels || {},
+						toastOnError: false,
+					} );
+					if ( ! resCh.ok ) {
+						throw new Error( 'http_' + resCh.status );
+					}
+				} catch ( _e ) {
+					ok = false;
+				}
+			}
+
+			ctx.isSaving = false;
+
+			if ( ! ok ) {
+				// Rollback to the last known good snapshot.
+				ctx.prefs    = Object.assign( {}, ctx.initialPrefs || {} );
+				ctx.channels = Object.assign( {}, ctx.initialChannels || {} );
+				toast( t( 'prefsSaveFailed', 'Could not save preferences.' ), 'error' );
+				return;
+			}
+
+			ctx.initialPrefs    = JSON.parse( JSON.stringify( ctx.prefs || {} ) );
+			ctx.initialChannels = JSON.parse( JSON.stringify( ctx.channels || {} ) );
+			ctx.isDirty         = false;
+			ctx.savedAt         = Math.floor( Date.now() / 1000 );
+			syncDirtyAttr( false );
+			toast( t( 'prefsSaved', 'Preferences saved.' ), 'success' );
+		},
+
+		openResetConfirm() {
+			var ctx = getContext();
+			if ( ctx ) { ctx.resetConfirmOpen = true; }
+		},
+
+		closeResetConfirm() {
+			var ctx = getContext();
+			if ( ctx ) { ctx.resetConfirmOpen = false; }
+		},
+
+		resetToDefaults() {
+			var ctx = getContext();
+			if ( ! ctx ) { return; }
+
+			var digestsOff = ctx.digestsEnabled === false;
+			var next = {};
+			( ctx.catalogue || [] ).forEach( function ( entry ) {
+				var freq = entry.default_email_freq || 'immediate';
+				// Several catalogue defaults are daily/weekly. With digests disabled
+				// those would restore a pref that emails nothing, so they land on
+				// 'off' instead — visible in the chips right away, never silent. The
+				// member can still pick Immediate if they want mail for that type.
+				if ( digestsOff && DIGEST_FREQ.indexOf( freq ) !== -1 ) { freq = 'off'; }
+				next[ entry.slug ] = {
+					on_site:    !! entry.default_on_site,
+					email_freq: freq,
+				};
+			} );
+			ctx.prefs = next;
+
+			var spaces = Object.assign( {}, ctx.spacePrefs || {} );
+			Object.keys( spaces ).forEach( function ( id ) {
+				spaces[ id ] = 'all';
+			} );
+			ctx.spacePrefs = spaces;
+
+			ctx.isDirty = true;
+			ctx.resetConfirmOpen = false;
+			syncDirtyAttr( true );
+		},
+	},
+} );
+
+I18N = ( prefsStore.state && prefsStore.state.i18n ) || {};

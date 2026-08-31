@@ -1,0 +1,183 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "wbcom-essential/cta",
+  "version": "1.0.0",
+  "title": "CTA Section",
+  "category": "essential-marketing",
+  "icon": "megaphone",
+  "description": "Call-to-action section with heading, description, and a single CTA button. Supports stacked and inline layouts.",
+  "keywords": [
+    "cta",
+    "call-to-action",
+    "button",
+    "conversion",
+    "banner",
+    "essential",
+    "wbcom"
+  ],
+  "textdomain": "wbcom-essential",
+  "example": {
+    "attributes": {
+      "heading": "Ready to Get Started?",
+      "description": "Join thousands of satisfied customers today."
+    }
+  },
+  "attributes": {
+    "uniqueId": {
+      "type": "string",
+      "default": ""
+    },
+    "heading": {
+      "type": "string",
+      "default": "Ready to Get Started?"
+    },
+    "description": {
+      "type": "string",
+      "default": "Join thousands of satisfied customers today."
+    },
+    "buttonText": {
+      "type": "string",
+      "default": "Get Started Now"
+    },
+    "buttonUrl": {
+      "type": "string",
+      "default": "#"
+    },
+    "layout": {
+      "type": "string",
+      "default": "stacked"
+    },
+    "backgroundColor": {
+      "type": "string",
+      "default": "#f8f9fa"
+    },
+    "headingColor": {
+      "type": "string",
+      "default": "#1e1e2e"
+    },
+    "descriptionColor": {
+      "type": "string",
+      "default": "#6c757d"
+    },
+    "buttonBg": {
+      "type": "string",
+      "default": "#667eea"
+    },
+    "buttonColor": {
+      "type": "string",
+      "default": "#ffffff"
+    },
+    "buttonBgHover": {
+      "type": "string",
+      "default": "#5a6fd6"
+    },
+    "contentAlign": {
+      "type": "string",
+      "default": "center"
+    },
+    "padding": {
+      "type": "object",
+      "default": {
+        "top": 60,
+        "right": 32,
+        "bottom": 60,
+        "left": 32
+      }
+    },
+    "paddingTablet": {
+      "type": "object",
+      "default": null
+    },
+    "paddingMobile": {
+      "type": "object",
+      "default": null
+    },
+    "paddingUnit": {
+      "type": "string",
+      "default": "px"
+    },
+    "margin": {
+      "type": "object",
+      "default": {
+        "top": 0,
+        "right": 0,
+        "bottom": 0,
+        "left": 0
+      }
+    },
+    "marginTablet": {
+      "type": "object",
+      "default": null
+    },
+    "marginMobile": {
+      "type": "object",
+      "default": null
+    },
+    "marginUnit": {
+      "type": "string",
+      "default": "px"
+    },
+    "boxShadow": {
+      "type": "boolean",
+      "default": false
+    },
+    "shadowHorizontal": {
+      "type": "number",
+      "default": 0
+    },
+    "shadowVertical": {
+      "type": "number",
+      "default": 4
+    },
+    "shadowBlur": {
+      "type": "number",
+      "default": 8
+    },
+    "shadowSpread": {
+      "type": "number",
+      "default": 0
+    },
+    "shadowColor": {
+      "type": "string",
+      "default": "rgba(0, 0, 0, 0.12)"
+    },
+    "borderRadius": {
+      "type": "object",
+      "default": {
+        "top": 0,
+        "right": 0,
+        "bottom": 0,
+        "left": 0
+      }
+    },
+    "borderRadiusUnit": {
+      "type": "string",
+      "default": "px"
+    },
+    "hideOnDesktop": {
+      "type": "boolean",
+      "default": false
+    },
+    "hideOnTablet": {
+      "type": "boolean",
+      "default": false
+    },
+    "hideOnMobile": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "supports": {
+    "html": false,
+    "align": [
+      "wide",
+      "full"
+    ],
+    "color": false,
+    "spacing": false
+  },
+  "editorScript": "file:./index.js",
+  "editorStyle": "file:./index.css",
+  "style": "file:./style-index.css"
+}

@@ -1,0 +1,641 @@
+.wbcom-btn-wrapper [class^=wbcom-btn-] {
+    position: relative;
+    text-decoration: none !important;
+    z-index: 0;
+    overflow: hidden;
+    display: inline-block;
+    line-height: 1;
+    max-width: 100%;
+    vertical-align: bottom
+}
+
+.wbcom-btn-sm {
+    padding: 8px;
+    font-size: .85em;
+    -webkit-transition: all .2s ease-in-out;
+    transition: all .2s ease-in-out
+}
+
+.wbcom-btn-md {
+    padding: 15px;
+    font-size: 1em;
+    -webkit-transition: all .2s ease-in-out;
+    transition: all .2s ease-in-out
+}
+
+.wbcom-btn-lg {
+    padding: 25px;
+    font-size: 1.15em;
+    -webkit-transition: all .2s ease-in-out;
+    transition: all .2s ease-in-out
+}
+
+.wbcom-btn-1:before {
+    position: absolute;
+    content: "";
+    z-index: -1;
+    width: 200%;
+    height: 150%;
+    opacity: 0;
+    left: -50%;
+    bottom: 0;
+    -webkit-transform-origin: left bottom;
+    transform-origin: left bottom;
+    -webkit-transform: rotate(-90deg) translateZ(0);
+    transform: rotate(-90deg) translateZ(0);
+    will-change: transform, opacity;
+    -webkit-transition-property: opacity, -webkit-transform;
+    transition-property: transform, opacity;
+    transition-property: transform, opacity, -webkit-transform;
+    -webkit-transition-duration: .6s;
+    transition-duration: .6s;
+    -webkit-transition-timing-function: cubic-bezier(0.01, -.24, 0, .68);
+    transition-timing-function: cubic-bezier(0.01, -.24, 0, .68)
+}
+
+.wbcom-btn-1:hover:before {
+    -webkit-transform: rotate(0deg) translateZ(0);
+    transform: rotate(0deg) translateZ(0);
+    opacity: 1;
+    -webkit-transition-duration: .2s;
+    transition-duration: .2s
+}
+
+.wbcom-btn-2:before {
+    position: absolute;
+    content: "";
+    z-index: -1;
+    width: 0;
+    height: 0;
+    padding: 50%;
+    border-radius: 50% !important;
+    left: 50%;
+    top: 50%;
+    -webkit-transform: translate3d(-50%, -50%, 0) scale(0);
+    transform: translate3d(-50%, -50%, 0) scale(0);
+    -webkit-transition: -webkit-transform .15s ease-out;
+    transition: transform .15s ease-out;
+    transition: transform .15s ease-out, -webkit-transform .15s ease-out
+}
+
+.wbcom-btn-2:hover:before {
+    -webkit-transition-duration: .3s;
+    transition-duration: .3s;
+    -webkit-transform: translate3d(-50%, -50%, 0) scale(1.5);
+    transform: translate3d(-50%, -50%, 0) scale(1.5);
+    width: 100%
+}
+
+.wbcom-btn-3:before {
+    position: absolute;
+    content: "";
+    z-index: -1;
+    width: 110%;
+    height: 0;
+    opacity: 0;
+    left: 50%;
+    top: 50%;
+    -webkit-transform: translate3d(-50%, -50%, 0);
+    transform: translate3d(-50%, -50%, 0);
+    will-change: opacity, height;
+    -webkit-transition-property: opacity, height;
+    transition-property: opacity, height;
+    -webkit-transition-duration: .25s, .25s;
+    transition-duration: .25s, .25s;
+    -webkit-transition-delay: .15s, 0s;
+    transition-delay: .15s, 0s;
+    -webkit-transition-timing-function: cubic-bezier(0, 0, .11, 1.24);
+    transition-timing-function: cubic-bezier(0, 0, .11, 1.24)
+}
+
+.wbcom-btn-3:hover:before {
+    opacity: 1;
+    height: 110%;
+    -webkit-transition-duration: .25s, .4s;
+    transition-duration: .25s, .4s;
+    -webkit-transition-delay: 0s;
+    transition-delay: 0s
+}
+
+.wbcom-btn-4:before {
+    position: absolute;
+    content: "";
+    z-index: -1;
+    width: 0;
+    height: 110%;
+    opacity: 0;
+    left: 50%;
+    top: 50%;
+    -webkit-transform: translate3d(-50%, -50%, 0);
+    transform: translate3d(-50%, -50%, 0);
+    will-change: opacity, width;
+    -webkit-transition-property: opacity, width;
+    transition-property: opacity, width;
+    -webkit-transition-duration: .25s, .25s;
+    transition-duration: .25s, .25s;
+    -webkit-transition-delay: .15s, 0s;
+    transition-delay: .15s, 0s;
+    -webkit-transition-timing-function: cubic-bezier(0, 0, .11, 1.24);
+    transition-timing-function: cubic-bezier(0, 0, .11, 1.24)
+}
+
+.wbcom-btn-4:hover:before {
+    opacity: 1;
+    width: 110%;
+    -webkit-transition-duration: .25s, .4s;
+    transition-duration: .25s, .4s;
+    -webkit-transition-delay: 0s;
+    transition-delay: 0s
+}
+
+.wbcom-btn-5:before,
+.wbcom-btn-7:before {
+    position: absolute;
+    content: "";
+    z-index: -1;
+    width: 0;
+    height: 110%;
+    opacity: 0;
+    left: 0;
+    top: 0;
+    will-change: opacity, width;
+    -webkit-transition-property: opacity, width;
+    transition-property: opacity, width;
+    -webkit-transition-duration: .25s, .25s;
+    transition-duration: .25s, .25s;
+    -webkit-transition-delay: .15s, 0s;
+    transition-delay: .15s, 0s;
+    -webkit-transition-timing-function: cubic-bezier(0, 0, .11, 1.24);
+    transition-timing-function: cubic-bezier(0, 0, .11, 1.24)
+}
+
+.wbcom-btn-5:hover:before,
+.wbcom-btn-7:hover:before {
+    opacity: 1;
+    width: 110%;
+    -webkit-transition-duration: .25s, .4s;
+    transition-duration: .25s, .4s;
+    -webkit-transition-delay: 0s;
+    transition-delay: 0s
+}
+
+.wbcom-btn-7:before {
+    left: auto;
+    right: 0
+}
+
+.wbcom-btn-6:before,
+.wbcom-btn-8:before {
+    position: absolute;
+    content: "";
+    z-index: -1;
+    width: 110%;
+    height: 0;
+    opacity: 0;
+    left: 0;
+    bottom: 0;
+    will-change: opacity, height;
+    -webkit-transition-property: opacity, height;
+    transition-property: opacity, height;
+    -webkit-transition-duration: .25s, .25s;
+    transition-duration: .25s, .25s;
+    -webkit-transition-delay: .15s, 0s;
+    transition-delay: .15s, 0s;
+    -webkit-transition-timing-function: cubic-bezier(0, 0, .11, 1.24);
+    transition-timing-function: cubic-bezier(0, 0, .11, 1.24)
+}
+
+.wbcom-btn-6:hover:before,
+.wbcom-btn-8:hover:before {
+    opacity: 1;
+    height: 110%;
+    -webkit-transition-duration: .25s, .4s;
+    transition-duration: .25s, .4s;
+    -webkit-transition-delay: 0s;
+    transition-delay: 0s
+}
+
+.wbcom-btn-8:before {
+    bottom: auto;
+    top: 0
+}
+
+.wbcom-danger {
+    padding: 1rem 1.5rem;
+    margin-bottom: 2rem;
+    border-left: 5px solid rgba(0, 0, 0, 0.2);
+    font-weight: 700;
+    color: #fff;
+    background-color: #ba324f;
+}
+
+body.elementor-editor-active .wbcom-post-timeline-ajax-btn {
+    pointer-events: none !important;
+}
+
+.wbcom-post-timeline {
+    padding: 40px 0;
+    color: #000;
+}
+
+.wbcom-post-timeline__container {
+    position: relative;
+    padding: 0;
+}
+
+.wbcom-post-timeline__container::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 4px;
+    background: #eee;
+}
+
+.wbcom-post-timeline__block {
+    display: -webkit-box;
+    display: -ms-flexbox;
+    display: flex;
+    position: relative;
+    z-index: 1;
+    margin-bottom: 40px;
+}
+
+.wbcom-post-timeline__block:last-child {
+    margin-bottom: 0;
+}
+
+.wbcom-post-timeline__img {
+    display: -webkit-box;
+    display: -ms-flexbox;
+    display: flex;
+    -webkit-box-pack: center;
+    -ms-flex-pack: center;
+    justify-content: center;
+    -webkit-box-align: center;
+    -ms-flex-align: center;
+    align-items: center;
+    -ms-flex-negative: 0;
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: #2e5d9f;
+    text-align: center;
+    z-index: 9;
+}
+
+.wbcom-post-timeline__img i {
+    line-height: 24px;
+    font-size: 24px;
+    color: #fff;
+}
+
+.wbcom-post-timeline__img svg {
+    width: 24px;
+    height: auto;
+    fill: #fff;
+}
+
+.wbcom-post-timeline-img {
+    display: block;
+}
+
+.wbcom-post-timeline-img img {
+    vertical-align: bottom;
+    -webkit-transition: all 0.2s ease-in-out;
+    transition: all 0.2s ease-in-out;
+}
+
+.wbcom-post-timeline__content {
+    -webkit-box-flex: 1;
+    -ms-flex-positive: 1;
+    flex-grow: 1;
+    position: relative;
+    margin-left: 40px;
+    background: #eee;
+    border-radius: 10px;
+    padding: 40px;
+}
+
+@media screen and (max-width: 767px) {
+    .wbcom-post-timeline__content {
+        margin-left: 20px;
+        padding: 20px;
+    }
+}
+
+.wbcom-post-timeline__content::before {
+    content: "";
+    position: absolute;
+    top: 16px;
+    right: 100%;
+    width: 0;
+    height: 0;
+    border: 8px solid transparent;
+    border-right-color: #eee;
+    display: none;
+}
+
+.wbcom-post-timeline__content.show-arrow::before {
+    display: block;
+}
+
+.wbcom-post-timeline__content .wbcom-post-timeline-title {
+    color: #000;
+    padding: 0;
+    -ms-word-wrap: break-word;
+    word-wrap: break-word;
+}
+
+.wbcom-post-timeline__content .wbcom-post-timeline-title:after,
+.wbcom-post-timeline__content .wbcom-post-timeline-title:before {
+    display: none;
+}
+
+.wbcom-post-timeline__content .wbcom-post-timeline-title a {
+    -webkit-transition: color 0.2s ease-in-out;
+    transition: color 0.2s ease-in-out;
+}
+
+.wbcom-post-timeline__content img {
+    max-width: 100%;
+    height: auto;
+}
+
+.wbcom-post-timeline-date {
+    display: -webkit-box;
+    display: -ms-flexbox;
+    display: flex;
+    -webkit-box-pack: justify;
+    -ms-flex-pack: justify;
+    justify-content: space-between;
+    -webkit-box-align: center;
+    -ms-flex-align: center;
+    align-items: center;
+}
+
+.wbcom-post-timeline__date {
+    color: #000;
+    width: 100%;
+    display: block;
+    line-height: 60px;
+    font-weight: 700;
+}
+
+@-webkit-keyframes wbcom-bounce-1 {
+    0% {
+        opacity: 0;
+        -webkit-transform: scale(0.5);
+        transform: scale(0.5);
+    }
+
+    60% {
+        opacity: 1;
+        -webkit-transform: scale(1.2);
+        transform: scale(1.2);
+    }
+
+    100% {
+        -webkit-transform: scale(1);
+        transform: scale(1);
+    }
+}
+
+@keyframes wbcom-bounce-1 {
+    0% {
+        opacity: 0;
+        -webkit-transform: scale(0.5);
+        transform: scale(0.5);
+    }
+
+    60% {
+        opacity: 1;
+        -webkit-transform: scale(1.2);
+        transform: scale(1.2);
+    }
+
+    100% {
+        -webkit-transform: scale(1);
+        transform: scale(1);
+    }
+}
+
+@-webkit-keyframes wbcom-bounce-2 {
+    0% {
+        opacity: 0;
+        -webkit-transform: translateX(-100px);
+        transform: translateX(-100px);
+    }
+
+    60% {
+        opacity: 1;
+        -webkit-transform: translateX(20px);
+        transform: translateX(20px);
+    }
+
+    100% {
+        -webkit-transform: translateX(0);
+        transform: translateX(0);
+    }
+}
+
+@keyframes wbcom-bounce-2 {
+    0% {
+        opacity: 0;
+        -webkit-transform: translateX(-100px);
+        transform: translateX(-100px);
+    }
+
+    60% {
+        opacity: 1;
+        -webkit-transform: translateX(20px);
+        transform: translateX(20px);
+    }
+
+    100% {
+        -webkit-transform: translateX(0);
+        transform: translateX(0);
+    }
+}
+
+@-webkit-keyframes wbcom-bounce-2-inverse {
+    0% {
+        opacity: 0;
+        -webkit-transform: translateX(100px);
+        transform: translateX(100px);
+    }
+
+    60% {
+        opacity: 1;
+        -webkit-transform: translateX(-20px);
+        transform: translateX(-20px);
+    }
+
+    100% {
+        -webkit-transform: translateX(0);
+        transform: translateX(0);
+    }
+}
+
+@keyframes wbcom-bounce-2-inverse {
+    0% {
+        opacity: 0;
+        -webkit-transform: translateX(100px);
+        transform: translateX(100px);
+    }
+
+    60% {
+        opacity: 1;
+        -webkit-transform: translateX(-20px);
+        transform: translateX(-20px);
+    }
+
+    100% {
+        -webkit-transform: translateX(0);
+        transform: translateX(0);
+    }
+}
+
+.wbcom-post-timeline-ajax-btn {
+    border: none;
+    cursor: pointer;
+    width: 100%;
+    text-align: center;
+}
+
+@media screen and (min-width: 1025px) {
+    .wbcom-post-timeline.wbcom-post-timeline-2-col .wbcom-post-timeline__container::before {
+        left: 50% !important;
+        -webkit-transform: translateX(-50%);
+        transform: translateX(-50%);
+    }
+}
+
+@media screen and (min-width: 1025px) {
+    .wbcom-post-timeline.wbcom-post-timeline-2-col .wbcom-post-timeline__block:nth-child(even) {
+        -webkit-box-orient: horizontal;
+        -webkit-box-direction: reverse;
+        -ms-flex-direction: row-reverse;
+        flex-direction: row-reverse;
+    }
+
+    .wbcom-post-timeline.wbcom-post-timeline-2-col .wbcom-post-timeline__block:nth-child(even) .wbcom-post-timeline__img {
+        margin-right: calc(5% - 30px);
+    }
+
+    .wbcom-post-timeline.wbcom-post-timeline-2-col .wbcom-post-timeline__block:nth-child(odd) .wbcom-post-timeline__content::before {
+        right: auto;
+        left: 100%;
+        width: 0;
+        height: 0;
+        border: 8px solid transparent;
+        border-left-color: #eee;
+    }
+
+    .wbcom-post-timeline.wbcom-post-timeline-2-col .wbcom-post-timeline__block .wbcom-post-timeline__date {
+        text-align: left !important;
+    }
+
+    .wbcom-post-timeline.wbcom-post-timeline-2-col .wbcom-post-timeline__block:nth-child(even) .wbcom-post-timeline__date {
+        left: auto;
+        right: 120%;
+        text-align: right !important;
+    }
+}
+
+@media screen and (max-width: 1024px) {
+    .wbcom-post-timeline.wbcom-post-timeline-2-col .wbcom-post-timeline__block:nth-child(even) .wbcom-post-timeline__img {
+        margin-right: 0 !important;
+    }
+
+    .wbcom-post-timeline.wbcom-post-timeline-2-col .wbcom-post-timeline__block:nth-child(odd) .wbcom-post-timeline__content::before {
+        border-left-color: transparent !important;
+    }
+}
+
+@media screen and (min-width: 1025px) {
+    .wbcom-post-timeline.wbcom-post-timeline-2-col .wbcom-post-timeline__img {
+        width: 60px;
+        height: 60px;
+        -webkit-box-ordinal-group: 2;
+        -ms-flex-order: 1;
+        order: 1;
+        margin-left: calc(5% - 30px);
+        will-change: transform;
+    }
+}
+
+@media screen and (max-width: 1024px) {
+    .wbcom-post-timeline.wbcom-post-timeline-2-col .wbcom-post-timeline__img {
+        margin-left: 0 !important;
+    }
+}
+
+@media screen and (min-width: 1025px) {
+    .wbcom-post-timeline.wbcom-post-timeline-2-col .wbcom-post-timeline__content {
+        width: 45%;
+        -webkit-box-flex: 0;
+        -ms-flex-positive: 0;
+        flex-grow: 0;
+        will-change: transform;
+        margin: 0;
+        line-height: 1.2;
+    }
+
+    .wbcom-post-timeline.wbcom-post-timeline-2-col .wbcom-post-timeline__content::before {
+        top: 24px;
+    }
+}
+
+@media screen and (min-width: 1025px) {
+    .wbcom-post-timeline.wbcom-post-timeline-2-col .wbcom-post-timeline__date {
+        position: absolute;
+        width: 100%;
+        left: 120%;
+        top: 0;
+        margin: 0;
+    }
+}
+
+@media screen and (min-width: 1025px) {
+
+    .wbcom-post-timeline.wbcom-post-timeline-2-col .wbcom-post-timeline__content--hidden,
+    .wbcom-post-timeline.wbcom-post-timeline-2-col .wbcom-post-timeline__img--hidden {
+        visibility: hidden;
+    }
+
+    .wbcom-post-timeline.wbcom-post-timeline-2-col .wbcom-post-timeline__img--bounce-in {
+        -webkit-animation: wbcom-bounce-1 0.6s;
+        animation: wbcom-bounce-1 0.6s;
+    }
+
+    .wbcom-post-timeline.wbcom-post-timeline-2-col .wbcom-post-timeline__content--bounce-in {
+        -webkit-animation: wbcom-bounce-2 0.6s;
+        animation: wbcom-bounce-2 0.6s;
+    }
+
+    .wbcom-post-timeline.wbcom-post-timeline-2-col .wbcom-post-timeline__block:nth-child(even) .wbcom-post-timeline__content--bounce-in {
+        -webkit-animation-name: wbcom-bounce-2-inverse;
+        animation-name: wbcom-bounce-2-inverse;
+    }
+}
+
+@media screen and (min-width: 1025px) {
+
+    .wbcom-post-timeline.wbcom-post-timeline-1-col .wbcom-post-timeline__content--hidden,
+    .wbcom-post-timeline.wbcom-post-timeline-1-col .wbcom-post-timeline__img--hidden {
+        visibility: hidden;
+    }
+
+    .wbcom-post-timeline.wbcom-post-timeline-1-col .wbcom-post-timeline__img--bounce-in {
+        -webkit-animation: wbcom-bounce-1 0.6s;
+        animation: wbcom-bounce-1 0.6s;
+    }
+
+    .wbcom-post-timeline.wbcom-post-timeline-1-col .wbcom-post-timeline__content--bounce-in {
+        -webkit-animation: wbcom-bounce-2-inverse 0.6s;
+        animation: wbcom-bounce-2-inverse 0.6s;
+    }
+}

@@ -1,0 +1,790 @@
+<?php
+/**
+ * WB Gamification Leaderboard Engine
+ *
+ * Generates leaderboard data from the wb_gam_points ledger with opt-out
+ * filtering, period scoping, and extensible scope support.
+ *
+ * Periods: all | month | week | day
+ *
+ * Scope: by default the leaderboard is site-wide. Pass scope_type + scope_id
+ * to filter to a defined set of users. Scope resolution is extensible via the
+ * `wb_gam_leaderboard_scope_user_ids` filter — BuddyPress integration
+ * and third-party plugins hook in here to return the relevant user IDs.
+ *
+ * Opt-out: users with `leaderboard_opt_out = 1` in wb_gam_member_prefs are
+ * never shown on the leaderboard (not even their rank shown to others).
+ * They can still retrieve their own private rank.
+ *
+ * Performance:
+ *   - Object cache (2 min TTL) on get_leaderboard() and get_user_rank()
+ *   - cache_users() call before avatar loop to eliminate N+1 queries
+ *   - Snapshot cron writes top 500 to wb_gam_leaderboard_cache every 5 minutes
+ *   - get_leaderboard() reads from snapshot when fresh (< 10 min old)
+ *
+ * @package WB_Gamification
+ * @since   0.1.0
+ */
+
+namespace WBGam\Engine;
+
+defined( 'ABSPATH' ) || exit;
+// Silencing convention-driven false positives so Plugin Check signal stays clean:
+// - PrefixAllGlobals.NonPrefixedHooknameFound — plugin uses `wb_gam_*` as its
+// established hook prefix (documented in CLAUDE.md, declared in .phpcs.xml).
+// Plugin Check auto-detects `wb_gamification` from the text-domain header
+// and doesn't share the .phpcs.xml prefix list; hooks like
+// `wb_gam_points_redeemed` are part of the public 1.0 API and can't rename.
+// - PrefixAllGlobals.NonPrefixedFunctionFound — same convention. Helper
+// functions exported under `wb_gam_*` are documented in `src/Extensions/`.
+// - PluginCheck.Security.DirectDB.UnescapedDBParameter +
+// WordPress.DB.PreparedSQL.InterpolatedNotPrepared — this file does custom-
+// table work. Table names are interpolated from `{$wpdb->prefix}` plus
+// literal constants (no user input); user-supplied values pass through
+// `$wpdb->prepare()`. MySQL doesn't allow placeholder table names, so the
+// interpolation is unavoidable.
+// phpcs:disable PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber, WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound
+
+/**
+ * Generates leaderboard data from the points ledger with opt-out filtering and period scoping.
+ *
+ * @package WB_Gamification
+ */
+final class LeaderboardEngine {
+
+	/**
+	 * Action Scheduler group for the recurring snapshot. The wb_gam_ prefix
+	 * keeps it isolated from any host plugin's AS group on a shared install.
+	 *
+	 * @var string
+	 */
+	public const AS_GROUP = 'wb_gam_leaderboard';
+
+	/**
+	 * Initialize cron hooks and arm the recurring snapshot.
+	 *
+	 * Called from plugins_loaded via FeatureFlags or directly.
+	 *
+	 * @return void
+	 */
+	public static function init(): void {
+		// Cache invalidation — bump the wb_gamification group's last-changed
+		// stamp on every points-awarded event so leaderboard cache keys (which
+		// embed the stamp) auto-orphan instead of serving stale data for up
+		// to 120 seconds. Per skill Part 2.7 (incrementor pattern).
+		add_action( 'wb_gam_points_awarded', array( __CLASS__, 'invalidate_cache' ), 5, 0 );
+		add_action( 'wb_gam_points_awarded_batch', array( __CLASS__, 'invalidate_cache' ), 5, 0 );
+
+		// Hook the snapshot writer to the recurring event.
+		add_action( 'wb_gam_leaderboard_snapshot', array( __CLASS__, 'write_snapshot' ) );
+
+		// Arm the recurring snapshot on Action Scheduler. AS owns the cadence,
+		// so there is no custom WP-Cron interval to register (which previously
+		// tripped WP 6.7+'s _load_textdomain_just_in_time notice). AS is not
+		// initialised until init, so defer arming to it.
+		if ( did_action( 'init' ) ) {
+			self::maybe_schedule();
+		} else {
+			add_action( 'init', array( __CLASS__, 'maybe_schedule' ) );
+		}
+	}
+
+	/**
+	 * Arm the recurring snapshot (every 5 minutes) on Action Scheduler and
+	 * remove any legacy WP-Cron event so the snapshot can't double-fire.
+	 * Idempotent — safe to call on every init.
+	 *
+	 * @return void
+	 */
+	public static function maybe_schedule(): void {
+		// Legacy WP-Cron event from versions <= 1.6.1.
+		wp_clear_scheduled_hook( 'wb_gam_leaderboard_snapshot' );
+
+		if ( ! function_exists( 'as_schedule_recurring_action' ) || ! function_exists( 'as_has_scheduled_action' ) ) {
+			return;
+		}
+
+		// Guarded with as_has_scheduled_action() per the AS-schedule guard
+		// contract (bin/check-as-schedule-guard.php) so re-arming on every init
+		// never stacks duplicate recurring actions.
+		if ( ! as_has_scheduled_action( 'wb_gam_leaderboard_snapshot', array(), self::AS_GROUP ) ) {
+			as_schedule_recurring_action( time(), 300, 'wb_gam_leaderboard_snapshot', array(), self::AS_GROUP );
+		}
+	}
+
+	/**
+	 * Activation hook — arm the leaderboard snapshot.
+	 *
+	 * @return void
+	 */
+	public static function activate(): void {
+		self::maybe_schedule();
+	}
+
+	/**
+	 * Deactivation hook — clear the leaderboard snapshot schedule.
+	 *
+	 * @return void
+	 */
+	public static function deactivate(): void {
+		if ( function_exists( 'as_unschedule_all_actions' ) ) {
+			as_unschedule_all_actions( 'wb_gam_leaderboard_snapshot', array(), self::AS_GROUP );
+		}
+		// Legacy WP-Cron event from versions <= 1.6.1.
+		wp_clear_scheduled_hook( 'wb_gam_leaderboard_snapshot' );
+	}
+
+	/**
+	 * Invalidate every leaderboard cache key in one call.
+	 *
+	 * Bumps the wb_gamification cache group's last-changed stamp. Every
+	 * cache key in get_leaderboard() and get_user_rank() embeds that
+	 * stamp, so a bump here orphans every key reachable via either path
+	 * — Redis / Memcached evict via LRU, in-memory cache resets next
+	 * request. No manual key tracking needed.
+	 *
+	 * Hooked to `wb_gam_points_awarded` and `wb_gam_points_awarded_batch`
+	 * in init() at priority 5 so it runs before badge / challenge / streak
+	 * listeners that might re-read the leaderboard.
+	 *
+	 * Also exposed publicly so admin tools (the recompute CLI flag,
+	 * Settings rescue button) can call it explicitly.
+	 */
+	public static function invalidate_cache(): void {
+		// Tier 1 — bump the object-cache last-changed stamp. Every cache key
+		// in get_leaderboard() / get_user_rank() embeds this stamp, so all
+		// prior keys become unreachable in one operation.
+		wp_cache_set_last_changed( 'wb_gamification' );
+
+		// Tier 2 — record the invalidation time. read_from_snapshot() (which
+		// reads the wb_gam_leaderboard_cache SQL TABLE — separate cache layer
+		// with its own 10-minute freshness check) compares the snapshot's
+		// MAX(updated_at) against this option and bails if the option is
+		// newer. Without this, the snapshot serves stale data for up to
+		// 10 minutes after a points award even with the object cache busted.
+		// The cron rebuild every 5 minutes (wb_gam_leaderboard_snapshot)
+		// closes the gap; in the worst case readers fall through to the
+		// live SUM query, which is correct (just slower).
+		update_option( 'wb_gam_leaderboard_invalidated_at', time(), false );
+
+		/**
+		 * Fires after the leaderboard cache is invalidated.
+		 *
+		 * Lets other modules clear their own derived caches that depend on
+		 * leaderboard freshness (top-N member tiles, monthly digest emails,
+		 * etc.) without coupling them to the points-awarded hook directly.
+		 *
+		 * @since 1.0.0
+		 */
+		do_action( 'wb_gam_leaderboard_cache_invalidated' );
+	}
+
+	/**
+	 * Get the top-N members for a period, respecting opt-outs.
+	 *
+	 * @param string $period     Period: 'all' | 'month' | 'week' | 'day'.
+	 * @param int    $limit      Maximum rows to return (1–100).
+	 * @param string $scope_type Scope type identifier (e.g. 'bp_group'). Empty = site-wide.
+	 * @param int    $scope_id   Scope object ID (e.g. group_id).
+	 * @return array<int, array{rank: int, user_id: int, display_name: string, avatar_url: string, points: int}>
+	 */
+	public static function get_leaderboard(
+		string $period = 'all',
+		int $limit = 10,
+		string $scope_type = '',
+		int $scope_id = 0,
+		string $point_type = ''
+	): array {
+		global $wpdb;
+
+		$limit = max( 1, min( 100, $limit ) );
+
+		// Resolve the requested point type — empty string = primary, unknown
+		// slug also falls back to primary via PointTypeService.
+		$resolved_type = ( new \WBGam\Services\PointTypeService() )->resolve( $point_type ?: null );
+
+		// ── Object cache check ────────────────────────────────────────────────
+		// Cache key embeds the wb_gamification group's last-changed stamp so
+		// invalidate_cache() (called on wb_gam_points_awarded) auto-orphans
+		// every key when any award fires — no manual delete walk needed.
+		$last_changed = wp_cache_get_last_changed( 'wb_gamification' );
+		$cache_key    = sprintf(
+			'wb_gam_lb_%s_%d_%s_%d_%s_%s',
+			$period,
+			$limit,
+			$scope_type ? $scope_type : 'global',
+			$scope_id,
+			$resolved_type,
+			$last_changed
+		);
+		$cached       = wp_cache_get( $cache_key, 'wb_gamification' );
+		if ( false !== $cached ) {
+			return (array) $cached;
+		}
+
+		// ── Try snapshot table for global scopes ──────────────────────────────
+		// Snapshot now covers EVERY active currency (Phase 3b) — only scoped
+		// requests (BP groups, cohorts) still fall through to the live query.
+		if ( '' === $scope_type && 0 === $scope_id ) {
+			$snapshot_result = self::read_from_snapshot( $period, $limit, $resolved_type );
+			if ( null !== $snapshot_result ) {
+				wp_cache_set( $cache_key, $snapshot_result, 'wb_gamification', 120 );
+				return $snapshot_result;
+			}
+		}
+
+		// ── Full query fallback ───────────────────────────────────────────────
+		$period_start = self::get_period_start( $period );
+		$opt_out_ids  = self::get_opted_out_ids();
+		$scope_ids    = self::resolve_scope( $scope_type, $scope_id );
+
+		// Build WHERE clause.
+		$where_parts  = array();
+		$where_values = array();
+
+		// Always scope by point_type so per-currency leaderboards work even
+		// without the cache table being keyed by type yet (Phase 3b).
+		$where_parts[]  = 'p.point_type = %s';
+		$where_values[] = $resolved_type;
+
+		if ( $period_start ) {
+			$where_parts[]  = 'p.created_at >= %s';
+			$where_values[] = $period_start;
+		}
+
+		if ( ! empty( $opt_out_ids ) ) {
+			$placeholders = implode( ',', array_fill( 0, count( $opt_out_ids ), '%d' ) );
+			$where_values = array_merge( $where_values, $opt_out_ids );
+			// phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
+			$opt_out_clause = "AND p.user_id NOT IN ($placeholders)";
+		} else {
+			$opt_out_clause = '';
+		}
+
+		if ( ! empty( $scope_ids ) ) {
+			$placeholders = implode( ',', array_fill( 0, count( $scope_ids ), '%d' ) );
+			$scope_clause = "AND p.user_id IN ($placeholders)";
+			$where_values = array_merge( $where_values, $scope_ids );
+		} else {
+			$scope_clause = '';
+		}
+
+		// $where_parts always carries at least the point_type clause, so the
+		// WHERE keyword is always emitted.
+		$where_clause = 'WHERE ' . implode( ' AND ', $where_parts );
+
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$query = "
+			SELECT p.user_id,
+			       SUM(p.points) AS total_points,
+			       u.display_name
+			  FROM {$wpdb->prefix}wb_gam_points p
+			  JOIN {$wpdb->users} u ON u.ID = p.user_id
+			  {$where_clause}
+			  {$opt_out_clause}
+			  {$scope_clause}
+			 GROUP BY p.user_id
+			 ORDER BY total_points DESC
+			 LIMIT %d
+		";
+		// phpcs:enable
+
+		$where_values[] = $limit;
+
+		// $where_values always carries the point_type bind plus the LIMIT
+		// appended above, so the query is always prepared.
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		$rows = $wpdb->get_results( $wpdb->prepare( $query, $where_values ), ARRAY_A );
+
+		if ( ! $rows ) {
+			$result = array();
+			wp_cache_set( $cache_key, $result, 'wb_gamification', 120 );
+			return $result;
+		}
+
+		$result = self::hydrate_rows( $rows );
+
+		// Store in object cache with 2-minute TTL.
+		wp_cache_set( $cache_key, $result, 'wb_gamification', 120 );
+
+		return $result;
+	}
+
+	/**
+	 * Get a user's private rank within a period.
+	 *
+	 * Returned even if the user has opted out of public leaderboard display —
+	 * this is private data for the member themselves.
+	 *
+	 * @param int    $user_id    User to calculate rank for.
+	 * @param string $period     Period: 'all' | 'month' | 'week' | 'day'.
+	 * @param string $scope_type Optional scope type.
+	 * @param int    $scope_id   Optional scope ID.
+	 * @param string $point_type Optional currency slug — defaults to primary. Without
+	 *                           this filter, multi-currency sites compute rank
+	 *                           against the SUM of all currencies, which inflates
+	 *                           rank vs the public leaderboard which DOES filter.
+	 * @return array{rank: int, points: int, points_to_next: int|null}
+	 */
+	public static function get_user_rank(
+		int $user_id,
+		string $period = 'all',
+		string $scope_type = '',
+		int $scope_id = 0,
+		string $point_type = ''
+	): array {
+		global $wpdb;
+
+		// Resolve the currency once so cache key + queries match.
+		$resolved_type = ( new \WBGam\Services\PointTypeService() )->resolve( $point_type ?: null );
+
+		// ── Object cache check ────────────────────────────────────────────────
+		// Cache key embeds the wb_gamification group's last-changed stamp —
+		// see get_leaderboard() for the rationale.
+		$last_changed = wp_cache_get_last_changed( 'wb_gamification' );
+		$cache_key    = sprintf(
+			'wb_gam_rank_%d_%s_%s_%d_%s_%s',
+			$user_id,
+			$period,
+			$scope_type ? $scope_type : 'global',
+			$scope_id,
+			$resolved_type,
+			$last_changed
+		);
+		$cached       = wp_cache_get( $cache_key, 'wb_gamification' );
+		if ( false !== $cached ) {
+			return (array) $cached;
+		}
+
+		$period_start = self::get_period_start( $period );
+		$opt_out_ids  = self::get_opted_out_ids();
+		// Remove the current user from opt-outs so we can count them too.
+		$opt_out_ids = array_filter( $opt_out_ids, fn( $id ) => $id !== $user_id );
+		$scope_ids   = self::resolve_scope( $scope_type, $scope_id );
+
+		// Get user's own total for the period — scoped by currency so the
+		// rank computation matches what the public leaderboard sees.
+		if ( $period_start ) {
+			$user_total_sql = $wpdb->prepare(
+				"SELECT COALESCE(SUM(points),0) FROM {$wpdb->prefix}wb_gam_points
+				 WHERE user_id = %d AND point_type = %s AND created_at >= %s",
+				$user_id,
+				$resolved_type,
+				$period_start
+			);
+		} else {
+			$user_total_sql = $wpdb->prepare(
+				"SELECT COALESCE(SUM(points),0) FROM {$wpdb->prefix}wb_gam_points
+				 WHERE user_id = %d AND point_type = %s",
+				$user_id,
+				$resolved_type
+			);
+		}
+		$user_total = (int) $wpdb->get_var( $user_total_sql ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+
+		// Count users with strictly more points (their count + 1 = our rank).
+		$above_rank = self::count_users_above( $user_total, $period_start, $opt_out_ids, $scope_ids, $resolved_type );
+
+		// Find the lowest total above ours to calculate gap.
+		$next_total = self::get_next_threshold( $user_total, $period_start, $opt_out_ids, $scope_ids, $resolved_type );
+
+		$result = array(
+			'rank'           => $above_rank + 1,
+			'points'         => $user_total,
+			'points_to_next' => null !== $next_total ? ( $next_total - $user_total ) : null,
+		);
+
+		// Store in object cache with 2-minute TTL.
+		wp_cache_set( $cache_key, $result, 'wb_gamification', 120 );
+
+		return $result;
+	}
+
+	// ── Snapshot writer ────────────────────────────────────────────────────────
+
+	/**
+	 * Write leaderboard snapshot to the cache table.
+	 *
+	 * Called by WP-Cron every 5 minutes. Truncates and rewrites the top 500
+	 * users for each period into `wb_gam_leaderboard_cache`.
+	 *
+	 * @return void
+	 */
+	public static function write_snapshot(): void {
+		global $wpdb;
+
+		$cache_table  = $wpdb->prefix . 'wb_gam_leaderboard_cache';
+		$points_table = $wpdb->prefix . 'wb_gam_points';
+
+		// Snapshot start time — every row written this tick will have
+		// updated_at >= $started. After all (period × currency) inserts
+		// finish, anything older than $started is a stragger from the
+		// previous snapshot whose user dropped out of the top-500 — purge
+		// in one DELETE at the end. Reads during the rebuild always see
+		// SOME valid data (old or new), eliminating the read-through
+		// window that the legacy TRUNCATE pattern had on every cron tick.
+		$started = current_time( 'mysql' );
+
+		$periods = array(
+			'all'   => null,
+			'month' => self::get_period_start( 'month' ),
+			'week'  => self::get_period_start( 'week' ),
+			'day'   => self::get_period_start( 'day' ),
+		);
+
+		// One snapshot per (period × currency). Without this loop, every
+		// non-primary leaderboard read at 100k users would fall through to
+		// the live SUM query against wb_gam_points (full-table aggregation).
+		$pt_service = new \WBGam\Services\PointTypeService();
+		$currencies = array_map( static fn( $row ) => (string) $row['slug'], $pt_service->list() );
+		if ( empty( $currencies ) ) {
+			$currencies = array( $pt_service->default_slug() );
+		}
+
+		foreach ( $currencies as $slug ) {
+			foreach ( $periods as $period_key => $period_start ) {
+				$where = $wpdb->prepare( 'WHERE point_type = %s', $slug );
+				if ( null !== $period_start ) {
+					$where .= $wpdb->prepare( ' AND created_at >= %s', $period_start );
+				}
+
+				// UPSERT — insert new rows, update existing rows in place.
+				// The UNIQUE KEY (user_id, period, point_type) on the cache
+				// table is what makes ON DUPLICATE KEY UPDATE work; it was
+				// added by DbUpgrader::ensure_leaderboard_cache_unique_key.
+				// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				$wpdb->query(
+					$wpdb->prepare(
+						"INSERT INTO {$cache_table} (user_id, period, point_type, total_points, `rank`, updated_at)
+					 SELECT user_id, %s AS period, %s AS point_type, SUM(points) AS total_points,
+					        RANK() OVER (ORDER BY SUM(points) DESC) AS `rank`,
+					        NOW() AS updated_at
+					   FROM {$points_table}
+					   {$where}
+					  GROUP BY user_id
+					  ORDER BY total_points DESC
+					  LIMIT 500
+					ON DUPLICATE KEY UPDATE
+					   total_points = VALUES(total_points),
+					   `rank`       = VALUES(`rank`),
+					   updated_at   = VALUES(updated_at)",
+						$period_key,
+						$slug
+					)
+				);
+				// phpcs:enable
+			}
+		}
+
+		// Purge stragglers — rows from the previous snapshot whose user
+		// dropped out of the top-500 this tick. Their updated_at is older
+		// than the start of this rebuild, so a single bounded DELETE clears
+		// them without affecting any concurrent reads.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$wpdb->query(
+			$wpdb->prepare(
+				"DELETE FROM {$cache_table} WHERE updated_at < %s",
+				$started
+			)
+		);
+	}
+
+	// ── Private helpers ────────────────────────────────────────────────────────
+
+	/**
+	 * Try to read leaderboard data from the snapshot cache table.
+	 *
+	 * Returns null if the snapshot is stale (> 10 minutes old) or empty.
+	 * Only used for global (unscoped) leaderboard requests since the snapshot
+	 * does not respect per-request opt-outs or scopes.
+	 *
+	 * @param string $period    Period key: 'all', 'month', 'week', 'day'.
+	 * @param int    $limit     Maximum rows to return.
+	 * @return array<int, array{rank: int, user_id: int, display_name: string, avatar_url: string, points: int}>|null
+	 */
+	private static function read_from_snapshot( string $period, int $limit, string $point_type = 'points' ): ?array {
+		global $wpdb;
+
+		$cache_table = $wpdb->prefix . 'wb_gam_leaderboard_cache';
+		$opt_out_ids = self::get_opted_out_ids();
+
+		// Check snapshot freshness — must be less than 10 minutes old AND
+		// not older than the most recent cache invalidation. The latter
+		// covers the gap between a points award (which calls
+		// invalidate_cache) and the next 5-minute snapshot cron — without
+		// this check, the snapshot would still serve stale data for up
+		// to 10 minutes after every award.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching
+		$snapshot_built_at = $wpdb->get_var( "SELECT UNIX_TIMESTAMP(MAX(updated_at)) FROM {$cache_table}" );
+		if ( null === $snapshot_built_at ) {
+			return null;
+		}
+		$snapshot_built_at = (int) $snapshot_built_at;
+
+		if ( ( time() - $snapshot_built_at ) >= 600 ) { // 10 min hard cap
+			return null;
+		}
+
+		$invalidated_at = (int) get_option( 'wb_gam_leaderboard_invalidated_at', 0 );
+		if ( $invalidated_at > $snapshot_built_at ) {
+			// Snapshot is older than the most recent invalidation — fall
+			// through to the live query path, which is always correct.
+			return null;
+		}
+
+		$period_key = in_array( $period, array( 'all', 'month', 'week', 'day' ), true ) ? $period : 'all';
+
+		// Build opt-out exclusion for snapshot read.
+		$opt_out_clause = '';
+		$query_values   = array( $period_key, $point_type );
+
+		if ( ! empty( $opt_out_ids ) ) {
+			$placeholders   = implode( ',', array_fill( 0, count( $opt_out_ids ), '%d' ) );
+			$opt_out_clause = "AND c.user_id NOT IN ($placeholders)";
+			$query_values   = array_merge( $query_values, $opt_out_ids );
+		}
+
+		$query_values[] = $limit;
+
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT c.user_id, c.total_points, u.display_name
+				   FROM {$cache_table} c
+				   JOIN {$wpdb->users} u ON u.ID = c.user_id
+				  WHERE c.period = %s AND c.point_type = %s {$opt_out_clause}
+				  ORDER BY c.`rank` ASC
+				  LIMIT %d",
+				$query_values
+			),
+			ARRAY_A
+		);
+		// phpcs:enable
+
+		if ( ! $rows ) {
+			return null;
+		}
+
+		return self::hydrate_rows( $rows );
+	}
+
+	/**
+	 * Hydrate raw DB rows into the leaderboard result format.
+	 *
+	 * Adds rank, avatar_url, and properly types all fields. Uses cache_users()
+	 * to eliminate N+1 avatar/user-meta queries.
+	 *
+	 * @param array<int, array{user_id: string, total_points: string, display_name: string}> $rows Raw DB rows.
+	 * @return array<int, array{rank: int, user_id: int, display_name: string, avatar_url: string, points: int}>
+	 */
+	private static function hydrate_rows( array $rows ): array {
+		// Pre-cache all user objects to avoid N+1 queries in the avatar loop.
+		$user_ids = array_column( $rows, 'user_id' );
+		if ( ! empty( $user_ids ) ) {
+			cache_users( array_map( 'intval', $user_ids ) );
+		}
+
+		$result = array();
+		foreach ( $rows as $rank_zero => $row ) {
+			$user_id  = (int) $row['user_id'];
+			$result[] = array(
+				'rank'         => $rank_zero + 1,
+				'user_id'      => $user_id,
+				'display_name' => $row['display_name'],
+				'avatar_url'   => get_avatar_url( $user_id, array( 'size' => 48 ) ),
+				'points'       => (int) $row['total_points'],
+			);
+		}
+
+		/**
+		 * Filter leaderboard results before they are returned.
+		 *
+		 * Modify rankings, add custom fields, or filter out specific members.
+		 *
+		 * @since 1.0.0
+		 * @param array $result Hydrated leaderboard rows (rank, user_id, display_name, avatar_url, points).
+		 * @param array $rows   Raw DB rows before hydration.
+		 */
+		return (array) apply_filters( 'wb_gam_leaderboard_results', $result, $rows );
+	}
+
+	/**
+	 * Return the MySQL datetime string for the start of a period.
+	 * Returns null for 'all' (no time filter).
+	 *
+	 * @param string $period Period identifier: 'all' | 'month' | 'week' | 'day'.
+	 * @return string|null MySQL datetime string, or null for 'all'.
+	 */
+	private static function get_period_start( string $period ): ?string {
+		switch ( $period ) {
+			case 'day':
+				return gmdate( 'Y-m-d' ) . ' 00:00:00';
+			case 'week':
+				// Monday of the current ISO week.
+				return gmdate( 'Y-m-d', strtotime( 'monday this week' ) ) . ' 00:00:00';
+			case 'month':
+				return gmdate( 'Y-m-01' ) . ' 00:00:00';
+			default:
+				return null; // 'all'
+		}
+	}
+
+	/**
+	 * Resolve a scope type + ID to a list of user IDs.
+	 *
+	 * @param string $scope_type Scope type identifier, e.g. 'bp_group'.
+	 * @param int    $scope_id   Scope object ID, e.g. group ID.
+	 * @return int[]             Empty array means no scope restriction.
+	 */
+	private static function resolve_scope( string $scope_type, int $scope_id ): array {
+		if ( '' === $scope_type || $scope_id <= 0 ) {
+			return array();
+		}
+
+		/**
+		 * Resolve a leaderboard scope to a list of user IDs.
+		 *
+		 * BuddyPress integration hooks in here to return group member IDs.
+		 * Return an empty array to disable scope filtering (allow all users).
+		 *
+		 * @param int[]  $user_ids   Starting user ID list (empty).
+		 * @param string $scope_type Scope type identifier.
+		 * @param int    $scope_id   Scope object ID.
+		 */
+		return (array) apply_filters(
+			'wb_gam_leaderboard_scope_user_ids',
+			array(),
+			$scope_type,
+			$scope_id
+		);
+	}
+
+	/**
+	 * Return all user IDs hidden from the public leaderboard: members who opted
+	 * out via their preferences PLUS accounts the site owner excluded from
+	 * gamification (Settings > Access). Excluded users can't earn, so they must
+	 * not appear in any ranking either.
+	 *
+	 * @return int[]
+	 */
+	private static function get_opted_out_ids(): array {
+		global $wpdb;
+		$ids = $wpdb->get_col(
+			"SELECT user_id FROM {$wpdb->prefix}wb_gam_member_prefs WHERE leaderboard_opt_out = 1"
+		);
+		$ids = array_map( 'intval', $ids ?: array() );
+
+		// Owner-excluded accounts (roles / users / sandboxed) never rank.
+		$ids = array_merge( $ids, PointsEngine::excluded_user_ids() );
+
+		return array_values( array_unique( $ids ) );
+	}
+
+	/**
+	 * Count users with a points total strictly higher than $threshold.
+	 *
+	 * @param int         $threshold    Points total to compare against.
+	 * @param string|null $period_start MySQL datetime for period start, or null for all-time.
+	 * @param int[]       $opt_out_ids  User IDs excluded from the leaderboard.
+	 * @param int[]       $scope_ids    User IDs to restrict to (empty = all users).
+	 * @return int Number of users ranked above the threshold.
+	 */
+	private static function count_users_above(
+		int $threshold,
+		?string $period_start,
+		array $opt_out_ids,
+		array $scope_ids,
+		string $point_type = 'points'
+	): int {
+		global $wpdb;
+
+		// Always scope by point_type so multi-currency rank counts match the
+		// public leaderboard which also filters per-currency.
+		$values = array( $point_type );
+		$where  = ' AND p.point_type = %s';
+
+		if ( $period_start ) {
+			$where   .= ' AND p.created_at >= %s';
+			$values[] = $period_start;
+		}
+		if ( ! empty( $opt_out_ids ) ) {
+			$ph = implode( ',', array_fill( 0, count( $opt_out_ids ), '%d' ) );
+			// phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
+			$where .= " AND p.user_id NOT IN ($ph)";
+			$values = array_merge( $values, $opt_out_ids );
+		}
+		if ( ! empty( $scope_ids ) ) {
+			$ph = implode( ',', array_fill( 0, count( $scope_ids ), '%d' ) );
+			// phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
+			$where .= " AND p.user_id IN ($ph)";
+			$values = array_merge( $values, $scope_ids );
+		}
+		$values[] = $threshold;
+
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$sql = "SELECT COUNT(*) FROM (
+			SELECT user_id, SUM(points) AS total
+			  FROM {$wpdb->prefix}wb_gam_points p
+			 WHERE 1=1 {$where}
+			 GROUP BY p.user_id
+			HAVING total > %d
+		) ranked";
+		// phpcs:enable
+
+		return (int) $wpdb->get_var( $wpdb->prepare( $sql, $values ) ); // phpcs:ignore
+	}
+
+	/**
+	 * Find the lowest points total strictly above $threshold (the next rank's score).
+	 * Returns null if $threshold is already at the top.
+	 *
+	 * @param int         $threshold    Points total to compare against.
+	 * @param string|null $period_start MySQL datetime for period start, or null for all-time.
+	 * @param int[]       $opt_out_ids  User IDs excluded from the leaderboard.
+	 * @param int[]       $scope_ids    User IDs to restrict to (empty = all users).
+	 * @return int|null The next threshold, or null if already at the top.
+	 */
+	private static function get_next_threshold(
+		int $threshold,
+		?string $period_start,
+		array $opt_out_ids,
+		array $scope_ids,
+		string $point_type = 'points'
+	): ?int {
+		global $wpdb;
+
+		$values = array( $point_type );
+		$where  = ' AND p.point_type = %s';
+
+		if ( $period_start ) {
+			$where   .= ' AND p.created_at >= %s';
+			$values[] = $period_start;
+		}
+		if ( ! empty( $opt_out_ids ) ) {
+			$ph = implode( ',', array_fill( 0, count( $opt_out_ids ), '%d' ) );
+			// phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
+			$where .= " AND p.user_id NOT IN ($ph)";
+			$values = array_merge( $values, $opt_out_ids );
+		}
+		if ( ! empty( $scope_ids ) ) {
+			$ph = implode( ',', array_fill( 0, count( $scope_ids ), '%d' ) );
+			// phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
+			$where .= " AND p.user_id IN ($ph)";
+			$values = array_merge( $values, $scope_ids );
+		}
+		$values[] = $threshold;
+
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$sql = "SELECT MIN(total) FROM (
+			SELECT user_id, SUM(points) AS total
+			  FROM {$wpdb->prefix}wb_gam_points p
+			 WHERE 1=1 {$where}
+			 GROUP BY p.user_id
+			HAVING total > %d
+		) ranked";
+		// phpcs:enable
+
+		$result = $wpdb->get_var( $wpdb->prepare( $sql, $values ) ); // phpcs:ignore
+		return null !== $result ? (int) $result : null;
+	}
+}

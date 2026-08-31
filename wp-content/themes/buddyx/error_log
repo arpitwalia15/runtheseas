@@ -1,0 +1,56 @@
+[17-Aug-2026 16:53:16 UTC] PHP Fatal error:  Uncaught Error: Call to undefined function BuddyX\Buddyx\get_header() in /home/uelyxf3avkm6/public_html/wp-content/themes/buddyx/index.php:17
+Stack trace:
+#0 {main}
+  thrown in /home/uelyxf3avkm6/public_html/wp-content/themes/buddyx/index.php on line 17
+[18-Aug-2026 17:00:59 UTC] PHP Fatal error:  Uncaught Error: Call to undefined function BuddyX\Buddyx\get_header() in /home/uelyxf3avkm6/public_html/wp-content/themes/buddyx/index.php:17
+Stack trace:
+#0 {main}
+  thrown in /home/uelyxf3avkm6/public_html/wp-content/themes/buddyx/index.php on line 17
+[19-Aug-2026 16:55:27 UTC] PHP Fatal error:  Uncaught Error: Call to undefined function BuddyX\Buddyx\get_header() in /home/uelyxf3avkm6/public_html/wp-content/themes/buddyx/index.php:17
+Stack trace:
+#0 {main}
+  thrown in /home/uelyxf3avkm6/public_html/wp-content/themes/buddyx/index.php on line 17
+[20-Aug-2026 16:53:52 UTC] PHP Fatal error:  Uncaught Error: Call to undefined function BuddyX\Buddyx\get_header() in /home/uelyxf3avkm6/public_html/wp-content/themes/buddyx/index.php:17
+Stack trace:
+#0 {main}
+  thrown in /home/uelyxf3avkm6/public_html/wp-content/themes/buddyx/index.php on line 17
+[21-Aug-2026 16:51:51 UTC] PHP Fatal error:  Uncaught Error: Call to undefined function BuddyX\Buddyx\get_header() in /home/uelyxf3avkm6/public_html/wp-content/themes/buddyx/index.php:17
+Stack trace:
+#0 {main}
+  thrown in /home/uelyxf3avkm6/public_html/wp-content/themes/buddyx/index.php on line 17
+[22-Aug-2026 16:51:41 UTC] PHP Fatal error:  Uncaught Error: Call to undefined function BuddyX\Buddyx\get_header() in /home/uelyxf3avkm6/public_html/wp-content/themes/buddyx/index.php:17
+Stack trace:
+#0 {main}
+  thrown in /home/uelyxf3avkm6/public_html/wp-content/themes/buddyx/index.php on line 17
+[23-Aug-2026 16:52:20 UTC] PHP Fatal error:  Uncaught Error: Call to undefined function BuddyX\Buddyx\get_header() in /home/uelyxf3avkm6/public_html/wp-content/themes/buddyx/index.php:17
+Stack trace:
+#0 {main}
+  thrown in /home/uelyxf3avkm6/public_html/wp-content/themes/buddyx/index.php on line 17
+[24-Aug-2026 16:53:09 UTC] PHP Fatal error:  Uncaught Error: Call to undefined function BuddyX\Buddyx\get_header() in /home/uelyxf3avkm6/public_html/wp-content/themes/buddyx/index.php:17
+Stack trace:
+#0 {main}
+  thrown in /home/uelyxf3avkm6/public_html/wp-content/themes/buddyx/index.php on line 17
+[25-Aug-2026 16:52:53 UTC] PHP Fatal error:  Uncaught Error: Call to undefined function BuddyX\Buddyx\get_header() in /home/uelyxf3avkm6/public_html/wp-content/themes/buddyx/index.php:17
+Stack trace:
+#0 {main}
+  thrown in /home/uelyxf3avkm6/public_html/wp-content/themes/buddyx/index.php on line 17
+[26-Aug-2026 16:55:26 UTC] PHP Fatal error:  Uncaught Error: Call to undefined function BuddyX\Buddyx\get_header() in /home/uelyxf3avkm6/public_html/wp-content/themes/buddyx/index.php:17
+Stack trace:
+#0 {main}
+  thrown in /home/uelyxf3avkm6/public_html/wp-content/themes/buddyx/index.php on line 17
+[27-Aug-2026 16:55:55 UTC] PHP Fatal error:  Uncaught Error: Call to undefined function BuddyX\Buddyx\get_header() in /home/uelyxf3avkm6/public_html/wp-content/themes/buddyx/index.php:17
+Stack trace:
+#0 {main}
+  thrown in /home/uelyxf3avkm6/public_html/wp-content/themes/buddyx/index.php on line 17
+[28-Aug-2026 16:54:14 UTC] PHP Fatal error:  Uncaught Error: Call to undefined function BuddyX\Buddyx\get_header() in /home/uelyxf3avkm6/public_html/wp-content/themes/buddyx/index.php:17
+Stack trace:
+#0 {main}
+  thrown in /home/uelyxf3avkm6/public_html/wp-content/themes/buddyx/index.php on line 17
+[29-Aug-2026 16:54:20 UTC] PHP Fatal error:  Uncaught Error: Call to undefined function BuddyX\Buddyx\get_header() in /home/uelyxf3avkm6/public_html/wp-content/themes/buddyx/index.php:17
+Stack trace:
+#0 {main}
+  thrown in /home/uelyxf3avkm6/public_html/wp-content/themes/buddyx/index.php on line 17
+[30-Aug-2026 16:52:36 UTC] PHP Fatal error:  Uncaught Error: Call to undefined function BuddyX\Buddyx\get_header() in /home/uelyxf3avkm6/public_html/wp-content/themes/buddyx/index.php:17
+Stack trace:
+#0 {main}
+  thrown in /home/uelyxf3avkm6/public_html/wp-content/themes/buddyx/index.php on line 17

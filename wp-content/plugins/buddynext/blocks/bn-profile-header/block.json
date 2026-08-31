@@ -1,0 +1,54 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "buddynext/profile-header",
+	"title": "Profile Header",
+	"icon": "cover-image",
+	"category": "buddynext",
+	"description": "User profile header with avatar, cover photo, name, bio, social links, and follow/connect buttons.",
+	"keywords": [
+		"buddynext",
+		"profile",
+		"header",
+		"user"
+	],
+	"textdomain": "buddynext",
+	"editorScript": "buddynext-blocks-editor",
+	"viewScriptModule": "@buddynext/social-buttons",
+	"style": [
+		"file:../../assets/css/blocks.css",
+		"bn-profile"
+	],
+	"supports": {
+		"color": {
+			"background": true,
+			"text": true
+		},
+		"typography": {
+			"fontSize": true
+		},
+		"spacing": {
+			"padding": true,
+			"margin": true
+		}
+	},
+	"attributes": {
+		"userId": {
+			"type": "integer",
+			"default": 0
+		},
+		"showStats": {
+			"type": "boolean",
+			"default": true
+		},
+		"showActions": {
+			"type": "boolean",
+			"default": true
+		}
+	},
+	"example": {},
+	"editorStyle": [
+		"file:../../assets/css/blocks.css",
+		"bn-profile"
+	]
+}

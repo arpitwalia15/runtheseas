@@ -1,0 +1,84 @@
+<!-- start Simple Custom CSS and JS -->
+<style type="text/css">
+@media (min-width: 1025px) and (max-width: 1664px){
+	.small-width {
+    width: 27%!important;
+}
+		.custom-icon-box figure.elementor-image-box-img {
+    margin: 0px auto 15px auto !important;
+}
+	.custom-icon-box .elementor-image-box-wrapper {
+    flex-direction: column !important;
+}
+	.challenge-card {
+    width: 100% !important;
+}
+	body .chip-timer-one, body .chip-timer-two {
+    width: 177px !important;
+   
+}
+}
+@media screen and  (max-width: 1024px){
+		.custom-icon-box figure.elementor-image-box-img {
+    margin: 0px auto 15px auto !important;
+}
+	.custom-icon-box .elementor-image-box-wrapper {
+    flex-direction: column !important;
+}
+	body .fun-walk-clip-col-left, body .fun-walk-clip-col-middle, body .fun-walk-clip-col-right {
+    width: 100% !important;
+    max-width: 100% !important;
+		clip-path:unset!important;
+		flex:unset!important;
+		margin:0px!important;
+}
+}
+
+@media (min-width: 1665px) and (max-width: 1920px) {
+body .why-we-need-right-col {
+    max-width: 450px !important;
+}
+}
+
+
+.referral-text-cst img {
+    max-width: 218px;
+    margin: 0px auto;
+}
+.count-how {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #051431;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 3px solid #FBA52D;
+    overflow: hidden;
+    position: absolute;
+    z-index: 1;
+    box-shadow: 0 5px 10px rgba(0, 0, 0, 0.65), 0 8px 18px rgba(0, 0, 0, 0.45), 0 0 8px rgba(217, 166, 46, 0.45), inset 0 1px 3px rgba(255, 255, 255, 0.25);
+    top: -50px;
+}
+
+.help-us-listing p.elementor-image-box-description span {
+    font-size: 50px!important;
+    line-height: 30px!important;
+}
+
+
+
+
+@media screen and (max-width:767px){
+	.rts-medal {
+    width: 100% !important;
+    max-width: 100% !important;
+    gap: 20px !important;
+}
+	.rts-label .main {
+    font-size: 16px !important;
+}
+}</style>
+<!-- end Simple Custom CSS and JS -->

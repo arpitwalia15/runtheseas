@@ -1,0 +1,589 @@
+/**
+ * WBcom Essential Admin Styles
+ *
+ * @package WBCOM_Essential
+ */
+
+/* Reset & Base */
+.wbcom-essential-wrap {
+	max-width: 1200px;
+	margin: 20px 20px 20px 0;
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+}
+
+/* Header */
+.wbcom-header {
+	background: linear-gradient(135deg, #1e3a5f 0%, #2c5282 100%);
+	padding: 32px 40px;
+	border-radius: 12px;
+	color: #fff;
+	margin-bottom: 0;
+}
+
+.wbcom-header-content {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	margin-bottom: 8px;
+}
+
+.wbcom-header h1 {
+	margin: 0;
+	font-size: 28px;
+	font-weight: 600;
+	color: #fff;
+}
+
+.wbcom-version {
+	background: rgba(255, 255, 255, 0.2);
+	padding: 4px 12px;
+	border-radius: 20px;
+	font-size: 13px;
+	font-weight: 500;
+}
+
+.wbcom-tagline {
+	margin: 0 0 20px;
+	font-size: 15px;
+	opacity: 0.9;
+}
+
+/* Tabs */
+.wbcom-tabs {
+	display: flex;
+	gap: 8px;
+	margin: 0;
+	padding: 0;
+}
+
+.wbcom-tab {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 10px 20px;
+	background: rgba(255, 255, 255, 0.15);
+	color: rgba(255, 255, 255, 0.85);
+	text-decoration: none;
+	border-radius: 6px;
+	font-size: 14px;
+	font-weight: 500;
+	transition: all 0.2s ease;
+}
+
+.wbcom-tab:hover {
+	background: rgba(255, 255, 255, 0.25);
+	color: #fff;
+}
+
+.wbcom-tab.active {
+	background: #fff;
+	color: #1e3a5f;
+}
+
+.wbcom-tab .dashicons {
+	font-size: 16px;
+	width: 16px;
+	height: 16px;
+}
+
+/* Stats Cards */
+.wbcom-stats {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 20px;
+}
+
+.wbcom-stat-card {
+	display: flex;
+	align-items: center;
+	gap: 16px;
+	background: #fff;
+	padding: 24px;
+	border-radius: 10px;
+	border: 1px solid #e5e7eb;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.wbcom-stat-icon {
+	width: 48px;
+	height: 48px;
+	font-size: 48px;
+	line-height: 1;
+}
+
+.wbcom-stat-blocks .wbcom-stat-icon {
+	color: #6366f1;
+}
+
+.wbcom-stat-widgets .wbcom-stat-icon {
+	color: #ec4899;
+}
+
+.wbcom-stat-price .wbcom-stat-icon {
+	color: #10b981;
+}
+
+.wbcom-stat-info {
+	display: flex;
+	flex-direction: column;
+}
+
+.wbcom-stat-number {
+	font-size: 32px;
+	font-weight: 700;
+	color: #1f2937;
+	line-height: 1.2;
+}
+
+.wbcom-stat-label {
+	font-size: 14px;
+	color: #6b7280;
+}
+
+/* Main Content */
+.wbcom-content {
+	display: flex;
+	flex-direction: column;
+	gap: 24px;
+}
+
+.wbcom-section {
+	background: #fff;
+	padding: 28px;
+	border-radius: 10px;
+	border: 1px solid #e5e7eb;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.wbcom-section h2 {
+	margin: 0 0 20px;
+	font-size: 18px;
+	font-weight: 600;
+	color: #1f2937;
+	padding-bottom: 12px;
+	border-bottom: 1px solid #e5e7eb;
+}
+
+/* Features Grid */
+.wbcom-features {
+	display: grid;
+	grid-template-columns: repeat(2, 1fr);
+	gap: 24px;
+}
+
+.wbcom-feature {
+	padding: 20px;
+	background: #f9fafb;
+	border-radius: 8px;
+	border: 1px solid #e5e7eb;
+}
+
+.wbcom-feature .dashicons {
+	font-size: 32px;
+	width: 32px;
+	height: 32px;
+	margin-bottom: 12px;
+}
+
+.wbcom-feature:first-child .dashicons {
+	color: #6366f1;
+}
+
+.wbcom-feature:last-child .dashicons {
+	color: #ec4899;
+}
+
+.wbcom-feature h3 {
+	margin: 0 0 8px;
+	font-size: 16px;
+	font-weight: 600;
+	color: #1f2937;
+}
+
+.wbcom-feature > p {
+	margin: 0 0 16px;
+	font-size: 14px;
+	color: #6b7280;
+	line-height: 1.5;
+}
+
+.wbcom-feature ul {
+	margin: 0;
+	padding: 0 0 0 20px;
+	list-style: disc;
+}
+
+.wbcom-feature li {
+	font-size: 13px;
+	color: #4b5563;
+	margin-bottom: 6px;
+	line-height: 1.4;
+}
+
+/* How to Use */
+.wbcom-howto {
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+}
+
+.wbcom-howto-item {
+	display: flex;
+	align-items: flex-start;
+	gap: 16px;
+	padding: 16px;
+	background: #f9fafb;
+	border-radius: 8px;
+}
+
+.wbcom-howto-step {
+	width: 32px;
+	height: 32px;
+	background: #2c5282;
+	color: #fff;
+	border-radius: 50%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-weight: 600;
+	font-size: 14px;
+	flex-shrink: 0;
+}
+
+.wbcom-howto-item h4 {
+	margin: 0 0 4px;
+	font-size: 15px;
+	font-weight: 600;
+	color: #1f2937;
+}
+
+.wbcom-howto-item p {
+	margin: 0;
+	font-size: 13px;
+	color: #6b7280;
+}
+
+/* Requirements */
+.wbcom-req-grid {
+	display: grid;
+	grid-template-columns: repeat(2, 1fr);
+	gap: 12px;
+}
+
+.wbcom-req-item {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 12px 16px;
+	background: #f0fdf4;
+	border-radius: 6px;
+	font-size: 14px;
+	color: #166534;
+}
+
+.wbcom-req-item .dashicons {
+	font-size: 18px;
+	width: 18px;
+	height: 18px;
+	color: #22c55e;
+}
+
+.wbcom-req-item.wbcom-req-optional {
+	background: #fef3c7;
+	color: #92400e;
+}
+
+.wbcom-req-item.wbcom-req-optional .dashicons {
+	color: #f59e0b;
+}
+
+/* Sidebar */
+.wbcom-sidebar {
+	display: flex;
+	flex-direction: column;
+	gap: 20px;
+}
+
+.wbcom-sidebar-card {
+	background: #fff;
+	padding: 24px;
+	border-radius: 10px;
+	border: 1px solid #e5e7eb;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.wbcom-sidebar-card h3 {
+	margin: 0 0 16px;
+	font-size: 16px;
+	font-weight: 600;
+	color: #1f2937;
+}
+
+.wbcom-sidebar-card ul {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.wbcom-sidebar-card li {
+	margin-bottom: 12px;
+}
+
+.wbcom-sidebar-card li:last-child {
+	margin-bottom: 0;
+}
+
+.wbcom-sidebar-card a {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	color: #2563eb;
+	text-decoration: none;
+	font-size: 14px;
+	padding: 8px 12px;
+	border-radius: 6px;
+	transition: background 0.2s;
+}
+
+.wbcom-sidebar-card a:hover {
+	background: #f3f4f6;
+}
+
+.wbcom-sidebar-card .dashicons {
+	font-size: 18px;
+	width: 18px;
+	height: 18px;
+	color: #6b7280;
+}
+
+/* Themes Card */
+.wbcom-themes p {
+	margin: 0 0 12px;
+	font-size: 13px;
+	color: #6b7280;
+}
+
+.wbcom-themes ul {
+	margin-bottom: 16px !important;
+}
+
+.wbcom-themes li {
+	font-size: 13px;
+	color: #4b5563;
+	padding: 6px 0;
+	border-bottom: 1px solid #e5e7eb;
+}
+
+.wbcom-themes li:last-child {
+	border-bottom: none;
+}
+
+.wbcom-themes strong {
+	color: #1f2937;
+}
+
+.wbcom-btn {
+	display: inline-block;
+	background: #2c5282;
+	color: #fff !important;
+	padding: 10px 20px;
+	border-radius: 6px;
+	font-size: 14px;
+	font-weight: 500;
+	text-decoration: none;
+	text-align: center;
+	transition: background 0.2s;
+}
+
+.wbcom-btn:hover {
+	background: #1e3a5f;
+}
+
+/* License Page */
+.wbcom-license-page {
+	grid-column: 1 / -1;
+}
+
+.wbcom-license-content {
+	background: #fff;
+	padding: 32px;
+	border-radius: 10px;
+	border: 1px solid #e5e7eb;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+	max-width: 800px;
+}
+
+.wbcom-license-content h2 {
+	margin: 0 0 8px;
+	font-size: 20px;
+	font-weight: 600;
+	color: #1f2937;
+}
+
+.wbcom-license-content > p:first-of-type {
+	margin: 0 0 24px;
+	color: #6b7280;
+	font-size: 14px;
+}
+
+.wbcom-license-content table {
+	width: 100%;
+	border-collapse: collapse;
+	margin-bottom: 24px;
+}
+
+.wbcom-license-content table th {
+	text-align: left;
+	padding: 12px 16px;
+	font-weight: 600;
+	color: #374151;
+	width: 150px;
+	vertical-align: top;
+}
+
+.wbcom-license-content table td {
+	padding: 12px 16px;
+}
+
+.wbcom-license-content input[type="text"] {
+	width: 100%;
+	max-width: 320px;
+	padding: 10px 14px;
+	border: 1px solid #d1d5db;
+	border-radius: 6px;
+	font-size: 14px;
+}
+
+/* Single focus ring via box-shadow — visible to keyboard + mouse, clears WCAG 2.4.7. */
+.wbcom-license-content input[type="text"]:focus {
+	outline: none;
+	border-color: #2c5282;
+	box-shadow: 0 0 0 3px rgba(44, 82, 130, 0.25);
+}
+
+.wbcom-license-content .description {
+	display: block;
+	margin-top: 6px;
+	font-size: 13px;
+	color: #6b7280;
+}
+
+.wbcom-license-content .button {
+	padding: 8px 16px;
+	border-radius: 6px;
+	font-size: 14px;
+	font-weight: 500;
+	cursor: pointer;
+	transition: all 0.2s;
+}
+
+.wbcom-license-content .button-primary {
+	background: #2c5282;
+	border-color: #2c5282;
+	color: #fff;
+}
+
+.wbcom-license-content .button-primary:hover {
+	background: #1e3a5f;
+	border-color: #1e3a5f;
+}
+
+.wbcom-license-content .button-secondary {
+	background: #fff;
+	border: 1px solid #d1d5db;
+	color: #374151;
+}
+
+.wbcom-license-content .button-secondary:hover {
+	background: #f9fafb;
+	border-color: #9ca3af;
+}
+
+.wbcom-license-content h3 {
+	margin: 32px 0 16px;
+	font-size: 16px;
+	font-weight: 600;
+	color: #1f2937;
+}
+
+.wbcom-license-content ul {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.wbcom-license-content ul li {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 10px 0;
+	font-size: 14px;
+	color: #4b5563;
+	border-bottom: 1px solid #f3f4f6;
+}
+
+.wbcom-license-content ul li:last-child {
+	border-bottom: none;
+}
+
+.wbcom-license-content ul li .dashicons {
+	color: #10b981;
+	font-size: 18px;
+	width: 18px;
+	height: 18px;
+}
+
+.wbcom-license-content .wbcom-btn {
+	margin-top: 16px;
+}
+
+/* Settings Tab */
+.wbcom-tab-content select {
+	min-width: 280px;
+	padding: 8px 12px;
+	border: 1px solid #d1d5db;
+	border-radius: 6px;
+	font-size: 14px;
+}
+
+/* Single focus ring via box-shadow — visible to keyboard + mouse, clears WCAG 2.4.7. */
+.wbcom-tab-content select:focus {
+	outline: none;
+	border-color: #2c5282;
+	box-shadow: 0 0 0 3px rgba(44, 82, 130, 0.25);
+}
+
+.wbcom-tab-content .description {
+	display: block;
+	margin-top: 6px;
+	font-size: 13px;
+	color: #6b7280;
+}
+
+/* Responsive */
+
+@media (max-width: 782px) {
+	.wbcom-essential-wrap {
+		margin: 10px;
+	}
+
+	.wbcom-stats {
+		grid-template-columns: 1fr;
+	}
+
+	.wbcom-features {
+		grid-template-columns: 1fr;
+	}
+
+	.wbcom-req-grid {
+		grid-template-columns: 1fr;
+	}
+
+	.wbcom-header {
+		padding: 24px;
+	}
+
+	.wbcom-header h1 {
+		font-size: 22px;
+	}
+}

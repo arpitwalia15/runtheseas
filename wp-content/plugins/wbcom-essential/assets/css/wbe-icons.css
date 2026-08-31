@@ -1,0 +1,71 @@
+@font-face {
+  font-family: 'wbe-icons';
+  src: url('../icons/wbe-icons.eot?80823799');
+  src: url('../icons/wbe-icons.eot?80823799#iefix') format('embedded-opentype'),
+       url('../icons/wbe-icons.woff2?80823799') format('woff2'),
+       url('../icons/wbe-icons.woff?80823799') format('woff'),
+       url('../icons/wbe-icons.ttf?80823799') format('truetype'),
+       url('../icons/wbe-icons.svg?80823799#wbe-icons') format('svg');
+  font-weight: normal;
+  font-style: normal;
+}
+/* Chrome hack: SVG is rendered more smooth in Windozze. 100% magic, uncomment if you need it. */
+/* Note, that will break hinting! In other OS-es font will be not as sharp as it could be */
+/*
+@media screen and (-webkit-min-device-pixel-ratio:0) {
+  @font-face {
+    font-family: 'wbe-icons';
+    src: url('../icons/wbe-icons.svg?80823799#wbe-icons') format('svg');
+  }
+}
+*/
+[class^="wbe-icon-"]:before, [class*=" wbe-icon-"]:before {
+  font-family: "wbe-icons";
+  font-style: normal;
+  font-weight: normal;
+  speak: never;
+
+  display: inline-block;
+  text-decoration: inherit;
+  width: 1em;
+  margin-right: .2em;
+  text-align: center;
+  /* opacity: .8; */
+
+  /* For safety - reset parent styles, that can break glyph codes*/
+  font-variant: normal;
+  text-transform: none;
+
+  /* fix buttons height, for twitter bootstrap */
+  line-height: 1em;
+
+  /* Animation center compensation - margins should be symmetric */
+  /* remove if not needed */
+  margin-left: .2em;
+
+  /* you can be more comfortable with increased icons size */
+  /* font-size: 120%; */
+
+  /* Font smoothing. That was taken from TWBS */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  /* Uncomment for 3D effect */
+  /* text-shadow: 1px 1px 1px rgba(127, 127, 127, 0.3); */
+}
+
+.wbe-icon-check-circle:before { content: '\e800'; } /* '' */
+.wbe-icon-bell:before { content: '\e801'; } /* '' */
+.wbe-icon-search:before { content: '\e802'; } /* '' */
+.wbe-icon-shopping-cart:before { content: '\e803'; } /* '' */
+.wbe-icon-envelope:before { content: '\e804'; } /* '' */
+.wbe-icon-check:before { content: '\e805'; } /* '' */
+.wbe-icon-user-plus:before { content: '\e806'; } /* '' */
+.wbe-icon-angle-down:before { content: '\e807'; } /* '' */
+.wbe-icon-angle-up:before { content: '\e808'; } /* '' */
+.wbe-icon-angle-right:before { content: '\e809'; } /* '' */
+.wbe-icon-angle-left:before { content: '\e80a'; } /* '' */
+.wbe-icon-shopping-bag:before { content: '\e80b'; } /* '' */
+.wbe-icon-reply:before { content: '\e80c'; } /* '' */
+.wbe-icon-xmark:before { content: '\e80d'; } /* '' */
+.wbe-icon-spin5:before { content: '\e838'; } /* '' */

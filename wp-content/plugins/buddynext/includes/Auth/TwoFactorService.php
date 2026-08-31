@@ -1,0 +1,769 @@
+<?php // phpcs:disable WordPress.Files.FileName.NotHyphenatedLowercase,WordPress.Files.FileName.InvalidClassFileName -- PSR-4 naming used throughout this plugin.
+/**
+ * Two-factor authentication for BuddyNext — fully in-house.
+ *
+ * No third-party service: TOTP (RFC 6238 / RFC 4226) is implemented here, so any
+ * standard authenticator app (Google Authenticator, Authy, 1Password, …) works.
+ * Recovery is covered by one-time backup codes, and an email one-time code is
+ * offered at the login challenge as a fallback when the device is unavailable.
+ *
+ * Surfaces (three entry points, per the plugin rules):
+ *   - Member  : enrolment + management in the profile edit "Account" area
+ *               (TwoFactorController REST endpoints).
+ *   - Login    : AuthController issues a challenge after the password step and
+ *               completes sign-in only once a code verifies.
+ *   - Roles    : a site can require 2FA for chosen roles via the
+ *               buddynext_2fa_required_roles filter — developer-controlled, with
+ *               no admin screen (2FA is opt-in by design and never forced).
+ *
+ * Storage (usermeta):
+ *   bn_2fa_enabled         '1' once confirmed.
+ *   bn_2fa_secret          Base32 TOTP shared secret (active).
+ *   bn_2fa_pending_secret  Base32 secret during enrolment, before first verify.
+ *   bn_2fa_backup          Array of hashed, single-use backup codes.
+ *
+ * Transients:
+ *   bn_2fa_login_{id}      One-time login-challenge ticket → [user, remember].
+ *   bn_2fa_email_{user}    Hashed email one-time code.
+ *   bn_2fa_try_{hash}      Failed-verification counter for one challenge ticket.
+ *   bn_2fa_rsnd_{hash}     Email-code resend cooldown marker for one ticket.
+ *
+ * Filters:
+ *   buddynext_2fa_issuer            (string) label shown in the authenticator app.
+ *   buddynext_2fa_required_roles    (string[]) roles that must enable 2FA.
+ *
+ * @package BuddyNext\Auth
+ */
+
+declare( strict_types=1 );
+
+namespace BuddyNext\Auth;
+
+use WP_Error;
+use WP_User;
+
+defined( 'ABSPATH' ) || exit;
+
+/**
+ * In-house TOTP two-factor service.
+ */
+class TwoFactorService {
+
+	private const META_ENABLED = 'bn_2fa_enabled';
+	private const META_SECRET  = 'bn_2fa_secret';
+	private const META_PENDING = 'bn_2fa_pending_secret';
+	private const META_BACKUP  = 'bn_2fa_backup';
+
+	private const PERIOD       = 30;   // TOTP step, seconds.
+	private const DIGITS       = 6;
+	private const WINDOW       = 1;    // ± steps tolerated for clock skew.
+	private const LOGIN_TTL    = 300;  // Login-challenge ticket lifetime, seconds.
+	private const EMAIL_TTL    = 600;  // Email one-time code lifetime, seconds.
+	private const BACKUP_COUNT = 10;
+	private const BASE32       = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+
+	private const TRY_PREFIX      = 'bn_2fa_try_';  // Failed-attempt counter, per ticket.
+	private const TRY_MAX         = 5;              // Failures before the ticket locks out.
+	private const RESEND_PREFIX   = 'bn_2fa_rsnd_'; // Email-code resend cooldown, per ticket.
+	private const RESEND_COOLDOWN = 60;             // Seconds between email-code resends.
+
+	/* ───────────────────────────── Status ──────────────────────────────── */
+
+	/**
+	 * Is confirmed 2FA active for this user?
+	 *
+	 * @param int $user_id User ID.
+	 * @return bool
+	 */
+	public static function is_enabled( int $user_id ): bool {
+		return '1' === (string) get_user_meta( $user_id, self::META_ENABLED, true )
+			&& '' !== (string) get_user_meta( $user_id, self::META_SECRET, true );
+	}
+
+	/**
+	 * How many unused backup codes remain.
+	 *
+	 * @param int $user_id User ID.
+	 * @return int
+	 */
+	public static function backup_codes_remaining( int $user_id ): int {
+		$codes = get_user_meta( $user_id, self::META_BACKUP, true );
+		return is_array( $codes ) ? count( $codes ) : 0;
+	}
+
+	/**
+	 * Whether this user's role is required to use 2FA.
+	 *
+	 * 2FA is opt-in for everyone by default. An owner turns it on for a role in
+	 * Settings → Registration & Login (buddynext_2fa_required_roles), and a
+	 * developer can still override with the filter of the same name.
+	 *
+	 * THIS IS NO LONGER ADVISORY. It used to be: the option was read, its value
+	 * was handed to the REST status payload as a display hint, and nothing
+	 * whatsoever enforced it. An owner could set "require 2FA for administrators",
+	 * reasonably believe admin 2FA was now mandatory on their community, and be
+	 * wrong. A lever that reads its own input and throws it away is worse than no
+	 * lever at all — the owner thinks they are protected. It is now enforced in
+	 * enforce_enrolment().
+	 *
+	 * @param WP_User $user User.
+	 * @return bool
+	 */
+	public static function is_required_for( WP_User $user ): bool {
+		$roles = self::required_roles();
+
+		if ( empty( $roles ) ) {
+			return false;
+		}
+
+		if ( in_array( '*', $roles, true ) ) {
+			return true;
+		}
+
+		return (bool) array_intersect( (array) $user->roles, array_map( 'strval', $roles ) );
+	}
+
+	/**
+	 * Which roles the owner requires two-factor authentication of.
+	 *
+	 * The admin setting is a plain preset (nobody / admins / staff / everyone),
+	 * because that is the decision an owner is actually making. It resolves to role
+	 * slugs here, and the long-standing developer filter still has the last word.
+	 *
+	 * @return string[] Role slugs, or array( '*' ) for everyone.
+	 */
+	public static function required_roles(): array {
+		$preset = (string) get_option( 'buddynext_2fa_required', 'none' );
+
+		$map = array(
+			'none'   => array(),
+			'admins' => array( 'administrator' ),
+			'staff'  => array( 'administrator', 'editor' ),
+			'all'    => array( '*' ),
+		);
+
+		$roles = $map[ $preset ] ?? array();
+
+		/**
+		 * Filter the roles that must have two-factor authentication enabled.
+		 *
+		 * Return array( '*' ) to require it of everyone.
+		 *
+		 * @param string[] $roles Role slugs resolved from the admin setting.
+		 */
+		return (array) apply_filters( 'buddynext_2fa_required_roles', $roles );
+	}
+
+	/**
+	 * Hold a member on the 2FA setup screen when their role requires it.
+	 *
+	 * Deliberately not a login refusal: locking them out would leave them no way
+	 * to reach the enrolment screen, which is the only thing that can fix it. They
+	 * sign in, and every BuddyNext surface routes them to set 2FA up.
+	 *
+	 * @return void
+	 */
+	public static function enforce_enrolment(): void {
+		if ( ! is_user_logged_in() ) {
+			return;
+		}
+
+		$user = wp_get_current_user();
+		if ( ! $user instanceof WP_User || ! self::is_required_for( $user ) ) {
+			return;
+		}
+
+		if ( self::is_enabled( (int) $user->ID ) ) {
+			return;
+		}
+
+		// Yield to a live email-verification hold.
+		//
+		// VerificationListener::maybe_gate_unverified() (template_redirect:6)
+		// holds an unverified member on /verify and exempts only /verify; this
+		// gate exempts only /settings. A member under BOTH holds ping-ponged
+		// /verify -> /settings -> /verify forever - each gate loop-safe alone,
+		// mutually recursive together, the same shape as the onboarding x 2FA
+		// pair fixed in 17c581bb. Identity comes before enrolment: this gate
+		// stands down while the verification hold is live and resumes on the
+		// request after the member verifies, so they still get walked to 2FA
+		// setup - just after the thing that actually blocks them.
+		if ( VerificationListener::holds( (int) $user->ID ) ) {
+			return;
+		}
+
+		$setup_url = \BuddyNext\Core\PageRouter::settings_url( 'account' );
+
+		// Already on the settings screen — do not loop.
+		$current = (string) home_url( add_query_arg( array() ) );
+		if ( false !== strpos( $current, '/settings' ) ) {
+			return;
+		}
+
+		/**
+		 * Filter whether a member whose role requires 2FA is held on the setup screen.
+		 *
+		 * @param bool $enforce Whether to redirect.
+		 * @param int  $user_id Member being held.
+		 */
+		if ( ! (bool) apply_filters( 'buddynext_enforce_2fa_enrolment', true, (int) $user->ID ) ) {
+			return;
+		}
+
+		wp_safe_redirect( $setup_url );
+		exit;
+	}
+
+	/* ─────────────────────────── Enrolment ─────────────────────────────── */
+
+	/**
+	 * Begin enrolment: mint a fresh secret, stash it as pending, and return the
+	 * secret plus an otpauth:// URI for the authenticator-app QR code. Nothing is
+	 * enforced until confirm_enrollment() verifies the first code.
+	 *
+	 * @param int $user_id User ID.
+	 * @return array{secret:string, uri:string}
+	 */
+	public static function begin_enrollment( int $user_id ): array {
+		$secret = self::generate_secret();
+		update_user_meta( $user_id, self::META_PENDING, $secret );
+
+		$user    = get_userdata( $user_id );
+		$account = $user ? (string) $user->user_login : (string) $user_id;
+
+		return array(
+			'secret' => $secret,
+			'uri'    => self::provisioning_uri( $secret, $account ),
+		);
+	}
+
+	/**
+	 * Confirm enrolment by verifying a code against the pending secret. On
+	 * success the secret becomes active, 2FA turns on, and a fresh set of backup
+	 * codes is generated and returned (plaintext, shown once).
+	 *
+	 * @param int    $user_id User ID.
+	 * @param string $code    6-digit code from the authenticator app.
+	 * @return array{backup_codes:string[]}|WP_Error
+	 */
+	public static function confirm_enrollment( int $user_id, string $code ): array|WP_Error {
+		$pending = (string) get_user_meta( $user_id, self::META_PENDING, true );
+		if ( '' === $pending ) {
+			return new WP_Error( 'bn_2fa_no_pending', __( 'Start the setup again — the previous attempt expired.', 'buddynext' ) );
+		}
+		if ( ! self::verify_totp( $pending, $code ) ) {
+			return new WP_Error( 'bn_2fa_bad_code', __( 'That code did not match. Check your authenticator app and try again.', 'buddynext' ) );
+		}
+
+		update_user_meta( $user_id, self::META_SECRET, $pending );
+		update_user_meta( $user_id, self::META_ENABLED, '1' );
+		delete_user_meta( $user_id, self::META_PENDING );
+
+		$codes = self::generate_backup_codes( $user_id );
+
+		/**
+		 * Fires when a user turns on two-factor authentication.
+		 *
+		 * @param int $user_id User ID.
+		 */
+		do_action( 'buddynext_2fa_enabled', $user_id );
+
+		return array( 'backup_codes' => $codes );
+	}
+
+	/**
+	 * Turn 2FA off and wipe all related secrets/codes for the user.
+	 *
+	 * @param int $user_id User ID.
+	 * @return void
+	 */
+	public static function disable( int $user_id ): void {
+		delete_user_meta( $user_id, self::META_ENABLED );
+		delete_user_meta( $user_id, self::META_SECRET );
+		delete_user_meta( $user_id, self::META_PENDING );
+		delete_user_meta( $user_id, self::META_BACKUP );
+
+		/**
+		 * Fires when a user turns off two-factor authentication.
+		 *
+		 * @param int $user_id User ID.
+		 */
+		do_action( 'buddynext_2fa_disabled', $user_id );
+	}
+
+	/* ─────────────────────────── Backup codes ──────────────────────────── */
+
+	/**
+	 * Generate, store (hashed), and return a fresh set of one-time backup codes.
+	 * Replaces any existing set.
+	 *
+	 * @param int $user_id User ID.
+	 * @return string[] Plaintext codes (format "abcd-efgh"), shown to the user once.
+	 */
+	public static function generate_backup_codes( int $user_id ): array {
+		$plain  = array();
+		$hashed = array();
+		for ( $i = 0; $i < self::BACKUP_COUNT; $i++ ) {
+			$raw      = strtolower( wp_generate_password( 8, false, false ) );
+			$code     = substr( $raw, 0, 4 ) . '-' . substr( $raw, 4, 4 );
+			$plain[]  = $code;
+			$hashed[] = self::hash_code( $code );
+		}
+		update_user_meta( $user_id, self::META_BACKUP, $hashed );
+		return $plain;
+	}
+
+	/**
+	 * Verify and consume a single-use backup code (constant work per stored code).
+	 *
+	 * @param int    $user_id User ID.
+	 * @param string $code    Code as entered (case/space insensitive).
+	 * @return bool True when a code matched and was consumed.
+	 */
+	public static function verify_backup_code( int $user_id, string $code ): bool {
+		$code  = strtolower( str_replace( array( ' ', '_' ), array( '', '-' ), trim( $code ) ) );
+		$codes = get_user_meta( $user_id, self::META_BACKUP, true );
+		if ( ! is_array( $codes ) || empty( $code ) ) {
+			return false;
+		}
+		$target = self::hash_code( $code );
+		$found  = false;
+		$remain = array();
+		foreach ( $codes as $stored ) {
+			if ( ! $found && hash_equals( (string) $stored, $target ) ) {
+				$found = true; // Consume exactly one match.
+				continue;
+			}
+			$remain[] = $stored;
+		}
+		if ( $found ) {
+			update_user_meta( $user_id, self::META_BACKUP, $remain );
+		}
+		return $found;
+	}
+
+	/* ──────────────────────── Email fallback code ──────────────────────── */
+
+	/**
+	 * Can this member complete a challenge with an emailed code?
+	 *
+	 * The only requirement send_email_code() has is an address to send to, so that is
+	 * the only thing checked here - deliberately the same condition, not a second
+	 * opinion about it. There is no owner toggle for the email fallback: it exists so
+	 * a member who has lost their authenticator still has a way in, and making that
+	 * switchable would mean a site could lock its own members out permanently.
+	 *
+	 * @param int $user_id User ID.
+	 * @return bool
+	 */
+	public static function email_fallback_available( int $user_id ): bool {
+		$user = get_userdata( $user_id );
+
+		return $user instanceof \WP_User && '' !== trim( (string) $user->user_email );
+	}
+
+	/**
+	 * The second factors this member can actually complete a challenge with.
+	 *
+	 * Reported by GET /account/2fa so a client can render the right options instead of
+	 * guessing. Order is the order to offer them in: the authenticator first because it
+	 * is the one the member deliberately set up, then the codes they were told to keep,
+	 * then the fallback that needs no preparation.
+	 *
+	 * Returns an empty list when 2FA is off - there is no challenge to complete, and
+	 * saying "email" there would advertise a factor that leads nowhere.
+	 *
+	 * @param int $user_id User ID.
+	 * @return array<int,string> Method slugs: totp, backup, email.
+	 */
+	public static function available_methods( int $user_id ): array {
+		if ( ! self::is_enabled( $user_id ) ) {
+			return array();
+		}
+
+		$methods = array( 'totp' );
+
+		if ( self::backup_codes_remaining( $user_id ) > 0 ) {
+			$methods[] = 'backup';
+		}
+
+		if ( self::email_fallback_available( $user_id ) ) {
+			$methods[] = 'email';
+		}
+
+		return $methods;
+	}
+
+	/**
+	 * Generate a one-time numeric code, store it hashed, and email it to the user.
+	 *
+	 * @param int $user_id User ID.
+	 * @return bool True when the mail was handed off to wp_mail().
+	 */
+	public static function send_email_code( int $user_id ): bool {
+		$user = get_userdata( $user_id );
+		if ( ! $user || '' === (string) $user->user_email ) {
+			return false;
+		}
+		$code = (string) wp_rand( 100000, 999999 );
+		set_transient( 'bn_2fa_email_' . $user_id, self::hash_code( $code ), self::EMAIL_TTL );
+
+		$site    = wp_specialchars_decode( (string) get_option( 'blogname' ), ENT_QUOTES );
+		$minutes = (int) ( self::EMAIL_TTL / 60 );
+		$subject = sprintf(
+			/* translators: %s: site name. */
+			__( 'Your %s sign-in code', 'buddynext' ),
+			$site
+		);
+		$message = sprintf(
+			/* translators: 1: 6-digit code, 2: minutes until expiry. */
+			__( "Your verification code is: %1\$s\n\nIt expires in %2\$d minutes. If you did not try to sign in, you can ignore this email.", 'buddynext' ),
+			$code,
+			$minutes
+		);
+
+		// Wrap in the shared branded shell so the 2FA email matches every other
+		// BuddyNext email (same header/footer + From identity), not a bare message.
+		return \BuddyNext\Notifications\EmailSender::send_with_identity(
+			$user->user_email,
+			$subject,
+			\BuddyNext\Notifications\EmailSender::brand_wrap( wpautop( esc_html( $message ) ), $subject ),
+			\BuddyNext\Notifications\EmailSender::build_identity_headers()
+		);
+	}
+
+	/**
+	 * Verify and consume an emailed one-time code.
+	 *
+	 * @param int    $user_id User ID.
+	 * @param string $code    Code as entered.
+	 * @return bool
+	 */
+	public static function verify_email_code( int $user_id, string $code ): bool {
+		$stored = (string) get_transient( 'bn_2fa_email_' . $user_id );
+		$code   = preg_replace( '/\D/', '', $code );
+		if ( '' === $stored || '' === (string) $code ) {
+			return false;
+		}
+		if ( hash_equals( $stored, self::hash_code( (string) $code ) ) ) {
+			delete_transient( 'bn_2fa_email_' . $user_id );
+			return true;
+		}
+		return false;
+	}
+
+	/**
+	 * Verify a code at login against any active factor: TOTP, then emailed code,
+	 * then a single-use backup code.
+	 *
+	 * @param int    $user_id User ID.
+	 * @param string $code    Code as entered.
+	 * @return bool
+	 */
+	public static function verify_login_code( int $user_id, string $code ): bool {
+		$secret = (string) get_user_meta( $user_id, self::META_SECRET, true );
+		if ( '' !== $secret && self::verify_totp( $secret, $code ) ) {
+			return true;
+		}
+		if ( self::verify_email_code( $user_id, $code ) ) {
+			return true;
+		}
+		return self::verify_backup_code( $user_id, $code );
+	}
+
+	/* ─────────────────────── Login-challenge ticket ────────────────────── */
+
+	/**
+	 * Issue a one-time, server-side login-challenge ticket (no auth cookie set).
+	 * The opaque token is handed to the client and exchanged for completion once
+	 * a code verifies.
+	 *
+	 * @param int  $user_id  Authenticated (password-verified) user ID.
+	 * @param bool $remember Whether the eventual cookie should be persistent.
+	 * @return string Opaque ticket token.
+	 */
+	public static function issue_login_challenge( int $user_id, bool $remember ): string {
+		$token = wp_generate_password( 32, false, false );
+		set_transient(
+			'bn_2fa_login_' . $token,
+			array(
+				'user'     => $user_id,
+				'remember' => $remember,
+			),
+			self::LOGIN_TTL
+		);
+		return $token;
+	}
+
+	/**
+	 * Read a login-challenge ticket without consuming it (e.g. to email a code).
+	 *
+	 * @param string $token Ticket token.
+	 * @return array{user:int, remember:bool}|null
+	 */
+	public static function peek_login_challenge( string $token ): ?array {
+		$data = get_transient( 'bn_2fa_login_' . $token );
+		if ( ! is_array( $data ) || empty( $data['user'] ) ) {
+			return null;
+		}
+		return array(
+			'user'     => (int) $data['user'],
+			'remember' => ! empty( $data['remember'] ),
+		);
+	}
+
+	/**
+	 * Consume (read once, then delete) a login-challenge ticket.
+	 *
+	 * @param string $token Ticket token.
+	 * @return array{user:int, remember:bool}|null
+	 */
+	public static function consume_login_challenge( string $token ): ?array {
+		$data = self::peek_login_challenge( $token );
+		if ( null !== $data ) {
+			delete_transient( 'bn_2fa_login_' . $token );
+		}
+		return $data;
+	}
+
+	/* ──────────────────── Brute-force throttle (per ticket) ─────────────── */
+
+	/**
+	 * Verify a login code under a per-ticket brute-force throttle.
+	 *
+	 * The challenge ticket is a 32-char, single-use, short-TTL secret minted only
+	 * after the password verified, so it identifies one sign-in attempt. We count
+	 * failed code guesses against that ticket and stop accepting any more once
+	 * TRY_MAX is reached, until the counter's window (the ticket TTL) elapses or
+	 * the member re-enters their password and a fresh ticket is issued. This
+	 * closes the unlimited-guess window on the 6-digit code without ever
+	 * weakening the constant-time checks in verify_login_code().
+	 *
+	 * Both the REST /auth/2fa flow and the wp-login bn_2fa flow call this, so the
+	 * lockout is enforced identically on every native sign-in path.
+	 *
+	 * @param string $token   Challenge ticket token (the throttle key).
+	 * @param int    $user_id Password-verified user ID from the ticket.
+	 * @param string $code    Code as entered.
+	 * @return true|WP_Error True when the code verified, WP_Error otherwise
+	 *                       (code 'bn_2fa_locked' once the attempt cap is hit).
+	 */
+	public static function verify_login_challenge( string $token, int $user_id, string $code ): bool|WP_Error {
+		$key = self::throttle_key( $token );
+
+		// NB: this counter intentionally stays in the DB transient, NOT the
+		// object-cache RateLimiter. It is a security lockout on 2FA code guesses,
+		// so "fail open" is not acceptable — an object-cache flush mid-attack must
+		// not reset the attacker's attempt count and hand them a fresh window.
+		if ( (int) get_transient( $key ) >= self::TRY_MAX ) {
+			return new WP_Error(
+				'bn_2fa_locked',
+				__( 'Too many incorrect codes. Please enter your password again to restart sign-in.', 'buddynext' )
+			);
+		}
+
+		if ( self::verify_login_code( $user_id, $code ) ) {
+			delete_transient( $key );
+			return true;
+		}
+
+		// Count this failure against the ticket; the window matches the ticket TTL
+		// so a stalled attempt clears itself without leaving the account locked.
+		set_transient( $key, (int) get_transient( $key ) + 1, self::LOGIN_TTL );
+
+		return new WP_Error(
+			'bn_2fa_failed',
+			__( 'That code was not correct. Try again, or use a backup code.', 'buddynext' )
+		);
+	}
+
+	/**
+	 * Whether an email-code resend is allowed for this ticket, recording the send.
+	 *
+	 * Adds a short per-ticket cooldown to the email-code fallback so the endpoint
+	 * cannot be used to mail-bomb a member or churn the stored code transient.
+	 * Returns false while a previous send is still inside the cooldown window.
+	 *
+	 * @param string $token Challenge ticket token (the cooldown key).
+	 * @return bool True when a send is allowed (and the cooldown was armed).
+	 */
+	public static function can_resend_email_code( string $token ): bool {
+		$key = self::RESEND_PREFIX . self::throttle_hash( $token );
+		if ( false !== get_transient( $key ) ) {
+			return false; // Still cooling down from the last send.
+		}
+		set_transient( $key, 1, self::RESEND_COOLDOWN );
+		return true;
+	}
+
+	/**
+	 * Transient key for a ticket's failed-attempt counter.
+	 *
+	 * @param string $token Challenge ticket token.
+	 * @return string
+	 */
+	private static function throttle_key( string $token ): string {
+		return self::TRY_PREFIX . self::throttle_hash( $token );
+	}
+
+	/**
+	 * Hash a ticket token into a safe, fixed-length transient-key fragment.
+	 *
+	 * @param string $token Challenge ticket token.
+	 * @return string
+	 */
+	private static function throttle_hash( string $token ): string {
+		return hash_hmac( 'sha256', $token, wp_salt( 'auth' ) );
+	}
+
+	/* ─────────────────────────── TOTP / RFC 6238 ───────────────────────── */
+
+	/**
+	 * Generate a fresh Base32 TOTP secret (160-bit).
+	 *
+	 * @return string 32-character Base32 string.
+	 */
+	public static function generate_secret(): string {
+		$bytes = function_exists( 'random_bytes' ) ? random_bytes( 20 ) : '';
+		if ( '' === $bytes ) {
+			// Fallback: 20 bytes derived from wp_generate_password entropy.
+			for ( $i = 0; $i < 20; $i++ ) {
+				$bytes .= chr( wp_rand( 0, 255 ) );
+			}
+		}
+		return self::base32_encode( $bytes );
+	}
+
+	/**
+	 * Build the otpauth:// provisioning URI an authenticator app scans.
+	 *
+	 * @param string $secret  Base32 secret.
+	 * @param string $account Account label (username).
+	 * @return string
+	 */
+	public static function provisioning_uri( string $secret, string $account ): string {
+		$issuer = (string) apply_filters(
+			'buddynext_2fa_issuer',
+			wp_specialchars_decode( (string) get_option( 'blogname' ), ENT_QUOTES )
+		);
+		$label  = rawurlencode( $issuer . ':' . $account );
+		return sprintf(
+			'otpauth://totp/%s?secret=%s&issuer=%s&algorithm=SHA1&digits=%d&period=%d',
+			$label,
+			rawurlencode( $secret ),
+			rawurlencode( $issuer ),
+			self::DIGITS,
+			self::PERIOD
+		);
+	}
+
+	/**
+	 * Verify a TOTP code against a secret, tolerating ± WINDOW steps of skew.
+	 *
+	 * @param string $secret Base32 secret.
+	 * @param string $code   Submitted code.
+	 * @return bool
+	 */
+	public static function verify_totp( string $secret, string $code ): bool {
+		$code = preg_replace( '/\D/', '', $code );
+		if ( strlen( (string) $code ) !== self::DIGITS ) {
+			return false;
+		}
+		$key = self::base32_decode( $secret );
+		if ( '' === $key ) {
+			return false;
+		}
+		$counter = (int) floor( time() / self::PERIOD );
+		for ( $offset = -self::WINDOW; $offset <= self::WINDOW; $offset++ ) {
+			if ( hash_equals( self::hotp( $key, $counter + $offset ), (string) $code ) ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * HOTP (RFC 4226) for one counter value — the per-step TOTP building block.
+	 *
+	 * @param string $key     Raw (decoded) secret bytes.
+	 * @param int    $counter Moving factor.
+	 * @return string Zero-padded DIGITS-length code.
+	 */
+	private static function hotp( string $key, int $counter ): string {
+		// 8-byte big-endian counter (top 4 bytes are zero for any realistic time).
+		$binary = pack( 'N', 0 ) . pack( 'N', $counter );
+		$hash   = hash_hmac( 'sha1', $binary, $key, true );
+		$offset = ord( $hash[ strlen( $hash ) - 1 ] ) & 0x0f;
+		$value  = ( ( ord( $hash[ $offset ] ) & 0x7f ) << 24 )
+			| ( ( ord( $hash[ $offset + 1 ] ) & 0xff ) << 16 )
+			| ( ( ord( $hash[ $offset + 2 ] ) & 0xff ) << 8 )
+			| ( ord( $hash[ $offset + 3 ] ) & 0xff );
+		$value %= 10 ** self::DIGITS;
+		return str_pad( (string) $value, self::DIGITS, '0', STR_PAD_LEFT );
+	}
+
+	/* ───────────────────────────── Helpers ─────────────────────────────── */
+
+	/**
+	 * Salted hash for backup/email codes (high-entropy inputs → SHA-256 is ample).
+	 *
+	 * @param string $code Code.
+	 * @return string
+	 */
+	private static function hash_code( string $code ): string {
+		return hash_hmac( 'sha256', $code, wp_salt( 'auth' ) );
+	}
+
+	/**
+	 * RFC 4648 Base32 encode (no padding).
+	 *
+	 * @param string $data Raw bytes.
+	 * @return string
+	 */
+	private static function base32_encode( string $data ): string {
+		if ( '' === $data ) {
+			return '';
+		}
+		$bits = '';
+		$len  = strlen( $data );
+		for ( $i = 0; $i < $len; $i++ ) {
+			$bits .= str_pad( decbin( ord( $data[ $i ] ) ), 8, '0', STR_PAD_LEFT );
+		}
+		$out    = '';
+		$chunks = str_split( $bits, 5 );
+		foreach ( $chunks as $chunk ) {
+			$out .= self::BASE32[ bindec( str_pad( $chunk, 5, '0', STR_PAD_RIGHT ) ) ];
+		}
+		return $out;
+	}
+
+	/**
+	 * RFC 4648 Base32 decode (case-insensitive, ignores padding/spaces).
+	 *
+	 * @param string $data Base32 string.
+	 * @return string Raw bytes, or '' on invalid input.
+	 */
+	private static function base32_decode( string $data ): string {
+		$data = strtoupper( preg_replace( '/[^A-Za-z2-7]/', '', $data ) );
+		if ( '' === $data ) {
+			return '';
+		}
+		$bits = '';
+		$len  = strlen( $data );
+		for ( $i = 0; $i < $len; $i++ ) {
+			$pos = strpos( self::BASE32, $data[ $i ] );
+			if ( false === $pos ) {
+				return '';
+			}
+			$bits .= str_pad( decbin( $pos ), 5, '0', STR_PAD_LEFT );
+		}
+		$out    = '';
+		$chunks = str_split( $bits, 8 );
+		foreach ( $chunks as $chunk ) {
+			if ( 8 === strlen( $chunk ) ) {
+				$out .= chr( bindec( $chunk ) );
+			}
+		}
+		return $out;
+	}
+}

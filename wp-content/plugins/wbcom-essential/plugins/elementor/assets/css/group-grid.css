@@ -1,0 +1,216 @@
+/*--------------------------------------------------------------
+>>> TABLE OF CONTENTS:
+----------------------------------------------------------------
+# Global
+# BuddyPress
+--------------------------------------------------------------*/
+
+/*--------------------------------------------------------------
+# Global
+--------------------------------------------------------------*/
+#buddypress.buddypress-wrap.wbcom-groups-grid-widget .grid.bp-list>li .action .generic-button a,
+#buddypress.buddypress-wrap.wbcom-groups-grid-widget .grid.bp-list>li .action .generic-button button {
+    font-size: initial;
+    font-weight: normal;
+}
+
+.elementor-widget-wrap .wbcom-groups-grid-widget #groups-list li {
+    display: block;
+    align-items: center;
+    padding: 0 15px;
+    margin-bottom: 30px;
+    flex: auto;
+    min-width: inherit;
+}
+
+body:not(.logged-in) .grid.bp-list.wbtm-member-directory-type-2 .list-wrap,
+body:not(.logged-in) .grid.bp-list.wbtm-member-directory-type-3 .list-wrap {
+    padding-bottom: 15px !important;
+}
+
+@media screen and (min-width: 24em) {
+
+    .grid.two>li,
+    .grid.three>li {
+        width: 50%;
+    }
+
+    .grid.two>li:nth-child(odd),
+    .grid.three>li:nth-child(odd) {
+        padding-right: 10px;
+    }
+
+    .grid.two>li:nth-child(even),
+    .grid.three>li:nth-child(even) {
+        padding-left: 10px;
+    }
+
+    .grid.two>li .item,
+    .grid.three>li .item {
+        margin: 1rem auto 0;
+        width: 80%;
+    }
+
+    .grid.two>li .item .item-title,
+    .grid.three>li .item .item-title {
+        width: auto;
+    }
+}
+
+/* Build the three column class medium up */
+@media screen and (min-width: 46.8em) {
+    .grid.three>li {
+        padding-top: 0;
+        width: 33.333333%;
+        width: calc(100% / 3);
+    }
+
+    .grid.three>li:nth-child(1n+1) {
+        padding-left: 5px;
+        padding-right: 5px;
+    }
+
+    .grid.three>li:nth-child(3n+3) {
+        padding-left: 5px;
+        padding-right: 0;
+    }
+
+    .grid.three>li:nth-child(3n+1) {
+        padding-left: 0;
+        padding-right: 5px;
+    }
+}
+
+/* Build the four column class medium up */
+@media screen and (min-width: 46.8em) {
+    .grid.four>li {
+        width: 25%;
+    }
+
+    .grid.four>li:nth-child(1n+1) {
+        padding-left: 5px;
+        padding-right: 5px;
+    }
+
+    .grid.four>li:nth-child(4n+4) {
+        padding-left: 5px;
+        padding-right: 0;
+    }
+
+    .grid.four>li:nth-child(4n+1) {
+        padding-left: 0;
+        padding-right: 5px;
+    }
+}
+
+/*--------------------------------------------------------------
+# BuddyPress
+--------------------------------------------------------------*/
+.bp-list {
+    border-top: 0;
+}
+
+#buddypress.buddypress-wrap .grid.bp-list {
+    padding-top: 0;
+    display: flex;
+    flex-flow: row wrap;
+    margin-bottom: 0;
+    width: auto;
+    margin: 0 -15px;
+    list-style: none;
+}
+
+.buddypress-wrap .grid.bp-list:after,
+.buddypress-wrap .grid.bp-list>li:after,
+.buddypress-wrap .grid.bp-list:before,
+.buddypress-wrap .grid.bp-list>li:before {
+    content: normal;
+}
+
+.buddypress-wrap .grid.bp-list>li {
+    border-bottom: none;
+    margin: 0;
+    margin-bottom: 30px;
+    padding: 0 15px;
+}
+
+.grid>li {
+    width: 100%;
+}
+
+.grid.bp-list>li .list-wrap {
+    margin: 0;
+}
+
+.grid.members-list .list-wrap {
+    min-height: 40px;
+}
+
+.buddypress-wrap .grid.bp-list>li .list-wrap {
+    height: 100%;
+    padding-bottom: 15px;
+}
+
+.buddypress:not(.logged-in) .grid.bp-list .list-wrap {
+    padding-bottom: 15px;
+}
+
+.buddypress-wrap .grid.bp-list>li .item,
+.buddypress-wrap .grid.bp-list>li .item .group-desc,
+.buddypress-wrap .grid.bp-list>li .item .item-block {
+    width: 100%;
+}
+
+.buddypress-wrap .grid.bp-list>li .item .item-block {
+    margin-bottom: 0;
+}
+
+.buddypress-wrap .grid.bp-list>li .action {
+    bottom: 0;
+    float: none;
+    height: auto;
+    padding: 0;
+    position: relative;
+    top: 0;
+    margin: auto;
+    margin-top: 20px;
+}
+
+.buddypress-wrap .grid.bp-list>li .item-avatar {
+    margin: 0;
+    text-align: center;
+    width: auto;
+}
+
+.buddypress-wrap .grid.bp-list>li .item-avatar img.avatar {
+    max-width: 126px;
+    width: 100%;
+}
+
+.grid.members-list .list-wrap .item-block,
+.buddypress:not(.logged-in) .grid.members-list .list-wrap {
+    min-height: 100%;
+}
+
+.buddypress-wrap .grid.bp-list>li .action .generic-button {
+    margin: 10px 0 0;
+}
+
+@media screen and (min-width: 24em) {
+    .grid.four>li {
+        width: 50%;
+    }
+}
+
+@media screen and (min-width: 46.8em) {
+    .grid.four>li {
+        width: 33.333333%;
+        width: calc(100% / 3);
+    }
+}
+
+@media screen and (min-width: 73.2em) {
+    .grid.four>li {
+        width: 25%;
+    }
+}

@@ -1,0 +1,136 @@
+<?php
+/**
+ * BuddyNext template part: post-comment-form.
+ *
+ * Comment textarea + submit button rendered inside the post-card's comments
+ * expand region. Returns silently when the viewer is unauthenticated.
+ * Mirrors the markup previously inlined in
+ * `templates/partials/post-card.php` between `<div class="bn-comment-form">`
+ * and its matching closing tag (plus the legacy `buddynext_post_comment_form_extra`
+ * action, kept as a transitional bridge — Pro listeners should migrate to
+ * `buddynext_part_post_comment_form_after`).
+ *
+ * @package BuddyNext
+ * @since   1.1.0
+ *
+ * @var array  $bn_post     Hydrated post array.
+ * @var int   $bn_post_id   Post ID.
+ * @var int   $user_id      Current viewer ID. Part returns silently when 0.
+ * @var string $placeholder Textarea placeholder.
+ * @var array  $classes     Optional extra CSS classes.
+ *
+ * Fires:
+ *   - do_action( 'buddynext_part_post_comment_form_before', $args )
+ *   - do_action( 'buddynext_part_post_comment_form_after',  $args )
+ *
+ * Filters:
+ *   - apply_filters( 'buddynext_part_post_comment_form_args',    array $args )
+ *   - apply_filters( 'buddynext_part_post_comment_form_classes', array $classes, array $args )
+ */
+
+declare( strict_types=1 );
+
+defined( 'ABSPATH' ) || exit;
+
+$args = array(
+	'bn_post'     => isset( $bn_post ) && is_array( $bn_post ) ? $bn_post : array(),
+	'bn_post_id'  => isset( $bn_post_id ) ? absint( $bn_post_id ) : 0,
+	'user_id'     => isset( $user_id ) ? absint( $user_id ) : 0,
+	'placeholder' => isset( $placeholder ) ? (string) $placeholder : __( 'Write a comment...', 'buddynext' ),
+	'classes'     => isset( $classes ) ? (array) $classes : array(),
+);
+
+/** Sanitized partial arguments. @var array<string,mixed> $args */
+$args = (array) apply_filters( 'buddynext_part_post_comment_form_args', $args );
+
+if ( 0 === (int) $args['bn_post_id'] || 0 === (int) $args['user_id'] ) {
+	return;
+}
+
+$bn_classes = array_merge( array( 'bn-comment-form' ), array_filter( (array) $args['classes'], 'is_string' ) );
+/** Computed root-class list. @var array<int,string> $bn_classes */
+$bn_classes = (array) apply_filters( 'buddynext_part_post_comment_form_classes', $bn_classes, $args );
+$bn_class   = trim(
+	implode(
+		' ',
+		array_unique(
+			array_filter(
+				$bn_classes,
+				static function ( $c ) {
+					return is_string( $c ) && '' !== $c;
+				}
+			)
+		)
+	)
+);
+
+$bn_cf_post_id     = (int) $args['bn_post_id'];
+$bn_cf_user_id     = (int) $args['user_id'];
+$bn_cf_placeholder = (string) $args['placeholder'];
+
+$current_display_name = (string) get_the_author_meta( 'display_name', $bn_cf_user_id );
+$name_for_initials    = '' !== $current_display_name ? $current_display_name : 'U';
+$current_initials     = implode( '', array_map( static fn( string $w ): string => strtoupper( mb_substr( $w, 0, 1 ) ), explode( ' ', $name_for_initials ) ) );
+
+do_action( 'buddynext_part_post_comment_form_before', $args );
+?>
+<div class="<?php echo esc_attr( $bn_class ); ?>">
+	<span class="bn-avatar bn-comment-form__avatar" data-size="sm" aria-hidden="true"><?php echo esc_html( mb_substr( $current_initials, 0, 2 ) ); ?></span>
+	<label for="bn-comment-input-<?php echo absint( $bn_cf_post_id ); ?>" class="screen-reader-text">
+		<?php esc_html_e( 'Write a comment', 'buddynext' ); ?>
+	</label>
+	<textarea
+		id="bn-comment-input-<?php echo absint( $bn_cf_post_id ); ?>"
+		class="bn-input bn-textarea bn-comment-form__input"
+		placeholder="<?php echo esc_attr( $bn_cf_placeholder ); ?>"
+		aria-label="<?php esc_attr_e( 'Comment text', 'buddynext' ); ?>"
+		data-comment-input="<?php echo absint( $bn_cf_post_id ); ?>"
+		rows="1"
+	></textarea>
+	<?php
+	/*
+	 * Character-counter slot, matching the composer's.
+	 *
+	 * attachCharCounter() (assets/js/feed/store.js) looks for a template-owned
+	 * slot first and otherwise injects a bare <span> immediately AFTER the
+	 * textarea. This form is display:flex, so that span became a flex ITEM and
+	 * took 40px off the textarea — enough that at 375px the "Write a comment..."
+	 * placeholder no longer fit on one line and wrapped inside a 44px box, with
+	 * the second line clipped. Measured: placeholder 114.4px vs a 111.5px content
+	 * box; without the injected span the textarea is 185px with ~70px to spare.
+	 *
+	 * The CSS comment at bn-feed.css:2180-2183 describes the fallback as "a block
+	 * element after the textarea", but display:block on a flex child is
+	 * blockified to a flex item — it never stacked. Owning the slot here is what
+	 * the JS was written to prefer.
+	 */
+	?>
+	<span class="bn-comment-form__char-counter-slot" aria-live="polite"></span>
+	<?php if ( (bool) get_option( 'buddynext_enable_emoji_picker', true ) ) : ?>
+		<?php // Same option-gated picker the composer offers; the setting promises the comment editor too. The shared initEmojiPicker() binds any .bn-emoji-trigger and inserts into the target resolved within this .bn-comment-form. ?>
+		<button
+			type="button"
+			class="bn-emoji-trigger bn-comment__emoji-trigger bn-comment-form__emoji"
+			data-bn-emoji-target=".bn-comment-form__input"
+			aria-label="<?php esc_attr_e( 'Insert emoji', 'buddynext' ); ?>"
+			aria-haspopup="true"
+			aria-expanded="false"
+			title="<?php esc_attr_e( 'Insert emoji', 'buddynext' ); ?>"
+		>
+			<?php buddynext_icon( 'smile' ); ?>
+		</button>
+	<?php endif; ?>
+	<button
+		type="button"
+		class="bn-btn bn-comment-form__submit"
+		data-variant="primary"
+		data-size="sm"
+		data-wp-on--click="actions.submitComment"
+		aria-label="<?php esc_attr_e( 'Post comment', 'buddynext' ); ?>"
+	>
+		<?php buddynext_icon( 'send' ); ?>
+	</button>
+</div>
+
+<?php
+do_action( 'buddynext_part_post_comment_form_after', $args );

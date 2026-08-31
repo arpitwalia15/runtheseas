@@ -1,0 +1,190 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "wbcom-essential/promo-banner",
+  "version": "1.0.0",
+  "title": "Promo Banner",
+  "category": "essential-marketing",
+  "icon": "megaphone",
+  "description": "Promotional image banner with text overlay and CTA button. Supports overlay and split layout styles.",
+  "keywords": [
+    "promo",
+    "banner",
+    "promotion",
+    "sale",
+    "cta",
+    "marketing",
+    "advertisement",
+    "essential",
+    "wbcom"
+  ],
+  "textdomain": "wbcom-essential",
+  "example": {
+    "attributes": {
+      "heading": "Special Offer",
+      "description": "Save up to 50% on selected items",
+      "buttonText": "Shop Now"
+    }
+  },
+  "attributes": {
+    "uniqueId": {
+      "type": "string",
+      "default": ""
+    },
+    "heading": {
+      "type": "string",
+      "default": "Special Offer"
+    },
+    "description": {
+      "type": "string",
+      "default": "Save up to 50% on selected items"
+    },
+    "buttonText": {
+      "type": "string",
+      "default": "Shop Now"
+    },
+    "buttonUrl": {
+      "type": "string",
+      "default": "#"
+    },
+    "backgroundImage": {
+      "type": "object",
+      "default": {}
+    },
+    "overlayColor": {
+      "type": "string",
+      "default": "rgba(0,0,0,0.4)"
+    },
+    "headingColor": {
+      "type": "string",
+      "default": "#ffffff"
+    },
+    "descriptionColor": {
+      "type": "string",
+      "default": "rgba(255,255,255,0.9)"
+    },
+    "buttonBg": {
+      "type": "string",
+      "default": "#ffffff"
+    },
+    "buttonColor": {
+      "type": "string",
+      "default": "#1e1e2e"
+    },
+    "contentAlign": {
+      "type": "string",
+      "default": "center"
+    },
+    "minHeight": {
+      "type": "number",
+      "default": 300
+    },
+    "bannerStyle": {
+      "type": "string",
+      "default": "overlay"
+    },
+    "padding": {
+      "type": "object",
+      "default": {
+        "top": 48,
+        "right": 24,
+        "bottom": 48,
+        "left": 24
+      }
+    },
+    "paddingTablet": {
+      "type": "object",
+      "default": null
+    },
+    "paddingMobile": {
+      "type": "object",
+      "default": null
+    },
+    "paddingUnit": {
+      "type": "string",
+      "default": "px"
+    },
+    "margin": {
+      "type": "object",
+      "default": {
+        "top": 0,
+        "right": 0,
+        "bottom": 0,
+        "left": 0
+      }
+    },
+    "marginTablet": {
+      "type": "object",
+      "default": null
+    },
+    "marginMobile": {
+      "type": "object",
+      "default": null
+    },
+    "marginUnit": {
+      "type": "string",
+      "default": "px"
+    },
+    "boxShadow": {
+      "type": "boolean",
+      "default": false
+    },
+    "shadowHorizontal": {
+      "type": "number",
+      "default": 0
+    },
+    "shadowVertical": {
+      "type": "number",
+      "default": 4
+    },
+    "shadowBlur": {
+      "type": "number",
+      "default": 16
+    },
+    "shadowSpread": {
+      "type": "number",
+      "default": 0
+    },
+    "shadowColor": {
+      "type": "string",
+      "default": "rgba(0, 0, 0, 0.12)"
+    },
+    "borderRadius": {
+      "type": "object",
+      "default": {
+        "top": 8,
+        "right": 8,
+        "bottom": 8,
+        "left": 8
+      }
+    },
+    "borderRadiusUnit": {
+      "type": "string",
+      "default": "px"
+    },
+    "hideOnDesktop": {
+      "type": "boolean",
+      "default": false
+    },
+    "hideOnTablet": {
+      "type": "boolean",
+      "default": false
+    },
+    "hideOnMobile": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "supports": {
+    "html": false,
+    "align": [
+      "wide",
+      "full"
+    ],
+    "color": false,
+    "spacing": false
+  },
+  "editorScript": "file:./index.js",
+  "editorStyle": "file:./index.css",
+  "style": "file:./style-index.css"
+}

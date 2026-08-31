@@ -1,0 +1,1095 @@
+<?php
+/**
+ * The `buddyx()` extra.
+ *
+ * @package buddyx
+ */
+
+if ( ! function_exists( 'buddyx_is_truthy' ) ) {
+	/**
+	 * Boolean-equivalence helper for theme_mod values.
+	 *
+	 * Treats `true / 1 / '1' / 'on' / 'yes' / 'true' / 'enable'` as truthy
+	 * and `false / 0 / '0' / '' / 'off' / 'no' / 'false' / 'disable' / null`
+	 * as falsy. Any other value falls back to PHP loose-truthiness.
+	 *
+	 * Required because pre-5.1.0 customers carry literal 'on'/'off' string
+	 * values for switch theme_mods (Kirki preserved the choice keys
+	 * directly), and PHP gotchas mean `(int) 'on' === 0` and `(bool) 'off'
+	 * === true` — both of which silently invert the customer's intent.
+	 * WordPress's own `wp_validate_boolean()` is unsuitable here because
+	 * it only recognizes 'false'/'0' as falsy (so `wp_validate_boolean('off')
+	 * === true`). This helper mirrors the values_equal() logic added to
+	 * Active_Callback in commit b4cccf6 so render-time and condition-time
+	 * agree on the same truthiness contract.
+	 *
+	 * @param mixed $value Raw theme_mod value (any scalar / null).
+	 * @return bool
+	 */
+	function buddyx_is_truthy( $value ): bool {
+		if ( is_bool( $value ) ) {
+			return $value;
+		}
+		if ( is_int( $value ) ) {
+			return 0 !== $value;
+		}
+		if ( null === $value ) {
+			return false;
+		}
+		if ( is_string( $value ) ) {
+			$normalized = strtolower( trim( $value ) );
+			if ( in_array( $normalized, array( '1', 'on', 'yes', 'true', 'enable' ), true ) ) {
+				return true;
+			}
+			if ( in_array( $normalized, array( '0', '', 'off', 'no', 'false', 'disable' ), true ) ) {
+				return false;
+			}
+		}
+		return (bool) $value;
+	}
+}
+
+// Content wrapper
+if ( ! function_exists( 'buddyx_content_top' ) ) {
+	function buddyx_content_top() {
+		?>
+		<div class="site-wrapper">
+		<?php
+	}
+}
+
+add_action( 'buddyx_before_content', 'buddyx_content_top' );
+
+if ( ! function_exists( 'buddyx_content_bottom' ) ) {
+	function buddyx_content_bottom() {
+		?>
+		</div>
+		<?php
+	}
+}
+
+add_action( 'buddyx_after_content', 'buddyx_content_bottom' );
+
+// Site Sub Header
+if ( ! function_exists( 'buddyx_sub_header' ) ) {
+	add_action( 'buddyx_sub_header', 'buddyx_sub_header' );
+
+	function buddyx_sub_header() {
+		global $post;
+		if ( is_front_page() ) {
+			return;
+		}
+		?>
+		<div class="site-sub-header">
+			<div class="container">
+				<?php
+				// Handle search results separately
+				if ( is_search() ) {
+					?>
+					<h2 class="page-title">
+						<?php esc_html_e( 'Search', 'buddyx' ); ?>
+					</h2>
+					<?php
+				} elseif ( get_post_type() === 'post' || is_single() || is_archive( 'post-type-archive-forum' ) || is_archive( 'post-type-archive-topic' ) || is_archive( 'post-type-archive-ideas' ) && ( function_exists( 'is_shop' ) && ! is_shop() ) ) {
+					get_template_part( 'template-parts/content/page_header' );
+				} elseif ( get_post_type() === 'page' || is_singular() ) {
+					get_template_part( 'template-parts/content/entry_title', get_post_type() );
+				}
+
+				// Breadcrumbs for all cases. `buddyx_is_truthy()` handles
+				// pre-5.1.0 'on'/'off' strings; `! empty('off')` would
+				// otherwise treat the disabled toggle as enabled.
+				do_action( 'buddyx_before_breadcrumb' );
+				if ( buddyx_is_truthy( get_theme_mod( 'site_breadcrumbs', buddyx_defaults( 'site-breadcrumbs' ) ) ) ) {
+					buddyx_the_breadcrumb();
+				}
+				do_action( 'buddyx_after_breadcrumb' );
+				?>
+			</div>
+		</div>
+		<?php
+	}
+}
+
+/*
+ * BREADCRUMBS
+ */
+if ( ! function_exists( 'buddyx_the_breadcrumb' ) ) {
+	/**
+	 * Displays breadcrumb navigation for BuddyX theme, with caching.
+	 *
+	 * This function checks if Yoast SEO breadcrumbs are enabled. If so, it uses
+	 * `yoast_breadcrumb` to display them. If not, it falls back to the `buddyx_get_breadcrumb`
+	 * function to display custom breadcrumbs. The output is cached using `wp_cache` to improve
+	 * performance and avoid regenerating breadcrumbs on every page load.
+	 *
+	 * Caching is performed based on the current post or page ID, and the cache duration is set
+	 * to 12 hours.
+	 *
+	 * @return void
+	 */
+	function buddyx_the_breadcrumb() {
+		// Generate a unique transient key based on the post ID or page ID.
+		$post_id       = get_the_ID();
+		$transient_key = 'buddyx_breadcrumb_' . $post_id;
+
+		// Try to get the cached breadcrumb.
+		$breadcrumb = get_transient( $transient_key );
+
+		if ( false === $breadcrumb ) {
+			// No cached breadcrumb, generate it.
+			ob_start();
+
+			$wpseo_titles = get_option( 'wpseo_titles' );
+			if ( function_exists( 'yoast_breadcrumb' ) && isset( $wpseo_titles['breadcrumbs-enable'] ) && $wpseo_titles['breadcrumbs-enable'] == 1 ) {
+				yoast_breadcrumb( '<p id="breadcrumbs">', '</p>' );
+			} else {
+				echo '<div class="buddyx-breadcrumbs">';
+					buddyx_get_breadcrumb();
+				echo '</div>';
+			}
+
+			// Store the generated breadcrumb.
+			$breadcrumb = ob_get_clean();
+			set_transient( $transient_key, $breadcrumb, 12 * HOUR_IN_SECONDS ); // Cache for 12 hours.
+		}
+
+		// Output the breadcrumb.
+		echo wp_kses_post( $breadcrumb );
+	}
+}
+
+// Site Loader
+if ( ! function_exists( 'buddyx_site_loader' ) ) {
+	/**
+	 * Renders the site loader overlay shown while the page is initializing.
+	 *
+	 * Supports 5 animation types (dots / spinner / pulse / bars / logo) selected
+	 * via the customizer. Adds role=status + aria-live for screen readers, and
+	 * respects prefers-reduced-motion via CSS in assets/css/loaders.css.
+	 */
+	function buddyx_site_loader() {
+		// `buddyx_is_truthy()` provides consistent boolean handling across the
+		// theme; this replaces an earlier defensive multi-check that manually
+		// listed '0' / 'off' string variants.
+		if ( ! buddyx_is_truthy( get_theme_mod( 'site_loader', buddyx_defaults( 'site-loader' ) ) ) ) {
+			return;
+		}
+
+		$type  = (string) get_theme_mod( 'site_loader_type', 'dots' );
+		$text  = (string) get_theme_mod( 'site_loader_text', __( 'Loading', 'buddyx' ) );
+		$logo  = (string) get_theme_mod( 'site_loader_logo', '' );
+		$speed = (float) get_theme_mod( 'site_loader_speed', 1.5 );
+		// Clamp to safe range.
+		$speed = max( 0.3, min( 5.0, $speed ) );
+
+		$valid_types = array( 'dots', 'spinner', 'pulse', 'bars', 'logo' );
+		if ( ! in_array( $type, $valid_types, true ) ) {
+			$type = 'dots';
+		}
+
+		$style_attr = sprintf( '--bx-loader-speed:%ss;', $speed );
+		?>
+		<div class="site-loader site-loader--<?php echo esc_attr( $type ); ?>"
+		     role="status"
+		     aria-live="polite"
+		     aria-label="<?php echo esc_attr( $text ); ?>"
+		     style="<?php echo esc_attr( $style_attr ); ?>">
+			<div class="loader-inner">
+				<?php if ( 'logo' === $type ) : ?>
+					<?php if ( $logo ) : ?>
+						<img class="site-loader__logo" src="<?php echo esc_url( $logo ); ?>" alt="<?php echo esc_attr( $text ); ?>" />
+					<?php elseif ( has_custom_logo() ) : ?>
+						<?php the_custom_logo(); ?>
+					<?php else : ?>
+						<span class="site-loader__text"><?php echo esc_html( $text ); ?></span>
+					<?php endif; ?>
+				<?php elseif ( 'bars' === $type ) : ?>
+					<span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span>
+				<?php elseif ( 'spinner' === $type ) : ?>
+					<span class="spinner"></span>
+				<?php elseif ( 'pulse' === $type ) : ?>
+					<span class="pulse"></span>
+				<?php else : ?>
+					<span class="dot"></span><span class="dot dot1"></span><span class="dot dot2"></span><span class="dot dot3"></span><span class="dot dot4"></span>
+				<?php endif; ?>
+			</div>
+			<span class="screen-reader-text"><?php echo esc_html( $text ); ?></span>
+		</div>
+		<?php
+	}
+}
+
+// Site Search and WooCommerce Cart Icon.
+if ( ! function_exists( 'buddyx_site_menu_icon' ) ) {
+	/**
+	 * Renders site menu icons, including a search icon and a WooCommerce cart icon.
+	 * The function checks the theme settings to determine if the icons should be displayed.
+	 */
+	function buddyx_site_menu_icon() {
+		// Get the settings for search and cart icons from the theme customizer.
+		// `buddyx_is_truthy()` correctly handles the pre-5.1.0 'on'/'off'
+		// string values (Kirki preserved choice keys directly). PHP would
+		// otherwise silently flip the intent: `(int) 'on' === 0` and
+		// `(bool) 'off' === true`. WP core's `wp_validate_boolean()` is
+		// unsuitable because `wp_validate_boolean('off') === true`.
+		$searchicon         = buddyx_is_truthy( get_theme_mod( 'site_search', buddyx_defaults( 'site-search' ) ) );
+		$carticon           = buddyx_is_truthy( get_theme_mod( 'site_cart', buddyx_defaults( 'site-cart' ) ) );
+		$color_toggle_show  = buddyx_is_truthy( get_theme_mod( 'site_color_mode_toggle_show', 'on' ) );
+
+		// Wrapper renders if any of these icons (search, cart, color-mode toggle) are enabled.
+		if ( ! empty( $searchicon ) || ! empty( $carticon ) || $color_toggle_show ) :
+			?>
+			<div class="menu-icons-wrapper">
+				<?php
+				// Render the search icon if enabled.
+				if ( ! empty( $searchicon ) ) :
+					?>
+					<div class="search" <?php echo apply_filters( 'buddyx_search_slide_toggle_data_attrs', '' ); // phpcs:ignore ?>>
+						<a href="#" id="overlay-search" class="search-icon" title="<?php esc_attr_e( 'Search', 'buddyx' ); ?>" aria-label="Toggle search overlay">
+							<span class="fa fa-search"></span>
+						</a>
+						<div class="top-menu-search-container" <?php echo apply_filters( 'buddyx_search_field_toggle_data_attrs', '' ); // phpcs:ignore ?>>
+							<?php get_search_form(); ?>
+						</div>
+					</div>
+				<?php endif; ?>
+
+				<?php
+				// Render the cart icon if enabled and WooCommerce is active.
+				if ( ! empty( $carticon ) && function_exists( 'is_woocommerce' ) ) :
+					buddyx_render_cart_icon();
+				endif;
+
+				// Color-mode toggle (Light / Dark / Auto). Component decides
+				// whether to render based on customizer settings.
+				do_action( 'buddyx_header_actions' );
+				?>
+			</div>
+			<?php
+		endif;
+	}
+}
+
+/**
+ * Canonical default for the footer copyright text.
+ *
+ * Single source of truth, shared by the Customizer field
+ * (Footer_Fields.php) and the render site below, so the two cannot drift.
+ *
+ * @return string The default copyright string, with [tokens] unexpanded.
+ */
+if ( ! function_exists( 'buddyx_footer_default_copyright_text' ) ) {
+	function buddyx_footer_default_copyright_text() {
+		return __( 'Copyright &copy; [current_year] [site_title] | Powered by [theme_author]', 'buddyx' );
+	}
+}
+
+/**
+ * Function Footer Custom Text
+ */
+if ( ! function_exists( 'buddyx_footer_custom_text' ) ) {
+	/**
+	 * Retrieves and formats the custom footer text based on theme settings.
+	 * This function checks if a custom copyright text is set in the theme customizer.
+	 * If a custom text is provided, it replaces placeholders with the current year, site title, and theme author link.
+	 * If no custom text is set, it generates a default copyright message with the site title and a link to the BuddyX theme.
+	 *
+	 * @return string The formatted footer text.
+	 */
+	function buddyx_footer_custom_text() {
+		/*
+		 * ONE code path, ONE default. This previously read the setting with no
+		 * default, so a fresh site fell into a second, hardcoded branch whose
+		 * markup differed from the Customizer field's default (it linked the site
+		 * title; the token string did not). Opening the Customizer and pressing
+		 * Save without editing anything therefore saved the field default and
+		 * silently changed the footer. Both branches are now the same string,
+		 * sourced from buddyx_footer_default_copyright_text().
+		 */
+		$copyright = get_theme_mod( 'site_copyright_text', buddyx_footer_default_copyright_text() );
+
+		$output = str_replace(
+			array( '[current_year]', '[site_title]', '[theme_author]' ),
+			array(
+				date_i18n( 'Y' ),
+				'<span class="buddyx-footer-site-title"><a href="' . esc_url( home_url( '/' ) ) . '">' . esc_html( get_bloginfo( 'name' ) ) . '</a></span>',
+				'<a href="' . esc_url( 'https://wbcomdesigns.com/downloads/buddyx-theme/' ) . '">' . esc_html__( 'BuddyX WordPress Theme', 'buddyx' ) . '</a>',
+			),
+			$copyright
+		);
+
+		// Apply filter to allow modifications to the footer text.
+		return apply_filters( 'buddyx_footer_copyright_text', wp_kses_post( $output ) );
+	}
+}
+
+/**
+ * Categorized Blog
+ * Find out if blog has more than one category.
+ */
+if ( ! function_exists( 'buddyx_categorized_blog' ) ) {
+	function buddyx_categorized_blog() {
+		if ( false === ( $all_the_cool_cats = get_transient( 'buddyx_category_count' ) ) ) {
+
+			$all_the_cool_cats = get_categories( array( 'hide_empty' => 1 ) );
+			$all_the_cool_cats = count( $all_the_cool_cats );
+			set_transient( 'buddyx_category_count', $all_the_cool_cats, DAY_IN_SECONDS );
+
+		}
+
+		if ( 1 !== (int) $all_the_cool_cats ) {
+			return true;
+		} else {
+			return false;
+		}
+	}
+}
+
+/**
+ * Blog Post Meta
+ */
+if ( ! function_exists( 'buddyx_posted_on' ) ) {
+
+	function buddyx_posted_on() {
+
+		global $post;
+
+		if ( is_sticky() && is_home() && ! is_paged() ) {
+			echo '<span class="entry-featured">' . esc_html__( 'Sticky', 'buddyx' ) . '</span>';
+		}
+
+		if ( in_array( 'category', get_object_taxonomies( get_post_type() ) ) && buddyx_categorized_blog() ) {
+			echo '<span class="entry-cat-links">' . get_the_category_list( ', ' ) . '</span>';
+		}
+
+		if ( ! is_search() ) {
+
+			if ( ! post_password_required() && ( comments_open() || get_comments_number() ) ) {
+				echo '<span class="entry-comments-link">';
+				comments_popup_link( esc_html__( 'Leave a comment', 'buddyx' ), esc_html__( '1 Comment', 'buddyx' ), esc_html__( '% Comments', 'buddyx' ) );
+				echo '</span>';
+			}
+		}
+
+		edit_post_link( esc_html__( 'Edit', 'buddyx' ), '<span class="entry-edit-link">', '</span>' );
+	}
+}
+
+/**
+ * Managing 404 URL in Frontend
+ */
+if ( ! function_exists( 'buddyx_404_redirect' ) ) {
+	/**
+	 * Redirects 404 error pages to a custom page set in the theme customizer.
+	 * This optimized version only runs necessary code when on a 404 page and
+	 * adds more efficient checks.
+	 *
+	 * @return void
+	 */
+	function buddyx_404_redirect() {
+		// Only proceed if we're on a 404 page - avoid unnecessary processing.
+		if ( ! is_404() ) {
+			return;
+		}
+
+		// Check for rtMedia routes early to avoid unnecessary theme mod retrieval.
+		$request_uri = isset( $_SERVER['REQUEST_URI'] ) ? esc_url_raw( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : '';
+		if ( '' !== $request_uri && strpos( $request_uri, '/media/' ) !== false ) {
+			return;
+		}
+
+		// Get the custom 404 page ID - retrieve from theme mod only once.
+		$redirect_page_id = get_theme_mod( 'buddyx_404_page', 0 );
+
+		// Only proceed with redirection if a valid page ID exists.
+		if ( ! empty( $redirect_page_id ) && get_post_status( $redirect_page_id ) === 'publish' ) {
+			$redirect_url = get_permalink( $redirect_page_id );
+
+			// Only redirect if we got a valid URL.
+			if ( ! empty( $redirect_url ) ) {
+				wp_safe_redirect( $redirect_url, 301 );
+				exit;
+			}
+		}
+	}
+
+	// Hook the function to the `template_redirect` action.
+	add_action( 'template_redirect', 'buddyx_404_redirect', 10 );
+}
+
+/**
+ * Add Elementor Locations Support
+ */
+if ( ! function_exists( 'buddyx_register_elementor_locations' ) ) {
+	function buddyx_register_elementor_locations( $elementor_theme_manager ) {
+
+		$elementor_theme_manager->register_location( 'header' );
+		$elementor_theme_manager->register_location( 'footer' );
+	}
+	add_action( 'elementor/theme/register_locations', 'buddyx_register_elementor_locations' );
+}
+
+/**
+ * Display LifterLMS Course and Lesson sidebars
+ * on courses and lessons in place of the sidebar returned by
+ * this function
+ *
+ * @param    string     $id    default sidebar id (an empty string)
+ * @return   string
+ */
+if ( ! function_exists( 'buddyx_llms_sidebar_function' ) ) {
+	function buddyx_llms_sidebar_function( $id ) {
+
+		$my_sidebar_id = 'sidebar-right'; // replace this with your theme's sidebar ID
+
+		return $my_sidebar_id;
+	}
+	add_filter( 'llms_get_theme_default_sidebar', 'buddyx_llms_sidebar_function' );
+}
+
+/**
+ * Declare explicit theme support for LifterLMS course and lesson sidebars
+ *
+ * @return   void
+ */
+if ( ! function_exists( 'buddyx_llms_theme_support' ) ) {
+	function buddyx_llms_theme_support() {
+
+		add_theme_support( 'lifterlms-sidebars' );
+	}
+	add_action( 'after_setup_theme', 'buddyx_llms_theme_support' );
+}
+
+/**
+ * Example usage for learndash-focus-header-usermenu-after action.
+ */
+add_action(
+	'learndash-focus-header-usermenu-after',
+	function ( $course_id, $user_id ) {
+		?>
+		<a href="#" id="buddyx-toggle-track">
+			<span class="learndash-dark-mode"><i class="fa fa-moon"></i></span>
+			<span class="learndash-light-mode"><i class="fa fa-sun"></i></span>
+		</a>
+		<?php
+	},
+	10,
+	2
+);
+
+/**
+ * Remove buddyx remove single post subheader.
+ *
+ * @return void
+ */
+if ( ! function_exists( 'buddyx_remove_single_post_subheader' ) ) {
+	function buddyx_remove_single_post_subheader() {
+		if ( is_single() && 'post' === get_post_type() ) {
+			remove_action( 'buddyx_sub_header', 'buddyx_sub_header' );
+		}
+	}
+	add_action( 'wp', 'buddyx_remove_single_post_subheader' );
+}
+
+/**
+ * buddyx_add_post_meta_box.
+ */
+add_action( 'add_meta_boxes', 'buddyx_add_post_meta_box' );
+if ( ! function_exists( 'buddyx_add_post_meta_box' ) ) {
+	function buddyx_add_post_meta_box() {
+		global $post;
+
+		add_meta_box(
+			'buddyx_post_settings',
+			__( 'Post Settings', 'buddyx' ),
+			'render_buddyx_add_post_settings_meta_box',
+			array( 'post' ),
+			'normal',
+			'high'
+		);
+
+		add_meta_box(
+			'buddyx_postformat_settings',
+			__( 'Post Format Settings', 'buddyx' ),
+			'render_buddyx_add_post_format_meta_box',
+			array( 'post' ),
+			'normal',
+			'high'
+		);
+	}
+}
+
+if ( ! function_exists( 'render_buddyx_add_post_settings_meta_box' ) ) {
+	function render_buddyx_add_post_settings_meta_box( $post ) {
+		$post_id         = $post->ID;
+		$title_overwrite = get_post_meta( $post_id, '_post_title_overwrite', true );
+		$title_position  = get_post_meta( $post_id, '_post_title_position', true );
+		?>
+		<div class="buddyx_post_settings">
+			<div class="buddyx-field buddyx-checkbox">
+				<label>
+					<input type="checkbox" name="_post_title_overwrite" value='yes' <?php checked( $title_overwrite, 'yes' ); ?>/>
+					<?php esc_html_e( 'Overwrite Title Customizer settings', 'buddyx' ); ?>
+				</label>
+			</div>
+			<div class="buddyx-field buddyx-radio">
+				<div>
+					<h4><?php esc_html_e( 'Title Style', 'buddyx' ); ?></h4>
+				</div>
+				<ul class="buddyx_radio_list">
+					<li class="buddyx_radio_list_item">
+						<label>
+							<input class="buddyx_radio_input" type="radio" name="_post_title_position" value="title-over" <?php checked( $title_position, 'title-over' ); ?>/>
+							<img src="<?php echo esc_url( get_template_directory_uri() . '/assets/images/single-blog-layout-1.png' ); ?>" class="post-title-image" alt="<?php esc_attr_e( 'Title over featured image', 'buddyx' ); ?>"/>
+						</label>
+					</li>
+					<li class="buddyx_radio_list_item">
+						<label>
+							<input class="buddyx_radio_input" type="radio" name="_post_title_position" value="half" <?php checked( $title_position, 'half' ); ?>/>
+							<img src="<?php echo esc_url( get_template_directory_uri() . '/assets/images/single-blog-layout-2.png' ); ?>" class="post-title-image" alt="<?php esc_attr_e( 'Title overlapping featured image', 'buddyx' ); ?>"/>
+						</label>
+					</li>
+					<li class="buddyx_radio_list_item">
+						<label>
+							<input class="buddyx_radio_input" type="radio" name="_post_title_position" value="title-above" <?php checked( $title_position, 'title-above' ); ?>/>
+							<img src="<?php echo esc_url( get_template_directory_uri() . '/assets/images/single-blog-layout-3.png' ); ?>" class="post-title-image" alt="<?php esc_attr_e( 'Title above featured image', 'buddyx' ); ?>"/>
+						</label>
+					</li>
+					<li class="buddyx_radio_list_item">
+						<label>
+							<input class="buddyx_radio_input" type="radio" name="_post_title_position" value="title-below" <?php checked( $title_position, 'title-below' ); ?>/>
+							<img src="<?php echo esc_url( get_template_directory_uri() . '/assets/images/single-blog-layout-4.png' ); ?>" class="post-title-image" alt="<?php esc_attr_e( 'Title below featured image', 'buddyx' ); ?>"/>
+						</label>
+					</li>
+				</ul>
+			</div>
+		</div>
+		<?php
+	}
+}
+
+if ( ! function_exists( 'render_buddyx_add_post_format_meta_box' ) ) {
+	function render_buddyx_add_post_format_meta_box( $post ) {
+		$post_format       = get_post_format( $post );
+		$post_id           = $post->ID;
+		$post_video        = get_post_meta( $post_id, '_buddyx_post_video', true );
+		$post_audio        = get_post_meta( $post_id, '_buddyx_post_audio', true );
+		$post_quote        = get_post_meta( $post_id, '_buddyx_post_quote', true );
+		$post_quote_author = get_post_meta( $post_id, '_buddyx_post_quote_author', true );
+
+		$post_link_title    = get_post_meta( $post_id, '_buddyx_post_link_title', true );
+		$post_link_url      = get_post_meta( $post_id, '_buddyx_post_link_url', true );
+		$post_image_gallery = get_post_meta( $post_id, '_buddyx_image_gallery', true );
+		?>
+		<div class="buddyx_post_format-settings">
+			<?php wp_nonce_field( 'buddyx_save_post_meta', 'buddyx_post_meta_nonce' ); ?>
+			<input type="hidden" value="<?php echo esc_attr( $post_format ); ?>" id="buddyx_post_format"/>
+			<div class="buddyx_video_format_setting">
+				<p class="description"><?php esc_html_e( 'Enter Youtube, Vimeo and etc video url.', 'buddyx' ); ?></p>
+				<div class="buddyx_input_section">
+					<div class="format-setting-label">
+						<label class="label"><?php esc_html_e( 'Video URL', 'buddyx' ); ?></label>
+					</div>
+					<input type="text" id="buddyx_post_video" name="buddyx_post_video" value="<?php echo esc_attr( $post_video ); ?>" class="buddyx-input-text"/>
+					<a href="javascript:void(0);" class="buddyx_upload_media option-tree-ui-button button button-primary light" data-id="buddyx_post_video" rel="<?php echo esc_attr( $post_id ); ?>" title="<?php esc_attr_e( 'Add Media', 'buddyx' ); ?>">
+						<span class="dashicons dashicons-insert"></span>
+					</a>
+				</div>
+			</div>
+
+			<div class="buddyx_audio_format_setting">
+				<p class="description"><?php esc_html_e( 'Enter audio url.', 'buddyx' ); ?></p>
+				<div class="buddyx_input_section">
+					<div class="format-setting-label">
+						<label class="label"><?php esc_html_e( 'Audio URL', 'buddyx' ); ?></label>
+					</div>
+					<input type="text" id="buddyx_post_audio" name="buddyx_post_audio" value="<?php echo esc_attr( $post_audio ); ?>" class="buddyx-input-text"/>
+					<a href="javascript:void(0);" class="buddyx_upload_media option-tree-ui-button button button-primary light" data-id="buddyx_post_audio" rel="<?php echo esc_attr( $post_id ); ?>" title="<?php esc_attr_e( 'Add Media', 'buddyx' ); ?>">
+						<span class="dashicons dashicons-insert"></span>
+					</a>
+				</div>
+			</div>
+
+			<div class="buddyx_quote_format_setting">
+				<p class="description"><?php esc_html_e( 'Input your quote.', 'buddyx' ); ?></p>
+				<div class="buddyx_input_section">
+					<div class="format-setting-label">
+						<label class="label"><?php esc_html_e( 'Quote Text', 'buddyx' ); ?></label>
+					</div>
+					<textarea name="buddyx_post_quote" class="buddyx-input-textare"><?php echo esc_textarea( $post_quote ); ?></textarea>
+				</div>
+				<div class="buddyx_input_section">
+					<div class="format-setting-label">
+						<label class="label"><?php esc_html_e( 'Quote Author', 'buddyx' ); ?></label>
+					</div>
+					<input type="text" name="buddyx_post_quote_author" value="<?php echo esc_attr( $post_quote_author ); ?>" class="buddyx-input-text"/>
+				</div>
+			</div>
+
+			<div class="buddyx_link_format_setting">
+				<p class="description"><?php esc_html_e( 'Input your link.', 'buddyx' ); ?></p>
+				<div class="buddyx_input_section">
+					<div class="format-setting-label">
+						<label class="label"><?php esc_html_e( 'Link Title', 'buddyx' ); ?></label>
+					</div>
+					<input type="text" name="buddyx_post_link_title" value="<?php echo esc_attr( $post_link_title ); ?>" class="buddyx-input-text"/>
+				</div>
+				<div class="buddyx_input_section">
+					<div class="format-setting-label">
+						<label class="label"><?php esc_html_e( 'Link URL', 'buddyx' ); ?></label>
+					</div>
+					<input type="text" name="buddyx_post_link_url" value="<?php echo esc_attr( $post_link_url ); ?>" class="buddyx-input-text"/>
+				</div>
+			</div>
+
+			<div class="buddyx_gallery_format_setting">
+				<p class="description"><?php esc_html_e( 'To create a gallery, upload your images and then select "Uploaded to this post" from the dropdown (in the media popup) to see images attached to this post. You can drag to re-order or delete them there.', 'buddyx' ); ?></p>
+				<div id="images_gallery_container" class="buddyx_images_gallery_container">
+					<ul class="buddyx_images_gallery images_gallery">
+					<?php
+						$image_gallery = '';
+					if ( ! empty( $post_image_gallery ) ) {
+						$post_image_gallery = explode( ',', $post_image_gallery );
+
+						foreach ( $post_image_gallery as $image_id ) {
+							if ( trim( $image_id ) != '' ) {
+								$image_id = absint( $image_id );
+								// $image = wp_get_attachment_image_src($image_id, 'thumbnail');
+
+								echo '<li class="image" data-attachment_id="' . $image_id . '">
+										<div class="attachment-preview type-image">
+											<div class="thumbnail">
+												<div class="centered">
+												' . wp_get_attachment_image( $image_id, 'thumbnail' ) . '
+												</div>
+											</div>
+										</div>
+
+										<div class="actions">
+											<a href="#" id="' . $image_id . '" class="delete" title="' . __( 'Delete image', 'buddyx' ) . '"><i class="dashicons dashicons-no"></i></a>
+										</div>
+									</li>';
+								$image_gallery .= $image_id . ',';
+							}
+						}
+					}
+
+					?>
+					</ul>
+					<input type="hidden" id="buddyx_image_gallery" name="buddyx_image_gallery" value="<?php echo esc_attr( substr( @$image_gallery, 0, -1 ) ); ?>" />
+				</div>
+				<div class="clearfix buddyx_image_gallery_description">
+					<p class="add_buddyx_images hide-if-no-js">
+						<a class="components-button is-primary" href="#"><?php echo __( 'Add images gallery', 'buddyx' ); ?></a>
+					</p>
+				</div>
+			</div>
+
+
+			<script>
+			( function ( $ ) {
+				'use strict';
+				$('#buddyx_postformat_settings').hide();
+				$( document ).ready( function () {
+
+					var post_format = $('input[name=post_format]:checked').val();
+					if ( typeof post_format == 'undefined' ) {
+						post_format = $('#buddyx_post_format').val();
+					}
+					if ( post_format == 'video' || post_format == 'audio' || post_format == 'quote' || post_format == 'link' || post_format == 'gallery' ) {
+						$('#buddyx_postformat_settings').show();
+						$( '.buddyx_video_format_setting').hide();
+						$( '.buddyx_audio_format_setting').hide();
+						$( '.buddyx_quote_format_setting').hide();
+						$( '.buddyx_link_format_setting').hide();
+						$( '.buddyx_gallery_format_setting').hide();
+						$( '.buddyx_' + post_format + '_format_setting').show();
+					}
+
+
+					$(document).on( "change", 'input[name=post_format], .editor-post-format__content select.components-select-control__input' , function(e){
+						var post_format = $( this ).val();
+						$( '.buddyx_video_format_setting').hide();
+						$( '.buddyx_audio_format_setting').hide();
+						$( '.buddyx_quote_format_setting').hide();
+						$( '.buddyx_link_format_setting').hide();
+						$( '.buddyx_gallery_format_setting').hide();
+						if ( post_format == 'video' ) {
+							$('#buddyx_postformat_settings').show();
+							$( '.buddyx_video_format_setting').show();
+						} else if ( post_format == 'audio' ) {
+							$('#buddyx_postformat_settings').show();
+							$( '.buddyx_audio_format_setting').show();
+						} else if ( post_format == 'quote' ) {
+							$('#buddyx_postformat_settings').show();
+							$( '.buddyx_quote_format_setting').show();
+						} else if ( post_format == 'link' ) {
+							$('#buddyx_postformat_settings').show();
+							$( '.buddyx_link_format_setting').show();
+						}else if ( post_format == 'gallery' ) {
+							$('#buddyx_postformat_settings').show();
+							$( '.buddyx_gallery_format_setting').show();
+						} else {
+							$('#buddyx_postformat_settings').hide();
+						}
+					});
+
+					/* Uploading files */
+					var image_gallery_frame;
+					var $image_gallery_ids = $('#buddyx_image_gallery');
+					var $images_gallery = $('#images_gallery_container ul.images_gallery');
+					$('.add_buddyx_images').on( 'click', 'a', function( event ) {
+						var $el = $(this);
+						var attachment_ids = $image_gallery_ids.val();
+						event.preventDefault();
+						/* If the media frame already exists, reopen it. */
+						if ( image_gallery_frame ) {
+							image_gallery_frame.open();
+							return;
+						}
+						/* Create the media frame.  */
+						image_gallery_frame = wp.media.frames.downloadable_file = wp.media({
+							/* Set the title of the modal.  */
+							title: '<?php echo __( 'Add images gallery', 'buddyx' ); ?>',
+							button: {
+								text: '<?php echo __( 'Add to gallery', 'buddyx' ); ?>',
+							},
+							multiple: true
+						});
+						/* When an image is selected, run a callback.  */
+						image_gallery_frame.on( 'select', function() {
+							var selection = image_gallery_frame.state().get('selection');
+							selection.map( function( attachment ) {
+								attachment = attachment.toJSON();
+								if ( attachment.id ) {
+									attachment_ids = attachment_ids ? attachment_ids + "," + attachment.id : attachment.id;
+									$images_gallery.append('\
+										<li class="image" data-attachment_id="' + attachment.id + '">\
+											<div class="attachment-preview type-image">\
+												<div class="thumbnail">\
+													<div class="centered">\
+														<img src="' + attachment.url + '" alt="' + (attachment.alt || "") + '" />\
+													</div>\
+												</div>\
+											</div>\
+											<div class="actions">\
+												<a href="#" class="delete" title="<?php echo __( 'Delete image', 'buddyx' ); ?>"><i class="dashicons dashicons-no"></i></a>\
+											</div>\
+										</li>');
+								}
+							} );
+							$image_gallery_ids.val( attachment_ids );
+						});
+						/* Finally, open the modal. */
+						image_gallery_frame.open();
+					});
+					/* Image ordering */
+					$images_gallery.sortable({
+						items: 'li.image',
+						cursor: 'move',
+						scrollSensitivity:40,
+						forcePlaceholderSize: true,
+						forceHelperSize: false,
+						helper: 'clone',
+						opacity: 0.65,
+						placeholder: 'wc-metabox-sortable-placeholder',
+						start:function(event,ui){
+							ui.item.css('background-color','#f6f6f6');
+						},
+						stop:function(event,ui){
+							ui.item.removeAttr('style');
+						},
+						update: function(event, ui) {
+							var attachment_ids = '';
+							$('#images_gallery_container ul li.image').css('cursor','default').each(function() {
+								var attachment_id = $(this).attr( 'data-attachment_id' );
+								attachment_ids = attachment_ids + attachment_id + ',';
+							});
+							$image_gallery_ids.val( attachment_ids );
+						}
+					});
+					/* Remove images */
+					$('#images_gallery_container').on( 'click', 'a.delete', function() {
+
+						$(this).closest('li.image').remove();
+						var attachment_ids = '';
+						$('#images_gallery_container ul li.image').css('cursor','default').each(function() {
+							var attachment_id = $(this).attr( 'data-attachment_id' );
+							attachment_ids = attachment_ids + attachment_id + ',';
+						});
+						$image_gallery_ids.val( attachment_ids );
+						return false;
+					} );
+
+
+					$('.buddyx_upload_media').on( 'click',  function( event ) {
+						var $el = $(this);
+						var media_id = $(this).data( 'id' );
+						event.preventDefault();
+						/* If the media frame already exists, reopen it. */
+						if ( image_gallery_frame ) {
+							image_gallery_frame.open();
+							return;
+						}
+						/* Create the media frame.  */
+						image_gallery_frame = wp.media.frames.downloadable_file = wp.media({
+							/* Set the title of the modal.  */
+							title: '<?php echo __( 'Add Media', 'buddyx' ); ?>',
+							button: {
+								text: '<?php echo __( 'Add to Media', 'buddyx' ); ?>',
+							},
+							multiple: true
+						});
+						/* When an image is selected, run a callback.  */
+						image_gallery_frame.on( 'select', function() {
+							var selection = image_gallery_frame.state().get('selection');
+							selection.map( function( attachment ) {
+								attachment = attachment.toJSON();
+								if ( attachment.id ) {
+
+									$( '#' + media_id ).val(attachment.url);
+								}
+							} );
+						});
+						/* Finally, open the modal. */
+						image_gallery_frame.open();
+					});
+
+				});
+			} )( jQuery );
+			</script>
+
+		</div>
+		<?php
+	}
+}
+
+add_action( 'save_post', 'buddyx_save_post_meta', 10, 1 );
+if ( ! function_exists( 'buddyx_save_post_meta' ) ) {
+	/**
+	 * Saves custom post meta when a post is saved.
+	 * Handles various post formats and custom settings.
+	 *
+	 * @param int $post_id The ID of the post being saved.
+	 * @return void
+	 */
+	function buddyx_save_post_meta( $post_id ) {
+		// Skip if this is an autosave.
+		if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
+			return;
+		}
+
+		// Skip if current user can't edit posts.
+		if ( ! current_user_can( 'edit_post', $post_id ) ) {
+			return;
+		}
+
+		// Check if we're working with a post.
+		if ( ! isset( $_POST['post_type'] ) || 'post' !== $_POST['post_type'] ) {
+			return;
+		}
+
+		// Verify nonce.
+		if ( ! isset( $_POST['buddyx_post_meta_nonce'] ) ||
+			! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['buddyx_post_meta_nonce'] ) ), 'buddyx_save_post_meta' ) ) {
+			return;
+		}
+
+		// Array of text fields to update.
+		$text_fields = array(
+			'buddyx_post_video'        => '_buddyx_post_video',
+			'buddyx_post_audio'        => '_buddyx_post_audio',
+			'buddyx_post_quote'        => '_buddyx_post_quote',
+			'buddyx_post_quote_author' => '_buddyx_post_quote_author',
+			'buddyx_post_link_title'   => '_buddyx_post_link_title',
+			'buddyx_post_link_url'     => '_buddyx_post_link_url',
+			'buddyx_image_gallery'     => '_buddyx_image_gallery',
+		);
+
+		// Process and save text fields.
+		foreach ( $text_fields as $field_name => $meta_key ) {
+			if ( isset( $_POST[ $field_name ] ) ) {
+				$value = sanitize_text_field( wp_unslash( $_POST[ $field_name ] ) );
+				update_post_meta( $post_id, $meta_key, $value );
+			}
+		}
+
+		// Handle checkbox for title overwrite (separate because it needs different handling).
+		if ( isset( $_POST['_post_title_overwrite'] ) ) {
+			update_post_meta( $post_id, '_post_title_overwrite', sanitize_text_field( wp_unslash( $_POST['_post_title_overwrite'] ) ) );
+		} else {
+			// Remove the meta if the checkbox is unchecked.
+			delete_post_meta( $post_id, '_post_title_overwrite' );
+		}
+
+		// Handle title position.
+		if ( isset( $_POST['_post_title_position'] ) ) {
+			// Validate against allowed values (optional security enhancement).
+			$allowed_positions = array( 'title-over', 'half', 'title-above', 'title-below' );
+			$position          = sanitize_text_field( wp_unslash( $_POST['_post_title_position'] ) );
+
+			if ( in_array( $position, $allowed_positions ) ) {
+				update_post_meta( $post_id, '_post_title_position', $position );
+			}
+		}
+	}
+}
+
+/**
+ * Function will add feature image for blog post in the activity feed content.
+ *
+ * @param string $content
+ * @param int    $blog_post_id
+ *
+ * @return string $content
+ *
+ * @since 4.2.2
+ */
+function buddyx_add_feature_image_blog_post_as_activity_content_callback( $content, $blog_post_id ) {
+	if ( function_exists( 'buddypress' ) && ! isset( buddypress()->buddyboss ) ) {
+		if ( ! empty( $blog_post_id ) && ! empty( get_post_thumbnail_id( $blog_post_id ) ) ) {
+			$content .= sprintf( ' <a class="buddyx-post-img-link" href="%s"><img src="%s" alt="%s" loading="lazy" /></a>', esc_url( get_permalink( $blog_post_id ) ), esc_url( wp_get_attachment_image_url( get_post_thumbnail_id( $blog_post_id ), 'large' ) ), esc_attr( get_the_title( $blog_post_id ) ) );
+		}
+	}
+
+	return $content;
+}
+
+add_filter( 'buddyx_add_feature_image_blog_post_as_activity_content', 'buddyx_add_feature_image_blog_post_as_activity_content_callback', 10, 2 );
+
+add_action( 'bp_before_activity_activity_content', 'buddyx_bp_blogs_activity_content_set_temp_content' );
+
+/**
+ * Function which set the temporary content on the blog post activity.
+ *
+ * @since 4.2.2
+ */
+function buddyx_bp_blogs_activity_content_set_temp_content() {
+
+	if ( function_exists( 'buddypress' ) && ! isset( buddypress()->buddyboss ) ) {
+
+		global $activities_template;
+
+		$activity = $activities_template->activity;
+		if ( ( 'blogs' === $activity->component ) && isset( $activity->secondary_item_id ) && 'new_blog_' . get_post_type( $activity->secondary_item_id ) === $activity->type ) {
+			$content = get_post( $activity->secondary_item_id );
+			// If we converted $content to an object earlier, flip it back to a string.
+			if ( is_a( $content, 'WP_Post' ) ) {
+				$activities_template->activity->content = '&#8203;';
+			}
+		} elseif ( 'blogs' === $activity->component && 'new_blog_comment' === $activity->type && $activity->secondary_item_id && $activity->secondary_item_id > 0 ) {
+			$activities_template->activity->content = '&#8203;';
+		}
+	}
+}
+
+add_filter( 'bp_get_activity_content_body', 'buddyx_bp_blogs_activity_content_with_read_more', 9999, 2 );
+
+/**
+ * Function which enhances activity blog post content with formatting, featured images, and read more links.
+ *
+ * @param string $content  The current activity content.
+ * @param object $activity The activity object.
+ *
+ * @return string Modified activity content.
+ *
+ * @since 4.2.2
+ */
+function buddyx_bp_blogs_activity_content_with_read_more( $content, $activity = null ) {
+
+	if ( ! is_object( $activity ) || empty( $activity->id ) ) {
+		return $content;
+	}
+
+	// Only proceed if BuddyPress is active and not BuddyBoss.
+	if ( ! function_exists( 'buddypress' ) || isset( buddypress()->buddyboss ) ) {
+		return $content;
+	}
+
+	// Handle blog posts in activity stream.
+	if ( 'blogs' === $activity->component && isset( $activity->secondary_item_id ) ) {
+		// Handle new blog posts.
+		if ( 'new_blog_' . get_post_type( $activity->secondary_item_id ) === $activity->type ) {
+			$blog_post = get_post( $activity->secondary_item_id );
+
+			if ( ! is_a( $blog_post, 'WP_Post' ) ) {
+				return $content;
+			}
+
+			// Get featured image.
+			$content_img = apply_filters( 'buddyx_add_feature_image_blog_post_as_activity_content', '', $blog_post->ID );
+
+			// Format post title with link.
+			$post_title = sprintf(
+				'<a class="buddyx-post-title-link" href="%s"><span class="buddyx-post-title">%s</span></a>',
+				esc_url( get_permalink( $blog_post->ID ) ),
+				esc_html( $blog_post->post_title )
+			);
+
+			// Get and process post excerpt.
+			$excerpt = bp_create_excerpt(
+				bp_strip_script_and_style_tags( html_entity_decode( get_the_excerpt( $blog_post->ID ) ) )
+			);
+
+			// Check if excerpt ends with ellipsis.
+			$has_ellipsis = ( strpos( $excerpt, __( '&hellip;', 'buddyx' ) ) !== false );
+
+			// Clean up the excerpt.
+			if ( $has_ellipsis ) {
+				$excerpt = str_replace( ' [&hellip;]', '&hellip;', $excerpt );
+			}
+
+			// Apply BP filters.
+			$excerpt = apply_filters_ref_array( 'bp_get_activity_content', array( $excerpt, $activity ) );
+
+			// Extract and preserve iframes.
+			$has_iframe = preg_match( '/<iframe.*src=\"(.*)\".*><\/iframe>/isU', $excerpt, $matches );
+
+			// Strip tags but preserve links and allowed elements.
+			if ( $has_iframe && ! empty( $matches[0] ) ) {
+				$iframe   = $matches[0];
+				$excerpt  = strip_tags( preg_replace( '/<iframe.*?\/iframe>/i', '', $excerpt ), '<a>' );
+				$excerpt .= $iframe;
+			} else {
+				$excerpt = strip_tags( $excerpt, '<a><iframe><img><span><div>' );
+			}
+
+			// Format final content.
+			return sprintf(
+				'%1$s <div class="buddyx-content-wrp">%2$s %3$s</div>',
+				$content_img,
+				$post_title,
+				wpautop( $excerpt )
+			);
+		}
+		// Handle blog comments.
+		elseif ( 'new_blog_comment' === $activity->type && $activity->secondary_item_id > 0 ) {
+			$comment = get_comment( $activity->secondary_item_id );
+			if ( ! $comment ) {
+				return $content;
+			}
+
+			$content = bp_create_excerpt( html_entity_decode( $comment->comment_content ) );
+
+			// Check if comment excerpt has ellipsis and add read more link if it does.
+			if ( false !== strpos( $content, __( '&hellip;', 'buddyx' ) ) ) {
+				$content     = str_replace( ' [&hellip;]', '&hellip;', $content );
+				$append_text = apply_filters( 'bp_activity_excerpt_append_text', __( ' Read more', 'buddyx' ) );
+
+				return wpautop(
+					sprintf(
+						'%1$s<span class="activity-blog-post-link"><a href="%2$s" rel="nofollow">%3$s</a></span>',
+						$content,
+						get_comment_link( $activity->secondary_item_id ),
+						$append_text
+					)
+				);
+			}
+
+			return wpautop( $content );
+		}
+	}
+
+	return $content;
+}

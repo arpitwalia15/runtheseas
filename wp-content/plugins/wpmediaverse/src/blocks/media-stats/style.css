@@ -1,0 +1,99 @@
+/**
+ * Media Stats Block — Frontend Styles
+ */
+
+.mvs-stats-block {
+	max-width: 960px;
+	margin: 0 auto;
+	/* Prevent the inner grid (180 px min track) from forcing the block
+	   wider than the parent on narrow viewports. Without this, the
+	   showcase page on a 390 px phone overflows by ~11 px and triggers
+	   a horizontal scroll on the Stats block container. */
+	min-width: 0;
+	overflow: hidden;
+}
+
+.mvs-stats-cards {
+	display: grid;
+	/* `minmax(0, 1fr)` for the grow side keeps the track from blowing
+	   past the container when the 180 px minimum doesn't fit. */
+	grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
+	gap: 16px;
+	margin-bottom: 24px;
+}
+
+@media (max-width: 480px) {
+	/* On very narrow phones, drop the 180 px minimum and let cards
+	   stack one per row so the Stats block fits in 360 px viewports. */
+	.mvs-stats-cards {
+		grid-template-columns: 1fr;
+	}
+}
+
+.mvs-stat-card {
+	background: var(--mvs-surface-2, var(--mvs-surface));
+	border: 1px solid var(--mvs-border-light);
+	border-radius: var(--mvs-radius-md, 8px);
+	padding: var(--mvs-space-3, 16px);
+	box-shadow: var(--mvs-shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.06));
+	text-align: center;
+}
+
+.mvs-stat-card .mvs-stat-value {
+	display: block;
+	font-size: 2em;
+	font-weight: 700;
+	color: var(--mvs-primary);
+	line-height: 1.2;
+}
+
+.mvs-stat-card .mvs-stat-label {
+	display: block;
+	margin-top: 4px;
+	font-size: 0.85em;
+	color: var(--mvs-text-secondary);
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+}
+
+.mvs-top-media {
+	margin-top: var(--mvs-space-4, 24px);
+	min-width: 0;
+	overflow: hidden;
+}
+
+.mvs-top-media h4 {
+	font-size: 1.1em;
+	margin: 0 0 var(--mvs-space-2, 8px);
+}
+
+/* Top-media leaderboard table (title / views / reactions). */
+.mvs-stats-table {
+	width: 100%;
+	border-collapse: collapse;
+}
+
+.mvs-stats-table th,
+.mvs-stats-table td {
+	padding: var(--mvs-space-2, 8px);
+	text-align: start;
+}
+
+.mvs-stats-table thead tr {
+	border-bottom: 2px solid var(--mvs-border-light);
+}
+
+.mvs-stats-table tbody tr {
+	border-bottom: 1px solid var(--mvs-border-light);
+}
+
+.mvs-stats-table tbody tr:last-child {
+	border-bottom: none;
+}
+
+.mvs-stats-table td:first-child {
+	max-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}

@@ -1,0 +1,482 @@
+<?php // phpcs:disable WordPress.Files.FileName.NotHyphenatedLowercase,WordPress.Files.FileName.InvalidClassFileName -- PSR-4 naming used throughout this plugin.
+/**
+ * Icon service.
+ *
+ * Renders SVG icons from the plugin's assets/icons/ directory,
+ * sanitized through wp_kses() so inline SVG output is always safe.
+ *
+ * Usage:
+ *   // Echo directly (templates):
+ *   buddynext_icon( 'bell' );
+ *   buddynext_icon( 'user', 'my-css-class' );
+ *
+ *   // Get string (class methods):
+ *   $html = buddynext_get_icon( 'star' );
+ *   echo \BuddyNext\Core\IconService::render( 'star' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- pre-sanitized via wp_kses().
+ *
+ * @package BuddyNext\Core
+ */
+
+declare( strict_types=1 );
+
+namespace BuddyNext\Core;
+
+/**
+ * Static SVG icon renderer.
+ *
+ * Reads icon files from assets/icons/<name>.svg, sanitizes via wp_kses(),
+ * and optionally injects a CSS class into the root <svg> element.
+ */
+class IconService {
+
+	/**
+	 * Base directory for icon SVG files (set at class-resolution time).
+	 *
+	 * Cannot be a true class constant because BUDDYNEXT_DIR is defined at
+	 * plugin-load time, after the autoloader resolves the class.
+	 *
+	 * @var string
+	 */
+	private static string $icons_dir = '';
+
+	/**
+	 * Base directory for emoji SVG files (Microsoft Fluent vendor set).
+	 *
+	 * @var string
+	 */
+	private static string $emoji_dir = '';
+
+	/**
+	 * Return the absolute path to the icons directory.
+	 *
+	 * @return string Path with trailing slash.
+	 */
+	private static function icons_dir(): string {
+		if ( '' === self::$icons_dir ) {
+			self::$icons_dir = BUDDYNEXT_DIR . 'assets/icons/';
+		}
+
+		return self::$icons_dir;
+	}
+
+	/**
+	 * Return the absolute path to the emoji directory.
+	 *
+	 * @return string Path with trailing slash.
+	 */
+	private static function emoji_dir(): string {
+		if ( '' === self::$emoji_dir ) {
+			self::$emoji_dir = BUDDYNEXT_DIR . 'assets/emoji/';
+		}
+
+		return self::$emoji_dir;
+	}
+
+	/**
+	 * Resolve a reaction-emoji slug to its public asset URL.
+	 *
+	 * Reads the Microsoft Fluent Emoji SVG vendored in `assets/emoji/`
+	 * matching the canonical BuddyNext reaction slug (e.g. `like`, `love`,
+	 * `haha`, `wow`, `sad`, `angry`). Returns an empty string when the
+	 * slug has no vendored asset so callers can omit the chip rather than
+	 * emit a broken image.
+	 *
+	 * @param string $slug Reaction emoji slug.
+	 * @return string Asset URL, or empty string when missing.
+	 */
+	public static function emoji_url( string $slug ): string {
+		$slug = sanitize_file_name( $slug );
+		if ( '' === $slug ) {
+			return '';
+		}
+		if ( ! file_exists( self::emoji_dir() . $slug . '.svg' ) ) {
+			return '';
+		}
+		return plugins_url( 'assets/emoji/' . $slug . '.svg', BUDDYNEXT_DIR . 'buddynext.php' );
+	}
+
+	/**
+	 * Render an `<img>` tag for a reaction emoji.
+	 *
+	 * The image is loaded from `assets/emoji/<slug>.svg` — sourced from
+	 * Microsoft Fluent Emoji (Flat). Renders as a real `<img>` element so
+	 * the same emoji appears identically across every host platform
+	 * (escaping the inconsistency native Unicode emoji have between
+	 * macOS / Windows / Android / Linux). Returns an empty string when
+	 * the slug has no vendored asset.
+	 *
+	 * @param string $slug      Reaction slug. See `assets/emoji/README.md`.
+	 * @param string $css_class Optional CSS class appended to `bn-emoji`.
+	 * @param string $alt       Optional alt text. Default is the slug as
+	 *                          a human label (e.g. `like` → `Like reaction`).
+	 *                          Pass `''` explicitly for a decorative image
+	 *                          (an `aria-hidden="true"` empty-alt is emitted).
+	 * @return string Sanitized `<img>` markup, safe to echo.
+	 */
+	public static function render_emoji( string $slug, string $css_class = '', ?string $alt = null ): string {
+		$url = self::emoji_url( $slug );
+		if ( '' === $url ) {
+			return '';
+		}
+
+		$classes = 'bn-emoji' . ( '' !== $css_class ? ' ' . $css_class : '' );
+
+		if ( null === $alt ) {
+			$alt = ucfirst( str_replace( array( '-', '_' ), ' ', $slug ) ) . ' reaction';
+		}
+
+		if ( '' === $alt ) {
+			return sprintf(
+				'<img src="%s" class="%s" alt="" aria-hidden="true" width="20" height="20" loading="lazy" decoding="async" />',
+				esc_url( $url ),
+				esc_attr( $classes )
+			);
+		}
+
+		return sprintf(
+			'<img src="%s" class="%s" alt="%s" width="20" height="20" loading="lazy" decoding="async" />',
+			esc_url( $url ),
+			esc_attr( $classes ),
+			esc_attr( $alt )
+		);
+	}
+
+	/**
+	 * List the slugs of every vendored emoji (the basenames of the SVGs in
+	 * assets/emoji/). Used by the custom-reactions picker so admins choose a
+	 * real Fluent emoji rather than a raw colour. Sorted alphabetically.
+	 *
+	 * @return string[] Emoji slugs, e.g. ['angry','celebrate','check', …].
+	 */
+	public static function available_emoji_slugs(): array {
+		$files = glob( self::emoji_dir() . '*.svg' );
+		if ( ! is_array( $files ) ) {
+			return array();
+		}
+		$slugs = array_map(
+			static function ( string $path ): string {
+				return basename( $path, '.svg' );
+			},
+			$files
+		);
+		sort( $slugs );
+		return $slugs;
+	}
+
+	/**
+	 * Fallback Lucide icon slug per built-in space-category slug.
+	 *
+	 * Only used when a category carries no admin-supplied icon_svg. Categories
+	 * created by the site owner (or built-ins whose icon the owner cleared) fall
+	 * through to self::CATEGORY_ICON_DEFAULT.
+	 *
+	 * @var array<string, string>
+	 */
+	private const CATEGORY_ICON_MAP = array(
+		'technology'  => 'cpu',
+		'design'      => 'image',
+		'marketing'   => 'megaphone',
+		'startups'    => 'rocket',
+		'ai-ml'       => 'cpu',
+		'data'        => 'bar-chart',
+		'product'     => 'target',
+		'writing'     => 'edit',
+		'open-source' => 'globe',
+		'business'    => 'briefcase',
+		'creative'    => 'star',
+	);
+
+	/**
+	 * Icon slug rendered when a space category has neither a stored icon_svg nor
+	 * an entry in CATEGORY_ICON_MAP.
+	 */
+	private const CATEGORY_ICON_DEFAULT = 'home';
+
+	/**
+	 * Render the icon for a space category.
+	 *
+	 * Single source of truth for the category emblem shown on space cards, the
+	 * space hero, the about panel, the settings avatar fallback, and the
+	 * directory sidebar rows. Resolution order:
+	 *
+	 *   1. The category's admin-editable icon_svg (bn_space_categories.icon_svg,
+	 *      edited via the taxonomy editor and round-tripped by
+	 *      SpaceCategoryService) — passed in directly, or looked up by slug.
+	 *   2. The built-in slug → Lucide map (CATEGORY_ICON_MAP).
+	 *   3. The generic CATEGORY_ICON_DEFAULT glyph.
+	 *
+	 * The return value is always wp_kses()-sanitized and safe to echo.
+	 *
+	 * @param string|null $cat_slug Category slug. Empty/unknown yields the default glyph.
+	 * @param string|null $icon_svg Optional pre-resolved icon_svg for the category
+	 *                              (from a hydrated category row). When null the
+	 *                              value is looked up from the category table by
+	 *                              slug; pass '' to skip the lookup entirely.
+	 * @return string Sanitized SVG markup safe for inline output.
+	 */
+	public static function space_category_icon( ?string $cat_slug, ?string $icon_svg = null ): string {
+		$cat_slug = (string) $cat_slug;
+
+		if ( null === $icon_svg ) {
+			$icon_svg = self::category_icon_svg_by_slug( $cat_slug );
+		}
+
+		$icon_svg = trim( (string) $icon_svg );
+		if ( '' !== $icon_svg ) {
+			return wp_kses( $icon_svg, self::category_icon_allowed_tags() );
+		}
+
+		return self::render( self::CATEGORY_ICON_MAP[ $cat_slug ] ?? self::CATEGORY_ICON_DEFAULT );
+	}
+
+	/**
+	 * Allowlist (for wp_kses) covering an admin-supplied space-category icon_svg.
+	 *
+	 * THE single allowlist for a category icon, used on BOTH write
+	 * (SpaceCategoryService::allowed_svg_tags) and render. It has to be one list:
+	 * when the two drifted apart they silently destroyed icons in both directions
+	 * — write accepted a <g> wrapper that render then stripped, and render accepted
+	 * a <polygon> that write had already stripped, so a star or triangle icon
+	 * (ordinary Lucide shapes) saved as an empty <svg>.
+	 *
+	 * Keep it a superset of allowed_tags(), which covers only BuddyNext's own
+	 * bundled icons and needs no <g>.
+	 *
+	 * @return array<string, array<string, bool>>
+	 */
+	public static function category_icon_allowed_tags(): array {
+		$shape = array(
+			'fill'            => true,
+			'stroke'          => true,
+			'stroke-width'    => true,
+			'stroke-linecap'  => true,
+			'stroke-linejoin' => true,
+			'class'           => true,
+		);
+
+		return array(
+			'svg'      => $shape + array(
+				'xmlns'       => true,
+				'viewbox'     => true,
+				'width'       => true,
+				'height'      => true,
+				'aria-hidden' => true,
+				'role'        => true,
+			),
+			'g'        => $shape,
+			'path'     => $shape + array( 'd' => true ),
+			'circle'   => $shape + array(
+				'cx' => true,
+				'cy' => true,
+				'r'  => true,
+			),
+			'rect'     => $shape + array(
+				'x'      => true,
+				'y'      => true,
+				'width'  => true,
+				'height' => true,
+				'rx'     => true,
+				'ry'     => true,
+			),
+			'line'     => $shape + array(
+				'x1' => true,
+				'y1' => true,
+				'x2' => true,
+				'y2' => true,
+			),
+			'polyline' => $shape + array( 'points' => true ),
+			'polygon'  => $shape + array( 'points' => true ),
+		);
+	}
+
+	/**
+	 * Look up a space category's stored icon_svg by slug.
+	 *
+	 * Reads through SpaceCategoryService::get_all() (object-cached, single query
+	 * per request) and memoizes the slug → icon_svg map for the rest of the
+	 * request, so the many per-card icon renders on the directory cost one read.
+	 *
+	 * @param string $cat_slug Category slug.
+	 * @return string Stored icon_svg markup, or '' when the category has none.
+	 */
+	private static function category_icon_svg_by_slug( string $cat_slug ): string {
+		if ( '' === $cat_slug || ! class_exists( '\\BuddyNext\\Spaces\\SpaceCategoryService' ) ) {
+			return '';
+		}
+
+		static $map = null;
+
+		if ( null === $map ) {
+			$map     = array();
+			$service = new \BuddyNext\Spaces\SpaceCategoryService();
+
+			foreach ( $service->get_all() as $category ) {
+				if ( ! empty( $category['slug'] ) ) {
+					$map[ (string) $category['slug'] ] = (string) ( $category['icon_svg'] ?? '' );
+				}
+			}
+		}
+
+		return $map[ $cat_slug ] ?? '';
+	}
+
+	/**
+	 * Whether an icon SVG exists on disk for the given slug.
+	 *
+	 * Lets callers (e.g. integration panels) validate an icon up front and fall
+	 * back to a known-good default instead of silently rendering a blank.
+	 *
+	 * @param string $name Icon slug — filename without the .svg extension.
+	 * @return bool
+	 */
+	public static function has( string $name ): bool {
+		return '' !== $name && file_exists( self::icons_dir() . sanitize_file_name( $name ) . '.svg' );
+	}
+
+	/**
+	 * Load an SVG icon, sanitize it, and return the safe HTML string.
+	 *
+	 * Returns an empty string when the named icon does not exist on disk.
+	 * The returned string is always safe to pass directly to echo.
+	 *
+	 * @param string $name      Icon slug — filename without the .svg extension.
+	 *                          Examples: 'user', 'bell', 'graduation-cap'.
+	 * @param string $css_class Optional CSS class(es) to inject into the <svg> element.
+	 * @return string Sanitized SVG markup safe for inline output.
+	 */
+	public static function render( string $name, string $css_class = '' ): string {
+		// Per-request memo. A single page (the feed especially) renders the same
+		// handful of icons many times; caching the finished markup per
+		// (name, css_class) turns N file_get_contents + wp_kses passes into one
+		// per unique icon per request. Trusted local assets, so the key is just
+		// the name + class. Cleared naturally at the end of each request.
+		static $cache = array();
+
+		$key = $name . '|' . $css_class;
+		if ( isset( $cache[ $key ] ) ) {
+			return $cache[ $key ];
+		}
+
+		$path = self::icons_dir() . sanitize_file_name( $name ) . '.svg';
+
+		// Nav-item icons are stored as the admin picker's value, historically a
+		// `tab-*` slug naming a file in assets/svg/admin/ rather than in the
+		// assets/icons/ library this renderer reads.
+		//
+		// Two steps, in this order, and the order is the point:
+		//
+		// 1. ALIAS — `tab-star` means the library's `star`. Most of that second set
+		// was a straight copy of Lucide glyphs, so resolving the alias first is
+		// what allows the duplicates to be deleted: a site that stored
+		// `tab-star` keeps its icon from the one remaining copy.
+		// 2. FALLBACK — the genuinely bespoke admin glyphs (tab-about, tab-auth,
+		// tab-custom …) have no Lucide equivalent and still live in
+		// assets/svg/admin/. They resolve here.
+		//
+		// Without step 1 the picker and the library were two sets of the same
+		// artwork, free to drift; without step 2 every custom nav item rendered a
+		// blank icon, which is the bug the fallback was originally added for.
+		if ( ! file_exists( $path ) && 0 === strpos( $name, 'tab-' ) ) {
+			$bn_bare  = substr( $name, 4 );
+			$bn_alias = self::icons_dir() . sanitize_file_name( $bn_bare ) . '.svg';
+
+			$path = file_exists( $bn_alias )
+				? $bn_alias
+				: BUDDYNEXT_DIR . 'assets/svg/admin/' . sanitize_file_name( $name ) . '.svg';
+		}
+
+		if ( ! file_exists( $path ) ) {
+			$cache[ $key ] = '';
+			return '';
+		}
+
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- local plugin file, not a remote HTTP request.
+		$svg = file_get_contents( $path );
+
+		if ( false === $svg || '' === trim( $svg ) ) {
+			$cache[ $key ] = '';
+			return '';
+		}
+
+		// Always inject bn-icon as base class so every icon gets the
+		// sizing, stroke, and display rules from bn-base.css.
+		//
+		// Plus a per-name modifier, `bn-icon--{name}`. Without it the rendered SVG
+		// carried no trace of WHICH icon it was, so anything that needs to treat
+		// one icon differently from another had to be done at all ~39 call sites
+		// and re-done at every new one. The RTL mirroring of directional icons is
+		// exactly that case: arrows and horizontal chevrons must flip for an RTL
+		// reader, vertical ones must not, and now one CSS rule can say so.
+		$classes = 'bn-icon bn-icon--' . sanitize_html_class( $name )
+			. ( '' !== $css_class ? ' ' . $css_class : '' );
+		$svg     = str_replace( '<svg ', '<svg class="' . esc_attr( $classes ) . '" ', $svg );
+
+		$cache[ $key ] = wp_kses( $svg, self::allowed_tags() );
+		return $cache[ $key ];
+	}
+
+	/**
+	 * WP_kses allowlist for inline SVG elements and attributes.
+	 *
+	 * Exposed as public so template files can pass it directly to wp_kses()
+	 * when needed:  echo wp_kses( $svg_string, IconService::allowed_tags() ).
+	 *
+	 * @return array<string, array<string, bool>>
+	 */
+	public static function allowed_tags(): array {
+		return array(
+			'svg'      => array(
+				'xmlns'           => true,
+				'viewbox'         => true,
+				'fill'            => true,
+				'stroke'          => true,
+				'stroke-width'    => true,
+				'stroke-linecap'  => true,
+				'stroke-linejoin' => true,
+				'class'           => true,
+				'aria-hidden'     => true,
+				'role'            => true,
+				'width'           => true,
+				'height'          => true,
+			),
+			'path'     => array(
+				'd'      => true,
+				'fill'   => true,
+				'stroke' => true,
+				'class'  => true,
+			),
+			'circle'   => array(
+				'cx'     => true,
+				'cy'     => true,
+				'r'      => true,
+				'fill'   => true,
+				'stroke' => true,
+				'class'  => true,
+			),
+			'line'     => array(
+				'x1'    => true,
+				'x2'    => true,
+				'y1'    => true,
+				'y2'    => true,
+				'class' => true,
+			),
+			'polyline' => array(
+				'points' => true,
+				'class'  => true,
+			),
+			'polygon'  => array(
+				'points' => true,
+				'class'  => true,
+			),
+			'rect'     => array(
+				'x'      => true,
+				'y'      => true,
+				'width'  => true,
+				'height' => true,
+				'rx'     => true,
+				'ry'     => true,
+				'class'  => true,
+			),
+		);
+	}
+}

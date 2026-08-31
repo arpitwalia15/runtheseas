@@ -1,0 +1,621 @@
+/*
+ * BuddyNext - Notifications (v2)
+ *
+ * Inner notifications template lives inside the shared hub-shell main column
+ * (.bn-app__main); right-sidebar widgets are injected via the
+ * buddynext_right_sidebar action. This stylesheet therefore owns ONLY the
+ * notification list and sidecard widget chrome - never page-grid or rail.
+ *
+ * Composes from the v2 primitive layer in bn-base.css:
+ *   .bn-section-head        page header (title + Mark-all-read)
+ *   .bn-card[data-v2]       wrap the list and side-cards
+ *   .bn-tabs / .bn-tab      filter strip with .bn-tab__count
+ *   .bn-avatar[data-size]   actor avatar (sm)
+ *   .bn-badge[data-tone]    type pill + per-tab unread chip
+ *   .bn-btn[data-variant]   inline + header actions
+ *
+ * Bell dropdown rules (used by partials/nav.php) ride on the same vocabulary.
+ */
+
+/* ── Main column flow ─────────────────────────────────────────────────── */
+
+.bn-notifs-main {
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s5);
+	font-family: var(--bn-font-ui);
+	font-size: var(--bn-text-base);
+	color: var(--bn-ink);
+}
+
+/* ── End-of-list marker ───────────────────────────────────────────────────
+ * Closes a non-empty list on its final page, mirroring the feed's .bn-feed-end
+ * so the two hubs read consistently — the finished list is capped rather than
+ * just stopping (card 10124166442). Sits naturally after the last group, the way
+ * every mainstream feed caps a list, not pinned to the bottom. */
+.bn-notifs-end {
+	text-align: center;
+	padding: var(--bn-s5) 0 var(--bn-s2);
+	color: var(--bn-ink-3);
+	font-size: var(--bn-text-sm);
+}
+
+.bn-notifs-end__text {
+	display: inline-block;
+	padding: var(--bn-s2) var(--bn-s4);
+	border-radius: var(--bn-r-md);
+	background: var(--bn-surface);
+	border: 1px solid var(--bn-line);
+}
+
+/* ── Filter tabs - overflow/scrollbar inherited from base .bn-tabs ─────── */
+
+/* ── Group section ────────────────────────────────────────────────────── */
+
+.bn-notif-group {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s2);
+}
+
+.bn-notif-group__head {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	font-family: var(--bn-font-mono);
+	font-size: var(--bn-text-2xs);
+	font-weight: var(--bn-fw-semibold);
+	letter-spacing: var(--bn-ls-wider);
+	text-transform: uppercase;
+	color: var(--bn-ink-4);
+	padding: 0 2px;
+}
+
+.bn-notif-group__title { color: var(--bn-ink-3); }
+
+.bn-notif-group__meta { color: var(--bn-accent); }
+
+/* ── List wrapper ─────────────────────────────────────────────────────── */
+
+.bn-notif-list {
+	padding: 0;
+	overflow: hidden;
+}
+
+/* ── Notification row ─────────────────────────────────────────────────── */
+
+.bn-notif-row {
+	position: relative;
+	display: grid;
+	grid-template-columns: auto 1fr;
+	gap: var(--bn-s3);
+	padding: var(--bn-s4);
+	border-bottom: 1px solid var(--bn-line-faint);
+	background: transparent;
+	cursor: pointer;
+	transition: background var(--bn-dur-fast) var(--bn-ease);
+	align-items: flex-start;
+	min-height: 56px;
+}
+
+.bn-notif-row:last-child { border-bottom: none; }
+
+.bn-notif-row:hover { background: var(--bn-sunken); }
+
+.bn-notif-row:focus-within {
+	box-shadow: var(--bn-ring);
+	outline: 2px solid transparent;
+	outline-offset: 2px;
+}
+
+/* Unread state is conveyed by the subtle background tint + the pulse dot in the
+   corner. The previous left accent stripe was a redundant third marker that
+   read as a decorative accent bar, so it has been removed. */
+.bn-notif-row--unread { background: var(--bn-accent-50); }
+
+.bn-notif-row__pulse {
+	position: absolute;
+	inset-block-start: var(--bn-s4);
+	inset-inline-end: var(--bn-s4);
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	background: var(--bn-accent);
+	box-shadow: 0 0 0 4px color-mix(in oklch, var(--bn-accent) 18%, transparent);
+}
+
+/* ── Avatar + type pill ───────────────────────────────────────────────── */
+
+.bn-notif-row__avatar-wrap {
+	position: relative;
+	flex-shrink: 0;
+	width: 28px;
+	height: 28px;
+}
+
+.bn-notif-row__avatar {
+	width: 28px;
+	height: 28px;
+}
+
+.bn-notif-row__avatar img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	border-radius: inherit;
+}
+
+/* System notification (no actor): the avatar holds the type icon instead of a
+   "?" placeholder. Centre the glyph in an accent-tinted disc so it reads as a
+   deliberate system badge (e.g. an earned award), not a broken avatar. */
+.bn-notif-row__avatar--system {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	background: color-mix(in oklch, var(--bn-accent) 14%, var(--bn-surface));
+	color: var(--bn-accent);
+}
+
+.bn-notif-row__avatar--system svg {
+	width: 15px;
+	height: 15px;
+}
+
+.bn-notif-row__type {
+	position: absolute;
+	inset-block-end: -4px;
+	inset-inline-end: -4px;
+	width: 16px;
+	height: 16px;
+	border-radius: 50%;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border: 2px solid var(--bn-surface);
+	background: var(--bn-sunken);
+	color: var(--bn-ink-2);
+}
+
+.bn-notif-row__type svg {
+	width: 9px;
+	height: 9px;
+	stroke-width: 2.2;
+}
+
+.bn-notif-row--unread .bn-notif-row__type { border-color: var(--bn-accent-50); }
+
+/* Tone-mapped colour for the type pill - mirrors .bn-badge[data-tone]. */
+.bn-notif-row__type[data-tone="accent"]   { background: var(--bn-accent-100); color: var(--bn-accent-700); }
+.bn-notif-row__type[data-tone="info"]     { background: var(--bn-info-bg);    color: var(--bn-info); }
+.bn-notif-row__type[data-tone="success"]  { background: var(--bn-success-bg); color: var(--bn-success); }
+.bn-notif-row__type[data-tone="warn"]     { background: var(--bn-warn-bg);    color: var(--bn-warn); }
+.bn-notif-row__type[data-tone="danger"]   { background: var(--bn-danger-bg); color: var(--bn-danger); }
+
+/* ── Row body ─────────────────────────────────────────────────────────── */
+
+.bn-notif-row__body {
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s2);
+}
+
+.bn-notif-row__text {
+	font-size: var(--bn-text-sm);
+	line-height: var(--bn-leading-normal);
+	color: var(--bn-ink-2);
+}
+
+.bn-notif-row__text strong {
+	font-weight: var(--bn-fw-semibold);
+	color: var(--bn-ink);
+}
+
+.bn-notif-row__meta {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	flex-wrap: wrap;
+}
+
+.bn-notif-row__time {
+	font-family: var(--bn-font-mono);
+	font-size: var(--bn-text-2xs);
+	color: var(--bn-ink-4);
+	letter-spacing: var(--bn-ls-wide);
+}
+
+.bn-notif-row__actions {
+	display: flex;
+	gap: var(--bn-s2);
+	flex-wrap: wrap;
+}
+
+/* Inline action buttons receive their visuals from .bn-btn - preserve hit area. */
+.bn-notif-row__actions .bn-btn { pointer-events: auto; min-height: 40px; }
+
+/* Dismiss (×) sits at the right end of the meta line — a compact corner control,
+   never its own stacked row beneath the content. Pushed right with margin-auto
+   and sized down from the inline action buttons so the meta row stays compact. */
+.bn-notif-row__meta { flex-wrap: nowrap; }
+.bn-notif-row__dismiss {
+	margin-inline-start: auto;
+	min-height: 0;
+	block-size: 28px;
+	inline-size: 28px;
+	padding: 0;
+	flex-shrink: 0;
+}
+
+/* ── Empty state ──────────────────────────────────────────────────────── */
+
+.bn-notif-empty {
+	padding: var(--bn-s8) var(--bn-s6);
+	text-align: center;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: var(--bn-s2);
+}
+
+.bn-notif-empty__emblem {
+	width: 48px;
+	height: 48px;
+	border-radius: 50%;
+	background: var(--bn-sunken);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	color: var(--bn-ink-3);
+	margin-block-end: var(--bn-s2);
+}
+
+.bn-notif-empty__emblem svg {
+	width: 22px;
+	height: 22px;
+	stroke-width: 1.5;
+}
+
+.bn-notif-empty__title {
+	font-family: var(--bn-font-display);
+	font-size: var(--bn-text-md);
+	font-weight: var(--bn-fw-semibold);
+	color: var(--bn-ink);
+	margin: 0;
+}
+
+.bn-notif-empty__sub {
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink-3);
+	max-width: 380px;
+	line-height: var(--bn-leading-normal);
+	margin: 0;
+}
+
+/* ── Pagination ──────────────────────────────────────────────────────── */
+
+.bn-notif-pagination {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--bn-s3);
+	padding: var(--bn-s3) 0;
+	flex-wrap: wrap;
+}
+
+.bn-notif-pagination__meta {
+	font-family: var(--bn-font-mono);
+	font-size: var(--bn-text-2xs);
+	color: var(--bn-ink-4);
+	letter-spacing: var(--bn-ls-wide);
+}
+
+/* ── Sidebar sidecards (injected into .bn-app__right via action) ─────── */
+
+.bn-notif-sidecard {
+	padding: 0;
+	overflow: hidden;
+}
+
+.bn-notif-sidecard + .bn-notif-sidecard {
+	margin-block-start: var(--bn-s4);
+}
+
+.bn-notif-sidecard__head {
+	padding: var(--bn-s3) var(--bn-s4);
+	font-family: var(--bn-font-mono);
+	font-size: var(--bn-text-2xs);
+	font-weight: var(--bn-fw-semibold);
+	letter-spacing: var(--bn-ls-wider);
+	text-transform: uppercase;
+	color: var(--bn-ink-4);
+	border-bottom: 1px solid var(--bn-line-faint);
+}
+
+.bn-notif-sidecard__row {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s3);
+	padding: var(--bn-s3) var(--bn-s4);
+	border-bottom: 1px solid var(--bn-line-faint);
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink-2);
+	text-decoration: none;
+	transition: background var(--bn-dur-fast) var(--bn-ease);
+	min-height: 40px;
+}
+
+.bn-notif-sidecard__row:last-child { border-bottom: none; }
+
+.bn-notif-sidecard__row:hover { background: var(--bn-sunken); }
+
+.bn-notif-sidecard__row:focus-visible {
+	outline: 2px solid transparent;
+	outline-offset: 2px;
+	box-shadow: var(--bn-ring);
+}
+
+.bn-notif-sidecard__row.is-active {
+	background: var(--bn-accent-50);
+	color: var(--bn-accent-700);
+}
+
+.bn-notif-sidecard__row.is-active .bn-notif-sidecard__icon { color: var(--bn-accent); }
+
+.bn-notif-sidecard__icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 16px;
+	height: 16px;
+	color: var(--bn-ink-3);
+	flex-shrink: 0;
+}
+
+.bn-notif-sidecard__icon svg {
+	width: 16px;
+	height: 16px;
+	stroke-width: 1.75;
+}
+
+.bn-notif-sidecard__label {
+	flex: 1;
+	color: inherit;
+}
+
+/* Recent-actors avatar strip */
+.bn-notif-sidecard__actors {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--bn-s2);
+	padding: var(--bn-s3) var(--bn-s4);
+}
+
+.bn-notif-sidecard__actor {
+	display: inline-flex;
+	width: 32px;
+	height: 32px;
+	border-radius: 50%;
+	overflow: hidden;
+	background: var(--bn-sunken);
+	flex-shrink: 0;
+	transition: transform var(--bn-dur-fast) var(--bn-ease);
+}
+
+.bn-notif-sidecard__actor:hover { transform: translateY(-1px); }
+
+.bn-notif-sidecard__actor:focus-visible {
+	outline: 2px solid transparent;
+	outline-offset: 2px;
+	box-shadow: var(--bn-ring);
+}
+
+.bn-notif-sidecard__actor img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+/* ── Bell dropdown (nav partial) ─────────────────────────────────────── */
+
+.bn-bell-wrap { position: relative; }
+
+.bn-bell-dropdown {
+	position: absolute;
+	top: calc(100% + var(--bn-s2));
+	inset-inline-end: 0;
+	width: 360px;
+	background: var(--bn-surface);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-lg);
+	box-shadow: var(--bn-shadow-lg);
+	z-index: 999;
+	overflow: hidden;
+}
+
+.bn-bell-dropdown__header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: var(--bn-s3) var(--bn-s4);
+	border-bottom: 1px solid var(--bn-line-faint);
+}
+
+.bn-bell-dropdown__title {
+	font-size: var(--bn-text-sm);
+	font-weight: var(--bn-fw-semibold);
+	color: var(--bn-ink);
+}
+
+.bn-bell-dropdown__list {
+	max-height: 400px;
+	overflow-y: auto;
+}
+
+.bn-bell-dropdown__footer {
+	padding: var(--bn-s3) var(--bn-s4);
+	border-top: 1px solid var(--bn-line-faint);
+	text-align: center;
+}
+
+/* Unread chip used by the bell button - still consumes the badge primitive
+   colour but with a smaller fixed footprint. */
+.bn-notif-badge {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 18px;
+	height: 18px;
+	padding: 0 var(--bn-s1);
+	border-radius: var(--bn-r-full);
+	background: var(--bn-accent);
+	color: var(--bn-accent-fg);
+	font-size: var(--bn-text-2xs);
+	font-weight: var(--bn-fw-bold);
+	line-height: 1;
+}
+
+/* ── Reduced motion ──────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+	.bn-notif-row,
+	.bn-notif-sidecard__row,
+	.bn-notif-sidecard__actor {
+		transition: none;
+	}
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────── */
+
+/* Desktop / tablet-landscape: lay the row out HORIZONTALLY so it uses the full
+   width instead of stacking text -> meta -> actions into a tall block with an
+   empty right half. The message text grows and takes the slack; the meta
+   (badge + relative time + dismiss) and the Open / Mark-as-read actions sit
+   compactly on the right, vertically centred — one tidy line per notification. */
+@media (min-width: 769px) {
+	.bn-notif-row { align-items: center; }
+	.bn-notif-row__body {
+		flex-direction: row;
+		flex-wrap: wrap;
+		align-items: center;
+		column-gap: var(--bn-s4);
+		row-gap: var(--bn-s1);
+	}
+	.bn-notif-row__text {
+		flex: 1 1 220px;
+		min-width: 0;
+	}
+	.bn-notif-row__meta {
+		flex: 0 0 auto;
+		margin-inline-start: auto;
+	}
+	.bn-notif-row__actions {
+		flex: 0 0 auto;
+	}
+}
+
+/* iPad / tablet - shell already hides .bn-app__right ≤ 1024px, so we
+   only tune list padding here. */
+@media (max-width: 1024px) {
+	.bn-notif-row { padding: var(--bn-s3) var(--bn-s4); }
+}
+
+/* Mobile - stack tightly; tap targets ≥ 40px enforced via min-height. */
+@media (max-width: 640px) {
+	.bn-notif-row {
+		padding: var(--bn-s3);
+		gap: var(--bn-s2);
+	}
+	.bn-notif-row__meta {
+		flex-wrap: wrap;
+		row-gap: var(--bn-s1);
+	}
+	.bn-notif-row__pulse {
+		inset-block-start: var(--bn-s3);
+		inset-inline-end: var(--bn-s3);
+	}
+	.bn-notif-tabs { padding-block-end: 2px; }
+	.bn-notif-pagination {
+		justify-content: space-between;
+		gap: var(--bn-s2);
+	}
+	.bn-bell-dropdown {
+		width: calc(100vw - var(--bn-s8));
+		inset-inline-end: calc(var(--bn-s4) * -1);
+	}
+}
+
+/* ── Muted-list sidebar widget (Pattern D-15) ──────────────────────────────
+   Rendered by parts/notifications-sidecard-muted.php. Shows up to 5 muted
+   users with avatar + name + handle + per-row Unmute, plus a "Manage muted"
+   footer link to the full Privacy list on /profile/edit/. */
+
+.bn-notif-sidecard--muted .bn-notif-sidecard__muted-list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+.bn-notif-sidecard__muted-row {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s3);
+	padding: var(--bn-s3) var(--bn-s4);
+	border-top: 1px solid var(--bn-line);
+}
+.bn-notif-sidecard__muted-row:first-child {
+	border-top: 0;
+}
+.bn-notif-sidecard__muted-avatar {
+	flex-shrink: 0;
+	display: inline-flex;
+	width: 32px;
+	height: 32px;
+	border-radius: 50%;
+	overflow: hidden;
+}
+.bn-notif-sidecard__muted-avatar img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+.bn-notif-sidecard__muted-id {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+}
+.bn-notif-sidecard__muted-name {
+	color: var(--bn-ink);
+	font-size: var(--bn-text-sm);
+	font-weight: var(--bn-fw-semibold);
+	text-decoration: none;
+	line-height: 1.2;
+}
+.bn-notif-sidecard__muted-name:hover {
+	color: var(--bn-accent);
+}
+.bn-notif-sidecard__muted-handle {
+	color: var(--bn-ink-3);
+	font-family: var(--bn-font-mono, var(--bn-font-ui));
+	font-size: 11px;
+}
+.bn-notif-sidecard__muted-cta {
+	flex-shrink: 0;
+}
+.bn-notif-sidecard__foot {
+	padding: var(--bn-s2) var(--bn-s4) var(--bn-s3);
+	border-top: 1px solid var(--bn-line);
+	display: flex;
+	justify-content: flex-end;
+}
+.bn-notif-sidecard__manage {
+	font-size: var(--bn-text-xs);
+	font-weight: var(--bn-fw-semibold);
+	color: var(--bn-ink-2);
+	text-decoration: none;
+}
+.bn-notif-sidecard__manage:hover {
+	color: var(--bn-accent);
+}

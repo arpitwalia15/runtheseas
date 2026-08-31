@@ -1,0 +1,126 @@
+.wbcom-accordions .wbaccordion {
+	margin: 1em 0;
+	-webkit-transition: all 0.2s ease-in-out;
+	transition: all 0.2s ease-in-out;
+	background-color: rgba(0, 0, 0, 0.1);
+}
+
+.wbcom-accordions .wbaccordion__head {
+	padding: 0;
+	cursor: pointer;
+	position: relative;
+	margin: 0;
+}
+
+.wbcom-accordions .wbaccordion__body {
+	padding: 15px 20px;
+	display: none;
+}
+
+.wbcom-accordions .wbaccordion.is-open .wbaccordion__body {
+	display: block;
+}
+
+.wbcom-accordions .wbaccordion__head>button,
+.wbcom-accordions button.wbaccordion__head {
+	cursor: pointer;
+	display: -webkit-box;
+	display: -ms-flexbox;
+	display: flex;
+	-webkit-box-align: center;
+	-ms-flex-align: center;
+	align-items: center;
+	width: 100%;
+	background: none !important;
+	border: 0 !important;
+	font: inherit;
+	text-align: inherit;
+	-webkit-box-shadow: none !important;
+	box-shadow: none !important;
+	white-space: normal !important;
+	-webkit-transition: all 0.2s ease-in-out;
+	transition: all 0.2s ease-in-out;
+}
+
+.wbcom-accordions .wbaccordion__head>button i,
+.wbcom-accordions .wbaccordion__head>button:after {
+	-webkit-transition: all 0.2s ease-in-out;
+	transition: all 0.2s ease-in-out;
+}
+
+.wbcom-accordions .wbaccordion__head>button[aria-disabled],
+.wbcom-accordions button.wbaccordion__head[aria-disabled] {
+	cursor: default;
+	outline: 0;
+}
+
+.wbcom-accordions .wbaccordion__head>button[aria-disabled]:after,
+.wbcom-accordions button.wbaccordion__head[aria-disabled]:after {
+	display: none !important;
+}
+
+.wbcom-accordions .wbaccordion__head>button {
+	position: relative;
+	z-index: 1;
+	margin: 0;
+	padding: 15px 20px;
+	width: 100%;
+	background: inherit;
+	border: inherit;
+	color: inherit;
+	max-width: 100%;
+	-webkit-box-shadow: none !important;
+	box-shadow: none !important;
+	outline: 0;
+}
+
+.wbcom-accordions .wbaccordion__head>button:focus-visible {
+	outline: 2px solid currentColor;
+	outline-offset: -2px;
+}
+
+.wbcom-accordions .wbaccordion__head>button:before {
+	display: none;
+}
+
+.wbcom-accordions .wbaccordion__head>button:after {
+	-webkit-transition: all 0.2s ease-out;
+	transition: all 0.2s ease-out;
+	content: "";
+	-webkit-transform: translateY(-15%) rotate(45deg);
+	transform: translateY(-15%) rotate(45deg);
+	z-index: 0;
+	padding: 4px;
+	border-width: 0 4px 4px 0;
+	border-style: solid;
+	-webkit-filter: drop-shadow(0 0 0 rgba(0, 0, 0, 0.5));
+	filter: drop-shadow(0 0 0 rgba(0, 0, 0, 0.5));
+	margin-left: auto;
+}
+
+.wbcom-accordions .wbaccordion__head>button i {
+	text-align: center;
+}
+
+.wbcom-accordions .wbaccordion__head>button svg {
+    width: 18px;
+    height: 18px;
+    font-size: inherit;
+    margin-right: 10px;
+}
+
+.wbcom-accordions .wbaccordion__head>button .wbaccordion-prefix {
+	text-align: center;
+	font-weight: 700;
+}
+
+.wbcom-accordions .wbaccordion.is-open>.wbaccordion__head button:after {
+	-webkit-transform: translateY(-15%) rotate(225deg);
+	transform: translateY(-15%) rotate(225deg);
+	margin-top: 2px;
+}
+
+body.rtl .wbcom-accordions .wbaccordion__head>button::after {
+	margin-left: 0;
+	margin-right: auto;
+}

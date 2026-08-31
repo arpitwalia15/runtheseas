@@ -1,0 +1,338 @@
+<?php
+/**
+ * Reply card partial.
+ *
+ * @package Jetonomy
+ */
+
+defined( 'ABSPATH' ) || exit;
+
+// Blocked-author tombstone. Set server-side by Reply::apply_block_tombstone()
+// (get_threaded()'s tree builder, or the Q&A accepted-answer callout). The
+// node itself is deliberately kept (not dropped upstream) so any child
+// replies from OTHER, non-blocked users still attach to the thread — only
+// the content and author-facing chrome for THIS row are suppressed.
+if ( ! empty( $reply->is_blocked_author ) ) {
+	?>
+	<div id="reply-<?php echo (int) $reply->id; ?>" class="jt-reply jt-reply-blocked" data-wp-interactive="jetonomy">
+		<div class="jt-reply-body jt-reply-tombstone">
+			<?php jetonomy_echo_icon( 'shield', 16 ); ?>
+			<span><?php esc_html_e( 'Content hidden — you blocked this user.', 'jetonomy' ); ?></span>
+			<?php if ( is_user_logged_in() ) : ?>
+				<button class="jt-act jt-unblock-btn" type="button"
+					data-wp-on--click="actions.unblockUser"
+					data-user-id="<?php echo (int) $reply->author_id; ?>"
+					title="<?php esc_attr_e( 'Unblock this user', 'jetonomy' ); ?>"
+					aria-label="<?php esc_attr_e( 'Unblock this user', 'jetonomy' ); ?>">
+					<?php esc_html_e( 'Unblock', 'jetonomy' ); ?>
+				</button>
+			<?php endif; ?>
+		</div>
+	</div>
+	<?php
+	return;
+}
+
+// Private-reply tombstone (1.8.1). Set server-side by
+// Reply::apply_private_tombstone() when THIS viewer may not read the text
+// (not the author, not the topic author, not staff). Same keep-the-node
+// contract as the blocked tombstone above: children stay attached, counts
+// and deep-link page math stay viewer-independent (Basecamp 9804279999).
+if ( ! empty( $reply->is_private_hidden ) ) {
+	?>
+	<div id="reply-<?php echo (int) $reply->id; ?>" class="jt-reply jt-reply-private-hidden" data-wp-interactive="jetonomy">
+		<div class="jt-reply-body jt-reply-tombstone">
+			<?php jetonomy_echo_icon( 'lock', 16 ); ?>
+			<span><?php esc_html_e( 'Private reply — visible to the topic author and moderators.', 'jetonomy' ); ?></span>
+		</div>
+	</div>
+	<?php
+	return;
+}
+
+$display = \Jetonomy\Author::for_display( (int) $reply->author_id, $reply );
+// Anonymous-posting leak-audit fix: role pill / online status must never be
+// derived from the raw author_id when the display identity is masked, or
+// "Anonymous [Admin]" / an online dot de-anonymizes the real author.
+$jt_is_masked = (int) $display['id'] !== (int) $reply->author_id;
+$profile      = \Jetonomy\Models\UserProfile::find_by_user( (int) $reply->author_id );
+$trust        = $profile ? (int) $profile->trust_level : 0;
+$time_ago     = human_time_diff( strtotime( $reply->created_at ), time() );
+$is_op        = (int) $reply->author_id === (int) $post->author_id;
+$is_accepted  = (int) $reply->is_accepted;
+
+// 1.4.0 C.1 fix: space-role moderators (subscriber WP role + jt_space_members
+// admin/mod) get the same edit / split / delete affordances as WP-cap mods.
+// Permission_Engine::can() checks WP cap → space role → trust level in order.
+$jt_reply_viewer       = get_current_user_id();
+$jt_can_moderate_reply = $jt_reply_viewer
+	? \Jetonomy\Permissions\Permission_Engine::can( $jt_reply_viewer, 'moderate', (int) ( $post->space_id ?? 0 ) )
+	: false;
+
+// Shareable permalink for THIS reply — the affordance that makes a reply a
+// linkable thing rather than something only a notification can reach. The
+// timestamp carries it (Discourse/Reddit/GitHub convention), so there is no
+// new control to learn and right-click-copy already works. Rendered for
+// guests too: they are the ones who most need to share, and the pre-existing
+// data-reply-id lives on logged-in chrome only.
+//
+// $permalink_page: the caller passes the page it already rendered, so this
+// costs zero queries per card. Absent (off-page accepted-answer callout) it
+// resolves itself. $space may be null on some routes -> empty slug -> '' ->
+// plain text, never a broken link.
+$jt_reply_permalink = \Jetonomy\reply_permalink(
+	(string) ( $space->slug ?? '' ),
+	(string) ( $post->slug ?? '' ),
+	(int) $reply->id,
+	isset( $permalink_page ) ? (int) $permalink_page : null
+);
+?>
+<?php
+// id="reply-{id}" is the anchor target for every reply deep link — notification
+// links, JSON-LD accepted answers, profile reply lists. It is rendered
+// unconditionally, for GUESTS as well as members: the readers following these
+// links are most often logged-out (email links, crawlers), and the pre-existing
+// data-reply-id only ever rendered on logged-in action chrome.
+?>
+<div id="reply-<?php echo (int) $reply->id; ?>" class="jt-reply <?php echo $is_accepted ? esc_attr( 'accepted' ) : ''; ?>" data-wp-interactive="jetonomy">
+	<div class="jt-reply-head">
+		<span class="jt-avatar-wrap <?php echo ( ! $jt_is_masked && \Jetonomy\Models\UserProfile::is_online( (int) $reply->author_id ) ) ? esc_attr( 'is-online' ) : ''; ?>">
+			<?php
+			// get_user_link() returns trusted, fully-escaped plugin markup (incl. the
+			// Lucide SVG fallback avatar, which wp_kses_post would strip). Echo direct.
+			echo \Jetonomy\get_user_link( (int) $display['id'], 'jt-avatar-sm', 28, false ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+			?>
+		</span>
+		<?php if ( '' !== $display['url'] ) : ?>
+			<a class="jt-reply-author" href="<?php echo esc_url( $display['url'] ); ?>">
+				<?php echo esc_html( $display['name'] ); ?>
+			</a>
+		<?php else : ?>
+			<span class="jt-reply-author"><?php echo esc_html( '' !== $display['name'] ? $display['name'] : __( 'Anonymous', 'jetonomy' ) ); ?></span>
+		<?php endif; ?>
+		<?php
+		// 1.4.0 G3: role pill — same as post-card.php, scoped to the
+		// PARENT POST's space (an admin of space A replying in space B
+		// gets no pill on the space-B reply, which is the right
+		// behaviour). Reads the cache warmed at the top of single-post.php.
+		$jt_role = isset( $post ) && isset( $post->space_id )
+			? \Jetonomy\get_space_role_label( (int) $reply->author_id, (int) $post->space_id )
+			: null;
+		if ( ! $jt_is_masked && null !== $jt_role ) :
+			$jt_role_label = ( 'admin' === $jt_role )
+				? __( 'Admin', 'jetonomy' )
+				: __( 'Mod', 'jetonomy' );
+			?>
+			<span class="jt-role-pill jt-role-pill--<?php echo esc_attr( $jt_role ); ?>">
+				<?php echo esc_html( $jt_role_label ); ?>
+			</span>
+		<?php endif; ?>
+		<?php
+		// 1.4.1 byline cleanup: trust-level number removed from inline bylines.
+		// "TL2" / "TL3" reads as jargon to first-time visitors. Trust progress
+		// stays accessible on the user profile + hover-card surfaces.
+		?>
+		<?php if ( $is_op ) : ?>
+			<span class="jt-reply-op"><?php esc_html_e( 'OP', 'jetonomy' ); ?></span>
+		<?php endif; ?>
+		<span class="jt-reply-time">
+			<?php
+			/* translators: %s: human-readable time difference. */
+			$jt_time_text = sprintf( __( '%s ago', 'jetonomy' ), $time_ago );
+			// Stored UTC -> site timezone for the machine-readable value, per
+			// the date/time standard. The visible text stays relative.
+			$jt_time_iso = get_date_from_gmt( (string) $reply->created_at, 'c' );
+			?>
+			<?php if ( '' !== $jt_reply_permalink ) : ?>
+				<a class="jt-reply-permalink" href="<?php echo esc_url( $jt_reply_permalink ); ?>"
+					aria-label="<?php esc_attr_e( 'Permalink to this reply', 'jetonomy' ); ?>">
+					<time datetime="<?php echo esc_attr( $jt_time_iso ); ?>"><?php echo esc_html( $jt_time_text ); ?></time>
+				</a>
+			<?php else : ?>
+				<time datetime="<?php echo esc_attr( $jt_time_iso ); ?>"><?php echo esc_html( $jt_time_text ); ?></time>
+			<?php endif; ?>
+		</span>
+		<?php if ( $is_accepted ) : ?>
+			<span class="jt-accepted-tag"><?php jetonomy_echo_icon( 'check-circle', 14 ); ?> <?php esc_html_e( 'Accepted', 'jetonomy' ); ?></span>
+		<?php endif; ?>
+		<?php if ( ! empty( $reply->is_private ) ) : ?>
+			<span class="jt-private-tag" title="<?php esc_attr_e( 'Only you, the topic author, and moderators can read this reply.', 'jetonomy' ); ?>"><?php jetonomy_echo_icon( 'lock', 12 ); ?> <?php esc_html_e( 'Private', 'jetonomy' ); ?></span>
+		<?php endif; ?>
+	</div>
+	<div class="jt-reply-body">
+		<?php
+		// jetonomy_kses_embedded_content() is a wp_kses() wrapper with an extended iframe allowlist — safe to echo.
+		// Embeds first so standalone URLs (including `tiktok.com/@user/video/...`)
+		// are captured as whole tokens BEFORE jetonomy_format_content runs its
+		// @mention / #hashtag matchers — otherwise a URL path's `/@name` gets
+		// eaten by the mention regex and the URL never embeds.
+		$jt_reply_rendered = jetonomy_kses_embedded_content( jetonomy_format_content( \Jetonomy\Embeds::process( wp_kses_post( $reply->content ) ) ) );
+		jetonomy_maybe_enqueue_embed_scripts( $jt_reply_rendered );
+		echo $jt_reply_rendered; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+		?>
+	</div>
+	<?php
+	// Reply after-content slot (Pro attachment strip renders here). Mirrors the
+	// post-level jetonomy_after_post_content filter; same shared kses set.
+	$jt_reply_after = apply_filters( 'jetonomy_after_reply_content', '', $reply );
+	if ( '' !== $jt_reply_after ) {
+		echo wp_kses( $jt_reply_after, jetonomy_after_content_allowed_html() ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- kses'd above.
+	}
+
+	$reply_viewer_id   = get_current_user_id();
+	$reply_viewer_vote = $reply_viewer_id ? \Jetonomy\Models\Vote::get_user_vote( $reply_viewer_id, 'reply', (int) $reply->id ) : null;
+	?>
+	<div class="jt-reply-foot">
+		<?php
+		// 1.4.1 voting cleanup: up + down buttons stay as separate <button>
+		// elements (voting JS in view.js binds to the buttons individually
+		// and reads the score via `el.ref.querySelector('.n')`, so the
+		// inner shape MUST not change). The wrapper `.jt-vote-cluster`
+		// only adds visual grouping + alignment so up and down read as
+		// equal-weight peers — no friction asymmetry, no nudging toward
+		// one side. JS bindings are untouched and verified live.
+		?>
+		<?php if ( jetonomy_space_allows_voting( $space ?? null ) ) : ?>
+		<div class="jt-vote-cluster" role="group" aria-label="<?php esc_attr_e( 'Vote on this reply', 'jetonomy' ); ?>">
+			<?php if ( is_user_logged_in() ) : ?>
+			<button class="jt-act <?php echo 1 === $reply_viewer_vote ? 'voted' : ''; ?>"
+				data-wp-on--click="actions.voteReplyUp"
+				data-reply-id="<?php echo (int) $reply->id; ?>"
+				title="<?php esc_attr_e( 'Vote up', 'jetonomy' ); ?>"
+				aria-label="<?php esc_attr_e( 'Vote up', 'jetonomy' ); ?>">
+				<?php jetonomy_echo_icon( 'chevron-up', 14 ); ?> <span class="n"><?php echo (int) $reply->vote_score; ?></span>
+			</button>
+				<?php
+				// Hide downvote on own replies — self-downvote was landing at
+				// -1 (Basecamp 9803889865).
+				if ( (int) $reply->author_id !== get_current_user_id() ) :
+					?>
+			<button class="jt-act <?php echo -1 === $reply_viewer_vote ? 'voted' : ''; ?>"
+				data-wp-on--click="actions.voteReplyDown"
+				data-reply-id="<?php echo (int) $reply->id; ?>"
+				title="<?php esc_attr_e( 'Vote down', 'jetonomy' ); ?>"
+				aria-label="<?php esc_attr_e( 'Vote down', 'jetonomy' ); ?>"><?php jetonomy_echo_icon( 'chevron-down', 14 ); ?></button>
+				<?php endif; ?>
+			<?php else : ?>
+				<?php
+				// Logged-out: reply votes were clickable buttons that silently
+				// failed on click (no auth). Match the post-vote control — a
+				// "Log in to vote" link that takes the intent somewhere.
+				?>
+			<a class="jt-act jt-act-login"
+				href="<?php echo esc_url( wp_login_url( \Jetonomy\current_url() ) ); ?>"
+				title="<?php esc_attr_e( 'Log in to vote', 'jetonomy' ); ?>"
+				aria-label="<?php esc_attr_e( 'Log in to vote', 'jetonomy' ); ?>">
+				<?php jetonomy_echo_icon( 'chevron-up', 14 ); ?> <span class="n"><?php echo (int) $reply->vote_score; ?></span>
+			</a>
+			<?php endif; ?>
+		</div>
+		<?php endif; ?>
+		<?php if ( is_user_logged_in() ) : ?>
+			<button class="jt-act jt-reply-to-btn"
+				data-wp-on--click="actions.setReplyTo"
+				data-reply-id="<?php echo (int) $reply->id; ?>"
+				data-reply-author="<?php echo esc_attr( '' !== $display['name'] ? $display['name'] : __( 'Anonymous', 'jetonomy' ) ); ?>"
+				title="<?php esc_attr_e( 'Reply', 'jetonomy' ); ?>"
+				aria-label="<?php esc_attr_e( 'Reply', 'jetonomy' ); ?>"><?php jetonomy_echo_icon( 'message-circle', 14 ); ?> <span class="jt-btn-label"><?php esc_html_e( 'Reply', 'jetonomy' ); ?></span></button>
+			<button class="jt-act"
+				data-wp-on--click="actions.quoteReply"
+				data-reply-id="<?php echo (int) $reply->id; ?>"
+				data-reply-author="<?php echo esc_attr( '' !== $display['name'] ? $display['name'] : __( 'Anonymous', 'jetonomy' ) ); ?>"
+				title="<?php esc_attr_e( 'Quote', 'jetonomy' ); ?>"
+				aria-label="<?php esc_attr_e( 'Quote', 'jetonomy' ); ?>"><?php jetonomy_echo_icon( 'quote', 14 ); ?></button>
+		<?php endif; ?>
+		<?php if ( is_user_logged_in() && get_current_user_id() !== (int) $reply->author_id ) : ?>
+			<button class="jt-act"
+				data-wp-on--click="actions.flagReply"
+				data-reply-id="<?php echo (int) $reply->id; ?>"
+				title="<?php esc_attr_e( 'Report', 'jetonomy' ); ?>"
+				aria-label="<?php esc_attr_e( 'Report', 'jetonomy' ); ?>"><?php jetonomy_echo_icon( 'flag', 14 ); ?></button>
+		<?php endif; ?>
+		<?php if ( is_user_logged_in() && ( get_current_user_id() === (int) $reply->author_id || $jt_can_moderate_reply ) ) : ?>
+			<div class="jt-more-menu">
+				<button class="jt-act jt-more-trigger" type="button"
+					data-wp-on--click="actions.toggleMoreMenu"
+					title="<?php esc_attr_e( 'More options', 'jetonomy' ); ?>"
+					aria-label="<?php esc_attr_e( 'More options', 'jetonomy' ); ?>"><?php jetonomy_echo_icon( 'more-horizontal', 14 ); ?></button>
+				<div class="jt-more-dropdown" hidden>
+					<button class="jt-more-item"
+						data-wp-on--click="actions.editReply"
+						data-reply-id="<?php echo (int) $reply->id; ?>">
+						<?php jetonomy_echo_icon( 'edit', 14 ); ?> <?php esc_html_e( 'Edit', 'jetonomy' ); ?>
+					</button>
+					<button class="jt-more-item"
+						data-wp-on--click="actions.toggleReplyPrivacy"
+						data-reply-id="<?php echo (int) $reply->id; ?>"
+						data-private="<?php echo empty( $reply->is_private ) ? '0' : '1'; ?>">
+						<?php jetonomy_echo_icon( 'lock', 14 ); ?> <?php echo empty( $reply->is_private ) ? esc_html__( 'Make Private', 'jetonomy' ) : esc_html__( 'Make Public', 'jetonomy' ); ?>
+					</button>
+					<?php if ( $jt_can_moderate_reply ) : ?>
+					<button class="jt-more-item"
+						data-wp-on--click="actions.splitReply"
+						data-reply-id="<?php echo (int) $reply->id; ?>"
+						data-post-id="<?php echo (int) $post->id; ?>"
+						data-space-id="<?php echo (int) ( $post->space_id ?? 0 ); ?>">
+						<?php jetonomy_echo_icon( 'split', 14 ); ?> <?php esc_html_e( 'Split to Topic', 'jetonomy' ); ?>
+					</button>
+					<?php endif; ?>
+					<button class="jt-more-item jt-more-item--danger"
+						data-wp-on--click="actions.deleteReply"
+						data-reply-id="<?php echo (int) $reply->id; ?>">
+						<?php jetonomy_echo_icon( 'trash', 14 ); ?> <?php esc_html_e( 'Delete', 'jetonomy' ); ?>
+					</button>
+				</div>
+			</div>
+		<?php endif; ?>
+	<?php
+	// Accept Answer button — Q&A spaces, for non-accepted replies. Shown to the
+	// post author OR anyone who can close posts in the space (space moderators
+	// and admins), mirroring Replies_Controller::accept_reply()'s permission gate
+	// so the button appears exactly when the action would succeed. Space-role
+	// moderators hold `close_posts` but not `moderate`, so this uses close_posts.
+	if (
+		is_user_logged_in()
+		&& isset( $post, $space )
+		&& 'qa' === ( $space->type ?? '' )
+		&& (
+			get_current_user_id() === (int) $post->author_id
+			|| \Jetonomy\Permissions\Permission_Engine::can( get_current_user_id(), 'close_posts', (int) ( $post->space_id ?? 0 ) )
+		)
+		&& ! $is_accepted
+	) :
+		?>
+		<button class="jt-act"
+			data-wp-on--click="actions.acceptReply"
+			data-reply-id="<?php echo (int) $reply->id; ?>"
+			data-post-id="<?php echo (int) $post->id; ?>"
+			title="<?php esc_attr_e( 'Accept as best answer', 'jetonomy' ); ?>"
+			aria-label="<?php esc_attr_e( 'Accept as best answer', 'jetonomy' ); ?>">
+			<?php jetonomy_echo_icon( 'check-circle', 14 ); ?> <span class="jt-btn-label"><?php esc_html_e( 'Accept', 'jetonomy' ); ?></span>
+		</button>
+	<?php endif; ?>
+	<?php
+		// Un-accept — shown on the accepted reply to the post author or a moderator
+		// (close_posts), so a wrongly-accepted answer can be reverted.
+	if (
+			is_user_logged_in()
+			&& isset( $post, $space )
+			&& 'qa' === ( $space->type ?? '' )
+			&& $is_accepted
+			&& (
+				get_current_user_id() === (int) $post->author_id
+				|| \Jetonomy\Permissions\Permission_Engine::can( get_current_user_id(), 'close_posts', (int) ( $post->space_id ?? 0 ) )
+			)
+		) :
+		?>
+			<button class="jt-act"
+				data-wp-on--click="actions.unacceptReply"
+				data-reply-id="<?php echo (int) $reply->id; ?>"
+				data-post-id="<?php echo (int) $post->id; ?>"
+				title="<?php esc_attr_e( 'Remove accepted answer', 'jetonomy' ); ?>"
+				aria-label="<?php esc_attr_e( 'Remove accepted answer', 'jetonomy' ); ?>">
+			<?php jetonomy_echo_icon( 'x-circle', 14 ); ?> <span class="jt-btn-label"><?php esc_html_e( 'Unaccept', 'jetonomy' ); ?></span>
+			</button>
+		<?php endif; ?>
+		<?php do_action( 'jetonomy_reply_actions', $reply ); ?>
+	</div>
+</div>

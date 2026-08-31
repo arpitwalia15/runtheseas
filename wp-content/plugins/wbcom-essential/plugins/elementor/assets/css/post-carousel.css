@@ -1,0 +1,386 @@
+.wbcom-danger {
+    padding: 1rem 1.5rem;
+    margin-bottom: 2rem;
+    border-left: 5px solid rgba(0, 0, 0, .2);
+    font-weight: 700;
+    color: #fff;
+    background-color: #ba324f
+}
+
+.wbcom-clear {
+    clear: both
+}
+
+.wbcom-overflow-hidden {
+    overflow: hidden !important
+}
+
+.wbcom-ellipsis {
+    max-width: 100%;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden
+}
+
+.wbcom-posts-card {
+    position: relative
+}
+
+.wbcom-posts-horizontal {
+    display: -webkit-box;
+    display: -ms-flexbox;
+    display: flex;
+    -webkit-box-align: stretch;
+    -ms-flex-align: stretch;
+    align-items: stretch
+}
+
+.wbcom-posts-horizontal-reverse {
+    display: -webkit-box;
+    display: -ms-flexbox;
+    display: flex;
+    -webkit-box-orient: horizontal;
+    -webkit-box-direction: reverse;
+    -ms-flex-direction: row-reverse;
+    flex-direction: row-reverse;
+    -webkit-box-align: stretch;
+    -ms-flex-align: stretch;
+    align-items: stretch
+}
+
+.wbcom-posts-card-body-wrapper {
+    display: -webkit-box;
+    display: -ms-flexbox;
+    display: flex;
+    -webkit-box-orient: horizontal;
+    -webkit-box-direction: normal;
+    -ms-flex-direction: row;
+    flex-direction: row
+}
+
+.wbcom-posts-card-body-wrapper .wbcom-posts-card-body-wrapper-inner {
+    max-width: 100%
+}
+
+.wbcom-posts-bg-img .wbcom-posts-card-body-wrapper {
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    -webkit-transition: background .4s ease-in-out;
+    transition: background .4s ease-in-out;
+    overflow: hidden
+}
+
+.wbcom-posts-bg-img .wbcom-posts-card-body-url {
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1
+}
+
+.wbcom-posts-card-body {
+    z-index: 2
+}
+
+.wbcom-posts-card-footer {
+    display: -webkit-box;
+    display: -ms-flexbox;
+    display: flex;
+    -webkit-box-align: center;
+    -ms-flex-align: center;
+    align-items: center
+}
+
+.wbcom-posts-card-img-wrapper {
+    position: relative;
+    background-position: center center;
+    background-attachment: scroll;
+    background-repeat: no-repeat;
+    background-size: cover;
+    -webkit-transition: opacity .2s ease-in-out;
+    transition: opacity .2s ease-in-out
+}
+
+.wbcom-posts-horizontal .wbcom-posts-card-img-wrapper a,
+.wbcom-posts-horizontal-reverse .wbcom-posts-card-img-wrapper a {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1
+}
+
+.wbcom-posts-card-img-wrapper.overflowhidden {
+    overflow: hidden
+}
+
+.wbcom-posts-card-title a {
+    text-decoration: none !important
+}
+
+.wbcom-posts-card-featured-img {
+    position: relative;
+    display: block
+}
+
+.wbcom-posts-card-featured-img img {
+    vertical-align: bottom;
+    width: 100%;
+    height: auto;
+    max-width: 100%;
+    -webkit-transition: all .2s ease-in-out;
+    transition: all .2s ease-in-out
+}
+
+.wbcom-posts-card-author-img a,
+.wbcom-posts-card-cats span a {
+    display: inline-block;
+    vertical-align: bottom
+}
+
+.wbcom-posts-card-date.card-footer-block a,
+.wbcom-posts-card-date.card-footer-block span {
+    display: block
+}
+
+.wbcom-posts-card-date.card-footer-block svg {
+    width: 16px;
+    height: 16px;
+}
+
+.wbcom-posts-card-date.card-footer-block i,
+.wbcom-posts-card-date.card-footer-block svg {
+    margin-right: 8px;
+}
+
+.wbcom-posts-card-date.card-footer-inline a,
+.wbcom-posts-card-date.card-footer-inline span {
+    display: inline-block
+}
+
+.wbcom-posts-card-cats a,
+.wbcom-posts-card-date a {
+    -webkit-transition: all .15s ease-in-out;
+    transition: all .15s ease-in-out
+}
+
+.wbcom-posts-card-author-img img {
+    display: inline-block;
+    vertical-align: middle;
+    border-radius: 100%
+}
+
+.tmc-posts-card-featured-img a {
+    position: relative;
+    display: block;
+    z-index: 8;
+    overflow: hidden
+}
+
+.wbcom-posts-pager {
+    display: -webkit-box;
+    display: -ms-flexbox;
+    display: flex
+}
+
+.wbcom-posts-pager>a,
+.wbcom-posts-pager>span {
+    text-align: center;
+    -webkit-transition: all .15s ease-in-out;
+    transition: all .15s ease-in-out
+}
+
+.wbcom-posts-pager .current,
+.wbcom-posts-pager .dots {
+    pointer-events: none
+}
+
+.wbcom-post-carousel {
+    padding-bottom: 0 !important;
+    position: relative;
+    overflow: hidden
+}
+
+.wbcom-post-carousel.swiper-initialized {
+    opacity: 1
+}
+
+.wbcom-post-carousel .elementor-swiper-button-next,
+.wbcom-post-carousel .elementor-swiper-button-prev {
+    position: absolute;
+    top: 50%;
+    color: #fff;
+    width: 45px;
+    height: 45px;
+    border: 0;
+    border-radius: 0;
+    margin: 0;
+    -webkit-transform: translateY(-50%);
+    transform: translateY(-50%);
+    z-index: 9;
+    opacity: 1;
+    font-size: 30px;
+    line-height: 45px;
+    text-align: center;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    -webkit-transition: all .2s ease-in-out;
+    transition: all .2s ease-in-out
+}
+
+.wbcom-post-carousel .elementor-swiper-button-prev {
+    left: 0
+}
+
+.wbcom-post-carousel .elementor-swiper-button-next {
+    right: 0
+}
+
+.wbcom-post-carousel .elementor-swiper-button svg {
+    width: 1em;
+    height: 1em;
+    fill: currentColor
+}
+
+.wbcom-post-carousel .swiper-pagination {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 10;
+    text-align: center
+}
+
+.wbcom-post-carousel .swiper-pagination-bullet {
+    margin: 0 1px !important;
+    width: 20px;
+    height: 20px;
+    display: inline-block;
+    background: #000;
+    opacity: 0.25;
+    border-radius: 50%;
+    cursor: pointer
+}
+
+.wbcom-post-carousel .swiper-pagination-bullet-active {
+    opacity: 1
+}
+
+.wbcom-post-carousel .swiper-slide {
+    height: auto
+}
+
+.wbcom-carousel-item {
+    vertical-align: bottom
+}
+
+.wbcom-slider-price {
+    position: absolute;
+    z-index: 2
+}
+
+.wbcom-slider-price.top-left {
+    top: 0;
+    left: 0
+}
+
+.wbcom-slider-price.top-right {
+    top: 0;
+    right: 0
+}
+
+.wbcom-slider-price.bottom-left {
+    bottom: 0;
+    left: 0
+}
+
+.wbcom-slider-price.bottom-right {
+    bottom: 0;
+    right: 0
+}
+
+.wbcom-slider-price div.bdg {
+    display: inline-block;
+    line-height: 1;
+    padding: 15px;
+    font-size: 16px;
+    font-weight: 700
+}
+
+.wbcom-slider-badge {
+    position: absolute;
+    z-index: 1
+}
+
+.wbcom-slider-badge.top-left {
+    top: 0;
+    left: 0
+}
+
+.wbcom-slider-badge.top-right {
+    top: 0;
+    right: 0
+}
+
+.wbcom-slider-badge.bottom-left {
+    bottom: 0;
+    left: 0
+}
+
+.wbcom-slider-badge.bottom-right {
+    bottom: 0;
+    right: 0
+}
+
+.wbcom-slider-badge ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: -webkit-box;
+    display: -ms-flexbox;
+    display: flex;
+    -ms-flex-wrap: wrap;
+    flex-wrap: wrap
+}
+
+.wbcom-slider-badge ul li {
+    margin: 0;
+    padding: 0
+}
+
+.wbcom-slider-badge ul li div {
+    display: inline-block;
+    line-height: 1;
+    padding: 15px;
+    font-size: 16px;
+    font-weight: 700;
+    margin: 10px 0 0 10px
+}
+
+.wbcom-slider-product-cats {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: -webkit-box;
+    display: -ms-flexbox;
+    display: flex
+}
+
+.wbcom-slider-product-cats li {
+    margin: 0;
+    padding: 0
+}

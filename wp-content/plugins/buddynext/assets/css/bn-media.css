@@ -1,0 +1,537 @@
+/* BuddyNext media grid, tiles, and lightbox (BN-native; no WPMediaVerse CSS).
+   Uses BuddyNext's real design tokens (bn-surface, bn-sunken, bn-ink, bn-r,
+   bn-s, bn-accent) so every surface is dark-mode aware via the canonical trio
+   ([data-bn-theme], [data-theme], [data-bx-mode]) token overrides in
+   bn-base.css. */
+
+/* Media grid (feed post) - Instagram/Facebook collage.
+   Multi-image posts render as a fixed-aspect collage (never a tall vertical
+   stack), and the block is height-capped so one activity cannot take over the
+   page. Tiles fill their grid cells; images cover. The fourth tile shows a
+   "+N" overlay when there are more; extras stay in the DOM (hidden) so the
+   lightbox still pages through every item. */
+.bn-post-card__media-grid {
+	display: grid;
+	gap: 2px;
+	margin: var( --bn-s3, 12px ) 0 0;
+	border-radius: var( --bn-r-md, 10px );
+	overflow: hidden;
+	max-height: 60vh;
+}
+/* In a collage, tiles fill their cell (the grid defines the shape), not 1:1. */
+.bn-post-card__media-grid .bn-media-tile { aspect-ratio: auto; height: 100%; width: 100%; min-height: 0; border-radius: 0; }
+
+/* Single image keeps its own shape (no forced crop); the grid's 60vh cap and
+   the image max-height keep a tall shot from taking over the feed. Letterbox
+   bars (object-fit: contain) only appear on very tall portraits that hit the
+   cap - landscape shots fill the width edge-to-edge with no crop. */
+.bn-post-card__media-grid--1 { aspect-ratio: auto; }
+.bn-post-card__media-grid--1 .bn-media-tile { aspect-ratio: auto; height: auto; }
+/* Single media (image OR video poster): cap the height so a tall/portrait shot
+   never dominates the feed, tied to the viewport (min with 60vh) so it also never
+   overflows the grid's own 60vh cap and clips on a short laptop screen. object-fit:
+   contain letterboxes tall media — the aspect ratio is preserved, never cropped. */
+.bn-post-card__media-grid--1 .bn-media-tile__img { height: auto; max-height: min( 60vh, 32rem ); object-fit: contain; }
+.bn-post-card__media-grid--2 { grid-template-columns: 1fr 1fr; aspect-ratio: 2 / 1; }
+.bn-post-card__media-grid--3 { grid-template-columns: 2fr 1fr; grid-template-rows: 1fr 1fr; aspect-ratio: 3 / 2; }
+.bn-post-card__media-grid--3 .bn-media-tile:first-child { grid-row: 1 / span 2; }
+.bn-post-card__media-grid--4 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; aspect-ratio: 1 / 1; }
+/* Beyond four, keep extras in the DOM for lightbox paging but hide them. */
+.bn-post-card__media-grid--4 .bn-media-tile:nth-child( n + 5 ) { display: none; }
+
+/* "+N more" overlay on the last visible collage tile. */
+.bn-media-tile[data-bn-media-more]::after {
+	content: "+" attr( data-bn-media-more );
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: oklch( 0% 0 0 / 0.55 );
+	color: oklch( 100% 0 0 );
+	font-size: clamp( 1.25rem, 4vw, 2rem );
+	font-weight: 700;
+}
+
+/* ── Profile / space gallery — uniform 3-up grid of lightbox tiles ──────── */
+.bn-media-gallery {
+	display: grid;
+	grid-template-columns: repeat( 3, 1fr );
+	gap: var( --bn-s1, 4px );
+}
+@media ( max-width: 640px ) {
+	.bn-media-gallery { grid-template-columns: repeat( 2, 1fr ); }
+}
+/* Gallery tiles are always square, regardless of count (grid() varies by N). */
+.bn-media-gallery .bn-media-tile { aspect-ratio: 1 / 1; }
+
+/* ── Tiles ──────────────────────────────────────────────────────────────── */
+.bn-media-tile {
+	position: relative;
+	display: block;
+	width: 100%;
+	margin: 0;
+	padding: 0;
+	border: 0;
+	background: var( --bn-sunken, oklch( 97% 0.004 0 ) );
+	cursor: pointer;
+	overflow: hidden;
+	aspect-ratio: 1 / 1;
+	border-radius: var( --bn-r-sm, 5px );
+}
+.bn-media-tile__img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+	transition: transform 0.18s ease;
+}
+.bn-media-tile:hover .bn-media-tile__img,
+.bn-media-tile:focus-visible .bn-media-tile__img { transform: scale( 1.015 ); }
+.bn-media-tile:focus-visible { outline: 2px solid transparent; outline-offset: 2px; box-shadow: var( --bn-ring ); }
+
+/* Video tile with no generated poster — intentionally dark in BOTH themes so
+ * the white play overlay stays legible (video chrome reads as dark). */
+.bn-media-tile--no-poster {
+	background: oklch( 22% 0.01 var( --bn-hue, 264 ) );
+}
+
+/* Video play overlay */
+.bn-media-tile__play {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: oklch( 100% 0 0 );
+	background: oklch( 0% 0 0 / 0.18 );
+	pointer-events: none;
+}
+.bn-media-tile__play-icon { width: 2.75rem; height: 2.75rem; filter: drop-shadow( 0 1px 3px oklch( 0% 0 0 / 0.5 ) ); }
+
+/* Audio tile — a themed, dark-aware square card (icon + title + native player),
+ * not a raw player floating in an empty cell. */
+.bn-media-tile--audio {
+	display: flex;
+	flex-direction: column;
+	gap: var( --bn-s2, 8px );
+	align-items: center;
+	justify-content: center;
+	padding: var( --bn-s3, 12px );
+	background: var( --bn-sunken, oklch( 97% 0.004 0 ) );
+	cursor: default;
+}
+.bn-media-tile--audio .bn-media-tile__audio-icon { color: var( --bn-ink-3, oklch( 58% 0.008 0 ) ); }
+.bn-media-tile--audio .bn-media-tile__audio-icon svg { width: 2rem; height: 2rem; }
+.bn-media-tile__audio-title {
+	max-width: 100%;
+	font-size: var( --bn-text-sm, 0.875rem );
+	font-weight: 600;
+	color: var( --bn-ink-2, oklch( 40% 0.01 0 ) );
+	text-align: center;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.bn-media-tile__audio-player { width: 100%; max-width: 280px; }
+
+/*
+ * Single-audio post — a compact, premium audio card instead of a raw player in a
+ * tall empty square. A two-row grid: an accent-tinted album-art square (music
+ * icon) spans both rows on the left; the title sits on row 1 and the player on
+ * row 2 to its right. Content-height (no forced aspect) so the card is ~as tall as
+ * its contents, and full feed width so it reads as part of the post. Collage cells
+ * (audio mixed with photos/videos) keep the centered column above.
+ */
+.bn-media-tile__audio-body { display: contents; }
+.bn-post-card__media-grid--1 .bn-media-tile--audio {
+	flex-direction: row;
+	align-items: center;
+	justify-content: flex-start;
+	gap: var( --bn-s4, 16px );
+	height: auto;
+	min-height: 0;
+	padding: var( --bn-s4, 16px );
+}
+.bn-post-card__media-grid--1 .bn-media-tile--audio .bn-media-tile__audio-icon {
+	flex: 0 0 auto;
+	display: grid;
+	place-items: center;
+	width: 3.5rem;
+	height: 3.5rem;
+	border-radius: var( --bn-r-md, 10px );
+	background: var( --bn-accent-50, oklch( 95% 0.03 var( --bn-hue, 250 ) ) );
+	color: var( --bn-accent, oklch( 62% 0.18 var( --bn-hue, 250 ) ) );
+}
+.bn-post-card__media-grid--1 .bn-media-tile--audio .bn-media-tile__audio-icon svg { width: 1.75rem; height: 1.75rem; }
+/* Title + player are a single centred column beside the art (display:contents on
+ * the body lets them flex-align as if direct children, so the group centres against
+ * the art box regardless of its height — no row-span misalignment). */
+.bn-post-card__media-grid--1 .bn-media-tile__audio-body {
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	gap: var( --bn-s2, 8px );
+	flex: 1 1 auto;
+	min-width: 0;
+}
+.bn-post-card__media-grid--1 .bn-media-tile__audio-title {
+	max-width: 100%;
+	text-align: start;
+	font-size: var( --bn-text-base, 0.9375rem );
+	color: var( --bn-ink, oklch( 22% 0.01 0 ) );
+}
+.bn-post-card__media-grid--1 .bn-media-tile__audio-player {
+	width: 100%;
+	max-width: 420px;
+}
+@media ( max-width: 480px ) {
+	.bn-post-card__media-grid--1 .bn-media-tile--audio {
+		gap: var( --bn-s3, 12px );
+		padding: var( --bn-s3, 12px );
+	}
+	.bn-post-card__media-grid--1 .bn-media-tile--audio .bn-media-tile__audio-icon {
+		width: 3rem;
+		height: 3rem;
+	}
+	.bn-post-card__media-grid--1 .bn-media-tile__audio-player { max-width: none; }
+}
+/* Theme the native audio control to the active scheme so it doesn't render a
+ * light pill on the dark card (and vice-versa). */
+[data-bn-theme="dark"] .bn-media-tile__audio-player,
+[data-theme="dark"] .bn-media-tile__audio-player,
+[data-bx-mode="dark"] .bn-media-tile__audio-player,
+[data-bn-theme="dark"] .bn-lightbox__media,
+[data-theme="dark"] .bn-lightbox__media,
+[data-bx-mode="dark"] .bn-lightbox__media {
+	color-scheme: dark;
+}
+
+/* ── Interactive lightbox (media stage + interaction panel) ─────────────── */
+body.bn-lightbox-open { overflow: hidden; }
+.bn-lightbox {
+	position: fixed;
+	inset: 0;
+	z-index: 100000;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+.bn-lightbox[hidden] { display: none; }
+.bn-lightbox__backdrop {
+	position: absolute;
+	inset: 0;
+	background: oklch( 0% 0 0 / 0.9 );
+	border: 0;
+	box-shadow: none;
+	cursor: zoom-out;
+}
+/* The backdrop is a <button>, so the host theme's generic button:hover/:focus
+   styling was repainting it on hover — the overlay appeared to change shade as
+   the cursor moved outside the media. Pin every interaction state to the same
+   dim (specificity beats the theme's `button:hover`) so it stays constant. */
+.bn-lightbox__backdrop:hover,
+.bn-lightbox__backdrop:focus,
+.bn-lightbox__backdrop:focus-visible,
+.bn-lightbox__backdrop:active {
+	background: oklch( 0% 0 0 / 0.9 );
+	border: 0;
+	box-shadow: none;
+	outline: 2px solid transparent;
+	outline-offset: 2px;
+}
+.bn-lightbox__dialog {
+	position: relative;
+	display: flex;
+	width: min( 96vw, 1400px );
+	height: 92vh;
+	max-height: 92vh;
+	border-radius: var( --bn-r-lg, 14px );
+	overflow: hidden;
+	box-shadow: 0 12px 48px oklch( 0% 0 0 / 0.5 );
+}
+
+/* Media stage — fills remaining width left of the panel. */
+.bn-lightbox__stage {
+	position: relative;
+	flex: 1 1 auto;
+	min-width: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: oklch( 8% 0.01 var( --bn-hue, 264 ) );
+}
+.bn-lightbox__media-wrap {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 100%;
+	height: 100%;
+}
+.bn-lightbox__media {
+	max-width: 100%;
+	max-height: 92vh;
+	width: auto;
+	height: auto;
+	display: block;
+	object-fit: contain;
+}
+
+/* Stage nav — over the media, never overlapping the panel. */
+.bn-lightbox__nav {
+	position: absolute;
+	top: 50%;
+	transform: translateY( -50% );
+	z-index: 1;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 2.75rem;
+	height: 2.75rem;
+	border: 0;
+	border-radius: 999px;
+	color: oklch( 100% 0 0 );
+	background: oklch( 0% 0 0 / 0.5 );
+	cursor: pointer;
+	transition: background 0.15s ease;
+}
+.bn-lightbox__nav:hover { background: oklch( 0% 0 0 / 0.78 ); }
+/* Controls on the dark media stage keep their deliberate solid-white ring (the
+   accent halo is illegible on black), so opt out of the shared --bn-ring. */
+.bn-lightbox__nav:focus-visible { outline: 2px solid oklch( 100% 0 0 ); outline-offset: 2px; box-shadow: none; }
+.bn-lightbox__nav--prev { inset-inline-start: 0.75rem; }
+.bn-lightbox__nav--next { inset-inline-end: 0.75rem; }
+.bn-lightbox:not( .bn-lightbox--has-nav ) .bn-lightbox__nav { display: none; }
+
+/* Interaction panel. */
+.bn-lightbox__panel {
+	flex: 0 0 360px;
+	max-width: 92vw;
+	display: flex;
+	flex-direction: column;
+	background: var( --bn-surface, oklch( 100% 0 0 ) );
+	color: var( --bn-ink, oklch( 20% 0.01 0 ) );
+	border-inline-start: 1px solid var( --bn-line, oklch( 92% 0.005 0 ) );
+	min-height: 0;
+}
+.bn-lightbox__panel-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var( --bn-s2, 8px );
+	padding: var( --bn-s3, 12px ) var( --bn-s4, 16px );
+	border-block-end: 1px solid var( --bn-line, oklch( 92% 0.005 0 ) );
+}
+.bn-lightbox__author { display: flex; align-items: center; gap: var( --bn-s2, 8px ); min-width: 0; }
+.bn-lightbox__author-avatar { width: 36px; height: 36px; border-radius: 999px; object-fit: cover; }
+.bn-lightbox__author-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bn-lightbox__close {
+	flex-shrink: 0;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 2rem;
+	height: 2rem;
+	border: 0;
+	border-radius: 999px;
+	color: var( --bn-ink-3, oklch( 58% 0.008 0 ) );
+	background: var( --bn-sunken, oklch( 97% 0.004 0 ) );
+	cursor: pointer;
+}
+.bn-lightbox__close:hover { color: var( --bn-ink, oklch( 20% 0.01 0 ) ); }
+
+.bn-lightbox__panel-body {
+	flex: 1 1 auto;
+	overflow-y: auto;
+	padding: var( --bn-s4, 16px );
+	display: flex;
+	flex-direction: column;
+	gap: var( --bn-s4, 16px );
+}
+.bn-lightbox__views { margin: 0; font-size: var( --bn-text-sm, 0.875rem ); color: var( --bn-ink-3, oklch( 58% 0.008 0 ) ); }
+
+/* Reaction row. */
+.bn-lightbox__reactions { display: flex; flex-wrap: wrap; gap: var( --bn-s1, 4px ); }
+.bn-lightbox__reaction {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 4px 8px;
+	border: 1px solid transparent;
+	border-radius: 999px;
+	background: var( --bn-sunken, oklch( 97% 0.004 0 ) );
+	cursor: pointer;
+	transition: border-color 0.12s ease, transform 0.12s ease;
+}
+.bn-lightbox__reaction:hover { transform: translateY( -1px ); background: var( --bn-line-faint, oklch( 95% 0.003 0 ) ); }
+/* Active pill: a translucent accent tint that reads correctly in light AND
+   dark (a fixed light --bn-accent-100 became a bright blob on the dark panel). */
+.bn-lightbox__reaction.is-active {
+	border-color: var( --bn-accent, oklch( 58% 0.13 264 ) );
+	background: color-mix( in oklch, var( --bn-accent, oklch( 58% 0.13 264 ) ) 16%, transparent );
+}
+.bn-lightbox__reaction-emoji { width: 20px; height: 20px; display: block; max-width: none; flex-shrink: 0; }
+.bn-lightbox__reaction-count { font-size: var( --bn-text-xs, 0.75rem ); font-weight: 600; color: var( --bn-ink-2, oklch( 40% 0.01 0 ) ); }
+
+/* Action row. */
+.bn-lightbox__actions { display: flex; gap: var( --bn-s1, 4px ); flex-wrap: wrap; }
+.bn-lightbox__action {
+	flex: 1 1 auto;
+	display: inline-flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 2px;
+	padding: var( --bn-s2, 8px );
+	border: 0;
+	border-radius: var( --bn-r-sm, 5px );
+	background: transparent;
+	color: var( --bn-ink-2, oklch( 40% 0.01 0 ) );
+	font-size: var( --bn-text-xs, 0.75rem );
+	text-decoration: none;
+	cursor: pointer;
+	transition: background 0.12s ease, color 0.12s ease;
+}
+/* Set background AND color/border on hover so a theme's generic
+   `button:hover { background:accent; color:#fff; border:accent }` (e.g. Reign)
+   can't bleed white text + an accent border onto the light hover surface — that
+   made the label "mix" into the background. The dedicated class outranks the
+   bare button selector, no !important needed. */
+.bn-lightbox__action:hover {
+	background: var( --bn-sunken, oklch( 97% 0.004 0 ) );
+	color: var( --bn-ink-2, oklch( 40% 0.01 0 ) );
+	border: 0;
+}
+.bn-lightbox__action svg { width: 20px; height: 20px; }
+/* Pressed (favorited) state — declared after :hover so the accent colour holds
+   even while hovered. The heart fills (not just an outline colour shift) so the
+   favorited state is unmistakable, matching the universal filled-heart pattern
+   and the reaction row's active treatment. */
+.bn-lightbox__action[aria-pressed="true"],
+.bn-lightbox__action[aria-pressed="true"]:hover { color: var( --bn-accent, oklch( 58% 0.13 264 ) ); }
+.bn-lightbox__action[aria-pressed="true"] svg { fill: currentColor; }
+
+/* Comments. */
+/* Grow to fill the panel-body's leftover height so the empty state can center in
+   it instead of sitting as a lone line at the top with a tall blank void below
+   (the panel is a chat-style column: content up top, composer pinned at the
+   bottom). Real comments still stack from the top via the default flex-start. */
+.bn-lightbox__comments { display: flex; flex-direction: column; gap: var( --bn-s3, 12px ); flex: 1 1 auto; min-height: 0; }
+/* margin:auto centers the empty message on both axes within the grown region. */
+.bn-lightbox__comments-empty {
+	margin: auto;
+	max-width: 28ch;
+	text-align: center;
+	color: var( --bn-ink-3, oklch( 58% 0.008 0 ) );
+	font-size: var( --bn-text-sm, 0.875rem );
+	line-height: var( --bn-leading-snug, 1.4 );
+}
+.bn-lightbox__comment { font-size: var( --bn-text-sm, 0.875rem ); line-height: 1.45; }
+.bn-lightbox__comment-author { margin-inline-end: 6px; }
+.bn-lightbox__comment-text { color: var( --bn-ink-2, oklch( 40% 0.01 0 ) ); }
+
+/* Comment form pinned to the panel bottom. */
+.bn-lightbox__comment-form {
+	display: flex;
+	gap: var( --bn-s2, 8px );
+	padding: var( --bn-s3, 12px ) var( --bn-s4, 16px );
+	border-block-start: 1px solid var( --bn-line, oklch( 92% 0.005 0 ) );
+}
+.bn-lightbox__comment-input {
+	flex: 1 1 auto;
+	min-width: 0;
+	padding: var( --bn-s2, 8px ) var( --bn-s3, 12px );
+	border: 1px solid var( --bn-line, oklch( 92% 0.005 0 ) );
+	border-radius: 999px;
+	background: var( --bn-sunken, oklch( 97% 0.004 0 ) );
+	color: var( --bn-ink, oklch( 20% 0.01 0 ) );
+	/* Lock typography to BN tokens (mirrors the .bn-input primitive). `font:
+	   inherit` here pulled the host theme's body typography (16px / 1.6 from
+	   global.min.css) into the field, so it rendered larger than the Post button
+	   beside it and drifted per-theme. */
+	font-family: var( --bn-font-ui );
+	font-size: var( --bn-text-sm, 0.875rem );
+	line-height: var( --bn-leading-snug, 1.4 );
+}
+.bn-lightbox__comment-input:focus-visible { outline: 2px solid transparent; outline-offset: 2px; border-color: var( --bn-accent, oklch( 58% 0.13 264 ) ); }
+
+/* Private DM media: a one-to-one image has no social layer, so the whole side
+   panel is dropped and the media goes full-bleed (WhatsApp/Telegram pattern).
+   The only chrome a DM image needs — sender, download, close — floats over the
+   stage via .bn-lightbox__dm-chrome. Driven by .bn-lightbox--dm, set from the
+   tile's data-bn-dm flag in lightbox.js. */
+.bn-lightbox--dm .bn-lightbox__panel { display: none; }
+
+/* Floating stage chrome — hidden unless the lightbox is in DM mode. */
+.bn-lightbox__dm-chrome { display: none; }
+.bn-lightbox--dm .bn-lightbox__dm-chrome {
+	position: absolute;
+	inset: 0 0 auto 0;
+	z-index: 2;
+	display: flex;
+	align-items: center;
+	gap: var( --bn-s2, 8px );
+	padding: var( --bn-s3, 12px ) var( --bn-s4, 16px );
+	/* Gradient scrim so the white sender/icons stay legible over any image. */
+	background: linear-gradient( to bottom, oklch( 0% 0 0 / 0.55 ), transparent );
+	pointer-events: none; /* let clicks fall through to the image; re-enable on controls */
+}
+.bn-lightbox__dm-spacer { flex: 1 1 auto; }
+.bn-lightbox__dm-author {
+	display: flex;
+	align-items: center;
+	gap: var( --bn-s2, 8px );
+	min-width: 0;
+	pointer-events: auto;
+}
+/* Author markup is shared with the panel (renderAuthor); recolor it for the
+   dark scrim instead of the light panel. */
+.bn-lightbox__dm-author .bn-lightbox__author-link { text-decoration: none; }
+.bn-lightbox__dm-author .bn-lightbox__author-avatar { width: 32px; height: 32px; border-radius: 999px; object-fit: cover; }
+.bn-lightbox__dm-author .bn-lightbox__author-name {
+	color: oklch( 100% 0 0 );
+	font-weight: 600;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.bn-lightbox__dm-btn {
+	flex-shrink: 0;
+	pointer-events: auto;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 2.25rem;
+	height: 2.25rem;
+	border: 0;
+	border-radius: 999px;
+	color: oklch( 100% 0 0 );
+	background: oklch( 0% 0 0 / 0.5 );
+	cursor: pointer;
+	text-decoration: none;
+	transition: background 0.15s ease;
+}
+.bn-lightbox__dm-btn:hover { background: oklch( 0% 0 0 / 0.78 ); }
+.bn-lightbox__dm-btn:focus-visible { outline: 2px solid oklch( 100% 0 0 ); outline-offset: 2px; box-shadow: none; }
+.bn-lightbox__dm-btn svg { width: 20px; height: 20px; }
+
+[data-bn-theme="dark"] .bn-lightbox__media,
+[data-theme="dark"] .bn-lightbox__media,
+[data-bx-mode="dark"] .bn-lightbox__media,
+[data-bn-theme="dark"] .bn-lightbox__media-wrap video,
+[data-theme="dark"] .bn-lightbox__media-wrap video,
+[data-bx-mode="dark"] .bn-lightbox__media-wrap video {
+	color-scheme: dark;
+}
+
+/* Stack the panel beneath the media on narrow screens. */
+@media ( max-width: 768px ) {
+	.bn-lightbox__dialog { flex-direction: column; width: 100vw; height: 100vh; max-height: 100vh; border-radius: 0; }
+	.bn-lightbox__stage { flex: 1 1 50%; min-height: 0; }
+	.bn-lightbox__media { max-height: 50vh; }
+	.bn-lightbox__panel { flex: 1 1 auto; width: 100%; max-width: none; border-inline-start: 0; border-block-start: 1px solid var( --bn-line, oklch( 92% 0.005 0 ) ); }
+
+	/* DM mode has no panel — let the image use the whole viewport. */
+	.bn-lightbox--dm .bn-lightbox__stage { flex: 1 1 100%; }
+	.bn-lightbox--dm .bn-lightbox__media { max-height: 100vh; }
+}
+

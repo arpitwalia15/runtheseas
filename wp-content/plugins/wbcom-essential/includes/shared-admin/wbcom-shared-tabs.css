@@ -1,0 +1,346 @@
+/**
+ * WBCom Shared Tab Styles - Modern Design
+ * 
+ * Unified tab styling for all WBCom plugins
+ * Features smooth animations, modern design, and consistent look
+ * 
+ * @version 1.0.0
+ */
+
+/* ===================================================================
+   MODERN TAB WRAPPER
+   =================================================================== */
+
+.wbcom-tab-wrapper {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+    margin: 20px 0;
+    overflow: hidden;
+}
+
+/* ===================================================================
+   MODERN TAB NAVIGATION
+   =================================================================== */
+
+.wbcom-nav-tab-wrapper {
+    display: flex;
+    align-items: center;
+    background: #f8f9fa;
+    border-bottom: 1px solid #e5e7eb;
+    padding: 0;
+    margin: 0;
+    position: relative;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.wbcom-nav-tab-wrapper::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 3px;
+    background: #2c5282;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    width: var(--tab-indicator-width, 0);
+    transform: translateX(var(--tab-indicator-offset, 0));
+}
+
+/* ===================================================================
+   MODERN TAB ITEMS
+   =================================================================== */
+
+.wbcom-nav-tab {
+    display: inline-flex;
+    align-items: center;
+    padding: 16px 24px;
+    margin: 0;
+    border: none;
+    background: transparent;
+    color: #6b7280;
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+    position: relative;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+}
+
+.wbcom-nav-tab:hover {
+    color: #374151;
+    background: rgba(44, 82, 130, 0.05);
+}
+
+.wbcom-nav-tab:focus-visible {
+    outline: 2px solid #2c5282;
+    outline-offset: 2px;
+}
+
+.wbcom-nav-tab.nav-tab-active {
+    color: #2c5282;
+    background: #fff;
+    border-bottom-color: #2c5282;
+}
+
+/* Icon styles */
+.wbcom-nav-tab .dashicons {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    font-size: 20px;
+    line-height: 20px;
+    margin-right: 8px;
+    transition: transform 0.2s ease;
+}
+
+.wbcom-nav-tab:hover .dashicons {
+    transform: translateY(-1px);
+}
+
+.wbcom-nav-tab.nav-tab-active .dashicons {
+    color: #2c5282;
+}
+
+/* Badge/Counter styles */
+.wbcom-nav-tab .tab-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    margin-left: 8px;
+    background: #e5e7eb;
+    color: #6b7280;
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 10px;
+    transition: all 0.2s ease;
+}
+
+.wbcom-nav-tab:hover .tab-badge {
+    background: #d1d5db;
+    color: #374151;
+}
+
+.wbcom-nav-tab.nav-tab-active .tab-badge {
+    background: #2c5282;
+    color: #fff;
+}
+
+/* ===================================================================
+   TAB CONTENT AREA
+   =================================================================== */
+
+.wbcom-tab-content {
+    background: #fff;
+    padding: 32px;
+    min-height: 400px;
+    animation: wbcomFadeIn 0.3s ease;
+}
+
+@keyframes wbcomFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ===================================================================
+   FORM STYLING WITHIN TABS
+   =================================================================== */
+
+.wbcom-tab-content .form-table th {
+    padding: 20px 10px 20px 0;
+    font-weight: 600;
+    color: #374151;
+}
+
+.wbcom-tab-content .form-table td {
+    padding: 20px 10px;
+}
+
+.wbcom-tab-content .button {
+    padding: 8px 16px;
+    height: auto;
+    font-weight: 500;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+
+.wbcom-tab-content .button-primary {
+    background: #2c5282;
+    border-color: #2c5282;
+    box-shadow: 0 1px 3px rgba(44, 82, 130, 0.3);
+}
+
+.wbcom-tab-content .button-primary:hover {
+    background: #1e3a5f;
+    border-color: #1e3a5f;
+    box-shadow: 0 4px 6px rgba(44, 82, 130, 0.3);
+    transform: translateY(-1px);
+}
+
+/* ===================================================================
+   RESPONSIVE DESIGN
+   =================================================================== */
+
+@media screen and (max-width: 782px) {
+    .wbcom-nav-tab-wrapper {
+        flex-wrap: nowrap;
+        overflow-x: scroll;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
+    
+    .wbcom-nav-tab-wrapper::-webkit-scrollbar {
+        display: none;
+    }
+    
+    .wbcom-nav-tab {
+        padding: 12px 16px;
+        font-size: 13px;
+    }
+    
+    .wbcom-nav-tab .dashicons {
+        width: 18px;
+        height: 18px;
+        font-size: 18px;
+        margin-right: 6px;
+    }
+    
+    .wbcom-tab-content {
+        padding: 20px;
+    }
+}
+
+/* ===================================================================
+   LOADING STATE
+   =================================================================== */
+
+.wbcom-tab-content.loading {
+    position: relative;
+    min-height: 200px;
+}
+
+.wbcom-tab-content.loading::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 40px;
+    height: 40px;
+    margin: -20px 0 0 -20px;
+    border: 3px solid #f3f4f6;
+    border-top-color: #2c5282;
+    border-radius: 50%;
+    animation: wbcomSpin 1s linear infinite;
+}
+
+@keyframes wbcomSpin {
+    to { transform: rotate(360deg); }
+}
+
+/* ===================================================================
+   SPECIAL STYLES FOR SPECIFIC TAB TYPES
+   =================================================================== */
+
+/* License tab special styling */
+.wbcom-nav-tab.license-tab.valid .dashicons {
+    color: #10b981;
+}
+
+.wbcom-nav-tab.license-tab.invalid .dashicons {
+    color: #ef4444;
+}
+
+/* Settings saved notification */
+.wbcom-settings-saved {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: #10b981;
+    color: #fff;
+    padding: 12px 20px;
+    border-radius: 6px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    animation: wbcomSlideIn 0.3s ease;
+    z-index: 9999;
+}
+
+@keyframes wbcomSlideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+/* ===================================================================
+   ENHANCED WORDPRESS COMPATIBILITY
+   =================================================================== */
+
+/* Override default WordPress nav-tab styles when using our wrapper */
+.wbcom-tab-wrapper .nav-tab-wrapper {
+    border-bottom: none;
+    padding: 0;
+    margin: 0;
+}
+
+.wbcom-tab-wrapper .nav-tab {
+    border: none;
+    margin: 0;
+    background: transparent;
+}
+
+.wbcom-tab-wrapper .nav-tab-active {
+    border: none;
+    margin: 0;
+}
+
+/* ===================================================================
+   DARK MODE SUPPORT (OPTIONAL)
+   =================================================================== */
+
+@media (prefers-color-scheme: dark) {
+    .wbcom-supports-dark .wbcom-tab-wrapper {
+        background: #1f2937;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+    
+    .wbcom-supports-dark .wbcom-nav-tab-wrapper {
+        background: #111827;
+        border-bottom-color: #374151;
+    }
+    
+    .wbcom-supports-dark .wbcom-nav-tab {
+        color: #9ca3af;
+    }
+    
+    .wbcom-supports-dark .wbcom-nav-tab:hover {
+        color: #e5e7eb;
+        background: rgba(44, 82, 130, 0.1);
+    }
+    
+    .wbcom-supports-dark .wbcom-nav-tab.nav-tab-active {
+        color: #60a5fa;
+        background: #1f2937;
+        border-bottom-color: #60a5fa;
+    }
+    
+    .wbcom-supports-dark .wbcom-tab-content {
+        background: #1f2937;
+        color: #e5e7eb;
+    }
+}

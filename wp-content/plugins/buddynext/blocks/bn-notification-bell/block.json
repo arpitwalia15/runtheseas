@@ -1,0 +1,41 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "buddynext/notification-bell",
+	"title": "Notification Bell",
+	"icon": "bell",
+	"category": "buddynext",
+	"description": "Bell icon with unread notification count for custom header areas.",
+	"keywords": [
+		"buddynext",
+		"notifications",
+		"bell",
+		"header"
+	],
+	"textdomain": "buddynext",
+	"editorScript": "buddynext-blocks-editor",
+	"style": [
+		"file:../../assets/css/blocks.css",
+		"bn-header"
+	],
+	"supports": {
+		"inserter": false,
+		"color": {
+			"background": true,
+			"text": true
+		},
+		"typography": {
+			"fontSize": true
+		},
+		"spacing": {
+			"padding": true,
+			"margin": true
+		}
+	},
+	"attributes": {},
+	"example": {},
+	"editorStyle": [
+		"file:../../assets/css/blocks.css",
+		"bn-header"
+	]
+}

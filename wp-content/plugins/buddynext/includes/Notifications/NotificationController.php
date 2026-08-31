@@ -1,0 +1,608 @@
+<?php // phpcs:disable WordPress.Files.FileName.NotHyphenatedLowercase,WordPress.Files.FileName.InvalidClassFileName -- PSR-4 naming used throughout this plugin.
+/**
+ * REST controller for notifications.
+ *
+ * Routes (all under buddynext/v1):
+ *   GET  /me/notifications              - list notifications (auth required)
+ *   GET  /me/notifications/unread-count - unread badge count (auth required)
+ *   POST /me/notifications/{id}/read    - mark one notification read (auth required)
+ *   POST /me/notifications/read-all     - mark all read (auth required)
+ *   GET  /me/notification-prefs         - get notification preferences (auth required)
+ *   PUT  /me/notification-prefs         - update notification preferences (auth required)
+ *
+ * @package BuddyNext\Notifications
+ */
+
+declare( strict_types=1 );
+
+namespace BuddyNext\Notifications;
+
+use BuddyNext\Notifications\NotificationMessageService;
+use BuddyNext\Notifications\NotificationPrefCatalogue;
+use BuddyNext\Notifications\NotificationPrefService;
+use BuddyNext\Notifications\NotificationService;
+use BuddyNext\REST\BaseRestController;
+use BuddyNext\Spaces\SpaceMemberService;
+use WP_Error;
+use WP_REST_Request;
+use WP_REST_Response;
+
+/**
+ * Handles notification reads and state changes over REST.
+ */
+class NotificationController extends BaseRestController {
+
+	/**
+	 * Register the controller's routes.
+	 */
+	public function register_routes(): void {
+		register_rest_route(
+			'buddynext/v1',
+			'/me/notifications',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( $this, 'list_notifications' ),
+				'permission_callback' => array( $this, 'require_auth' ),
+				'args'                => array(
+					'filter'   => array(
+						'type'              => 'string',
+						'enum'              => array( 'all', 'unread', 'read' ),
+						'default'           => 'all',
+						'sanitize_callback' => 'sanitize_key',
+					),
+					// The handler reads cursor and per_page too, and declared neither.
+					// openapi.json is generated from this registry, so the spec offered
+					// only `offset` and steered every client onto O(n) OFFSET paging
+					// while the keyset cursor -- the reason the cursor exists -- sat
+					// undiscoverable. Prefer cursor; offset stays for existing callers.
+					'cursor'   => array(
+						'type'              => 'string',
+						'description'       => 'Keyset cursor from a previous response. Preferred over offset: it does not degrade as the list grows, and it cannot skip or repeat a row when new notifications arrive mid-page.',
+						'sanitize_callback' => 'sanitize_text_field',
+					),
+					'per_page' => array(
+						'type'              => 'integer',
+						'default'           => 20,
+						'description'       => 'Notifications per page.',
+						'sanitize_callback' => 'absint',
+					),
+					'offset'   => array(
+						'type'        => 'integer',
+						'minimum'     => 0,
+						'description' => 'Row offset. Superseded by cursor for new clients.',
+					),
+					// Delta polling. An app syncing a badge or a list previously had
+					// to walk the page newest-first and stop at an id it recognised,
+					// fetching and discarding rows it already held on every poll.
+					'since'    => array(
+						'type'              => 'string',
+						'description'       => 'Return only notifications created AFTER this time. Accepts an ISO-8601 timestamp (pass back created_at_gmt from a previous response) or a Unix epoch. Composes with cursor/per_page, so a large delta still pages.',
+						'sanitize_callback' => 'sanitize_text_field',
+					),
+				),
+			)
+		);
+
+		register_rest_route(
+			'buddynext/v1',
+			'/me/notifications/unread-count',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( $this, 'unread_count' ),
+				'permission_callback' => array( $this, 'require_auth' ),
+			)
+		);
+
+		register_rest_route(
+			'buddynext/v1',
+			'/me/notifications/read-all',
+			array(
+				array(
+					'methods'             => 'PUT',
+					'callback'            => array( $this, 'mark_all_read' ),
+					'permission_callback' => array( $this, 'require_auth' ),
+				),
+				// Keep POST for backwards compatibility.
+				array(
+					'methods'             => 'POST',
+					'callback'            => array( $this, 'mark_all_read' ),
+					'permission_callback' => array( $this, 'require_auth' ),
+				),
+			)
+		);
+
+		// Mark the list SEEN — clears the badge without marking rows read. The web
+		// does this automatically on list render (PageRouter); the native app calls
+		// this when the member opens their notifications screen so its bell badge
+		// clears the same way, while the Unread tab stays intact.
+		register_rest_route(
+			'buddynext/v1',
+			'/me/notifications/seen',
+			array(
+				array(
+					'methods'             => 'PUT',
+					'callback'            => array( $this, 'mark_seen' ),
+					'permission_callback' => array( $this, 'require_auth' ),
+				),
+				array(
+					'methods'             => 'POST',
+					'callback'            => array( $this, 'mark_seen' ),
+					'permission_callback' => array( $this, 'require_auth' ),
+				),
+			)
+		);
+
+		register_rest_route(
+			'buddynext/v1',
+			'/me/notifications/(?P<id>[\d]+)/read',
+			array(
+				array(
+					'methods'             => 'PUT',
+					'callback'            => array( $this, 'mark_read' ),
+					'permission_callback' => array( $this, 'require_auth' ),
+				),
+				// Keep POST for backwards compatibility.
+				array(
+					'methods'             => 'POST',
+					'callback'            => array( $this, 'mark_read' ),
+					'permission_callback' => array( $this, 'require_auth' ),
+				),
+			)
+		);
+
+		register_rest_route(
+			'buddynext/v1',
+			'/me/notifications/(?P<id>[\d]+)/unread',
+			array(
+				array(
+					'methods'             => 'PUT',
+					'callback'            => array( $this, 'mark_unread' ),
+					'permission_callback' => array( $this, 'require_auth' ),
+				),
+				array(
+					'methods'             => 'POST',
+					'callback'            => array( $this, 'mark_unread' ),
+					'permission_callback' => array( $this, 'require_auth' ),
+				),
+			)
+		);
+
+		register_rest_route(
+			'buddynext/v1',
+			'/me/notifications/(?P<id>[\d]+)',
+			array(
+				'methods'             => 'DELETE',
+				'callback'            => array( $this, 'delete_notification' ),
+				'permission_callback' => array( $this, 'require_auth' ),
+			)
+		);
+
+		register_rest_route(
+			'buddynext/v1',
+			'/me/notification-prefs',
+			array(
+				array(
+					'methods'             => 'GET',
+					'callback'            => array( $this, 'get_notification_prefs' ),
+					'permission_callback' => array( $this, 'require_auth' ),
+				),
+				array(
+					'methods'             => 'PUT',
+					'callback'            => array( $this, 'update_notification_prefs' ),
+					'permission_callback' => array( $this, 'require_auth' ),
+				),
+			)
+		);
+
+		register_rest_route(
+			'buddynext/v1',
+			'/me/notification-channels',
+			array(
+				array(
+					'methods'             => 'GET',
+					'callback'            => array( $this, 'get_notification_channels' ),
+					'permission_callback' => array( $this, 'require_auth' ),
+				),
+				array(
+					'methods'             => 'PUT',
+					'callback'            => array( $this, 'update_notification_channels' ),
+					'permission_callback' => array( $this, 'require_auth' ),
+				),
+			)
+		);
+
+		register_rest_route(
+			'buddynext/v1',
+			'/me/space-notification-prefs',
+			array(
+				array(
+					'methods'             => 'GET',
+					'callback'            => array( $this, 'list_space_notification_prefs' ),
+					'permission_callback' => array( $this, 'require_auth' ),
+				),
+				array(
+					'methods'             => 'POST',
+					'callback'            => array( $this, 'set_space_notification_pref' ),
+					'permission_callback' => array( $this, 'require_auth' ),
+				),
+			)
+		);
+	}
+
+	/**
+	 * Return paginated notifications for the current user.
+	 *
+	 * @param WP_REST_Request $request Incoming request.
+	 * @return WP_REST_Response
+	 */
+	public function list_notifications( WP_REST_Request $request ): WP_REST_Response {
+		$user_id  = get_current_user_id();
+		$cursor   = $request->get_param( 'cursor' ) ? (string) $request->get_param( 'cursor' ) : null;
+		$per_page = min( (int) ( $request->get_param( 'per_page' ) ?? 20 ), 50 );
+
+		// filter: all|unread|read (the app's unread-only tab). offset: page via
+		// LIMIT/OFFSET as an alternative to keyset cursor paging. Both are already
+		// supported by the service; they were simply never wired through here.
+		$filter = (string) ( $request->get_param( 'filter' ) ?? 'all' );
+		$offset = null !== $request->get_param( 'offset' ) ? max( 0, (int) $request->get_param( 'offset' ) ) : null;
+
+		$since    = $request->get_param( 'since' ) ? (string) $request->get_param( 'since' ) : null;
+		$result   = ( new NotificationService() )->list_for_user( $user_id, $cursor, $per_page, $filter, $offset, $since );
+		$composer = buddynext_service( 'notification_message' );
+		$composed = $composer->compose_batch( $result['items'] ?? array() );
+
+		// Enrich each row with the rendered message, link, icon, and label so
+		// REST consumers (in-app dropdown, mobile, email tokens) share the
+		// same presentation as the on-page list.
+		foreach ( $result['items'] as $i => $item ) {
+			$payload               = $composed[ $i ] ?? array();
+			$result['items'][ $i ] = array_merge(
+				$item,
+				array(
+					'message'    => (string) ( $payload['message'] ?? '' ),
+					'url'        => (string) ( $payload['url'] ?? '' ),
+					'icon'       => (string) ( $payload['icon'] ?? 'bell' ),
+					'tone'       => (string) ( $payload['tone'] ?? 'info' ),
+					'label'      => (string) ( $payload['label'] ?? '' ),
+					'actor_name' => (string) ( $payload['actor_name'] ?? '' ),
+				)
+			);
+		}
+
+		return new WP_REST_Response( $result, 200 );
+	}
+
+	/**
+	 * Return the unread notification count for the current user.
+	 *
+	 * @param WP_REST_Request $request Incoming request.
+	 * @return WP_REST_Response
+	 */
+	public function unread_count( WP_REST_Request $request ): WP_REST_Response { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found
+		$user_id = get_current_user_id();
+		// The app's bell badge = UNSEEN count (created since the list was last
+		// viewed). Viewing the list (mark_seen) clears it without marking items
+		// read, so the Unread tab stays intact. The route name is kept for
+		// backward compatibility.
+		$count = ( new NotificationService() )->unseen_count( $user_id );
+
+		return new WP_REST_Response( array( 'count' => $count ), 200 );
+	}
+
+	/**
+	 * Mark a single notification as read.
+	 *
+	 * @param WP_REST_Request $request Incoming request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function mark_read( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+		$notif_id = (int) $request->get_param( 'id' );
+		$user_id  = get_current_user_id();
+		$result   = ( new NotificationService() )->mark_read( $notif_id, $user_id );
+
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		return new WP_REST_Response( array( 'read' => true ), 200 );
+	}
+
+	/**
+	 * Mark a single notification unread for the current user.
+	 *
+	 * @param WP_REST_Request $request Incoming request (id param).
+	 * @return WP_REST_Response|WP_Error 200 { read: false } or a 403 WP_Error.
+	 */
+	public function mark_unread( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+		$notif_id = (int) $request->get_param( 'id' );
+		$user_id  = get_current_user_id();
+		$result   = ( new NotificationService() )->mark_unread( $notif_id, $user_id );
+
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		return new WP_REST_Response( array( 'read' => false ), 200 );
+	}
+
+	/**
+	 * Mark all notifications as read for the current user.
+	 *
+	 * @param WP_REST_Request $request Incoming request.
+	 * @return WP_REST_Response
+	 */
+	public function mark_all_read( WP_REST_Request $request ): WP_REST_Response { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found
+		$user_id = get_current_user_id();
+		( new NotificationService() )->mark_all_read( $user_id );
+
+		return new WP_REST_Response( array( 'read' => true ), 200 );
+	}
+
+	/**
+	 * Mark the notifications list as SEEN for the current user.
+	 *
+	 * Clears the bell/nav badge (unseen count → 0) without marking any row read,
+	 * so the Unread tab and Mark-unread stay intact. Used by the native app when
+	 * the member opens their notifications screen; the web does the equivalent on
+	 * list render.
+	 *
+	 * @param WP_REST_Request $request Incoming request.
+	 * @return WP_REST_Response
+	 */
+	public function mark_seen( WP_REST_Request $request ): WP_REST_Response { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found
+		$user_id = get_current_user_id();
+		( new NotificationService() )->mark_seen( $user_id );
+
+		return new WP_REST_Response( array( 'seen' => true ), 200 );
+	}
+
+	/**
+	 * Delete a single notification for the current user.
+	 *
+	 * @param WP_REST_Request $request Incoming request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function delete_notification( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+		$notif_id = (int) $request->get_param( 'id' );
+		$user_id  = get_current_user_id();
+		$result   = ( new NotificationService() )->delete( $notif_id, $user_id );
+
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		return new WP_REST_Response( array( 'deleted' => true ), 200 );
+	}
+
+	/**
+	 * Return notification preferences for the current user.
+	 *
+	 * Response merges the per-type catalogue defaults with any explicitly
+	 * stored row in bn_notification_prefs so every catalogue type appears
+	 * exactly once. The UI consumes the result without overlaying defaults
+	 * client-side.
+	 *
+	 * @return WP_REST_Response
+	 */
+	public function get_notification_prefs(): WP_REST_Response {
+		$user_id   = get_current_user_id();
+		$stored    = ( new NotificationPrefService() )->get_all_prefs( $user_id );
+		$catalogue = new NotificationPrefCatalogue();
+		$resolved  = $catalogue->resolve_for_user( $stored );
+
+		/*
+		 * The owner's site-wide digest switch (Settings -> Email), surfaced so the
+		 * app can grey out Daily/Weekly instead of offering a choice the server
+		 * will never honour — the same thing templates/settings/notifications.php
+		 * already does on the web.
+		 *
+		 * READ-ONLY, deliberately. The card that asked for this also asked the PUT
+		 * to accept it; that is refused. `buddynext_digest_frequency` is a
+		 * site-wide option owned by an administrator, and this route is
+		 * `require_auth` — accepting it here would let any logged-in member
+		 * disable email digests for the ENTIRE community. See the card for the
+		 * full reasoning.
+		 */
+		return new WP_REST_Response(
+			array(
+				'prefs'           => $resolved,
+				'stored'          => $stored,
+				'digests_enabled' => \BuddyNext\Notifications\EmailSender::digests_enabled(),
+				'updated'         => time(),
+			),
+			200
+		);
+	}
+
+	/**
+	 * Update notification preferences for the current user.
+	 *
+	 * Accepts a JSON body where keys are notification type strings and values
+	 * are objects with optional on_site (bool) and email_freq (string) fields.
+	 * Example: {"bn.new_follower": {"on_site": true, "email_freq": "daily"}}
+	 *
+	 * Returns 422 on any invalid email_freq value (must be one of immediate /
+	 * daily / weekly / off).
+	 *
+	 * @param WP_REST_Request $request Incoming request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function update_notification_prefs( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+		$user_id = get_current_user_id();
+		$body    = $request->get_json_params();
+
+		if ( ! is_array( $body ) || empty( $body ) ) {
+			return new WP_Error(
+				'invalid_prefs',
+				__( 'Request body must be a JSON object of notification preferences.', 'buddynext' ),
+				array( 'status' => 400 )
+			);
+		}
+
+		$valid_freq = array( 'immediate', 'daily', 'weekly', 'off' );
+		$errors     = array();
+		foreach ( $body as $type => $entry ) {
+			if ( ! is_array( $entry ) ) {
+				$errors[ (string) $type ] = __( 'Each preference must be an object.', 'buddynext' );
+				continue;
+			}
+			if ( isset( $entry['email_freq'] ) && ! in_array( (string) $entry['email_freq'], $valid_freq, true ) ) {
+				$errors[ (string) $type ] = __( 'email_freq must be one of: immediate, daily, weekly, off.', 'buddynext' );
+			}
+		}
+
+		if ( ! empty( $errors ) ) {
+			return new WP_Error(
+				'invalid_email_freq',
+				__( 'One or more preferences had an invalid email_freq value.', 'buddynext' ),
+				array(
+					'status' => 422,
+					'params' => $errors,
+				)
+			);
+		}
+
+		$service = new NotificationPrefService();
+		$service->set_all_prefs( $user_id, $body );
+
+		$catalogue = new NotificationPrefCatalogue();
+		$resolved  = $catalogue->resolve_for_user( $service->get_all_prefs( $user_id ) );
+
+		return new WP_REST_Response(
+			array(
+				'prefs'   => $resolved,
+				'updated' => time(),
+			),
+			200
+		);
+	}
+
+	/**
+	 * Return master channel preferences for the current user.
+	 *
+	 * Stored in usermeta `bn_channel_prefs`. Push defaults off when the Pro
+	 * push module is not loaded so the UI can hide the row without a separate
+	 * feature-flag request.
+	 *
+	 * @return WP_REST_Response
+	 */
+	public function get_notification_channels(): WP_REST_Response {
+		$user_id = get_current_user_id();
+		$stored  = ( new NotificationPrefService() )->get_channel_prefs( $user_id );
+
+		$push_available = class_exists( '\\BuddyNextPro\\Push\\PushDispatcher' );
+
+		$channels = array(
+			'in_app' => array_key_exists( 'in_app', $stored ) ? (bool) $stored['in_app'] : true,
+			'email'  => array_key_exists( 'email', $stored ) ? (bool) $stored['email'] : true,
+			'push'   => array_key_exists( 'push', $stored ) ? (bool) $stored['push'] : $push_available,
+			'sound'  => array_key_exists( 'sound', $stored ) ? (bool) $stored['sound'] : false,
+		);
+
+		return new WP_REST_Response(
+			array(
+				'channels'       => $channels,
+				'push_available' => $push_available,
+			),
+			200
+		);
+	}
+
+	/**
+	 * Update master channel preferences for the current user.
+	 *
+	 * @param WP_REST_Request $request Incoming request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function update_notification_channels( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+		$user_id = get_current_user_id();
+		$body    = $request->get_json_params();
+
+		if ( ! is_array( $body ) ) {
+			return new WP_Error(
+				'invalid_channels',
+				__( 'Request body must be a JSON object.', 'buddynext' ),
+				array( 'status' => 400 )
+			);
+		}
+
+		( new NotificationPrefService() )->set_channel_prefs( $user_id, $body );
+
+		return $this->get_notification_channels();
+	}
+
+	/**
+	 * List the current user's per-space notification preferences.
+	 *
+	 * Returns one row per active space membership with the resolved preference
+	 * (defaults to 'all' when no explicit row exists). The UI uses this to
+	 * render the Spaces section of the prefs page.
+	 *
+	 * @return WP_REST_Response
+	 */
+	public function list_space_notification_prefs(): WP_REST_Response {
+		$items = ( new NotificationPrefService() )->list_space_notification_prefs( get_current_user_id() );
+
+		return new WP_REST_Response( array( 'items' => $items ), 200 );
+	}
+
+	/**
+	 * Set the current user's notification preference for one space.
+	 *
+	 * Permission: logged-in user must be an active member of the space - the
+	 * underlying NotificationPrefService::set_space_pref() only updates an
+	 * existing membership row, so non-members get a 403 by virtue of false
+	 * being returned.
+	 *
+	 * @param WP_REST_Request $request Incoming request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function set_space_notification_pref( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+		$user_id  = get_current_user_id();
+		$body     = $request->get_json_params();
+		$space_id = isset( $body['space_id'] ) ? (int) $body['space_id'] : 0;
+		$pref     = isset( $body['pref'] ) ? (string) $body['pref'] : '';
+
+		if ( $space_id <= 0 || '' === $pref ) {
+			return new WP_Error(
+				'invalid_space_pref',
+				__( 'Both space_id and pref are required.', 'buddynext' ),
+				array( 'status' => 400 )
+			);
+		}
+
+		if ( ! in_array( $pref, array( 'all', 'mentions_only', 'none' ), true ) ) {
+			return new WP_Error(
+				'invalid_pref_value',
+				__( 'pref must be one of: all, mentions_only, none.', 'buddynext' ),
+				array( 'status' => 422 )
+			);
+		}
+
+		$member_service = new SpaceMemberService();
+		if ( ! $member_service->is_member( $space_id, $user_id ) ) {
+			return new WP_Error(
+				'not_a_member',
+				__( 'You must be a member of the space to set its notification preference.', 'buddynext' ),
+				array( 'status' => 403 )
+			);
+		}
+
+		$saved = ( new NotificationPrefService() )->set_space_pref( $user_id, $space_id, $pref );
+		if ( ! $saved ) {
+			return new WP_Error(
+				'space_pref_not_saved',
+				__( 'Could not save space notification preference.', 'buddynext' ),
+				array( 'status' => 500 )
+			);
+		}
+
+		return new WP_REST_Response(
+			array(
+				'space_id' => $space_id,
+				'pref'     => $pref,
+			),
+			200
+		);
+	}
+}

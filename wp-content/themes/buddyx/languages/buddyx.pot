@@ -1,0 +1,3787 @@
+# Copyright (C) 2026 wbcomdesigns,vapvarun
+# This file is distributed under the GNU General Public License v3.0 (or later).
+msgid ""
+msgstr ""
+"Project-Id-Version: BuddyX 5.1.4\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/theme/buddyx\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"POT-Creation-Date: 2026-07-14T08:20:25+00:00\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"X-Generator: WP-CLI 2.12.0\n"
+"X-Domain: buddyx\n"
+
+#. Theme Name of the theme
+#: style.css
+#: inc/Welcome/Component.php:473
+msgid "BuddyX"
+msgstr ""
+
+#. Theme URI of the theme
+#: style.css
+msgid "https://wbcomdesigns.com/downloads/buddyx-theme/"
+msgstr ""
+
+#. Description of the theme
+#: style.css
+msgid "BuddyX is an editorial-grade WordPress theme with a designer pattern library - 27 plug-and-play block patterns (hero, about, services, testimonials, pricing, FAQ, CTA, footer, query) composed from core blocks only. Self-hosted Inter and Newsreader fonts, fluid 8-step type scale, semantic color tokens (base / contrast / accent / surface) with WCAG AA contrast, Light and Editorial style variations, and full BuddyPress / WooCommerce / LearnDash compatibility. Hybrid FSE: classic templates plus theme.json design tokens editable in Site Editor. Lightweight, responsive, RTL- and translation-ready, accessibility-audited (WCAG 2.1 AA)."
+msgstr ""
+
+#. Author of the theme
+#: style.css
+msgid "wbcomdesigns,vapvarun"
+msgstr ""
+
+#. Author URI of the theme
+#: style.css
+msgid "https://github.com/vapvarun/buddyx"
+msgstr ""
+
+#. translators: %s: User display name.
+#: bb-buddypress/activity/entry.php:35
+#, php-format
+msgid "%s's post"
+msgstr ""
+
+#: bb-buddypress/activity/entry.php:44
+msgid "Pinned Post"
+msgstr ""
+
+#: bb-buddypress/activity/entry.php:51
+msgid "Turned off notifications"
+msgstr ""
+
+#. translators: %s = last activity timestamp (e.g. "active 1 hour ago")
+#. translators: %s: last activity timestamp (e.g. "Active 1 hour ago")
+#: bb-buddypress/groups/groups-loop.php:86
+#: bb-buddypress/groups/single/cover-image-header.php:149
+#: bb-buddypress/groups/single/group-header.php:92
+#: buddypress/groups/groups-loop.php:57
+#: buddypress/groups/single/cover-image-header.php:60
+#: buddypress/groups/single/group-header.php:43
+#, php-format
+msgid "Active %s"
+msgstr ""
+
+#: bb-buddypress/groups/groups-loop.php:128
+#: bb-buddypress/groups/single/cover-image-header.php:221
+#: bb-buddypress/groups/single/group-header.php:160
+msgid "Leave Group"
+msgstr ""
+
+#: bb-buddypress/groups/groups-loop.php:134
+#: bb-buddypress/groups/single/cover-image-header.php:227
+#: bb-buddypress/groups/single/group-header.php:166
+msgid "Are you sure you want to leave "
+msgstr ""
+
+#: bb-buddypress/groups/groups-loop.php:137
+#: bb-buddypress/groups/single/cover-image-header.php:63
+#: bb-buddypress/groups/single/cover-image-header.php:230
+#: bb-buddypress/groups/single/group-header.php:169
+#: bb-buddypress/groups/single/members-loop.php:264
+#: bb-buddypress/members/members-loop.php:292
+#: bb-buddypress/members/single/cover-image-header.php:101
+#: bb-buddypress/members/single/cover-image-header.php:289
+#: bb-buddypress/members/single/member-header.php:225
+msgid "Cancel"
+msgstr ""
+
+#: bb-buddypress/groups/groups-loop.php:138
+#: bb-buddypress/groups/single/cover-image-header.php:231
+#: bb-buddypress/groups/single/group-header.php:170
+#: bb-buddypress/groups/single/members-loop.php:265
+#: bb-buddypress/members/members-loop.php:293
+#: bb-buddypress/members/single/cover-image-header.php:290
+#: bb-buddypress/members/single/member-header.php:226
+msgid "Confirm"
+msgstr ""
+
+#: bb-buddypress/groups/single/cover-image-header.php:53
+#: bb-buddypress/members/single/cover-image-header.php:90
+#: buddypress/groups/single/cover-image-header.php:25
+#: buddypress/members/single/cover-image-header.php:15
+msgid "Change Cover Photo"
+msgstr ""
+
+#: bb-buddypress/groups/single/cover-image-header.php:59
+#: bb-buddypress/members/single/cover-image-header.php:97
+msgid "Reposition Cover Photo"
+msgstr ""
+
+#: bb-buddypress/groups/single/cover-image-header.php:64
+#: bb-buddypress/members/single/cover-image-header.php:102
+msgid "Save Changes"
+msgstr ""
+
+#: bb-buddypress/groups/single/cover-image-header.php:65
+#: bb-buddypress/members/single/cover-image-header.php:103
+msgid "Drag to move cover photo"
+msgstr ""
+
+#: bb-buddypress/groups/single/cover-image-header.php:66
+#: bb-buddypress/members/single/cover-image-header.php:104
+msgid "Cover photo"
+msgstr ""
+
+#: bb-buddypress/groups/single/cover-image-header.php:79
+#: bb-buddypress/groups/single/group-header.php:23
+#: buddypress/groups/single/cover-image-header.php:40
+#: buddypress/groups/single/group-header.php:23
+msgid "Change Group Photo"
+msgstr ""
+
+#: bb-buddypress/groups/single/cover-image-header.php:199
+#: bb-buddypress/groups/single/group-header.php:139
+msgid "Group Description"
+msgstr ""
+
+#: bb-buddypress/groups/single/group-header.php:140
+#: template-parts/header/navigation.php:59
+msgid "Close"
+msgstr ""
+
+#: bb-buddypress/groups/single/members-loop.php:202
+#: bb-buddypress/groups/single/members-loop.php:211
+#: bb-buddypress/groups/single/members-loop.php:213
+#: bb-buddypress/members/members-loop.php:225
+#: bb-buddypress/members/members-loop.php:236
+msgid "More options"
+msgstr ""
+
+#: bb-buddypress/groups/single/members-loop.php:247
+#: bb-buddypress/members/members-loop.php:275
+#: bb-buddypress/members/single/cover-image-header.php:272
+#: bb-buddypress/members/single/member-header.php:208
+msgid "Remove Connection"
+msgstr ""
+
+#. translators: %s: The member name with HTML tags
+#. translators: %s: The member name with HTML tags.
+#: bb-buddypress/groups/single/members-loop.php:257
+#: bb-buddypress/members/members-loop.php:285
+#: bb-buddypress/members/single/cover-image-header.php:282
+#: bb-buddypress/members/single/member-header.php:218
+#, php-format
+msgid "Are you sure you want to remove %s from your connections?"
+msgstr ""
+
+#: bb-buddypress/members/members-loop.php:234
+msgid "More Options"
+msgstr ""
+
+#: bb-buddypress/members/single/cover-image-header.php:127
+#: bb-buddypress/members/single/member-header.php:66
+#: buddypress/members/single/cover-image-header.php:26
+#: buddypress/members/single/member-header.php:14
+msgid "Change Profile Photo"
+msgstr ""
+
+#: bb-buddypress/members/single/groups/invites.php:10
+#: buddypress/members/single/groups/invites.php:10
+msgid "Group Invites"
+msgstr ""
+
+#: bb-buddypress/members/single/groups/invites.php:45
+#, php-format
+msgid "Invited by %1$s &middot; %2$s."
+msgstr ""
+
+#: buddypress/groups/single/cover-image-header.php:76
+#: buddypress/groups/single/group-header.php:58
+msgid "Group Types"
+msgstr ""
+
+#: buddypress/groups/single/cover-image-header.php:77
+#: buddypress/groups/single/group-header.php:59
+msgid "Group Type"
+msgstr ""
+
+#: buddypress/members/single/cover-image-header.php:69
+#: buddypress/members/single/member-header.php:52
+msgid "Member Types"
+msgstr ""
+
+#: buddypress/members/single/cover-image-header.php:70
+#: buddypress/members/single/member-header.php:53
+msgid "Member Type"
+msgstr ""
+
+#. translators: %s is the number of Group members
+#: buddypress/members/single/groups/invites.php:45
+#, php-format
+msgid "%s member"
+msgid_plural "%s members"
+msgstr[0] ""
+msgstr[1] ""
+
+#. translators: 1: title.
+#: comments.php:38
+#, php-format
+msgid "One thought on &ldquo;%1$s&rdquo;"
+msgstr ""
+
+#. translators: 1: comment count number, 2: title.
+#: comments.php:44
+#, php-format
+msgctxt "comments title"
+msgid "%1$s thought on &ldquo;%2$s&rdquo;"
+msgid_plural "%1$s thoughts on &ldquo;%2$s&rdquo;"
+msgstr[0] ""
+msgstr[1] ""
+
+#: comments.php:60
+msgid "Comments are closed."
+msgstr ""
+
+#: footer.php:34
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:809
+msgid "Footer"
+msgstr ""
+
+#. translators: %1$s: opening link tag, %2$s: closing link tag
+#: functions.php:407
+#, php-format
+msgid "BuddyX requires the BuddyPress Template Pack \"BP Nouveau\" to be active. Please activate this Template Pack from the %1$sBuddyPress Options%2$s."
+msgstr ""
+
+#: header.php:36
+msgid "Skip to content"
+msgstr ""
+
+#: inc/Accessibility/Component.php:73
+msgid "Expand child menu"
+msgstr ""
+
+#: inc/Accessibility/Component.php:74
+msgid "Collapse child menu"
+msgstr ""
+
+#. translators: 1: required WP version number, 2: required PHP version number, 3: available WP version number, 4: available PHP version number
+#: inc/back-compat.php:25
+#, php-format
+msgid "BuddyX requires at least WordPress version %1$s and PHP version %2$s. You are running versions %3$s and %4$s respectively. Please update and try again."
+msgstr ""
+
+#. translators: 1: required WP version number, 2: available WP version number
+#: inc/back-compat.php:30
+#, php-format
+msgid "BuddyX requires at least WordPress version %1$s. You are running version %2$s. Please update and try again."
+msgstr ""
+
+#. translators: 1: required PHP version number, 2: available PHP version number
+#: inc/back-compat.php:35
+#, php-format
+msgid "BuddyX requires at least PHP version %1$s. You are running version %2$s. Please update and try again."
+msgstr ""
+
+#: inc/back-compat.php:39
+msgid "BuddyX requires the BuddyPress Template Pack \"BP Nouveau\" to be active. Please activate this Template Pack from the BuddyPress Options."
+msgstr ""
+
+#: inc/Base_Support/block-styles.php:19
+msgid "Outline Accent"
+msgstr ""
+
+#: inc/Base_Support/block-styles.php:26
+msgid "Link with Arrow"
+msgstr ""
+
+#: inc/Base_Support/block-styles.php:33
+msgid "Gradient"
+msgstr ""
+
+#: inc/Base_Support/block-styles.php:40
+msgid "Dotted"
+msgstr ""
+
+#: inc/Base_Support/block-styles.php:47
+msgid "Card"
+msgstr ""
+
+#: inc/Base_Support/block-styles.php:54
+msgid "Bordered"
+msgstr ""
+
+#: inc/Base_Support/block-styles.php:61
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:245
+msgid "Editorial"
+msgstr ""
+
+#: inc/Base_Support/block-styles.php:68
+msgid "Stacked Links (no bullets)"
+msgstr ""
+
+#: inc/Base_Support/Component.php:199
+msgid "Borders"
+msgstr ""
+
+#: inc/Base_Support/Component.php:212
+msgid "BuddyX Hero"
+msgstr ""
+
+#: inc/Base_Support/Component.php:213
+msgid "BuddyX About"
+msgstr ""
+
+#: inc/Base_Support/Component.php:214
+msgid "BuddyX Features"
+msgstr ""
+
+#: inc/Base_Support/Component.php:215
+msgid "BuddyX Social Proof"
+msgstr ""
+
+#: inc/Base_Support/Component.php:216
+msgid "BuddyX Pricing & FAQ"
+msgstr ""
+
+#: inc/Base_Support/Component.php:217
+msgid "BuddyX CTA"
+msgstr ""
+
+#: inc/Base_Support/Component.php:218
+msgid "BuddyX Footer"
+msgstr ""
+
+#: inc/Base_Support/Component.php:219
+msgid "BuddyX Query"
+msgstr ""
+
+#: inc/class-buddyx-breadcrumbs.php:352
+msgid "Browse:"
+msgstr ""
+
+#: inc/class-buddyx-breadcrumbs.php:353
+msgctxt "breadcrumbs aria label"
+msgid "Breadcrumbs"
+msgstr ""
+
+#: inc/class-buddyx-breadcrumbs.php:354
+#: inc/Starter_Content/Component.php:94
+msgid "Home"
+msgstr ""
+
+#: inc/class-buddyx-breadcrumbs.php:355
+msgid "404 Not Found"
+msgstr ""
+
+#: inc/class-buddyx-breadcrumbs.php:356
+msgid "Archives"
+msgstr ""
+
+#. Translators: %s is the search query.
+#: inc/class-buddyx-breadcrumbs.php:358
+#, php-format
+msgid "Search results for: %s"
+msgstr ""
+
+#. Translators: %s is the page number.
+#: inc/class-buddyx-breadcrumbs.php:360
+#, php-format
+msgid "Page %s"
+msgstr ""
+
+#. Translators: %s is the page number.
+#: inc/class-buddyx-breadcrumbs.php:362
+#, php-format
+msgid "Comment Page %s"
+msgstr ""
+
+#. Translators: Minute archive title. %s is the minute time format.
+#: inc/class-buddyx-breadcrumbs.php:364
+#, php-format
+msgid "Minute %s"
+msgstr ""
+
+#. Translators: Weekly archive title. %s is the week date format.
+#: inc/class-buddyx-breadcrumbs.php:366
+#, php-format
+msgid "Week %s"
+msgstr ""
+
+#: inc/class-buddyx-breadcrumbs.php:375
+#: template-parts/header/buddypress-profile.php:190
+#: template-parts/header/buddypress-profile.php:191
+msgid "Register"
+msgstr ""
+
+#: inc/class-buddyx-breadcrumbs.php:858
+msgctxt "minute and hour archives time format"
+msgid "g:i a"
+msgstr ""
+
+#: inc/class-buddyx-breadcrumbs.php:876
+msgctxt "minute archives time format"
+msgid "i"
+msgstr ""
+
+#: inc/class-buddyx-breadcrumbs.php:894
+msgctxt "hour archives time format"
+msgid "g a"
+msgstr ""
+
+#: inc/class-buddyx-breadcrumbs.php:911
+#: inc/class-buddyx-breadcrumbs.php:941
+#: inc/class-buddyx-breadcrumbs.php:981
+#: inc/class-buddyx-breadcrumbs.php:1009
+#: inc/class-buddyx-breadcrumbs.php:1375
+msgctxt "yearly archives date format"
+msgid "Y"
+msgstr ""
+
+#: inc/class-buddyx-breadcrumbs.php:912
+#: inc/class-buddyx-breadcrumbs.php:982
+#: inc/class-buddyx-breadcrumbs.php:1380
+msgctxt "monthly archives date format"
+msgid "F"
+msgstr ""
+
+#: inc/class-buddyx-breadcrumbs.php:913
+#: inc/class-buddyx-breadcrumbs.php:1385
+msgctxt "daily archives date format"
+msgid "j"
+msgstr ""
+
+#: inc/class-buddyx-breadcrumbs.php:942
+msgctxt "weekly archives date format"
+msgid "W"
+msgstr ""
+
+#: inc/Color_Mode_Toggle/Component.php:116
+msgid "Light mode (click to switch to dark)"
+msgstr ""
+
+#: inc/Color_Mode_Toggle/Component.php:117
+msgid "Dark mode (click to switch to light)"
+msgstr ""
+
+#: inc/compatibility/buddypress/buddypress-functions.php:53
+msgid "Profile"
+msgstr ""
+
+#: inc/compatibility/buddypress/buddypress-functions.php:54
+#: inc/compatibility/buddypress/buddypress-functions.php:67
+msgid "Activity"
+msgstr ""
+
+#: inc/compatibility/buddypress/buddypress-functions.php:55
+msgid "Groups"
+msgstr ""
+
+#: inc/compatibility/buddypress/buddypress-functions.php:56
+msgid "Forums"
+msgstr ""
+
+#: inc/compatibility/buddypress/buddypress-functions.php:57
+msgid "Friends"
+msgstr ""
+
+#: inc/compatibility/buddypress/buddypress-functions.php:58
+msgid "Members"
+msgstr ""
+
+#: inc/compatibility/buddypress/buddypress-functions.php:59
+msgid "Blogs"
+msgstr ""
+
+#: inc/compatibility/buddypress/buddypress-functions.php:60
+msgid "Business"
+msgstr ""
+
+#: inc/compatibility/buddypress/buddypress-functions.php:297
+msgid "Recently earned badge"
+msgid_plural "Recently earned badges"
+msgstr[0] ""
+msgstr[1] ""
+
+#: inc/compatibility/fluentcart/fluentcart-functions.php:236
+#: inc/compatibility/surecart/surecart-functions.php:293
+msgid "Enable Cart Icon?"
+msgstr ""
+
+#: inc/compatibility/fluentcart/fluentcart-functions.php:241
+#: inc/compatibility/surecart/surecart-functions.php:298
+#: inc/Customizer_Settings/Fields/BuddyPress_Fields.php:22
+#: inc/Customizer_Settings/Fields/Header_Fields.php:21
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:271
+#: inc/Customizer_Settings/Fields/WP_Login_Fields.php:21
+#: inc/Customizer_Settings/Fields/WP_Login_Fields.php:34
+msgid "Yes"
+msgstr ""
+
+#: inc/compatibility/fluentcart/fluentcart-functions.php:242
+#: inc/compatibility/surecart/surecart-functions.php:299
+#: inc/Customizer_Settings/Fields/BuddyPress_Fields.php:23
+#: inc/Customizer_Settings/Fields/Header_Fields.php:22
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:272
+#: inc/Customizer_Settings/Fields/WP_Login_Fields.php:22
+#: inc/Customizer_Settings/Fields/WP_Login_Fields.php:35
+msgid "No"
+msgstr ""
+
+#: inc/compatibility/fluentcart/fluentcart-functions.php:244
+msgid "Display FluentCart cart icon in header"
+msgstr ""
+
+#: inc/compatibility/fluentcart/fluentcart-functions.php:254
+msgid "Single Product Sidebar"
+msgstr ""
+
+#: inc/compatibility/fluentcart/fluentcart-functions.php:264
+msgid "Choose sidebar layout for single product page."
+msgstr ""
+
+#: inc/compatibility/fluentcart/fluentcart-functions.php:334
+#: inc/compatibility/surecart/surecart-functions.php:360
+#: inc/compatibility/woocommerce/woocommerce-functions.php:46
+msgid "View Shopping Cart"
+msgstr ""
+
+#: inc/compatibility/surecart/surecart-functions.php:301
+msgid "Display SureCart cart icon in header"
+msgstr ""
+
+#: inc/compatibility/woocommerce/woocommerce-functions.php:98
+msgid "View your shopping cart"
+msgstr ""
+
+#: inc/Customizer/Component.php:166
+msgid "Theme Options"
+msgstr ""
+
+#: inc/Customizer_Framework/Controls/Background.php:58
+msgid "Color"
+msgstr ""
+
+#: inc/Customizer_Framework/Controls/Background.php:62
+msgid "Image URL"
+msgstr ""
+
+#: inc/Customizer_Framework/Controls/Background.php:64
+msgid "Select Image"
+msgstr ""
+
+#: inc/Customizer_Framework/Controls/Background.php:67
+msgid "Repeat"
+msgstr ""
+
+#: inc/Customizer_Framework/Controls/Background.php:75
+msgid "Position"
+msgstr ""
+
+#: inc/Customizer_Framework/Controls/Background.php:83
+#: inc/Customizer_Framework/Controls/Typography.php:162
+msgid "Size"
+msgstr ""
+
+#: inc/Customizer_Framework/Controls/Background.php:91
+msgid "Attachment"
+msgstr ""
+
+#. translators: %s: row label, e.g. "Item"
+#: inc/Customizer_Framework/Controls/Repeater.php:75
+#, php-format
+msgid "Add %s"
+msgstr ""
+
+#: inc/Customizer_Framework/Controls/Typography.php:82
+msgid "Theme fonts"
+msgstr ""
+
+#: inc/Customizer_Framework/Controls/Typography.php:88
+#: inc/Welcome/Component.php:564
+msgid "Google Fonts"
+msgstr ""
+
+#: inc/Customizer_Framework/Controls/Typography.php:102
+msgid "Custom Fonts"
+msgstr ""
+
+#: inc/Customizer_Framework/Controls/Typography.php:109
+msgid "Default (theme)"
+msgstr ""
+
+#: inc/Customizer_Framework/Controls/Typography.php:110
+msgid "Saved"
+msgstr ""
+
+#: inc/Customizer_Framework/Controls/Typography.php:111
+msgid "Search fonts…"
+msgstr ""
+
+#: inc/Customizer_Framework/Controls/Typography.php:142
+msgid "Family"
+msgstr ""
+
+#: inc/Customizer_Framework/Controls/Typography.php:148
+msgid "Weight"
+msgstr ""
+
+#: inc/Customizer_Framework/Controls/Typography.php:152
+msgid "Style"
+msgstr ""
+
+#: inc/Customizer_Framework/Controls/Typography.php:154
+msgid "Normal"
+msgstr ""
+
+#: inc/Customizer_Framework/Controls/Typography.php:155
+msgid "Italic"
+msgstr ""
+
+#: inc/Customizer_Framework/Controls/Typography.php:166
+msgid "Line height"
+msgstr ""
+
+#: inc/Customizer_Framework/Controls/Typography.php:173
+msgid "Letter"
+msgstr ""
+
+#: inc/Customizer_Framework/Controls/Typography.php:177
+msgid "Transform"
+msgstr ""
+
+#: inc/Customizer_Framework/Controls/Typography.php:179
+#: inc/Customizer_Framework/Controls/Typography.php:201
+msgid "None"
+msgstr ""
+
+#: inc/Customizer_Framework/Controls/Typography.php:180
+msgid "UPPER"
+msgstr ""
+
+#: inc/Customizer_Framework/Controls/Typography.php:181
+msgid "lower"
+msgstr ""
+
+#: inc/Customizer_Framework/Controls/Typography.php:182
+msgid "Capitalize"
+msgstr ""
+
+#: inc/Customizer_Framework/Controls/Typography.php:189
+msgid "Align"
+msgstr ""
+
+#: inc/Customizer_Framework/Controls/Typography.php:191
+msgid "Inherit"
+msgstr ""
+
+#: inc/Customizer_Framework/Controls/Typography.php:192
+#: inc/Customizer_Settings/Fields/Blog_Fields.php:38
+msgid "Left"
+msgstr ""
+
+#: inc/Customizer_Framework/Controls/Typography.php:193
+msgid "Center"
+msgstr ""
+
+#: inc/Customizer_Framework/Controls/Typography.php:194
+#: inc/Customizer_Settings/Fields/Blog_Fields.php:39
+msgid "Right"
+msgstr ""
+
+#: inc/Customizer_Framework/Controls/Typography.php:195
+msgid "Justify"
+msgstr ""
+
+#: inc/Customizer_Framework/Controls/Typography.php:199
+msgid "Decoration"
+msgstr ""
+
+#: inc/Customizer_Framework/Controls/Typography.php:202
+#: inc/Customizer_Settings/Fields/Blog_Fields.php:139
+msgid "Underline"
+msgstr ""
+
+#: inc/Customizer_Framework/Controls/Typography.php:203
+msgid "Strikethrough"
+msgstr ""
+
+#: inc/Customizer_Framework/Controls/Typography.php:204
+msgid "Overline"
+msgstr ""
+
+#: inc/Customizer_Settings/Component.php:140
+msgid "General"
+msgstr ""
+
+#: inc/Customizer_Settings/Component.php:149
+#: inc/Customizer_Settings/Fields/General_Fields.php:17
+#: inc/Welcome/Component.php:196
+#: inc/Welcome/Component.php:484
+msgid "Site Layout"
+msgstr ""
+
+#: inc/Customizer_Settings/Component.php:160
+#: inc/Welcome/Component.php:529
+msgid "Site Loader"
+msgstr ""
+
+#: inc/Customizer_Settings/Component.php:171
+#: inc/Welcome/Component.php:514
+msgid "Page Mapping"
+msgstr ""
+
+#: inc/Customizer_Settings/Component.php:182
+#: inc/Welcome/Component.php:539
+msgid "Typography"
+msgstr ""
+
+#: inc/Customizer_Settings/Component.php:191
+msgid "Site Title"
+msgstr ""
+
+#: inc/Customizer_Settings/Component.php:201
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:625
+#: inc/Welcome/Component.php:549
+msgid "Headings"
+msgstr ""
+
+#: inc/Customizer_Settings/Component.php:211
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:419
+#: inc/Welcome/Component.php:554
+#: template-parts/header/navigation.php:58
+msgid "Menu"
+msgstr ""
+
+#: inc/Customizer_Settings/Component.php:221
+#: inc/Welcome/Component.php:559
+msgid "Body"
+msgstr ""
+
+#: inc/Customizer_Settings/Component.php:232
+msgid "Site Header"
+msgstr ""
+
+#: inc/Customizer_Settings/Component.php:242
+msgid "Site Sub Header"
+msgstr ""
+
+#: inc/Customizer_Settings/Component.php:252
+msgid "Site Skin"
+msgstr ""
+
+#: inc/Customizer_Settings/Component.php:262
+#: inc/Welcome/Component.php:211
+#: inc/Welcome/Component.php:739
+msgid "Site Blog"
+msgstr ""
+
+#: inc/Customizer_Settings/Component.php:272
+#: inc/Welcome/Component.php:769
+msgid "Site Sidebar"
+msgstr ""
+
+#: inc/Customizer_Settings/Component.php:282
+#: inc/Welcome/Component.php:819
+msgid "WP Login"
+msgstr ""
+
+#: inc/Customizer_Settings/Component.php:291
+msgid "Logo"
+msgstr ""
+
+#: inc/Customizer_Settings/Component.php:304
+msgid "Community Settings"
+msgstr ""
+
+#: inc/Customizer_Settings/Component.php:314
+msgid "General Setting"
+msgstr ""
+
+#: inc/Customizer_Settings/Component.php:326
+#: inc/Welcome/Component.php:849
+msgid "Site Footer"
+msgstr ""
+
+#: inc/Customizer_Settings/Component.php:335
+#: inc/Welcome/Component.php:854
+msgid "Footer Section"
+msgstr ""
+
+#: inc/Customizer_Settings/Component.php:346
+#: inc/Welcome/Component.php:859
+msgid "Copyright Section"
+msgstr ""
+
+#: inc/Customizer_Settings/Component.php:357
+msgid "Site Performance"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Blog_Fields.php:17
+msgid "Blog Layout"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Blog_Fields.php:33
+msgid "Image position"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Blog_Fields.php:54
+msgid "Grid Columns"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Blog_Fields.php:59
+msgid "One"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Blog_Fields.php:60
+#: inc/Customizer_Settings/Fields/Blog_Fields.php:101
+msgid "Two"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Blog_Fields.php:75
+msgid "View"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Blog_Fields.php:80
+msgid "Without Masonry"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Blog_Fields.php:81
+msgid "With Masonry"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Blog_Fields.php:96
+#: inc/Welcome/Component.php:764
+msgid "Post Per Row"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Blog_Fields.php:102
+msgid "Three"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Blog_Fields.php:117
+msgid "Show Tags"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Blog_Fields.php:122
+#: inc/Customizer_Settings/Fields/Blog_Fields.php:159
+#: inc/Customizer_Settings/Fields/Footer_Fields.php:21
+#: inc/Customizer_Settings/Fields/General_Fields.php:108
+#: inc/Customizer_Settings/Fields/Header_Fields.php:37
+#: inc/Customizer_Settings/Fields/Header_Fields.php:54
+#: inc/Customizer_Settings/Fields/Header_Fields.php:71
+#: inc/Customizer_Settings/Fields/Header_Fields.php:87
+#: inc/Customizer_Settings/Fields/Sidebar_Fields.php:141
+#: inc/Customizer_Settings/Fields/Site_Performance.php:21
+#: inc/Customizer_Settings/Fields/Site_Performance.php:34
+#: inc/Customizer_Settings/Fields/Sub_Header_Fields.php:21
+#: inc/Customizer_Settings/Fields/Sub_Header_Fields.php:99
+msgid "Enable"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Blog_Fields.php:123
+#: inc/Customizer_Settings/Fields/Blog_Fields.php:160
+#: inc/Customizer_Settings/Fields/Footer_Fields.php:22
+#: inc/Customizer_Settings/Fields/General_Fields.php:109
+#: inc/Customizer_Settings/Fields/Header_Fields.php:38
+#: inc/Customizer_Settings/Fields/Header_Fields.php:55
+#: inc/Customizer_Settings/Fields/Header_Fields.php:72
+#: inc/Customizer_Settings/Fields/Header_Fields.php:88
+#: inc/Customizer_Settings/Fields/Sidebar_Fields.php:142
+#: inc/Customizer_Settings/Fields/Site_Performance.php:22
+#: inc/Customizer_Settings/Fields/Site_Performance.php:35
+#: inc/Customizer_Settings/Fields/Sub_Header_Fields.php:22
+#: inc/Customizer_Settings/Fields/Sub_Header_Fields.php:100
+msgid "Disable"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Blog_Fields.php:125
+msgid "Display tags on blog layouts."
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Blog_Fields.php:132
+msgid "Tags Style"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Blog_Fields.php:137
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:238
+msgid "Default"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Blog_Fields.php:138
+msgid "Badge"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Blog_Fields.php:154
+msgid "Show Edit Link"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Blog_Fields.php:162
+msgid "Please remember that the results will be shown in the frontend."
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Blog_Fields.php:177
+msgid "Single Post Content Width"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Blog_Fields.php:191
+msgid "Single Post Title Layout"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Blog_Fields.php:207
+msgid "Image Overlay Color"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Blog_Fields.php:208
+msgid "Allow to add image overlay color on single post title layout one."
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/BuddyPress_Fields.php:17
+msgid "Avatar Style"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/BuddyPress_Fields.php:18
+msgid "Set the round style for member and group avatars."
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Footer_Fields.php:17
+#: inc/Customizer_Settings/Fields/Sub_Header_Fields.php:17
+msgid "Customize Background ?"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Footer_Fields.php:30
+#: inc/Customizer_Settings/Fields/Sub_Header_Fields.php:30
+msgid "Background Control"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Footer_Fields.php:68
+msgid "Add Content"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/General_Fields.php:21
+msgid "You can select wide or box layout based on your preference."
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/General_Fields.php:35
+msgid "Max Content Layout Width"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/General_Fields.php:36
+msgid "Select the maximum content width for your website (px)"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/General_Fields.php:64
+#: inc/Welcome/Component.php:499
+msgid "Global Border Radius"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/General_Fields.php:65
+msgid "Set the content, various elements border radius for your website (px)"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/General_Fields.php:76
+#: inc/Welcome/Component.php:504
+msgid "Buttons Border Radius"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/General_Fields.php:77
+msgid "Set the buttons border radius for your website (px)"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/General_Fields.php:88
+#: inc/Welcome/Component.php:509
+msgid "Form Border Radius"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/General_Fields.php:89
+msgid "Set the form elements (except textarea) border radius for your website (px)"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/General_Fields.php:103
+msgid "Show site loader?"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/General_Fields.php:104
+msgid "Display a loading animation while the page is loading. Off by default — modern pages load fast enough that an extra animation usually adds perceived delay rather than helping."
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/General_Fields.php:118
+msgid "Loader animation"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/General_Fields.php:145
+msgid "Background color"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/General_Fields.php:171
+msgid "Element color"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/General_Fields.php:172
+msgid "Color of the spinner, dots, or text. Ignored when using a logo."
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/General_Fields.php:198
+msgid "Loader text"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/General_Fields.php:199
+msgid "Used for the screen-reader announcement (aria-label). Visible on the screen for the \"Logo\" loader."
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/General_Fields.php:201
+#: inc/extra.php:180
+msgid "Loading"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/General_Fields.php:218
+msgid "Custom logo image"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/General_Fields.php:219
+msgid "Upload an image to use as the loader. Falls back to the site logo when empty."
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/General_Fields.php:243
+msgid "Animation speed (seconds)"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/General_Fields.php:276
+msgid "Login Page"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/General_Fields.php:277
+msgid "You can redirect user to custom login page."
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/General_Fields.php:288
+msgid "Registration Page"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/General_Fields.php:289
+msgid "You can redirect user to custom registration page."
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/General_Fields.php:300
+msgid "404"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/General_Fields.php:301
+msgid "You can redirect user to custom 404 page."
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Header_Fields.php:17
+msgid "Enable Sticky Header ?"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Header_Fields.php:33
+msgid "Enable Search Icon"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Header_Fields.php:50
+msgid "Enable Cart Icon"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Header_Fields.php:67
+msgid "Enable Login Link"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Header_Fields.php:83
+msgid "Enable Register Link"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Sidebar_Fields.php:17
+msgid "Sidebar Layout"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Sidebar_Fields.php:33
+msgid "Single Post Sidebar Layout"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Sidebar_Fields.php:51
+msgid "Activity Directory Sidebar Layout"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Sidebar_Fields.php:67
+msgid "Members Directory Sidebar Layout"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Sidebar_Fields.php:83
+msgid "Groups Directory Sidebar Layout"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Sidebar_Fields.php:102
+msgid "bbPress Sidebar Layout"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Sidebar_Fields.php:120
+msgid "WooCommerce Sidebar Layout"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Sidebar_Fields.php:137
+msgid "Sticky Sidebar ?"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Site_Performance.php:17
+msgid "Load Google Fonts Locally ?"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Site_Performance.php:30
+msgid "Preload Local Fonts ?"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Site_Performance.php:50
+msgid "Flush Local Fonts Cache"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Site_Performance.php:51
+msgid "Click the button to reset the local fonts cache."
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:115
+msgid "Mode & Master"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:116
+msgid "Color mode and the master switch for custom colors"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:129
+msgid "Color mode"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:130
+msgid "Default look for new visitors."
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:131
+msgid "Light or Dark keeps the site on one look for everyone."
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:136
+msgid "Light"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:137
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:244
+msgid "Dark"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:155
+msgid "Show color-mode toggle"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:156
+msgid "Let visitors switch the look."
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:159
+msgid "Adds a sun and moon button so visitors can pick Light or Dark. Turn off to keep the look you set above."
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:164
+msgid "Show"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:165
+msgid "Hide"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:174
+msgid "Toggle position"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:175
+msgid "Where the button appears."
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:176
+msgid "Header places it next to the menu icons. Mobile shows it only in the mobile menu. Both shows it in each."
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:181
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:332
+#: inc/Welcome/Component.php:589
+msgid "Header"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:182
+msgid "Mobile"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:183
+msgid "Both"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:209
+msgid "Style preset"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:210
+msgid "Pick a ready-made starting look."
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:211
+msgid "Each card previews the preset's palette. Any colors you change below still take priority over the preset."
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:243
+msgid "Cool"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:246
+msgid "Minimal"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:247
+msgid "Monochrome"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:248
+msgid "Pastel"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:249
+msgid "Vibrant"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:250
+msgid "Warm"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:266
+msgid "Set Custom Colors?"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:297
+msgid "Brand"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:298
+msgid "Primary accent used across links, buttons, and highlights"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:307
+#: inc/Welcome/Component.php:704
+msgid "Theme Color"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:333
+msgid "Logo, navigation, and the top of every page"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:347
+msgid "Header surface"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:354
+msgid "Header Background Color"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:371
+msgid "Site title"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:378
+msgid "Site Title Color"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:390
+msgid "Site Title Hover Color"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:402
+msgid "Site Tagline Color"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:426
+msgid "Menu Color"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:438
+msgid "Menu Hover Color"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:450
+msgid "Menu Active Color"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:464
+msgid "Subheader Title Color"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:490
+msgid "Surfaces"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:491
+msgid "Background colors for the page, content area, and cards"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:500
+#: inc/Welcome/Component.php:699
+msgid "Body Background Color"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:512
+msgid "Content Background Color"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:513
+msgid "Note: This setting will only be used if the box layout is selected."
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:535
+msgid "Box Background Color"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:547
+msgid "Secondary Background Color"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:569
+msgid "Text & Links"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:570
+msgid "Body text and inline link colors"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:579
+msgid "Body Text Color"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:591
+#: inc/Welcome/Component.php:709
+msgid "Link Color"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:603
+msgid "Link Hover"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:626
+msgid "H1 through H6 — section titles across posts, pages, and widgets"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:635
+msgid "H1 Color"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:647
+msgid "H2 Color"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:659
+msgid "H3 Color"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:671
+msgid "H4 Color"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:683
+msgid "H5 Color"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:695
+msgid "H6 Color"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:717
+msgid "Buttons"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:718
+msgid "Background, text, and border in default and hover states"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:727
+msgid "Button Background Color"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:739
+msgid "Button Background Hover Color"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:751
+msgid "Button Text Color"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:763
+msgid "Button Text Hover Color"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:775
+msgid "Button Border Color"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:787
+msgid "Button Border Hover Color"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:810
+msgid "Widget area at the bottom of every page"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:819
+msgid "Footer Title Color"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:831
+msgid "Footer Content Color"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:843
+msgid "Footer Link Color"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:855
+msgid "Footer Link Hover"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:880
+msgid "Copyright"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:881
+msgid "Copyright bar shown below the footer widgets"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:890
+msgid "Copyright Background Color"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:902
+msgid "Copyright Border Color"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:920
+msgid "Copyright Content Color"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:932
+msgid "Copyright Link Color"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Skin_Fields.php:944
+msgid "Copyright Link Hover Color"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Sub_Header_Fields.php:71
+#: inc/Welcome/Component.php:674
+msgid "Content Typography"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Sub_Header_Fields.php:95
+msgid "Site Breadcrumbs?"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Typography_Fields.php:17
+#: inc/Welcome/Component.php:544
+msgid "Site Title Settings"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Typography_Fields.php:31
+#: inc/Customizer_Settings/Fields/Typography_Fields.php:57
+#: inc/Customizer_Settings/Fields/Typography_Fields.php:86
+#: inc/Customizer_Settings/Fields/Typography_Fields.php:112
+#: inc/Customizer_Settings/Fields/Typography_Fields.php:138
+#: inc/Customizer_Settings/Fields/Typography_Fields.php:164
+#: inc/Customizer_Settings/Fields/Typography_Fields.php:190
+#: inc/Customizer_Settings/Fields/Typography_Fields.php:216
+#: inc/Customizer_Settings/Fields/Typography_Fields.php:245
+#: inc/Customizer_Settings/Fields/Typography_Fields.php:271
+#: inc/Customizer_Settings/Fields/Typography_Fields.php:300
+msgid "We recommend using font size in pixels (px)"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Typography_Fields.php:43
+msgid "Site Tagline Settings"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Typography_Fields.php:72
+msgid "H1 Tag Settings"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Typography_Fields.php:98
+msgid "H2 Tag Settings"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Typography_Fields.php:124
+msgid "H3 Tag Settings"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Typography_Fields.php:150
+msgid "H4 Tag Settings"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Typography_Fields.php:176
+msgid "H5 Tag Settings"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Typography_Fields.php:202
+msgid "H6 Tag Settings"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Typography_Fields.php:231
+msgid "Menu Settings"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Typography_Fields.php:257
+msgid "Sub Menu Settings"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/Typography_Fields.php:286
+msgid "Settings"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/WP_Login_Fields.php:17
+#: inc/Welcome/Component.php:824
+msgid "Customize Your Logo Section"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/WP_Login_Fields.php:30
+msgid "Disable Logo?"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/WP_Login_Fields.php:50
+msgid "Custom Logo"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/WP_Login_Fields.php:73
+msgid "Logo Width"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/WP_Login_Fields.php:74
+msgid "Select the logo width (px)"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/WP_Login_Fields.php:97
+msgid "Logo Height"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/WP_Login_Fields.php:98
+msgid "Select the logo height (px)"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/WP_Login_Fields.php:121
+msgid "Logo Space Bottom"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/WP_Login_Fields.php:122
+msgid "Select the logo bottom spacing (px)"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/WP_Login_Fields.php:145
+msgid "Logo URL"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/WP_Login_Fields.php:168
+msgid "Logo Title"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/WP_Login_Fields.php:191
+msgid "Login Page Title"
+msgstr ""
+
+#: inc/Customizer_Settings/Fields/WP_Login_Fields.php:192
+msgid "Login page title that is shown on WordPress login page."
+msgstr ""
+
+#: inc/Custom_Logo/Component.php:91
+msgid "Dark Mode Logo"
+msgstr ""
+
+#: inc/Custom_Logo/Component.php:92
+msgid "Logo shown when the theme is in dark mode. Falls back to the standard logo if empty."
+msgstr ""
+
+#: inc/Editor/Component.php:65
+#: inc/Nav_Menus/Component.php:71
+msgid "Primary"
+msgstr ""
+
+#: inc/Editor/Component.php:70
+msgid "Secondary"
+msgstr ""
+
+#: inc/Editor/Component.php:75
+msgid "Red"
+msgstr ""
+
+#: inc/Editor/Component.php:80
+msgid "Green"
+msgstr ""
+
+#: inc/Editor/Component.php:85
+msgid "Blue"
+msgstr ""
+
+#: inc/Editor/Component.php:90
+msgid "Yellow"
+msgstr ""
+
+#: inc/Editor/Component.php:95
+msgid "Black"
+msgstr ""
+
+#: inc/Editor/Component.php:100
+msgid "Grey"
+msgstr ""
+
+#: inc/Editor/Component.php:105
+msgid "White"
+msgstr ""
+
+#: inc/Editor/Component.php:110
+msgid "Dusty daylight"
+msgstr ""
+
+#: inc/Editor/Component.php:115
+msgid "Dusty sun"
+msgstr ""
+
+#: inc/Editor/Component.php:132
+msgid "Small"
+msgstr ""
+
+#: inc/Editor/Component.php:133
+msgid "S"
+msgstr ""
+
+#: inc/Editor/Component.php:138
+msgid "Medium"
+msgstr ""
+
+#: inc/Editor/Component.php:139
+msgid "M"
+msgstr ""
+
+#: inc/Editor/Component.php:144
+msgid "Large"
+msgstr ""
+
+#: inc/Editor/Component.php:145
+msgid "L"
+msgstr ""
+
+#: inc/Editor/Component.php:150
+msgid "Larger"
+msgstr ""
+
+#: inc/Editor/Component.php:151
+msgid "XL"
+msgstr ""
+
+#. translators: %s: Post title.
+#. translators: %s: Name of current post. Only visible to screen readers
+#: inc/Excerpts/Component.php:44
+#: template-parts/content-bbpress.php:20
+#: template-parts/content-buddypress.php:20
+#: template-parts/content/entry-full-width.php:37
+#: template-parts/content/entry_content.php:21
+#, php-format
+msgid "Continue reading<span class=\"screen-reader-text\"> \"%s\"</span>"
+msgstr ""
+
+#: inc/extra.php:90
+#: inc/extra.php:249
+msgid "Search"
+msgstr ""
+
+#: inc/extra.php:284
+msgid "Copyright &copy; [current_year] [site_title] | Powered by [theme_author]"
+msgstr ""
+
+#: inc/extra.php:317
+msgid "BuddyX WordPress Theme"
+msgstr ""
+
+#: inc/extra.php:359
+msgid "Sticky"
+msgstr ""
+
+#: inc/extra.php:370
+msgid "Leave a comment"
+msgstr ""
+
+#: inc/extra.php:370
+msgid "1 Comment"
+msgstr ""
+
+#: inc/extra.php:370
+msgid "% Comments"
+msgstr ""
+
+#: inc/extra.php:375
+#: template-parts/content/entry_meta.php:146
+msgid "Edit"
+msgstr ""
+
+#: inc/extra.php:505
+msgid "Post Settings"
+msgstr ""
+
+#: inc/extra.php:514
+msgid "Post Format Settings"
+msgstr ""
+
+#: inc/extra.php:533
+msgid "Overwrite Title Customizer settings"
+msgstr ""
+
+#: inc/extra.php:538
+msgid "Title Style"
+msgstr ""
+
+#: inc/extra.php:544
+msgid "Title over featured image"
+msgstr ""
+
+#: inc/extra.php:550
+msgid "Title overlapping featured image"
+msgstr ""
+
+#: inc/extra.php:556
+msgid "Title above featured image"
+msgstr ""
+
+#: inc/extra.php:562
+msgid "Title below featured image"
+msgstr ""
+
+#: inc/extra.php:589
+msgid "Enter Youtube, Vimeo and etc video url."
+msgstr ""
+
+#: inc/extra.php:592
+msgid "Video URL"
+msgstr ""
+
+#: inc/extra.php:595
+#: inc/extra.php:608
+#: inc/extra.php:838
+msgid "Add Media"
+msgstr ""
+
+#: inc/extra.php:602
+msgid "Enter audio url."
+msgstr ""
+
+#: inc/extra.php:605
+msgid "Audio URL"
+msgstr ""
+
+#: inc/extra.php:615
+msgid "Input your quote."
+msgstr ""
+
+#: inc/extra.php:618
+msgid "Quote Text"
+msgstr ""
+
+#: inc/extra.php:624
+msgid "Quote Author"
+msgstr ""
+
+#: inc/extra.php:631
+msgid "Input your link."
+msgstr ""
+
+#: inc/extra.php:634
+msgid "Link Title"
+msgstr ""
+
+#: inc/extra.php:640
+msgid "Link URL"
+msgstr ""
+
+#: inc/extra.php:647
+msgid "To create a gallery, upload your images and then select \"Uploaded to this post\" from the dropdown (in the media popup) to see images attached to this post. You can drag to re-order or delete them there."
+msgstr ""
+
+#: inc/extra.php:670
+#: inc/extra.php:777
+msgid "Delete image"
+msgstr ""
+
+#: inc/extra.php:684
+#: inc/extra.php:754
+msgid "Add images gallery"
+msgstr ""
+
+#: inc/extra.php:756
+msgid "Add to gallery"
+msgstr ""
+
+#: inc/extra.php:840
+msgid "Add to Media"
+msgstr ""
+
+#: inc/extra.php:1036
+#: inc/extra.php:1076
+msgid "&hellip;"
+msgstr ""
+
+#: inc/extra.php:1078
+msgid " Read more"
+msgstr ""
+
+#: inc/Fonts/Component.php:131
+msgid "Modern Stacks"
+msgstr ""
+
+#: inc/Fonts/Component.php:132
+msgid "A collection of modern system fonts."
+msgstr ""
+
+#: inc/Fonts/Component.php:138
+msgid "System UI"
+msgstr ""
+
+#: inc/Fonts/Component.php:146
+msgid "Transitional"
+msgstr ""
+
+#: inc/Fonts/Component.php:154
+msgid "Monospace Slab Serif"
+msgstr ""
+
+#: inc/Fonts/Component.php:162
+msgid "Handwritten"
+msgstr ""
+
+#: inc/Fonts/Component.php:169
+msgid "Handwriting"
+msgstr ""
+
+#: inc/Fonts/Component.php:173
+msgid "Monospace"
+msgstr ""
+
+#: inc/Fonts/Component.php:177
+msgid "Sans Serif"
+msgstr ""
+
+#: inc/Fonts/Component.php:181
+msgid "Serif"
+msgstr ""
+
+#: inc/login.php:85
+msgid "Log In"
+msgstr ""
+
+#: inc/Nav_Menus/Component.php:76
+msgid "User Menu"
+msgstr ""
+
+#. translators: %s: JS handle
+#: inc/Scripts/Component.php:151
+#, php-format
+msgid "Invalid theme JS handle: %s"
+msgstr ""
+
+#. Template Name of the theme
+#: inc/Sidebars/Component.php:110
+#: inc/Welcome/Component.php:784
+msgid "Right Sidebar"
+msgstr ""
+
+#: inc/Sidebars/Component.php:112
+#: inc/Sidebars/Component.php:124
+#: inc/Sidebars/Component.php:138
+#: inc/Sidebars/Component.php:150
+#: inc/Sidebars/Component.php:162
+#: inc/Sidebars/Component.php:174
+#: inc/Sidebars/Component.php:186
+#: inc/Sidebars/Component.php:198
+#: inc/Sidebars/Component.php:210
+#: inc/Sidebars/Component.php:222
+#: inc/Sidebars/Component.php:237
+#: inc/Sidebars/Component.php:249
+#: inc/Sidebars/Component.php:263
+#: inc/Sidebars/Component.php:275
+#: inc/Sidebars/Component.php:290
+#: inc/Sidebars/Component.php:302
+#: inc/Sidebars/Component.php:315
+#: inc/Sidebars/Component.php:327
+#: inc/Sidebars/Component.php:339
+#: inc/Sidebars/Component.php:351
+msgid "Add widgets here."
+msgstr ""
+
+#. Template Name of the theme
+#: inc/Sidebars/Component.php:122
+#: inc/Welcome/Component.php:779
+msgid "Left Sidebar"
+msgstr ""
+
+#: inc/Sidebars/Component.php:136
+msgid "Community Left Sidebar"
+msgstr ""
+
+#: inc/Sidebars/Component.php:148
+msgid "Activity Directory Right Sidebar"
+msgstr ""
+
+#: inc/Sidebars/Component.php:160
+msgid "Members Directory Right Sidebar"
+msgstr ""
+
+#: inc/Sidebars/Component.php:172
+msgid "Groups Directory Right Sidebar"
+msgstr ""
+
+#: inc/Sidebars/Component.php:184
+msgid "Members Single Profile Sidebar"
+msgstr ""
+
+#: inc/Sidebars/Component.php:196
+msgid "Members Single User Activity"
+msgstr ""
+
+#: inc/Sidebars/Component.php:208
+msgid "Groups Single Group Sidebar"
+msgstr ""
+
+#: inc/Sidebars/Component.php:220
+msgid "Groups Single Group Activity"
+msgstr ""
+
+#: inc/Sidebars/Component.php:235
+msgid "bbPress Left Sidebar"
+msgstr ""
+
+#: inc/Sidebars/Component.php:247
+msgid "bbPress Right Sidebar"
+msgstr ""
+
+#: inc/Sidebars/Component.php:261
+msgid "WooCommerce Left Sidebar"
+msgstr ""
+
+#: inc/Sidebars/Component.php:273
+msgid "WooCommerce Right Sidebar"
+msgstr ""
+
+#: inc/Sidebars/Component.php:288
+msgid "Single Product Left Sidebar"
+msgstr ""
+
+#: inc/Sidebars/Component.php:300
+msgid "Single Product Right Sidebar"
+msgstr ""
+
+#: inc/Sidebars/Component.php:313
+msgid "Footer 1"
+msgstr ""
+
+#: inc/Sidebars/Component.php:325
+msgid "Footer 2"
+msgstr ""
+
+#: inc/Sidebars/Component.php:337
+msgid "Footer 3"
+msgstr ""
+
+#: inc/Sidebars/Component.php:349
+msgid "Footer 4"
+msgstr ""
+
+#: inc/Starter_Content/Component.php:112
+msgid "About"
+msgstr ""
+
+#: inc/Starter_Content/Component.php:125
+msgid "Services"
+msgstr ""
+
+#: inc/Starter_Content/Component.php:137
+msgid "Pricing"
+msgstr ""
+
+#: inc/Starter_Content/Component.php:148
+msgid "Journal"
+msgstr ""
+
+#: inc/Starter_Content/Component.php:153
+msgid "FAQ"
+msgstr ""
+
+#: inc/Starter_Content/Component.php:164
+msgid "Contact"
+msgstr ""
+
+#: inc/Starter_Content/Component.php:189
+msgid "Get in touch"
+msgstr ""
+
+#: inc/Starter_Content/Component.php:190
+msgid "We read every message. Tell us about your project, your timeline, and what would make this collaboration successful."
+msgstr ""
+
+#: inc/Starter_Content/Component.php:191
+msgid "Email us"
+msgstr ""
+
+#: inc/Starter_Content/Component.php:253
+msgid "Want to start with a BuddyX demo site?"
+msgstr ""
+
+#: inc/Starter_Content/Component.php:254
+msgid "Creates 7 demo pages (Home, About, Services, Pricing, Journal, FAQ, Contact) using the theme's built-in patterns, plus a primary navigation menu and sidebar widgets. You can edit or delete any of it afterward."
+msgstr ""
+
+#: inc/Starter_Content/Component.php:256
+msgid "Set up demo site"
+msgstr ""
+
+#: inc/Starter_Content/Component.php:257
+msgid "No thanks"
+msgstr ""
+
+#: inc/Starter_Content/Component.php:268
+#: inc/Starter_Content/Component.php:288
+msgid "You do not have permission to do this."
+msgstr ""
+
+#: inc/Starter_Content/Component.php:347
+msgid "Primary Menu"
+msgstr ""
+
+#. translators: %s: stylesheet handle
+#: inc/Styles/Component.php:342
+#, php-format
+msgid "Invalid theme stylesheet handle: %s"
+msgstr ""
+
+#. translators: 1: classname/type of the variable, 2: interface name
+#: inc/Template_Tags.php:54
+#, php-format
+msgid "The theme templating component %1$s does not implement the %2$s interface."
+msgstr ""
+
+#. translators: %s: template tag name
+#: inc/Template_Tags.php:81
+#, php-format
+msgid "The template tag %s does not exist."
+msgstr ""
+
+#. translators: 1: template tag method name, 2: component class name
+#: inc/Template_Tags.php:110
+#, php-format
+msgid "The template tag method %1$s registered by theme component %2$s must either be a callable or an array."
+msgstr ""
+
+#. translators: 1: template tag method name, 2: component class name
+#: inc/Template_Tags.php:121
+#, php-format
+msgid "The template tag method %1$s registered by theme component %2$s conflicts with an already registered template tag of the same name."
+msgstr ""
+
+#: inc/Template_Tags.php:202
+msgid "WordPress filesystem is not initialized properly."
+msgstr ""
+
+#. translators: %s: asset file path
+#: inc/Template_Tags.php:211
+#, php-format
+msgid "Error reading asset file: %s"
+msgstr ""
+
+#. translators: %s: error message
+#: inc/Template_Tags.php:221
+#, php-format
+msgid "Failed to get asset contents: %s"
+msgstr ""
+
+#. translators: 1: classname/type of the variable, 2: interface name
+#: inc/Theme.php:57
+#, php-format
+msgid "The theme component %1$s does not implement the %2$s interface."
+msgstr ""
+
+#. translators: %s: slug
+#: inc/Theme.php:120
+#, php-format
+msgid "No theme component with the slug %s exists."
+msgstr ""
+
+#: inc/Welcome/Component.php:48
+#: inc/Welcome/Component.php:49
+msgid "Getting Started"
+msgstr ""
+
+#: inc/Welcome/Component.php:148
+msgid "Welcome to BuddyX Theme"
+msgstr ""
+
+#: inc/Welcome/Component.php:150
+msgid "Version"
+msgstr ""
+
+#: inc/Welcome/Component.php:154
+msgid "Thank you for choosing the BuddyX Theme! Below you will find information on how to set up the theme and start using it."
+msgstr ""
+
+#: inc/Welcome/Component.php:156
+msgid "Open Customizer"
+msgstr ""
+
+#: inc/Welcome/Component.php:166
+msgid "Getting Started sections"
+msgstr ""
+
+#: inc/Welcome/Component.php:167
+msgid "Dashboard"
+msgstr ""
+
+#: inc/Welcome/Component.php:168
+#: inc/Welcome/Component.php:376
+#: inc/Welcome/Component.php:458
+msgid "Get BuddyX Pro"
+msgstr ""
+
+#: inc/Welcome/Component.php:169
+msgid "Community Addons"
+msgstr ""
+
+#: inc/Welcome/Component.php:171
+msgid "tab1"
+msgstr ""
+
+#: inc/Welcome/Component.php:178
+msgid "Customizer Settings"
+msgstr ""
+
+#: inc/Welcome/Component.php:179
+msgid "Go to Customizer"
+msgstr ""
+
+#: inc/Welcome/Component.php:186
+msgid "Upload Logo"
+msgstr ""
+
+#: inc/Welcome/Component.php:191
+msgid "Set Colors"
+msgstr ""
+
+#: inc/Welcome/Component.php:201
+msgid "Set Typography"
+msgstr ""
+
+#: inc/Welcome/Component.php:206
+#: inc/Welcome/Component.php:604
+msgid "Header Layout"
+msgstr ""
+
+#: inc/Welcome/Component.php:238
+msgid "Part of the Wbcom Community Family"
+msgstr ""
+
+#: inc/Welcome/Component.php:239
+msgid "Explore all"
+msgstr ""
+
+#: inc/Welcome/Component.php:241
+msgid "Social, gamification, discussions, courses, messaging, listings, and jobs. Every plugin works on its own, and the family keeps growing."
+msgstr ""
+
+#: inc/Welcome/Component.php:248
+msgid "BuddyNext"
+msgstr ""
+
+#: inc/Welcome/Component.php:249
+msgid "Community engine: profiles, activity feeds, and member spaces."
+msgstr ""
+
+#: inc/Welcome/Component.php:255
+msgid "WB Gamification"
+msgstr ""
+
+#: inc/Welcome/Component.php:256
+msgid "Points, badges, levels, and leaderboards for any activity."
+msgstr ""
+
+#: inc/Welcome/Component.php:261
+msgid "Jetonomy"
+msgstr ""
+
+#: inc/Welcome/Component.php:262
+msgid "Threaded discussions, Q&A spaces, and a token economy."
+msgstr ""
+
+#: inc/Welcome/Component.php:267
+msgid "Learnomy"
+msgstr ""
+
+#: inc/Welcome/Component.php:268
+msgid "A full LMS: courses, lessons, quizzes, and certificates."
+msgstr ""
+
+#: inc/Welcome/Component.php:273
+msgid "MediaVerse"
+msgstr ""
+
+#: inc/Welcome/Component.php:274
+msgid "Direct messaging and media galleries for members."
+msgstr ""
+
+#: inc/Welcome/Component.php:279
+msgid "WP Career Board"
+msgstr ""
+
+#: inc/Welcome/Component.php:280
+msgid "Job listings and applicant management."
+msgstr ""
+
+#: inc/Welcome/Component.php:285
+msgid "Listora"
+msgstr ""
+
+#: inc/Welcome/Component.php:286
+msgid "Member-submitted directory listings."
+msgstr ""
+
+#: inc/Welcome/Component.php:321
+msgid "Active"
+msgstr ""
+
+#: inc/Welcome/Component.php:328
+msgid "View plugin"
+msgstr ""
+
+#: inc/Welcome/Component.php:347
+#: inc/Welcome/Component.php:350
+msgid "Demo Installation"
+msgstr ""
+
+#: inc/Welcome/Component.php:349
+msgid "The theme comes with one-click demo installation support. Try the demo and install it on your WordPress BuddyPress site."
+msgstr ""
+
+#: inc/Welcome/Component.php:360
+msgid "BuddyX Child Theme"
+msgstr ""
+
+#: inc/Welcome/Component.php:362
+msgid "A child theme helps preserve customizations when the parent theme is updated, ensuring design consistency and security."
+msgstr ""
+
+#: inc/Welcome/Component.php:363
+msgid "Download Now"
+msgstr ""
+
+#: inc/Welcome/Component.php:373
+#: inc/Welcome/Component.php:456
+msgid "Get BuddyX Pro Theme"
+msgstr ""
+
+#: inc/Welcome/Component.php:375
+msgid "#1 WordPress Social Network and Community Theme Powered by BuddyPress or BuddyBoss Platform."
+msgstr ""
+
+#: inc/Welcome/Component.php:386
+msgid "Resources & Support"
+msgstr ""
+
+#: inc/Welcome/Component.php:392
+msgid "Document"
+msgstr ""
+
+#: inc/Welcome/Component.php:393
+msgid "Full docs to help you set up the theme."
+msgstr ""
+
+#: inc/Welcome/Component.php:398
+msgid "Community"
+msgstr ""
+
+#: inc/Welcome/Component.php:399
+msgid "Share your site and get help in our Facebook group."
+msgstr ""
+
+#: inc/Welcome/Component.php:404
+msgid "Videos"
+msgstr ""
+
+#: inc/Welcome/Component.php:405
+msgid "Bite-sized tutorials for every step of setup."
+msgstr ""
+
+#: inc/Welcome/Component.php:410
+msgid "Support"
+msgstr ""
+
+#: inc/Welcome/Component.php:411
+msgid "Get in touch with our support team."
+msgstr ""
+
+#: inc/Welcome/Component.php:416
+msgid "Give us feedback"
+msgstr ""
+
+#: inc/Welcome/Component.php:417
+msgid "Leave a 5-star review if BuddyX helped you."
+msgstr ""
+
+#: inc/Welcome/Component.php:447
+msgid "tab2"
+msgstr ""
+
+#: inc/Welcome/Component.php:452
+msgid "BuddyX Pro Theme"
+msgstr ""
+
+#: inc/Welcome/Component.php:455
+msgid "#1 WordPress community theme"
+msgstr ""
+
+#: inc/Welcome/Component.php:457
+msgid "The #1 WordPress social network and community theme, powered by BuddyPress or BuddyBoss Platform. Everything in BuddyX, plus the customizer settings, layouts, and integrations compared below."
+msgstr ""
+
+#: inc/Welcome/Component.php:463
+msgid "Compare Features Of BuddyX With BuddyX Pro"
+msgstr ""
+
+#: inc/Welcome/Component.php:464
+msgid "Take your time and compare every feature."
+msgstr ""
+
+#: inc/Welcome/Component.php:472
+msgid "Features"
+msgstr ""
+
+#: inc/Welcome/Component.php:474
+msgid "BuddyX Pro"
+msgstr ""
+
+#: inc/Welcome/Component.php:479
+msgid "Layout"
+msgstr ""
+
+#: inc/Welcome/Component.php:489
+msgid "Content Layout Width"
+msgstr ""
+
+#: inc/Welcome/Component.php:494
+msgid "Sidebar Width"
+msgstr ""
+
+#: inc/Welcome/Component.php:519
+msgid "Sign-in Popup | Register Form Fields"
+msgstr ""
+
+#: inc/Welcome/Component.php:524
+msgid "Scroll Top"
+msgstr ""
+
+#: inc/Welcome/Component.php:534
+msgid "Loading Text"
+msgstr ""
+
+#: inc/Welcome/Component.php:569
+msgid "Font Size (PX/EM)"
+msgstr ""
+
+#: inc/Welcome/Component.php:574
+msgid "Text Transform"
+msgstr ""
+
+#: inc/Welcome/Component.php:579
+msgid "Line Height"
+msgstr ""
+
+#: inc/Welcome/Component.php:584
+msgid "Letter Spacing"
+msgstr ""
+
+#: inc/Welcome/Component.php:594
+msgid "Top Bar"
+msgstr ""
+
+#: inc/Welcome/Component.php:599
+msgid "Sticky Header"
+msgstr ""
+
+#: inc/Welcome/Component.php:609
+msgid "Header Menu Position"
+msgstr ""
+
+#: inc/Welcome/Component.php:614
+msgid "Menu Effects"
+msgstr ""
+
+#: inc/Welcome/Component.php:619
+msgid "More Menu"
+msgstr ""
+
+#: inc/Welcome/Component.php:624
+msgid "Site Search Style"
+msgstr ""
+
+#: inc/Welcome/Component.php:629
+msgid "Login/Register Button Style"
+msgstr ""
+
+#: inc/Welcome/Component.php:634
+msgid "Background Color"
+msgstr ""
+
+#: inc/Welcome/Component.php:639
+msgid "Site Search"
+msgstr ""
+
+#: inc/Welcome/Component.php:644
+msgid "Site Cart"
+msgstr ""
+
+#: inc/Welcome/Component.php:649
+msgid "BuddyPress Components"
+msgstr ""
+
+#: inc/Welcome/Component.php:654
+#: inc/Welcome/Component.php:659
+#: inc/Welcome/Component.php:719
+msgid "Side Panel"
+msgstr ""
+
+#: inc/Welcome/Component.php:664
+msgid "Sub Header"
+msgstr ""
+
+#: inc/Welcome/Component.php:669
+msgid "Customize Background"
+msgstr ""
+
+#: inc/Welcome/Component.php:679
+msgid "Breadcrumbs"
+msgstr ""
+
+#: inc/Welcome/Component.php:684
+msgid "Skin Colors"
+msgstr ""
+
+#: inc/Welcome/Component.php:689
+msgid "Dark Mode"
+msgstr ""
+
+#: inc/Welcome/Component.php:694
+msgid "Custom Colors"
+msgstr ""
+
+#: inc/Welcome/Component.php:714
+msgid "Primary Header"
+msgstr ""
+
+#: inc/Welcome/Component.php:724
+msgid "Button Background Color / Hover"
+msgstr ""
+
+#: inc/Welcome/Component.php:729
+msgid "Button Text Color / Hover"
+msgstr ""
+
+#: inc/Welcome/Component.php:734
+msgid "Button Border Color / Hover"
+msgstr ""
+
+#: inc/Welcome/Component.php:744
+msgid "List Layout"
+msgstr ""
+
+#: inc/Welcome/Component.php:749
+msgid "Grid Layout"
+msgstr ""
+
+#: inc/Welcome/Component.php:754
+msgid "Masonry Layout"
+msgstr ""
+
+#: inc/Welcome/Component.php:759
+msgid "Blog Layout Style"
+msgstr ""
+
+#: inc/Welcome/Component.php:774
+msgid "No Sidebar"
+msgstr ""
+
+#. Template Name of the theme
+#: inc/Welcome/Component.php:789
+msgid "Both Sidebar"
+msgstr ""
+
+#: inc/Welcome/Component.php:794
+msgid "BuddyPress Sidebar"
+msgstr ""
+
+#: inc/Welcome/Component.php:799
+msgid "WooCommerce Sidebar"
+msgstr ""
+
+#: inc/Welcome/Component.php:804
+msgid "bbPress Sidebar"
+msgstr ""
+
+#: inc/Welcome/Component.php:809
+msgid "LearnDash Sidebar"
+msgstr ""
+
+#: inc/Welcome/Component.php:814
+msgid "Sticky Sidebar"
+msgstr ""
+
+#: inc/Welcome/Component.php:829
+msgid "Choose WP Login Theme"
+msgstr ""
+
+#: inc/Welcome/Component.php:834
+msgid "Customize Login Form"
+msgstr ""
+
+#: inc/Welcome/Component.php:839
+msgid "Customize Forget Form"
+msgstr ""
+
+#: inc/Welcome/Component.php:844
+msgid "Customize Button"
+msgstr ""
+
+#: inc/Welcome/Component.php:864
+#: inc/Welcome/Component.php:960
+msgid "BuddyPress"
+msgstr ""
+
+#: inc/Welcome/Component.php:869
+msgid "Activity Control"
+msgstr ""
+
+#: inc/Welcome/Component.php:870
+#: inc/Welcome/Component.php:885
+#: inc/Welcome/Component.php:890
+#: inc/Welcome/Component.php:895
+#: inc/Welcome/Component.php:900
+#: inc/Welcome/Component.php:905
+#: inc/Welcome/Component.php:910
+#: inc/Welcome/Component.php:915
+#: inc/Welcome/Component.php:920
+#: inc/Welcome/Component.php:925
+#: inc/Welcome/Component.php:971
+#: inc/Welcome/Component.php:976
+#: inc/Welcome/Component.php:981
+#: inc/Welcome/Component.php:986
+#: inc/Welcome/Component.php:991
+#: inc/Welcome/Component.php:996
+#: inc/Welcome/Component.php:1001
+#: inc/Welcome/Component.php:1006
+msgid "Limited"
+msgstr ""
+
+#: inc/Welcome/Component.php:874
+msgid "BuddyPress Activity Share"
+msgstr ""
+
+#: inc/Welcome/Component.php:879
+msgid "Activity Reaction"
+msgstr ""
+
+#: inc/Welcome/Component.php:884
+msgid "Activity Load More"
+msgstr ""
+
+#: inc/Welcome/Component.php:889
+msgid "Members Multiple Directory Layout"
+msgstr ""
+
+#: inc/Welcome/Component.php:894
+msgid "Members Default Cover Background"
+msgstr ""
+
+#: inc/Welcome/Component.php:899
+msgid "Groups Multiple Directory View"
+msgstr ""
+
+#: inc/Welcome/Component.php:904
+msgid "Group Default Cover Background"
+msgstr ""
+
+#: inc/Welcome/Component.php:909
+msgid "Member Multiple Header Layout"
+msgstr ""
+
+#: inc/Welcome/Component.php:914
+msgid "Member Primary Navigation Layout"
+msgstr ""
+
+#: inc/Welcome/Component.php:919
+msgid "Group Multiple Header Layout"
+msgstr ""
+
+#: inc/Welcome/Component.php:924
+msgid "Group Primary Navigation Style"
+msgstr ""
+
+#: inc/Welcome/Component.php:930
+#: inc/Welcome/Component.php:970
+msgid "WooCommerce"
+msgstr ""
+
+#: inc/Welcome/Component.php:935
+msgid "Product Listing Style"
+msgstr ""
+
+#: inc/Welcome/Component.php:940
+msgid "Shop Products Per Page"
+msgstr ""
+
+#: inc/Welcome/Component.php:945
+msgid "Display Filter Button"
+msgstr ""
+
+#: inc/Welcome/Component.php:950
+msgid "Sale Badge Style"
+msgstr ""
+
+#: inc/Welcome/Component.php:955
+msgid "Integrations"
+msgstr ""
+
+#: inc/Welcome/Component.php:965
+msgid "BuddyBoss Platform"
+msgstr ""
+
+#: inc/Welcome/Component.php:975
+msgid "LearnDash"
+msgstr ""
+
+#: inc/Welcome/Component.php:980
+msgid "LearnPress"
+msgstr ""
+
+#: inc/Welcome/Component.php:985
+msgid "LifterLMS"
+msgstr ""
+
+#: inc/Welcome/Component.php:990
+msgid "TutorLMS"
+msgstr ""
+
+#: inc/Welcome/Component.php:995
+msgid "bbPress"
+msgstr ""
+
+#: inc/Welcome/Component.php:1000
+msgid "Dokan"
+msgstr ""
+
+#: inc/Welcome/Component.php:1005
+msgid "WC Vendors"
+msgstr ""
+
+#: inc/Welcome/Component.php:1010
+msgid "GamiPress"
+msgstr ""
+
+#: inc/Welcome/Component.php:1015
+msgid "Paid Memberships"
+msgstr ""
+
+#: inc/Welcome/Component.php:1020
+msgid "The Event Calendar"
+msgstr ""
+
+#: inc/Welcome/Component.php:1033
+msgid "tab3"
+msgstr ""
+
+#: inc/Welcome/Component.php:1038
+#: inc/Welcome/Component.php:1042
+msgid "BuddyPress Community Bundle"
+msgstr ""
+
+#: inc/Welcome/Component.php:1041
+msgid "27 premium plugins - one bundle"
+msgstr ""
+
+#: inc/Welcome/Component.php:1043
+msgid "Instead of buying add-ons one by one, get every premium BuddyPress plugin we make in a single bundle - moderation at scale, richer member profiles, better activity feeds, privacy controls and more. One purchase, all future updates."
+msgstr ""
+
+#: inc/Welcome/Component.php:1044
+msgid "Get the Community Bundle"
+msgstr ""
+
+#: inc/Welcome/Component.php:1049
+msgid "What's inside the bundle"
+msgstr ""
+
+#: inc/Welcome/Component.php:1051
+msgid "BuddyPress Moderation Pro"
+msgstr ""
+
+#: inc/Welcome/Component.php:1051
+msgid "Report, review and moderate member content at scale."
+msgstr ""
+
+#: inc/Welcome/Component.php:1052
+msgid "BuddyPress Private Community Pro"
+msgstr ""
+
+#: inc/Welcome/Component.php:1052
+msgid "Lock your community down to members only, page by page."
+msgstr ""
+
+#: inc/Welcome/Component.php:1053
+msgid "BuddyPress Member Blog Pro"
+msgstr ""
+
+#: inc/Welcome/Component.php:1053
+msgid "Give every member their own front-end writing space."
+msgstr ""
+
+#: inc/Welcome/Component.php:1054
+msgid "BuddyPress Profile Pro"
+msgstr ""
+
+#: inc/Welcome/Component.php:1054
+msgid "Repeater fields and richer member identity on profiles."
+msgstr ""
+
+#: inc/Welcome/Component.php:1055
+msgid "BuddyPress Polls"
+msgstr ""
+
+#: inc/Welcome/Component.php:1055
+msgid "Let members create and vote on polls in the activity feed."
+msgstr ""
+
+#: inc/Welcome/Component.php:1056
+msgid "BuddyPress Hashtags"
+msgstr ""
+
+#: inc/Welcome/Component.php:1056
+msgid "Topic discovery with clickable hashtags across activity."
+msgstr ""
+
+#: inc/Welcome/Component.php:1057
+msgid "WP Stories"
+msgstr ""
+
+#: inc/Welcome/Component.php:1057
+msgid "Social, disappearing stories for a more personal feed."
+msgstr ""
+
+#: inc/Welcome/Component.php:1058
+msgid "BuddyVendor"
+msgstr ""
+
+#: inc/Welcome/Component.php:1058
+msgid "Turn members into WooCommerce store vendors."
+msgstr ""
+
+#: inc/Welcome/Component.php:1061
+msgid "Plus 19 more premium add-ons - all included, all kept up to date."
+msgstr ""
+
+#: inc/Welcome/Component.php:1062
+msgid "See everything in the bundle"
+msgstr ""
+
+#: inc/widgets/bp-profile-completion-widget.php:20
+msgid "Show Logged in user Profile Completion Progress."
+msgstr ""
+
+#: inc/widgets/bp-profile-completion-widget.php:26
+msgid "(BuddyPress) Profile Completion"
+msgstr ""
+
+#. translators: %s: profile completion percentage (e.g. "80%")
+#: inc/widgets/bp-profile-completion-widget.php:74
+#, php-format
+msgid "%s Complete"
+msgstr ""
+
+#: inc/widgets/bp-profile-completion-widget.php:100
+msgid "Complete"
+msgstr ""
+
+#: inc/widgets/bp-profile-completion-widget.php:196
+#: inc/widgets/bp-profile-completion-widget.php:433
+msgid "Profile Photo"
+msgstr ""
+
+#: inc/widgets/bp-profile-completion-widget.php:216
+#: inc/widgets/bp-profile-completion-widget.php:436
+msgid "Cover Photo"
+msgstr ""
+
+#: inc/widgets/bp-profile-completion-widget.php:298
+msgid "Profile Fields"
+msgstr ""
+
+#: inc/widgets/bp-profile-completion-widget.php:408
+msgid "Complete Your Profile"
+msgstr ""
+
+#: inc/widgets/bp-profile-completion-widget.php:442
+msgid "Title:"
+msgstr ""
+
+#: inc/widgets/bp-profile-completion-widget.php:446
+msgid "Profile field sets:"
+msgstr ""
+
+#: inc/widgets/bp-profile-completion-widget.php:467
+msgid "Profile photos:"
+msgstr ""
+
+#: inc/widgets/bp-profile-completion-widget.php:484
+msgid "Hide widget once progress hits 100%"
+msgstr ""
+
+#: inc/widgets/bp-profile-completion-widget.php:489
+msgid "Note: This widget is only displayed if a member is logged in."
+msgstr ""
+
+#. Template Name of the theme
+msgid "Custom Page Template"
+msgstr ""
+
+#. Template Name of the theme
+msgid "Custom Post Template"
+msgstr ""
+
+#. Template Name of the theme
+msgid "Page No Sidebar"
+msgstr ""
+
+#. Template Name of the theme
+msgid "Page Full Screen"
+msgstr ""
+
+#. Template Name of the theme
+msgid "Page Both Sidebar"
+msgstr ""
+
+#. Template Name of the theme
+msgid "Page Left Sidebar"
+msgstr ""
+
+#. Template Name of the theme
+msgid "Page Right Sidebar"
+msgstr ""
+
+#: patterns/about-founder.php
+msgctxt "Pattern title"
+msgid "About - Founder Spotlight"
+msgstr ""
+
+#: patterns/about-story.php
+msgctxt "Pattern title"
+msgid "About - Story"
+msgstr ""
+
+#: patterns/cta-fullbleed.php
+msgctxt "Pattern title"
+msgid "CTA - Full-bleed Gradient"
+msgstr ""
+
+#: patterns/cta-newsletter.php
+msgctxt "Pattern title"
+msgid "CTA - Newsletter Signup"
+msgstr ""
+
+#: patterns/features-alternating.php
+msgctxt "Pattern title"
+msgid "Features - Alternating Rows"
+msgstr ""
+
+#: patterns/footer-central.php
+msgctxt "Pattern title"
+msgid "Footer - Central CTA"
+msgstr ""
+
+#: patterns/footer-default-mega.php
+msgctxt "Pattern title"
+msgid "Footer - Default Mega"
+msgstr ""
+
+#: patterns/footer-mega.php
+msgctxt "Pattern title"
+msgid "Footer - Mega 5-column"
+msgstr ""
+
+#: patterns/footer-simple.php
+msgctxt "Pattern title"
+msgid "Footer - Simple Centered"
+msgstr ""
+
+#: patterns/footer-small.php
+msgctxt "Pattern title"
+msgid "Footer - Minimal Bar"
+msgstr ""
+
+#: patterns/general-banner-light.php
+msgctxt "Pattern title"
+msgid "Banner - Light Asymmetric"
+msgstr ""
+
+#: patterns/general-faq.php
+msgctxt "Pattern title"
+msgid "FAQ - Editorial"
+msgstr ""
+
+#: patterns/general-pricing.php
+msgctxt "Pattern title"
+msgid "Pricing - 3-tier Editorial"
+msgstr ""
+
+#: patterns/hero-image-led.php
+msgctxt "Pattern title"
+msgid "Hero - Image-led"
+msgstr ""
+
+#: patterns/hero-split-screen.php
+msgctxt "Pattern title"
+msgid "Hero - Split Screen"
+msgstr ""
+
+#: patterns/hero-typography-led.php
+msgctxt "Pattern title"
+msgid "Hero - Typography-led"
+msgstr ""
+
+#: patterns/query-cover-featured.php
+msgctxt "Pattern title"
+msgid "Posts - 4-up Featured Cards"
+msgstr ""
+
+#: patterns/query-cover-grid.php
+msgctxt "Pattern title"
+msgid "Posts - 3-up Editorial Grid"
+msgstr ""
+
+#: patterns/query-grid-excerpt.php
+msgctxt "Pattern title"
+msgid "Posts - Asymmetric Hero + Stack"
+msgstr ""
+
+#: patterns/query-listbig.php
+msgctxt "Pattern title"
+msgid "Posts - Horizontal List Split"
+msgstr ""
+
+#: patterns/query-simple-list.php
+msgctxt "Pattern title"
+msgid "Posts - Minimal Date + Title List"
+msgstr ""
+
+#: patterns/services-grid.php
+msgctxt "Pattern title"
+msgid "Services - 3-up Grid"
+msgstr ""
+
+#: patterns/social-proof-logos.php
+msgctxt "Pattern title"
+msgid "Logo Cloud - Trusted by"
+msgstr ""
+
+#: patterns/social-proof-stats.php
+msgctxt "Pattern title"
+msgid "Stats Row"
+msgstr ""
+
+#: patterns/social-proof-testimonials.php
+msgctxt "Pattern title"
+msgid "Testimonials - Editorial 3-up"
+msgstr ""
+
+#: patterns/steps.php
+msgctxt "Pattern title"
+msgid "Steps - Numbered Process"
+msgstr ""
+
+#: patterns/team-grid.php
+msgctxt "Pattern title"
+msgid "Team - 4-up Grid"
+msgstr ""
+
+#. Template Name of the theme
+msgid "Full Width - Large container"
+msgstr ""
+
+#. Template Name of the theme
+msgid "Full Width - Small container"
+msgstr ""
+
+#: rtmedia/main.php:97
+#: rtmedia/main.php:208
+msgid "rtMedia menu"
+msgstr ""
+
+#: scripts/templates/block/render.php:14
+#: scripts/templates/block/src/index.js:10
+msgid "BLOCKTITLE — Edit me!"
+msgstr ""
+
+#: searchform.php:10
+msgid "Search for:"
+msgstr ""
+
+#: searchform.php:11
+msgid "Enter Keyword"
+msgstr ""
+
+#: searchform.php:12
+msgid "Go"
+msgstr ""
+
+#: template-parts/content-bbpress.php:33
+#: template-parts/content-buddypress.php:33
+#: template-parts/content/entry-full-width.php:50
+#: template-parts/content/entry-page.php:38
+#: template-parts/content/entry_content.php:38
+msgid "Pages:"
+msgstr ""
+
+#: template-parts/content/entry-attachment.php:35
+#: template-parts/content/entry-post.php:36
+#: template-parts/content/entry.php:34
+msgid "Previous:"
+msgstr ""
+
+#: template-parts/content/entry-attachment.php:45
+#: template-parts/content/entry-post.php:37
+#: template-parts/content/entry.php:35
+msgid "Next:"
+msgstr ""
+
+#: template-parts/content/entry-attachment.php:51
+msgid "Post navigation"
+msgstr ""
+
+#. translators: %s: post title
+#: template-parts/content/entry_actions.php:22
+#, php-format
+msgid "Leave a Comment<span class=\"screen-reader-text\"> on %s</span>"
+msgstr ""
+
+#. translators: %s: post title
+#: template-parts/content/entry_actions.php:42
+#, php-format
+msgid "Edit <span class=\"screen-reader-text\">%s</span>"
+msgstr ""
+
+#. translators: %s: post author
+#: template-parts/content/entry_meta.php:93
+#: template-parts/content/entry_meta.php:99
+#, php-format
+msgctxt "post author"
+msgid "Written by %s"
+msgstr ""
+
+#. translators: %s: post parent title
+#: template-parts/content/entry_meta.php:116
+#, php-format
+msgctxt "post parent"
+msgid "In %s"
+msgstr ""
+
+#. translators: %s: post parent title
+#: template-parts/content/entry_meta.php:119
+#, php-format
+msgctxt "post parent"
+msgid "in %s"
+msgstr ""
+
+#. translators: separator between taxonomy terms
+#: template-parts/content/entry_taxonomies.php:24
+msgctxt "list item separator"
+msgid ", "
+msgstr ""
+
+#. translators: %s: list of taxonomy terms
+#: template-parts/content/entry_taxonomies.php:31
+#, php-format
+msgid "Posted in %s"
+msgstr ""
+
+#. translators: %s: list of taxonomy terms
+#: template-parts/content/entry_taxonomies.php:37
+#, php-format
+msgid "Tagged %s"
+msgstr ""
+
+#. translators: %s: taxonomy name
+#: template-parts/content/entry_taxonomies.php:44
+#, php-format
+msgid "%s:"
+msgstr ""
+
+#: template-parts/content/error-404.php:16
+msgid "It looks like nothing was found at this location. Maybe try one of the links below or a search?"
+msgstr ""
+
+#: template-parts/content/error-404.php:27
+msgid "Most Used Categories"
+msgstr ""
+
+#. translators: %1$s: smiley
+#: template-parts/content/error-404.php:45
+#, php-format
+msgid "Try looking in the monthly archives. %1$s"
+msgstr ""
+
+#: template-parts/content/error-500.php:14
+msgid "Oops! Something went wrong."
+msgstr ""
+
+#: template-parts/content/error-offline.php:14
+msgid "Oops! It looks like you&#8217;re offline."
+msgstr ""
+
+#. translators: 1: link to WP admin new post page.
+#: template-parts/content/error.php:23
+#, php-format
+msgid "Ready to publish your first post? <a href=\"%1$s\">Get started here</a>."
+msgstr ""
+
+#: template-parts/content/error.php:38
+msgid "Sorry, but nothing matched your search terms. Please try again with some different keywords."
+msgstr ""
+
+#: template-parts/content/error.php:44
+msgid "It seems we can&rsquo;t find what you&rsquo;re looking for. Perhaps searching can help."
+msgstr ""
+
+#: template-parts/content/page_header.php:14
+msgid "Oops! That page can&rsquo;t be found."
+msgstr ""
+
+#: template-parts/content/page_header.php:22
+msgid "Nothing Found"
+msgstr ""
+
+#. translators: %s: search query
+#: template-parts/content/page_header.php:41
+#, php-format
+msgid "Search Results for: %s"
+msgstr ""
+
+#: template-parts/content/pagination.php:13
+msgctxt "previous set of search results"
+msgid "Previous"
+msgstr ""
+
+#: template-parts/content/pagination.php:14
+msgctxt "next set of search results"
+msgid "Next"
+msgstr ""
+
+#: template-parts/content/pagination.php:15
+msgid "Page navigation"
+msgstr ""
+
+#: template-parts/header/buddypress-profile.php:59
+msgid "Messages"
+msgstr ""
+
+#: template-parts/header/buddypress-profile.php:77
+msgid "Notifications"
+msgstr ""
+
+#: template-parts/header/buddypress-profile.php:107
+msgid "No notifications found."
+msgstr ""
+
+#: template-parts/header/buddypress-profile.php:111
+msgid "All Notifications"
+msgstr ""
+
+#: template-parts/header/buddypress-profile.php:174
+msgid "Login"
+msgstr ""
+
+#: template-parts/header/buddypress-profile.php:175
+msgid "Log in"
+msgstr ""
+
+#: template-parts/header/navigation.php:38
+msgid "Main menu"
+msgstr ""
+
+#: template-parts/header/navigation.php:50
+msgid "Open menu"
+msgstr ""
+
+#: template-parts/header/navigation.php:89
+msgid "My Account"
+msgstr ""
+
+#: woocommerce/cart/cart.php:30
+msgid "Remove item"
+msgstr ""
+
+#: woocommerce/cart/cart.php:31
+msgid "Thumbnail image"
+msgstr ""
+
+#: woocommerce/cart/cart.php:32
+#: woocommerce/cart/cart.php:112
+msgid "Product"
+msgstr ""
+
+#: woocommerce/cart/cart.php:33
+#: woocommerce/cart/cart.php:137
+msgid "Price"
+msgstr ""
+
+#: woocommerce/cart/cart.php:34
+#: woocommerce/cart/cart.php:143
+msgid "Quantity"
+msgstr ""
+
+#: woocommerce/cart/cart.php:35
+#: woocommerce/cart/cart.php:169
+msgid "Subtotal"
+msgstr ""
+
+#. translators: %s is the product name
+#: woocommerce/cart/cart.php:78
+#, php-format
+msgid "Remove %s from cart"
+msgstr ""
+
+#: woocommerce/cart/cart.php:132
+msgid "Available on backorder"
+msgstr ""
+
+#: woocommerce/cart/cart.php:187
+msgid "Coupon:"
+msgstr ""
+
+#: woocommerce/cart/cart.php:187
+msgid "Coupon code"
+msgstr ""
+
+#: woocommerce/cart/cart.php:187
+msgid "Apply coupon"
+msgstr ""
+
+#: woocommerce/cart/cart.php:192
+msgid "Update cart"
+msgstr ""
+
+#: scripts/templates/block/block.json
+msgctxt "block title"
+msgid "BLOCKTITLE"
+msgstr ""
+
+#: scripts/templates/block/block.json
+msgctxt "block description"
+msgid "A custom BuddyX block."
+msgstr ""
+
+#: theme.json
+#: styles/cool.json
+#: styles/dark.json
+#: styles/minimal.json
+#: styles/monochrome.json
+#: styles/pastel.json
+#: styles/vibrant.json
+#: styles/warm.json
+msgctxt "Color name"
+msgid "Base"
+msgstr ""
+
+#: theme.json
+#: styles/cool.json
+#: styles/dark.json
+#: styles/minimal.json
+#: styles/monochrome.json
+#: styles/pastel.json
+#: styles/vibrant.json
+#: styles/warm.json
+msgctxt "Color name"
+msgid "Base 2"
+msgstr ""
+
+#: theme.json
+#: styles/cool.json
+#: styles/dark.json
+#: styles/minimal.json
+#: styles/monochrome.json
+#: styles/pastel.json
+#: styles/vibrant.json
+#: styles/warm.json
+msgctxt "Color name"
+msgid "Base 3"
+msgstr ""
+
+#: theme.json
+#: styles/cool.json
+#: styles/dark.json
+#: styles/minimal.json
+#: styles/monochrome.json
+#: styles/pastel.json
+#: styles/vibrant.json
+#: styles/warm.json
+msgctxt "Color name"
+msgid "Contrast"
+msgstr ""
+
+#: theme.json
+#: styles/cool.json
+#: styles/dark.json
+#: styles/minimal.json
+#: styles/monochrome.json
+#: styles/pastel.json
+#: styles/vibrant.json
+#: styles/warm.json
+msgctxt "Color name"
+msgid "Contrast 2"
+msgstr ""
+
+#: theme.json
+#: styles/cool.json
+#: styles/dark.json
+#: styles/minimal.json
+#: styles/monochrome.json
+#: styles/pastel.json
+#: styles/vibrant.json
+#: styles/warm.json
+msgctxt "Color name"
+msgid "Contrast 3"
+msgstr ""
+
+#: theme.json
+#: styles/dark.json
+msgctxt "Color name"
+msgid "Accent"
+msgstr ""
+
+#: theme.json
+#: styles/dark.json
+msgctxt "Color name"
+msgid "Accent 2"
+msgstr ""
+
+#: theme.json
+#: styles/dark.json
+msgctxt "Color name"
+msgid "Accent 3"
+msgstr ""
+
+#: theme.json
+#: styles/dark.json
+#: styles/warm.json
+msgctxt "Color name"
+msgid "Surface Warm"
+msgstr ""
+
+#: theme.json
+#: styles/dark.json
+msgctxt "Color name"
+msgid "Surface Cool"
+msgstr ""
+
+#: theme.json
+#: styles/cool.json
+#: styles/dark.json
+#: styles/minimal.json
+#: styles/monochrome.json
+#: styles/pastel.json
+#: styles/warm.json
+msgctxt "Color name"
+msgid "Surface Dark"
+msgstr ""
+
+#: theme.json
+msgctxt "Color name"
+msgid "Primary"
+msgstr ""
+
+#: theme.json
+msgctxt "Color name"
+msgid "Secondary"
+msgstr ""
+
+#: theme.json
+msgctxt "Color name"
+msgid "Red"
+msgstr ""
+
+#: theme.json
+msgctxt "Color name"
+msgid "Green"
+msgstr ""
+
+#: theme.json
+msgctxt "Color name"
+msgid "Blue"
+msgstr ""
+
+#: theme.json
+msgctxt "Color name"
+msgid "Yellow"
+msgstr ""
+
+#: theme.json
+msgctxt "Color name"
+msgid "Black"
+msgstr ""
+
+#: theme.json
+msgctxt "Color name"
+msgid "Grey"
+msgstr ""
+
+#: theme.json
+msgctxt "Color name"
+msgid "White"
+msgstr ""
+
+#: theme.json
+msgctxt "Color name"
+msgid "Dusty Daylight"
+msgstr ""
+
+#: theme.json
+msgctxt "Color name"
+msgid "Dusty Sun"
+msgstr ""
+
+#: theme.json
+msgctxt "Gradient name"
+msgid "Subtle Base"
+msgstr ""
+
+#: theme.json
+msgctxt "Gradient name"
+msgid "Warm Glow"
+msgstr ""
+
+#: theme.json
+msgctxt "Gradient name"
+msgid "Cool Mist"
+msgstr ""
+
+#: theme.json
+msgctxt "Gradient name"
+msgid "Accent Bold"
+msgstr ""
+
+#: theme.json
+msgctxt "Gradient name"
+msgid "Dark Velvet"
+msgstr ""
+
+#: theme.json
+msgctxt "Duotone name"
+msgid "Base / Contrast"
+msgstr ""
+
+#: theme.json
+msgctxt "Duotone name"
+msgid "Warm"
+msgstr ""
+
+#: theme.json
+msgctxt "Space size name"
+msgid "1 (8px)"
+msgstr ""
+
+#: theme.json
+msgctxt "Space size name"
+msgid "2 (16px)"
+msgstr ""
+
+#: theme.json
+msgctxt "Space size name"
+msgid "3 (24px)"
+msgstr ""
+
+#: theme.json
+msgctxt "Space size name"
+msgid "4 (32px)"
+msgstr ""
+
+#: theme.json
+msgctxt "Space size name"
+msgid "5 (48px)"
+msgstr ""
+
+#: theme.json
+msgctxt "Space size name"
+msgid "6 (64px)"
+msgstr ""
+
+#: theme.json
+msgctxt "Space size name"
+msgid "7 (80px)"
+msgstr ""
+
+#: theme.json
+msgctxt "Space size name"
+msgid "8 (96px)"
+msgstr ""
+
+#: theme.json
+msgctxt "Space size name"
+msgid "9 (128px)"
+msgstr ""
+
+#: theme.json
+msgctxt "Space size name"
+msgid "10 (160px)"
+msgstr ""
+
+#: theme.json
+msgctxt "Font size name"
+msgid "Extra Small"
+msgstr ""
+
+#: theme.json
+msgctxt "Font size name"
+msgid "Small"
+msgstr ""
+
+#: theme.json
+msgctxt "Font size name"
+msgid "Medium"
+msgstr ""
+
+#: theme.json
+msgctxt "Font size name"
+msgid "Large"
+msgstr ""
+
+#: theme.json
+msgctxt "Font size name"
+msgid "Extra Large"
+msgstr ""
+
+#: theme.json
+msgctxt "Font size name"
+msgid "Display"
+msgstr ""
+
+#: theme.json
+msgctxt "Font size name"
+msgid "Mega"
+msgstr ""
+
+#: theme.json
+msgctxt "Font size name"
+msgid "Legacy Larger"
+msgstr ""
+
+#: theme.json
+msgctxt "Font family name"
+msgid "Inter"
+msgstr ""
+
+#: theme.json
+msgctxt "Font family name"
+msgid "Newsreader"
+msgstr ""
+
+#: theme.json
+msgctxt "Font family name"
+msgid "System UI"
+msgstr ""
+
+#: theme.json
+msgctxt "Template part name"
+msgid "Header"
+msgstr ""
+
+#: theme.json
+msgctxt "Template part name"
+msgid "Footer"
+msgstr ""
+
+#: theme.json
+msgctxt "Template part name"
+msgid "Comments"
+msgstr ""
+
+#: theme.json
+msgctxt "Template part name"
+msgid "Post Meta"
+msgstr ""
+
+#: styles/cool.json
+msgctxt "Style variation name"
+msgid "Cool"
+msgstr ""
+
+#: styles/cool.json
+msgctxt "Color name"
+msgid "Sky"
+msgstr ""
+
+#: styles/cool.json
+msgctxt "Color name"
+msgid "Cyan"
+msgstr ""
+
+#: styles/cool.json
+msgctxt "Color name"
+msgid "Indigo"
+msgstr ""
+
+#: styles/cool.json
+msgctxt "Color name"
+msgid "Surface Sky"
+msgstr ""
+
+#: styles/cool.json
+msgctxt "Color name"
+msgid "Surface Mist"
+msgstr ""
+
+#: styles/dark.json
+msgctxt "Style variation name"
+msgid "Dark"
+msgstr ""
+
+#: styles/editorial.json
+msgctxt "Style variation name"
+msgid "Editorial"
+msgstr ""
+
+#: styles/minimal.json
+msgctxt "Style variation name"
+msgid "Minimal"
+msgstr ""
+
+#: styles/minimal.json
+msgctxt "Color name"
+msgid "Black Accent"
+msgstr ""
+
+#: styles/minimal.json
+msgctxt "Color name"
+msgid "Mid Grey"
+msgstr ""
+
+#: styles/minimal.json
+#: styles/monochrome.json
+msgctxt "Color name"
+msgid "Stone"
+msgstr ""
+
+#: styles/minimal.json
+#: styles/monochrome.json
+msgctxt "Color name"
+msgid "Surface 1"
+msgstr ""
+
+#: styles/minimal.json
+#: styles/monochrome.json
+msgctxt "Color name"
+msgid "Surface 2"
+msgstr ""
+
+#: styles/monochrome.json
+msgctxt "Style variation name"
+msgid "Monochrome"
+msgstr ""
+
+#: styles/monochrome.json
+msgctxt "Color name"
+msgid "Charcoal"
+msgstr ""
+
+#: styles/monochrome.json
+msgctxt "Color name"
+msgid "Pebble"
+msgstr ""
+
+#: styles/pastel.json
+msgctxt "Style variation name"
+msgid "Pastel"
+msgstr ""
+
+#: styles/pastel.json
+msgctxt "Color name"
+msgid "Rose"
+msgstr ""
+
+#: styles/pastel.json
+msgctxt "Color name"
+msgid "Lavender"
+msgstr ""
+
+#: styles/pastel.json
+msgctxt "Color name"
+msgid "Mint"
+msgstr ""
+
+#: styles/pastel.json
+msgctxt "Color name"
+msgid "Rose Soft"
+msgstr ""
+
+#: styles/pastel.json
+msgctxt "Color name"
+msgid "Lavender Soft"
+msgstr ""
+
+#: styles/vibrant.json
+msgctxt "Style variation name"
+msgid "Vibrant"
+msgstr ""
+
+#: styles/vibrant.json
+msgctxt "Color name"
+msgid "Vibrant Red"
+msgstr ""
+
+#: styles/vibrant.json
+msgctxt "Color name"
+msgid "Electric Purple"
+msgstr ""
+
+#: styles/vibrant.json
+msgctxt "Color name"
+msgid "Saffron"
+msgstr ""
+
+#: styles/vibrant.json
+msgctxt "Color name"
+msgid "Surface Rose"
+msgstr ""
+
+#: styles/vibrant.json
+msgctxt "Color name"
+msgid "Surface Lilac"
+msgstr ""
+
+#: styles/vibrant.json
+msgctxt "Color name"
+msgid "Surface Black"
+msgstr ""
+
+#: styles/warm.json
+msgctxt "Style variation name"
+msgid "Warm"
+msgstr ""
+
+#: styles/warm.json
+msgctxt "Color name"
+msgid "Terracotta"
+msgstr ""
+
+#: styles/warm.json
+msgctxt "Color name"
+msgid "Saddle"
+msgstr ""
+
+#: styles/warm.json
+msgctxt "Color name"
+msgid "Amber"
+msgstr ""
+
+#: styles/warm.json
+msgctxt "Color name"
+msgid "Surface Cream"
+msgstr ""

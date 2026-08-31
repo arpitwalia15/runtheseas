@@ -1,0 +1,72 @@
+/**
+ * Template: Minimal
+ *
+ * Centered narrow layout, clean typography, no sidebar.
+ *
+ * @package wbcom-essential
+ * @since 4.3.0
+ */
+
+.wbcom-sp--minimal {
+	padding: 48px 0 64px;
+}
+
+.wbcom-sp--minimal .wbcom-sp__header {
+	text-align: center;
+	margin-bottom: 32px;
+}
+
+.wbcom-sp--minimal .wbcom-sp__title {
+	font-size: clamp(1.75rem, 4vw, 2.75rem);
+	letter-spacing: -0.01em;
+}
+
+.wbcom-sp--minimal .wbcom-sp__meta {
+	justify-content: center;
+}
+
+/* Clean typography */
+.wbcom-sp--minimal .wbcom-sp__content {
+	font-size: 1.125rem;
+	line-height: 1.8;
+}
+
+.wbcom-sp--minimal .wbcom-sp__content p {
+	margin-bottom: 1.5em;
+}
+
+.wbcom-sp--minimal .wbcom-sp__content h2 {
+	margin-top: 2em;
+	margin-bottom: 0.75em;
+	font-size: 1.5rem;
+}
+
+.wbcom-sp--minimal .wbcom-sp__content h3 {
+	margin-top: 1.75em;
+	margin-bottom: 0.5em;
+	font-size: 1.25rem;
+}
+
+/* Tags minimal style */
+.wbcom-sp--minimal .wbcom-sp__tags {
+	justify-content: center;
+	border-top: none;
+	margin-top: 48px;
+}
+
+.wbcom-sp--minimal .wbcom-sp__tags a {
+	border: 1px solid var(--sp-border);
+	background: transparent;
+}
+
+.wbcom-sp--minimal .wbcom-sp__tags a:hover {
+	border-color: var(--sp-primary);
+	background: var(--sp-primary);
+	color: var(--sp-white);
+}
+
+/* Navigation text-only */
+.wbcom-sp--minimal .wbcom-sp-navigation {
+	border: none;
+	text-align: center;
+}

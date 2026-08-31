@@ -1,0 +1,185 @@
+/**
+ * Settings page sidebar navigation.
+ *
+ * Handles section show/hide, hash-based routing, and hash preservation on save.
+ *
+ * @package WPMediaVerse
+ */
+( function () {
+	'use strict';
+
+	const NAV_SELECTOR = '.mvs-settings-nav-item';
+	const SECTION_SELECTOR = '.mvs-settings-section';
+	const ACTIVE_CLASS = 'is-active';
+
+	function activateSection( sectionId ) {
+		// Deactivate all nav items and sections.
+		document.querySelectorAll( NAV_SELECTOR ).forEach( ( el ) => {
+			el.classList.remove( ACTIVE_CLASS );
+			el.removeAttribute( 'aria-current' );
+		} );
+		document.querySelectorAll( SECTION_SELECTOR ).forEach( ( el ) => el.classList.remove( ACTIVE_CLASS ) );
+
+		// Activate target nav item and section.
+		const navItem = document.querySelector( `${ NAV_SELECTOR }[data-section="${ sectionId }"]` );
+		const section = document.getElementById( 'section-' + sectionId );
+
+		if ( navItem && section ) {
+			navItem.classList.add( ACTIVE_CLASS );
+			navItem.setAttribute( 'aria-current', 'page' );
+			section.classList.add( ACTIVE_CLASS );
+		} else {
+			// Fallback: activate the first section.
+			const firstNav = document.querySelector( NAV_SELECTOR );
+			const firstSection = document.querySelector( SECTION_SELECTOR );
+			if ( firstNav ) {
+				firstNav.classList.add( ACTIVE_CLASS );
+				firstNav.setAttribute( 'aria-current', 'page' );
+			}
+			if ( firstSection ) firstSection.classList.add( ACTIVE_CLASS );
+		}
+	}
+
+	function getHashSection() {
+		const hash = window.location.hash.replace( '#', '' );
+		return hash || '';
+	}
+
+	/**
+	 * Webhook events depend on a destination URL: the sanitizer drops any
+	 * webhook row with an empty URL, so toggling events without a URL silently
+	 * resets the selection to "All events". Disable the event checkboxes until a
+	 * URL is present so the dependency is obvious rather than confusing.
+	 */
+	function initWebhookEvents() {
+		const url = document.getElementById( 'mvs-webhook-url' );
+		const events = document.getElementById( 'mvs-webhook-events' );
+		if ( ! url || ! events ) {
+			return;
+		}
+		const boxes = events.querySelectorAll( 'input[type="checkbox"]' );
+		const hint = document.querySelector( '.mvs-webhook-events-hint' );
+
+		function sync() {
+			const hasUrl = url.value.trim() !== '';
+			boxes.forEach( ( box ) => {
+				box.disabled = ! hasUrl;
+			} );
+			events.classList.toggle( 'is-disabled', ! hasUrl );
+			if ( hint ) {
+				hint.classList.toggle( 'is-active', ! hasUrl );
+			}
+		}
+
+		url.addEventListener( 'input', sync );
+		sync();
+	}
+
+	/**
+	 * "Settings saved." notices: the ?settings-updated URL param survives
+	 * client-side section switches, so the per-form footer notice would keep
+	 * showing in every section a user opens. Auto-dismiss all instances after a
+	 * few seconds, support manual dismissal, and strip the param from the URL
+	 * so section switches and reloads don't resurrect the notice.
+	 */
+	function initSaveNotices() {
+		const notices = document.querySelectorAll( '.mvs-save-notice' );
+		if ( ! notices.length ) {
+			return;
+		}
+
+		function dismissAll() {
+			document.querySelectorAll( '.mvs-save-notice' ).forEach( ( n ) => {
+				n.classList.add( 'is-dismissing' );
+				setTimeout( () => n.remove(), 200 );
+			} );
+		}
+
+		document.addEventListener( 'click', ( e ) => {
+			if ( e.target.closest( '.mvs-save-notice__dismiss' ) ) {
+				dismissAll();
+			}
+		} );
+
+		setTimeout( dismissAll, 5000 );
+
+		// Strip the save flags from the URL (keeps the section hash).
+		try {
+			const url = new URL( window.location.href );
+			if ( url.searchParams.has( 'settings-updated' ) || url.searchParams.has( 'permissions-saved' ) ) {
+				url.searchParams.delete( 'settings-updated' );
+				url.searchParams.delete( 'permissions-saved' );
+				history.replaceState( null, '', url.pathname + url.search + url.hash );
+			}
+		} catch ( err ) {
+			// URL API unavailable — leave the address bar as-is.
+		}
+	}
+
+	function init() {
+		initWebhookEvents();
+		initSaveNotices();
+
+		// Click handler for sidebar nav items.
+		document.querySelectorAll( NAV_SELECTOR ).forEach( ( item ) => {
+			item.addEventListener( 'click', ( e ) => {
+				// Only handle section links (hash-based). Let external page links navigate normally.
+				const href = item.getAttribute( 'href' ) || '';
+				if ( ! href.startsWith( '#' ) ) {
+					return;
+				}
+				e.preventDefault();
+				const sectionId = item.getAttribute( 'data-section' );
+				activateSection( sectionId );
+				history.replaceState( null, '', '#' + sectionId );
+			} );
+		} );
+
+		// On load, activate section from hash or default to first.
+		const hashSection = getHashSection();
+		if ( hashSection ) {
+			activateSection( hashSection );
+		} else {
+			const firstNav = document.querySelector( NAV_SELECTOR );
+			if ( firstNav ) {
+				activateSection( firstNav.getAttribute( 'data-section' ) );
+			}
+		}
+
+		// Browser back/forward.
+		window.addEventListener( 'hashchange', () => {
+			const section = getHashSection();
+			if ( section ) {
+				activateSection( section );
+			}
+		} );
+
+		// On form submit, inject hash into _wp_http_referer so WP redirects back to the same section.
+		document.querySelectorAll( '.mvs-settings-section form' ).forEach( ( form ) => {
+			form.addEventListener( 'submit', () => {
+				const referer = form.querySelector( 'input[name="_wp_http_referer"]' );
+				if ( referer && window.location.hash ) {
+					// Strip any existing hash and append current one.
+					referer.value = referer.value.replace( /#.*$/, '' ) + window.location.hash;
+				}
+			} );
+		} );
+	}
+
+	// Ctrl+S / Cmd+S to save the active section's form.
+	document.addEventListener( 'keydown', function ( e ) {
+		if ( ( e.ctrlKey || e.metaKey ) && e.key === 's' ) {
+			e.preventDefault();
+			var form = document.querySelector( '.mvs-settings-section.' + ACTIVE_CLASS + ' form' );
+			if ( form ) {
+				form.submit();
+			}
+		}
+	} );
+
+	if ( document.readyState === 'loading' ) {
+		document.addEventListener( 'DOMContentLoaded', init );
+	} else {
+		init();
+	}
+} )();

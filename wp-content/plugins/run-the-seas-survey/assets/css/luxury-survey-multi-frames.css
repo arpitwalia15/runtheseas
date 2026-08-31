@@ -1,0 +1,57 @@
+/* Frames every question in a multi-question step and draws complete cut corners. */
+.rts-luxury-survey__form .fluentform-step .ff-el-group:has(.ff-el-input--label):not(:has(textarea)):not(.rts-luxury-survey__numbered-question) {
+	position: relative;
+	isolation: isolate;
+	width: 100% !important;
+	max-width: none !important;
+	min-height: 82px;
+	padding: 22px 24px !important;
+	border: 0 !important;
+	margin: 0 0 18px !important;
+	background: #010913 !important;
+	box-shadow: 0 7px 18px rgba(0, 0, 0, .24);
+	box-sizing: border-box;
+	clip-path: polygon(10px 0, calc(100% - 10px) 0, 100% 10px, 100% calc(100% - 10px), calc(100% - 10px) 100%, 10px 100%, 0 calc(100% - 10px), 0 10px);
+}
+
+.rts-luxury-survey__form .fluentform-step .ff-el-group:has(.ff-el-input--label):not(:has(textarea)):not(.rts-luxury-survey__numbered-question) > .ff-el-input--label,
+.rts-luxury-survey__form .fluentform-step .ff-el-group:has(.ff-el-input--label):not(:has(textarea)):not(.rts-luxury-survey__numbered-question) > .ff-el-input--content {
+	position: relative;
+	z-index: 1;
+	width: 100% !important;
+	max-width: none !important;
+}
+
+.rts-luxury-survey__form .fluentform-step .rts-luxury-survey__numbered-question::before,
+.rts-luxury-survey__form .fluentform-step .ff-el-group:has(.ff-el-input--label):not(:has(textarea)):not(.rts-luxury-survey__numbered-question)::before,
+.rts-luxury-survey__form .fluentform-step .ff-el-group:has(textarea):not(.rts-luxury-survey__numbered-question)::before {
+	position: absolute;
+	inset: 0;
+	z-index: 3;
+	display: block !important;
+	width: auto;
+	height: auto;
+	border: 10px solid transparent;
+	border-image-source: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='30' height='30' viewBox='0 0 30 30'%3E%3Cpath d='M0.5 9.5L9.5 0.5H20.5L29.5 9.5V20.5L20.5 29.5H9.5L0.5 20.5Z' fill='none' stroke='%23d89a25' stroke-width='1'/%3E%3C/svg%3E");
+	border-image-slice: 10;
+	border-image-width: 10px;
+	border-image-repeat: stretch;
+	background: none !important;
+	box-sizing: border-box;
+	clip-path: none !important;
+	content: "";
+	opacity: 1;
+	pointer-events: none;
+}
+
+.rts-luxury-survey__form .fluentform-step .rts-luxury-survey__numbered-question,
+.rts-luxury-survey__form .fluentform-step .ff-el-group:has(.ff-el-input--label):not(:has(textarea)):not(.rts-luxury-survey__numbered-question),
+.rts-luxury-survey__form .fluentform-step .ff-el-group:has(textarea):not(.rts-luxury-survey__numbered-question) {
+	background-color: #010913 !important;
+}
+
+@media (max-width: 520px) {
+	.rts-luxury-survey__form .fluentform-step .ff-el-group:has(.ff-el-input--label):not(:has(textarea)):not(.rts-luxury-survey__numbered-question) {
+		padding: 18px 14px !important;
+	}
+}

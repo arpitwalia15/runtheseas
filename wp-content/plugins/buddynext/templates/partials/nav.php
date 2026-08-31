@@ -1,0 +1,334 @@
+<?php // phpcs:disable WordPress.Files.FileName.NotHyphenatedLowercase,WordPress.Files.FileName.InvalidClassFileName -- PSR-4 naming used throughout this plugin.
+/**
+ * BuddyNext — Shared nav partial.
+ *
+ * Rendered by `templates/shell/hub-shell.php` on every BN hub so the
+ * mobile bottom-bar navigation appears uniformly without each hub
+ * template needing to remember to include it.
+ *
+ * Historically this partial rendered the sticky `.bn-subnav` global
+ * navigation, plus inline `<style>` / `<script>` blocks for font-scale,
+ * search overlay, hover card, and toast helpers. As of the hub-shell
+ * takeover (see templates/shell/hub-shell.php) the rail lives inside
+ * `.bn-app`, the inline assets have moved to assets/css/bn-shell.css +
+ * assets/js/shell/{font-scale,extras}.js, and the BN topbar was removed
+ * entirely (the active theme's `get_header()` is the top navigation).
+ *
+ * What this partial now renders:
+ *   1. The Level-2 `.bn-context-nav` filtered bar (when items are present).
+ *   2. The mobile bottom-bar `.bn-mobile-nav` (below 640px the rail hides
+ *      and this 5-item Feed / Spaces / + / Alerts / Profile tab bar takes
+ *      over — see docs/v2 Plans/v2/mobile.html).
+ *
+ * Context variables (all optional — safe defaults apply):
+ *   $bn_nav_active  string  Key of the active section: 'feed'|'explore'|
+ *                           'members'|'spaces'|'notifications'|'messages'.
+ *                           Default: auto-detected from bn_hub query var.
+ *
+ * @package BuddyNext
+ */
+
+declare( strict_types=1 );
+
+defined( 'ABSPATH' ) || exit;
+
+use BuddyNext\Core\PageRouter;
+
+// ── URL resolution (delegates to PageRouter static builders) ─────────────────
+$bn_nav_urls = array(
+	'feed'          => PageRouter::activity_url(),
+	'explore'       => PageRouter::explore_url(),
+	'members'       => PageRouter::people_url(),
+	'spaces'        => PageRouter::spaces_url(),
+	'notifications' => PageRouter::notifications_url(),
+	'messages'      => PageRouter::messages_url(),
+);
+
+// ── Active item detection ───────────────────────────────────────────────────
+if ( empty( $bn_nav_active ) ) {
+	$bn_hub_var    = (string) get_query_var( 'bn_hub', '' );
+	$bn_map        = array(
+		'feed'          => 'feed',
+		'people'        => 'members',
+		'spaces'        => 'spaces',
+		'notifications' => 'notifications',
+		'messages'      => 'messages',
+	);
+	$bn_nav_active = isset( $bn_map[ $bn_hub_var ] ) ? $bn_map[ $bn_hub_var ] : '';
+}
+
+// ── Unread notifications count ──────────────────────────────────────────────
+// Read through NotificationService::unread_count() — the one cache-backed
+// source the bell / rail / title also use. nav.php previously ran its own raw
+// COUNT under a separate cache key (buddynext_nav), so the unread count was
+// queried twice on every hub render.
+$bn_nav_current_user = get_current_user_id();
+// Badge = UNSEEN (since the list was last viewed), not raw unread: viewing the
+// list clears the badge without marking rows read.
+$bn_unread_notifs = $bn_nav_current_user
+	? (int) buddynext_service( 'notifications' )->unseen_count( $bn_nav_current_user )
+	: 0;
+
+/**
+ * Level 2 Context Nav — per-section sub-navigation.
+ *
+ * Plugins and bridges inject items via the buddynext_context_nav filter.
+ * Each item: array( 'label' => string, 'url' => string, 'active' => bool ).
+ * The bar only renders when items are present.
+ *
+ * @param array  $items      Sub-navigation items (empty by default).
+ * @param string $bn_section Current active section from the main nav.
+ */
+$bn_context_items = apply_filters( 'buddynext_context_nav', array(), $bn_nav_active );
+if ( ! empty( $bn_context_items ) ) :
+	?>
+<nav class="bn-context-nav" data-bn-nav aria-label="<?php esc_attr_e( 'Section navigation', 'buddynext' ); ?>">
+	<div class="bn-context-nav__inner">
+		<?php foreach ( $bn_context_items as $ctx_item ) : ?>
+			<a href="<?php echo esc_url( $ctx_item['url'] ); ?>"
+				class="bn-context-nav__item<?php echo ! empty( $ctx_item['active'] ) ? ' bn-context-nav__item--active' : ''; ?>"
+				<?php echo ! empty( $ctx_item['active'] ) ? 'aria-current="page"' : ''; ?>>
+				<?php echo esc_html( $ctx_item['label'] ); ?>
+			</a>
+		<?php endforeach; ?>
+	</div>
+</nav>
+<?php endif; ?>
+
+<?php
+// The bar renders for EVERY visitor, not only members.
+//
+// It used to be wrapped in `if ( $bn_nav_current_user )`. Combined with
+// bn-shell.css hiding `.bn-app__rail` at `max-width: 768px`, that left a
+// logged-out visitor on a phone or an iPad in portrait with no BuddyNext
+// navigation on screen at all — only the host theme's hamburger. The rail is
+// the desktop nav and the bar is its mobile replacement, so gating the
+// replacement on login removed the only nav a guest had.
+//
+// Membership is now decided per SLOT below (Create / Alerts / Profile need an
+// account; Feed / Spaces do not), which is the level the distinction actually
+// belongs at. The `--bn-mobile-nav-clearance` padding in bn-shell.css was
+// already applied for guests, so this also removes the band of dead space that
+// was being reserved for a bar that never rendered.
+?>
+	<?php
+	// Curated 5-slot bottom bar. Kept data-driven so Settings → Navigation
+	// (mobile scope) can hide/relabel the slots whose slug it controls
+	// (feed/spaces/notifications) via the buddynext_mobile_nav_items filter —
+	// Nav\NavOverrides::apply_mobile_items(). The centre Create button and the
+	// Profile shortcut are not nav tabs, so they are never overridable, and the
+	// slot order is fixed (the centre Create button must stay centred).
+	// Hide the Spaces slot when the feature is off (the Spaces page itself is
+	// already guarded by PageRouter), so the bottom bar never links to a
+	// disabled surface.
+	//
+	// EXACTLY FIVE SLOTS — do not add a sixth. Create is centred by arithmetic,
+	// not by a CSS offset: it is `flex: 0 0 44px` between two `flex: 1` items on
+	// each side, so with 5 slots it lands on the viewport centre on its own. A
+	// sixth slot silently breaks that — Messages was previously a 6th item, which
+	// pushed Create 35px left of centre at 390px and squeezed every label to 69px.
+	// Messages is NOT in the bar: it is reachable from the theme header (Reign's
+	// Mobile Header Icons expose Message + Notification) and from the rail at
+	// >= 640px. If a slot must be added, one has to come out.
+	$bn_spaces_enabled = ! function_exists( 'buddynext_service' )
+		|| ! is_object( buddynext_service( 'features' ) )
+		|| buddynext_service( 'features' )->is_enabled( 'spaces' );
+
+	$bn_mobile_items = array(
+		array(
+			'key'   => 'feed',
+			'url'   => $bn_nav_urls['feed'],
+			'icon'  => 'home',
+			'label' => __( 'Feed', 'buddynext' ),
+			'show'  => true,
+		),
+		array(
+			'key'   => 'spaces',
+			'url'   => $bn_nav_urls['spaces'],
+			'icon'  => 'hash',
+			'label' => __( 'Spaces', 'buddynext' ),
+			'show'  => $bn_spaces_enabled,
+		),
+		// Composing, alerts and a profile all require an account. Shown only to
+		// members; a guest gets the public slots plus a Log in action instead, so
+		// the bar never offers a control that fails at the click (the same rule
+		// that removed the guest-visible "Create a space" button).
+		array(
+			'key'   => 'create',
+			'url'   => $bn_nav_urls['feed'] . '?compose=1',
+			'icon'  => 'plus',
+			'label' => __( 'Create post', 'buddynext' ),
+			'show'  => $bn_nav_current_user > 0,
+			'type'  => 'create',
+		),
+		array(
+			'key'         => 'notifications',
+			'url'         => $bn_nav_urls['notifications'],
+			'icon'        => 'bell',
+			'label'       => __( 'Alerts', 'buddynext' ),
+			'show'        => $bn_nav_current_user > 0,
+			'badge'       => true,
+			'badge_count' => $bn_unread_notifs,
+		),
+		array(
+			'key'   => 'members',
+			'url'   => $bn_nav_urls['members'],
+			'icon'  => 'users',
+			'label' => __( 'Members', 'buddynext' ),
+			// Guests only: takes the slot Create vacates so the bar does not
+			// collapse to two items. Members reach the directory from the rail.
+			'show'  => 0 === $bn_nav_current_user,
+		),
+		array(
+			'key'   => 'profile',
+			'url'   => PageRouter::profile_url( $bn_nav_current_user ),
+			'icon'  => 'user',
+			'label' => __( 'Profile', 'buddynext' ),
+			'show'  => $bn_nav_current_user > 0,
+		),
+		array(
+			'key'   => 'login',
+			'url'   => PageRouter::auth_url(),
+			'icon'  => 'log-in',
+			'label' => __( 'Log in', 'buddynext' ),
+			'show'  => 0 === $bn_nav_current_user,
+		),
+	);
+
+	// The mobile bar has its own key space (feed/spaces/create/notifications/
+	// profile); $bn_nav_active uses the main-nav keys (feed/members/spaces/
+	// notifications/messages). Map onto the mobile keys so both the active-item
+	// highlight below AND the buddynext_mobile_nav_items filter receive a
+	// mobile-correct value — the filter previously got the main-nav key (e.g.
+	// 'members'), which no mobile slot uses.
+	$bn_mobile_active_map = array(
+		'feed'          => 'feed',
+		'spaces'        => 'spaces',
+		'notifications' => 'notifications',
+		'messages'      => 'messages',
+	);
+	$bn_mobile_active     = isset( $bn_mobile_active_map[ $bn_nav_active ] ) ? $bn_mobile_active_map[ $bn_nav_active ] : '';
+
+	/**
+	 * Filter the mobile bottom-bar items.
+	 *
+	 * @param array<int,array<string,mixed>> $items  Bar item definitions.
+	 * @param string                         $active Active mobile-bar key (feed / spaces / notifications / profile / '').
+	 */
+	$bn_mobile_items = (array) apply_filters( 'buddynext_mobile_nav_items', $bn_mobile_items, $bn_mobile_active );
+
+	// Split the visible bar slots from any "overflow" entries (admin-created
+	// custom tabs flagged by NavOverrides::apply_mobile_items). The bar is a fixed
+	// 5-slot strip with a centred Create button, so custom tabs never get their own
+	// slot: when present, the Profile slot folds into a "More" sheet and a "More"
+	// toggle takes the 5th slot. With no custom tabs the bar is unchanged.
+	$bn_bar_items      = array();
+	$bn_overflow_items = array();
+	foreach ( $bn_mobile_items as $bn_m_item ) {
+		if ( ! is_array( $bn_m_item ) || empty( $bn_m_item['show'] ) ) {
+			continue;
+		}
+		if ( ! empty( $bn_m_item['overflow'] ) ) {
+			$bn_overflow_items[] = $bn_m_item;
+		} else {
+			$bn_bar_items[] = $bn_m_item;
+		}
+	}
+	if ( $bn_overflow_items ) {
+		foreach ( $bn_bar_items as $bn_i => $bn_it ) {
+			if ( 'profile' === (string) ( $bn_it['key'] ?? '' ) ) {
+				array_unshift( $bn_overflow_items, $bn_it );
+				unset( $bn_bar_items[ $bn_i ] );
+				break;
+			}
+		}
+		$bn_bar_items   = array_values( $bn_bar_items );
+		$bn_bar_items[] = array(
+			'key'   => 'more',
+			'type'  => 'more',
+			'icon'  => 'more-horizontal',
+			'label' => __( 'More', 'buddynext' ),
+			'show'  => true,
+		);
+	}
+	?>
+<nav class="bn-mobile-nav" data-bn-nav
+	aria-label="<?php esc_attr_e( 'Mobile navigation', 'buddynext' ); ?>">
+	<?php
+	foreach ( $bn_bar_items as $bn_m_item ) :
+		$bn_m_key    = (string) ( $bn_m_item['key'] ?? '' );
+		$bn_m_create = isset( $bn_m_item['type'] ) && 'create' === $bn_m_item['type'];
+		$bn_m_more   = isset( $bn_m_item['type'] ) && 'more' === $bn_m_item['type'];
+		$bn_m_badge  = ! empty( $bn_m_item['badge'] );
+		// Active state rides aria-current="page" (not a bespoke class), so the one
+		// generic nav-API active-sync in navigate.js can re-mark it after a client
+		// nav by reading [data-bn-nav] — no mobile-specific selector in the JS.
+		$bn_m_active = ! $bn_m_create && ! $bn_m_more && '' !== $bn_m_key && $bn_m_key === $bn_mobile_active;
+		$bn_m_class  = 'bn-mobile-nav__item'
+			. ( $bn_m_create ? ' bn-mobile-nav__item--create' : '' )
+			. ( $bn_m_more ? ' bn-mobile-nav__item--more' : '' );
+
+		if ( $bn_m_more ) :
+			?>
+			<button type="button"
+				class="<?php echo esc_attr( $bn_m_class ); ?>"
+				aria-haspopup="true"
+				aria-expanded="false"
+				aria-controls="bn-mobile-more"
+				data-bn-more-toggle>
+				<?php buddynext_icon( 'more-horizontal' ); ?>
+				<span><?php echo esc_html( (string) $bn_m_item['label'] ); ?></span>
+			</button>
+			<?php
+		else :
+			?>
+			<a href="<?php echo esc_url( (string) ( $bn_m_item['url'] ?? '#' ) ); ?>"
+				class="<?php echo esc_attr( $bn_m_class ); ?>"
+				<?php echo $bn_m_active ? 'aria-current="page"' : ''; ?>
+				<?php echo $bn_m_create ? 'aria-label="' . esc_attr( (string) $bn_m_item['label'] ) . '"' : ''; ?>>
+				<?php buddynext_icon( (string) ( $bn_m_item['icon'] ?? 'home' ) ); ?>
+				<?php if ( $bn_m_badge ) : ?>
+					<?php
+					// Server-rendered per-slot count (Alerts + Messages), matching the
+					// header bell + rail badges. The mobile nav has no Interactivity
+					// store on feed/spaces/profile, so a static count re-renders
+					// correctly on every hub.
+					$bn_m_count = (int) ( $bn_m_item['badge_count'] ?? 0 );
+					?>
+					<span class="bn-mobile-nav__badge"
+						<?php echo 0 === $bn_m_count ? 'hidden' : ''; ?>>
+						<?php echo esc_html( $bn_m_count > 99 ? '99+' : (string) $bn_m_count ); ?>
+					</span>
+				<?php endif; ?>
+				<?php if ( ! $bn_m_create ) : ?>
+					<span><?php echo esc_html( (string) ( $bn_m_item['label'] ?? '' ) ); ?></span>
+				<?php endif; ?>
+			</a>
+			<?php
+		endif;
+	endforeach;
+	?>
+</nav>
+	<?php if ( $bn_overflow_items ) : ?>
+	<div class="bn-mobile-more-backdrop" data-bn-more-close hidden></div>
+	<div class="bn-mobile-more" id="bn-mobile-more" role="dialog" aria-modal="true"
+		aria-label="<?php esc_attr_e( 'More navigation', 'buddynext' ); ?>" hidden>
+		<div class="bn-mobile-more__head">
+			<span class="bn-mobile-more__title"><?php esc_html_e( 'More', 'buddynext' ); ?></span>
+			<button type="button" class="bn-mobile-more__close"
+				aria-label="<?php esc_attr_e( 'Close', 'buddynext' ); ?>" data-bn-more-close>
+				<?php buddynext_icon( 'x' ); ?>
+			</button>
+		</div>
+		<ul class="bn-mobile-more__list">
+			<?php foreach ( $bn_overflow_items as $bn_ov ) : ?>
+				<li>
+					<a class="bn-mobile-more__link" href="<?php echo esc_url( (string) ( $bn_ov['url'] ?? '#' ) ); ?>">
+						<?php buddynext_icon( (string) ( $bn_ov['icon'] ?? 'link' ) ); ?>
+						<span><?php echo esc_html( (string) ( $bn_ov['label'] ?? '' ) ); ?></span>
+					</a>
+				</li>
+			<?php endforeach; ?>
+		</ul>
+	</div>
+	<?php endif; ?>

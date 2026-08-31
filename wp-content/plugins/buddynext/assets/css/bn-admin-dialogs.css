@@ -1,0 +1,251 @@
+/* ────────────────────────────────────────────────────────────────────────
+ * BuddyNext admin — confirm modal + toast notice
+ *
+ * Replaces native browser dialogs. Loaded on every BuddyNext admin page
+ * via AssetService alongside bn-admin-dialogs.js so feature classes can
+ * trigger bnConfirm() / bnToast() OR rely on data-bn-confirm attributes
+ * without enqueueing anything themselves.
+ *
+ * Chrome stays neutral; accent only on primary action.
+ * ──────────────────────────────────────────────────────────────────────── */
+
+/* ── Modal ──────────────────────────────────────────────────────────────── */
+
+.bn-dialog-backdrop {
+	position: fixed;
+	inset: 0;
+	background: color-mix(in oklch, var(--bn-ink) 50%, transparent);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: var(--bn-s4);
+	z-index: 100000;
+	animation: bn-dialog-fade-in 120ms ease-out;
+}
+
+@keyframes bn-dialog-fade-in {
+	from { opacity: 0; }
+	to   { opacity: 1; }
+}
+
+/* Component dimensions as tokens, not hand-picked numbers at the point of use.
+ *
+ * Type, spacing and radius in this file were already tokenised; these four were the
+ * remainder the card was pointing at. They are dimensions rather than scale values,
+ * so they get their own names here - the same pattern bn-admin.css already uses for
+ * --bn-a-control-max-w, --bn-a-table-search-w and --bn-a-page-max-w.
+ *
+ * Border widths (1px hairlines, the 2px focus outline, the 4px tone rail) stay
+ * literal: they are not on any scale, and a token per hairline would be indirection
+ * without a decision behind it. */
+.bn-dialog,
+.bn-toast {
+	--bn-dialog-max-w:  440px;
+	--bn-dialog-btn-h:  36px;
+	--bn-toast-min-w:   220px;
+	--bn-toast-max-w:   360px;
+}
+
+.bn-dialog {
+	background: var(--bn-surface);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-lg);
+	box-shadow: var(--bn-shadow-lg);
+	max-width: var(--bn-dialog-max-w);
+	width: 100%;
+	overflow: hidden;
+	display: flex;
+	flex-direction: column;
+	animation: bn-dialog-slide-in 160ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes bn-dialog-slide-in {
+	from { transform: translateY(var(--bn-s2)); opacity: 0; }
+	to   { transform: translateY(0);   opacity: 1; }
+}
+
+.bn-dialog__head {
+	padding: var(--bn-s4) var(--bn-s5) var(--bn-s2);
+}
+.bn-dialog__title {
+	margin: 0;
+	font-size: var(--bn-text-lg);
+	font-weight: var(--bn-fw-semibold, 600);
+	color: var(--bn-ink);
+	line-height: var(--bn-leading-tight);
+}
+
+.bn-dialog__body {
+	padding: 0 var(--bn-s5) var(--bn-s4);
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink-2);
+	line-height: var(--bn-leading-body);
+	max-height: 50vh;
+	overflow-y: auto;
+}
+
+.bn-dialog__foot {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: var(--bn-s2);
+	padding: var(--bn-s3) var(--bn-s5);
+	background: var(--bn-sunken);
+	border-top: 1px solid var(--bn-line);
+}
+
+.bn-dialog__cancel,
+.bn-dialog__ok {
+	appearance: none;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-height: var(--bn-dialog-btn-h);
+	padding: 0 var(--bn-s4);
+	font: inherit;
+	font-size: var(--bn-text-sm);
+	font-weight: var(--bn-fw-semibold, 600);
+	border-radius: var(--bn-r-md);
+	border: 1px solid transparent;
+	cursor: pointer;
+	background: transparent;
+	color: var(--bn-ink-2);
+	transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.bn-dialog__cancel {
+	background: var(--bn-surface);
+	border-color: var(--bn-line);
+	color: var(--bn-ink);
+}
+.bn-dialog__cancel:hover {
+	background: var(--bn-sunken);
+}
+
+.bn-dialog__ok {
+	background: var(--bn-accent);
+	color: var(--bn-accent-fg);
+	border-color: var(--bn-accent);
+}
+.bn-dialog__ok:hover {
+	filter: brightness(0.95);
+}
+
+.bn-dialog__ok[data-tone="danger"] {
+	background: var(--bn-danger, oklch(58% 0.20 25));
+	border-color: var(--bn-danger, oklch(58% 0.20 25));
+	color: var(--bn-accent-fg);
+}
+
+.bn-dialog__ok[data-tone="warning"] {
+	background: var(--bn-warn, oklch(70% 0.18 75));
+	border-color: var(--bn-warn, oklch(70% 0.18 75));
+	/* Intentionally mode-invariant: --bn-warn stays a light amber in both light
+	   and dark, so the label must stay dark for contrast. Derived from the warn
+	   token (warm, near-black) rather than a raw hex. */
+	color: color-mix(in oklch, var(--bn-warn) 22%, oklch(16% 0 0));
+}
+
+/* Typed-confirmation gate. The confirm button is disabled until the field
+   matches, so it must READ as unavailable — a danger-red button that silently
+   does nothing on click is worse than no gate. */
+.bn-dialog__ok:disabled,
+.bn-dialog__ok:disabled:hover {
+	background: var(--bn-sunken);
+	border-color: var(--bn-line);
+	color: var(--bn-ink-4);
+	cursor: not-allowed;
+	filter: none;
+}
+
+.bn-dialog__confirm-field {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s1);
+	margin-block-start: var(--bn-s3);
+}
+
+.bn-dialog__confirm-label {
+	font-size: var(--bn-text-xs);
+	font-weight: var(--bn-fw-semibold, 600);
+	color: var(--bn-ink);
+}
+
+.bn-dialog__confirm-input {
+	width: 100%;
+	max-width: var(--bn-a-control-max-w-xs, 100px);
+	min-height: var(--bn-dialog-btn-h);
+	padding: 0 var(--bn-s3);
+	font: inherit;
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink);
+	background: var(--bn-surface);
+	border: 1px solid var(--bn-line-strong);
+	border-radius: var(--bn-r-md);
+}
+
+.bn-dialog__confirm-input:focus-visible {
+	outline: 2px solid transparent;
+	outline-offset: var(--bn-a-outline-offset, 2px);
+	box-shadow: 0 0 0 3px color-mix(in oklch, var(--bn-accent) 35%, transparent);
+}
+
+.bn-dialog__cancel:focus-visible,
+.bn-dialog__ok:focus-visible {
+	outline: 2px solid transparent;
+	outline-offset: var(--bn-a-outline-offset, 2px);
+	box-shadow: 0 0 0 3px color-mix(in oklch, var(--bn-accent) 35%, transparent);
+}
+
+/* ── Toast ──────────────────────────────────────────────────────────────── */
+
+.bn-toast-root {
+	position: fixed;
+	bottom: var(--bn-s6);
+	inset-inline-end: var(--bn-s6);
+	display: flex;
+	flex-direction: column-reverse;
+	gap: var(--bn-s2);
+	z-index: 100001;
+	pointer-events: none;
+	max-width: calc(100vw - (2 * var(--bn-s6)));
+}
+
+.bn-toast {
+	pointer-events: auto;
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s3);
+	min-width: var(--bn-toast-min-w);
+	max-width: var(--bn-toast-max-w);
+	padding: var(--bn-s3) var(--bn-s4);
+	background: var(--bn-surface);
+	color: var(--bn-ink);
+	border: 1px solid var(--bn-line);
+	border-inline-start: 4px solid var(--bn-ink-3);
+	border-radius: var(--bn-r-md);
+	box-shadow: var(--bn-shadow-md);
+	font-size: var(--bn-text-sm);
+	line-height: var(--bn-leading-snug);
+	transform: translateY(var(--bn-s2));
+	opacity: 0;
+	transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1), opacity 200ms ease;
+}
+.bn-toast.is-visible {
+	transform: translateY(0);
+	opacity: 1;
+}
+
+.bn-toast--success { border-inline-start-color: var(--bn-success, oklch(55% 0.15 145)); }
+.bn-toast--error   { border-inline-start-color: var(--bn-danger,  oklch(58% 0.20 25)); }
+.bn-toast--warning { border-inline-start-color: var(--bn-warn,    oklch(70% 0.18 75)); }
+.bn-toast--info    { border-inline-start-color: var(--bn-accent); }
+
+@media (prefers-reduced-motion: reduce) {
+	.bn-dialog-backdrop,
+	.bn-dialog,
+	.bn-toast {
+		animation: none !important;
+		transition: none !important;
+	}
+}

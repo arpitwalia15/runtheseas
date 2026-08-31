@@ -1,0 +1,4030 @@
+/**
+ * BuddyNext Admin — Premium Chrome Styles
+ *
+ * Replaces the inline <style> block emitted by AdminPageBase::output_shared_styles().
+ * Covers every component class rendered by AdminPageBase and all BuddyNext admin
+ * sub-pages: Settings, Members, Spaces, NavManager, IntegrationHub, EmailEditor,
+ * Analytics, and MemberTypes.
+ *
+ * File structure:
+ *   1. :root — component-specific design tokens (--bn-a-* prefix)
+ *   2. Component rules — desktop-first
+ *   3. @media breakpoints — see the tier list below
+ *
+ * There is deliberately no dark section. This file has never carried a
+ * [data-theme="dark"] block, and nothing sets that attribute in wp-admin:
+ * assets/js/shell/font-scale.js is the only writer and it is enqueued solely for
+ * front-end hub pages via PageRouter::enqueue_hub_assets(). Admin dark mode is
+ * unbuilt, not broken — do not add dark overrides here expecting them to apply.
+ * Wiring it up (a toggle, or prefers-color-scheme) is a feature, and needs the
+ * attribute set on an admin surface first.
+ *
+ * Breakpoint tiers. Author against these three and nothing else:
+ *
+ *   1024px  Tablet. Multi-panel layouts fold to a single column and fixed
+ *           sidebars narrow. iPad portrait is 1024, so this is the tier that
+ *           decides whether the admin is usable on one. Used by the NavManager
+ *           three-panel grid, the hub shell sidebar, and the Member Types
+ *           header actions.
+ *    782px  WordPress core's own admin stack point. Core switches #wpbody to
+ *           its stacked layout here and its list tables switch to the mobile
+ *           card view, so ours must move on the same pixel or the page tears in
+ *           half. Its complement is written as min-width: 783px, not 782, to
+ *           avoid both rules matching at exactly 782.
+ *    640px  Phone. Remaining two-up rows go single-column.
+ *
+ * One documented exception: bn-admin-email.css collapses at 900px. The email
+ * editor is by far the heaviest consumer of .bn-split, and it needs to fold
+ * earlier than the rest; it earns its own threshold rather than dragging the
+ * shared 1024 down and disturbing every other screen that uses .bn-split.
+ * Both of its 900px rules fire together, so there is no width at which the
+ * layout is half-folded. Do not add a second exception without the same
+ * justification - a one-off breakpoint per screen is how a responsive system
+ * stops being a system.
+ *
+ * @package BuddyNext
+ * @since   1.0.0
+ */
+
+/* ==========================================================================
+   1. DESIGN TOKENS
+   ========================================================================== */
+
+:root {
+	/* --bn-a-* tokens alias the v2 --bn-* source in bn-base.css. They exist
+	 * only to preserve the admin's class surface; new admin code should
+	 * reference --bn-* directly. Dark mode flips through the v2 source. */
+
+	/* -- Brand ------------------------------------------------------------ */
+	--bn-a-brand:             var(--bn-accent);
+	--bn-a-brand-hover:       var(--bn-accent-700);
+	--bn-a-brand-light:       var(--bn-accent-100);
+
+	/* -- Backgrounds ------------------------------------------------------ */
+	--bn-a-bg:                var(--bn-canvas);
+	--bn-a-bg-subtle:         var(--bn-sunken);
+	--bn-a-bg-hover:          var(--bn-sunken);
+
+	/* -- Borders ---------------------------------------------------------- */
+	--bn-a-border:            var(--bn-line);
+	--bn-a-border-soft:       var(--bn-line-faint);
+
+	/* -- Text ------------------------------------------------------------- */
+	--bn-a-text-1:            var(--bn-ink);
+	--bn-a-text-2:            var(--bn-ink-2);
+	--bn-a-text-3:            var(--bn-ink-3);
+
+	/* -- Semantic --------------------------------------------------------- */
+	--bn-a-green:             var(--bn-success);
+	--bn-a-green-bg:          var(--bn-success-bg);
+	--bn-a-amber:             var(--bn-warn);
+	--bn-a-amber-bg:          var(--bn-warn-bg);
+	--bn-a-red:               var(--bn-danger);
+	--bn-a-red-bg:            var(--bn-danger-bg);
+	/* Informational, not a product accent. --bn-a-career-* aliases the same base
+	   pair, but that name means "Career Board" and a neutral notice is not a
+	   partner surface. */
+	--bn-a-info:              var(--bn-info);
+	--bn-a-info-bg:           var(--bn-info-bg);
+
+	/* -- Sibling-product accents (hue-derived in bn-base.css) ----------- */
+	--bn-a-jetonomy:          var(--bn-jetonomy);
+	--bn-a-jetonomy-bg:       var(--bn-jetonomy-bg);
+	--bn-a-jetonomy-border:   var(--bn-jetonomy-bg);
+	--bn-a-mvs:               var(--bn-media);
+	--bn-a-mvs-bg:            var(--bn-media-bg);
+	--bn-a-mvs-border:        var(--bn-media-bg);
+	--bn-a-gamif:             var(--bn-events);
+	--bn-a-gamif-bg:          var(--bn-events-bg);
+	--bn-a-gamif-border:      var(--bn-events-bg);
+	--bn-a-career:            var(--bn-info);
+	--bn-a-career-bg:         var(--bn-info-bg);
+	--bn-a-career-border:     var(--bn-info-bg);
+
+	/* -- Spacing (4px grid) ----------------------------------------------- */
+	--bn-a-s1:                var(--bn-s1);
+	--bn-a-s2:                var(--bn-s2);
+	--bn-a-s3:                var(--bn-s3);
+	--bn-a-s4:                var(--bn-s4);
+	--bn-a-s5:                var(--bn-s5);
+	--bn-a-s6:                var(--bn-s6);
+	--bn-a-s8:                var(--bn-s8);
+	--bn-a-s10:               var(--bn-s10);
+
+	/* -- Border radius ---------------------------------------------------- */
+	--bn-a-r-sm:              var(--bn-r-sm);
+	--bn-a-r-md:              var(--bn-r-md);
+	--bn-a-r-lg:              var(--bn-r-lg);
+	--bn-a-r-full:            999px;                   /* pill: badges, chips, status dots */
+
+	/* -- Typography ------------------------------------------------------- */
+	--bn-a-font-body:         var(--bn-font-ui);
+	--bn-a-font-display:      var(--bn-font-display);
+	/* Admin-scoped reading size: measured against Learnomy's admin, our field
+	   content, table cells, and inputs ran 13px vs its 14px - the one real
+	   size gap behind the "very small" feel (nav/titles/hints already match).
+	   This sheet only loads in wp-admin, so member-facing text is untouched. */
+	--bn-text-sm:             14px;
+	--bn-a-text-2xs:          var(--bn-text-2xs);
+	/* Sunken surface. Was used in three places with three different rgba
+	   fallbacks (0.03 / 0.04 / 0.06) standing in for one missing token, so the
+	   same "recessed" surface rendered as three different greys and none of
+	   them responded to dark mode. */
+	--bn-a-sunken:            var(--bn-sunken);
+	--bn-a-text-xs:           var(--bn-text-xs);
+	--bn-a-text-sm:           var(--bn-text-sm);
+	--bn-a-text-md:           var(--bn-text-md);
+	--bn-a-text-base:         var(--bn-text-base);
+	--bn-a-text-lg:           var(--bn-text-lg);
+	--bn-a-text-xl:           var(--bn-text-xl);
+	--bn-a-text-2xl:          var(--bn-text-2xl);
+	--bn-a-fw-normal:         var(--bn-fw-normal);
+	--bn-a-fw-medium:         var(--bn-fw-medium);
+	--bn-a-fw-semibold:       var(--bn-fw-semibold);
+	--bn-a-fw-bold:           var(--bn-fw-bold);
+	--bn-a-fw-extrabold:      var(--bn-fw-extrabold);
+
+	/* -- Shadows ---------------------------------------------------------- */
+	--bn-a-shadow-sm:         var(--bn-shadow-sm);
+	--bn-a-shadow-md:         var(--bn-shadow-md);
+
+	/* -- Transitions ------------------------------------------------------ */
+	--bn-a-transition:        var(--bn-dur) var(--bn-ease);
+
+	/* -- Avatar accent colours not covered by semantic tokens -------------- */
+	--bn-a-av-pink:           oklch(60% 0.20 350);
+
+	/* -- Structural / component sizes ------------------------------------ */
+	--bn-a-page-max-w:        1100px;
+	--bn-a-control-max-w:     560px;
+	/* The narrow step, for a control holding a count, price or percentage. Two
+	   values is the whole scale on purpose: every additional width is one more way
+	   for two adjacent fields to disagree by 20px for no reason a reader can see. */
+	--bn-a-control-max-w-xs:  100px;
+	--bn-a-table-search-w:    240px;
+	--bn-a-addon-accent-w:    3px;
+	--bn-a-row-badge-py:      2px;
+	--bn-a-row-badge-px:      7px;
+
+	/* -- Toggle dimensions ----------------------------------------------- */
+	--bn-a-toggle-w:          40px;
+	--bn-a-toggle-h:          22px;
+	--bn-a-toggle-r:          11px;
+	--bn-a-toggle-knob:       16px;
+	--bn-a-toggle-knob-off:   3px;
+	--bn-a-toggle-knob-on:    21px;
+
+	/* -- Avatar dimensions ----------------------------------------------- */
+	--bn-a-avatar-sz:         34px;
+	--bn-a-avatar-sz-sm:      28px;
+
+	/* -- More-menu button size ------------------------------------------- */
+	--bn-a-more-btn-sz:       28px;
+
+	/* -- Input constraints ----------------------------------------------- */
+	--bn-a-input-min-w:       200px;
+	--bn-a-field-max-w:       400px;
+
+	/* -- Input look (ONE uniform admin field — used by every option) ----- */
+	--bn-a-input-border:      var(--bn-line-strong);   /* crisp, reads as tappable */
+	--bn-a-input-radius:      var(--bn-a-r-sm);
+	--bn-a-input-pad-y:       var(--bn-a-s2);
+	--bn-a-input-pad-x:       var(--bn-a-s3);
+	--bn-a-focus-ring:        0 0 0 3px color-mix(in oklch, var(--bn-a-brand) 22%, transparent);
+
+	/* -- Card / dropdown min-widths -------------------------------------- */
+	--bn-a-dropdown-min-w:    140px;
+
+	/* -- Drag handle dimensions ------------------------------------------ */
+	--bn-a-drag-bar-w:        18px;
+	--bn-a-drag-bar-h:        2px;
+	--bn-a-drag-bar-gap:      3px;
+
+	/* -- Typography specifics -------------------------------------------- */
+	--bn-a-ls-stat:           -0.5px;
+	--bn-a-outline-offset-in: -2px;
+	--bn-a-outline-offset:    2px;
+
+	/* -- Code background (developer bar) ---------------------------------- */
+	--bn-a-bg-code:           oklch(18% 0.005 var(--bn-hue));
+	--bn-a-code-text:         oklch(82% 0.18 145);
+}
+
+/* ==========================================================================
+   2. DARK MODE
+   ========================================================================== */
+
+/* Dark-mode token shifts come from the v2 source (bn-base.css). The aliases
+ * above already re-resolve, so no admin-scoped dark overrides are required. */
+
+/* ==========================================================================
+   3. COMPONENT RULES
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Notice — inline success/error flash messages
+
+   Shared across every BuddyNext admin screen (Members, Spaces > Categories,
+   Member Types, ...). This lives in bn-admin.css — loaded site-wide on BN
+   admin and the home of the --bn-a-* tokens these rules use — rather than in a
+   page-specific stylesheet. It previously lived only in bn-admin-members.css,
+   so the notice rendered unstyled (plain text + a bare dismiss glyph) on every
+   screen except Members, which was the only page that loaded that file. The
+   dismiss button is injected site-wide by bn-admin-dialogs.js initNotices(),
+   so its styling has to be equally site-wide.
+   -------------------------------------------------------------------------- */
+
+.bn-notice {
+	position: relative;
+	/* Room for the dismiss button so a long message never runs under it. The
+	   inline-end padding is the button's own width plus a gutter. */
+	padding: var(--bn-a-s3) var(--bn-a-s10, 2.5rem) var(--bn-a-s3) var(--bn-a-s4);
+	border-radius: var(--bn-a-r-sm);
+	margin-bottom: var(--bn-a-s4);
+	font-size: var(--bn-a-text-sm);
+	font-weight: var(--bn-a-fw-medium);
+}
+
+/* Added by bn-admin-dialogs.js, so it only exists when it can actually work.
+   Inset positioning rather than right/left keeps it on the correct side in RTL. */
+.bn-notice__dismiss {
+	position: absolute;
+	inset-block-start: 50%;
+	inset-inline-end: var(--bn-a-s2);
+	transform: translateY(-50%);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	/* Keeps the pointer target usable without overpowering a slim notice.
+	   Fallbacks are deliberate: an unresolved var() invalidates the whole
+	   declaration, and this button then collapses to the glyph's own 11x18 --
+	   which is exactly what happened when this first shipped against
+	   --bn-a-s7, a token that does not exist in the admin scale. */
+	inline-size: var(--bn-a-s8, 2rem);
+	block-size: var(--bn-a-s8, 2rem);
+	padding: 0;
+	border: 0;
+	border-radius: var(--bn-a-r-sm);
+	background: none;
+	/* Inherit so the button reads as part of its own notice rather than
+	   introducing a third colour on a green or red ground. */
+	color: inherit;
+	font-size: var(--bn-a-text-lg);
+	line-height: 1;
+	opacity: 0.7;
+	cursor: pointer;
+}
+
+.bn-notice__dismiss:hover,
+.bn-notice__dismiss:focus-visible {
+	opacity: 1;
+	background: rgba( 0, 0, 0, 0.06 );
+}
+
+.bn-notice__dismiss:focus-visible {
+	outline: 2px solid currentColor;
+	outline-offset: -2px;
+}
+
+/* A composite notice keeps its own paragraphs.
+ *
+ * Most notices are one sentence and render_notice() emits the text directly. A
+ * few are not — a cron warning with a <strong> lead and a <code> command, a bulk
+ * result with a translator-commented printf — and those keep their markup and
+ * take the primitive's classes instead of being forced through the helper, where
+ * rebuilding a translated string around a sprintf is real risk for no visual
+ * gain. Their inner <p> would otherwise add browser margins on top of the
+ * notice's own padding, so the card grows a ragged gap top and bottom. */
+.bn-notice > p:first-child {
+	margin-block-start: 0;
+}
+
+.bn-notice > p:last-child {
+	margin-block-end: 0;
+}
+
+.bn-notice-success {
+	background: var(--bn-a-green-bg);
+	color: var(--bn-a-green);
+	border: 1px solid var(--bn-a-green-bg);
+}
+
+.bn-notice-error {
+	background: var(--bn-a-red-bg);
+	color: var(--bn-a-red);
+	border: 1px solid var(--bn-a-red-bg);
+}
+
+/* Warning and info existed as core notice types that admin screens were still
+   hand-rolling, so a "this will affect existing members" caution rendered in
+   WordPress grey next to BuddyNext's own green and red. Four tones or the
+   primitive only covers half of what the screens actually say. */
+.bn-notice-warning {
+	background: var(--bn-a-amber-bg);
+	color: var(--bn-a-amber);
+	border: 1px solid var(--bn-a-amber-bg);
+}
+
+.bn-notice-info {
+	background: var(--bn-a-info-bg);
+	color: var(--bn-a-info);
+	border: 1px solid var(--bn-a-info-bg);
+}
+
+/* --------------------------------------------------------------------------
+   Page wrap
+   -------------------------------------------------------------------------- */
+
+.bn-admin-wrap {
+	max-width: var(--bn-a-page-max-w);
+	font-family: var(--bn-a-font-body);
+}
+
+/* --------------------------------------------------------------------------
+   Page header
+   -------------------------------------------------------------------------- */
+
+.bn-admin-header {
+	margin-bottom: var(--bn-a-s6);
+}
+
+.bn-admin-title {
+	font-family: var(--bn-a-font-display);
+	font-size: var(--bn-a-text-2xl) !important;
+	font-weight: var(--bn-a-fw-bold) !important;
+	color: var(--bn-a-text-1) !important;
+	margin: 0 0 var(--bn-a-s1) !important;
+	line-height: 1.3 !important;
+}
+
+.bn-admin-sub {
+	font-size: var(--bn-a-text-sm);
+	color: var(--bn-a-text-2);
+	margin: 0;
+}
+
+/* --------------------------------------------------------------------------
+   Tab bar
+   -------------------------------------------------------------------------- */
+
+/* Pages & URLs tab — one tidy row per community hub: name + slug + URL preview,
+   with the optional backing page tucked in a disclosure. Divider-separated for
+   a clean, scannable list. */
+/* Compact, columnar layout: Hub | URL slug | Backing page. */
+.bn-pages-table {
+	width: 100%;
+	border-collapse: collapse;
+}
+.bn-pages-table th {
+	text-align: start;
+	font-size: var(--bn-a-text-xs);
+	font-weight: var(--bn-a-fw-semibold);
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	color: var(--bn-a-text-3);
+	padding: 0 var(--bn-a-s4) var(--bn-a-s2) 0;
+	border-bottom: 1px solid var(--bn-a-border);
+}
+.bn-pages-table td {
+	vertical-align: top;
+	padding: var(--bn-a-s3) var(--bn-a-s4) var(--bn-a-s3) 0;
+	border-bottom: 1px solid var(--bn-a-border-soft);
+}
+.bn-pages-table tr:last-child td {
+	border-bottom: 0;
+}
+.bn-pages-table .bn-field-hint {
+	display: block;
+	margin: 2px 0 0;
+}
+.bn-pages-cell--hub strong {
+	display: block;
+	font-size: var(--bn-a-text-sm);
+	color: var(--bn-a-text-1);
+}
+.bn-pages-cell--slug {
+	width: 32%;
+}
+.bn-pages-cell--page {
+	width: 38%;
+}
+.bn-pages-slug-input {
+	width: 100%;
+	max-width: 220px;
+}
+.bn-pages-cell--page select {
+	width: 100%;
+	max-width: 300px;
+	box-sizing: border-box;
+}
+.bn-pages-create {
+	margin-top: var(--bn-a-s2);
+	font-size: var(--bn-a-text-sm);
+	color: var(--bn-a-text-2);
+}
+
+/* Stack to label-over-control on small screens. */
+@media ( max-width: 782px ) {
+	.bn-pages-table,
+	.bn-pages-table tbody,
+	.bn-pages-table tr,
+	.bn-pages-table td {
+		display: block;
+		width: 100%;
+	}
+	.bn-pages-table thead {
+		display: none;
+	}
+	.bn-pages-table td {
+		border-bottom: 0;
+		padding: var(--bn-a-s1) 0;
+	}
+	.bn-pages-table tr {
+		padding: var(--bn-a-s3) 0;
+		border-bottom: 1px solid var(--bn-a-border-soft);
+	}
+}
+
+/* Page sub-nav (Members / Profile Fields / …) — underline tab strip so it
+   matches the AdminHub section tabs and every other nav in the admin. */
+.bn-admin-tabs {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--bn-a-s1, 4px);
+	border-bottom: 1px solid var(--bn-a-border);
+	margin-bottom: var(--bn-a-s5);
+}
+
+.bn-atab {
+	padding: 10px 14px;
+	margin-bottom: -1px;
+	border: 0;
+	border-bottom: 2px solid transparent;
+	background: none;
+	font-size: var(--bn-a-text-sm);
+	font-weight: var(--bn-a-fw-medium);
+	line-height: 1.2;
+	color: var(--bn-a-text-2);
+	cursor: pointer;
+	text-decoration: none;
+	display: inline-flex;
+	align-items: center;
+	white-space: nowrap;
+	transition: color var(--bn-a-transition), border-color var(--bn-a-transition);
+}
+
+.bn-atab.active,
+.bn-atab.active:visited {
+	color: var(--bn-a-brand);
+	border-bottom-color: var(--bn-a-brand);
+	font-weight: var(--bn-a-fw-semibold);
+}
+
+.bn-atab:hover:not(.active) {
+	color: var(--bn-a-text-1);
+}
+
+.bn-atab:focus-visible {
+	outline: 2px solid var(--bn-a-brand);
+	outline-offset: var(--bn-a-outline-offset-in);
+	border-radius: var(--bn-a-r-sm, 4px);
+}
+
+/* Colour field — swatch picker + hex input, shared across every admin screen
+   (Settings brand colour, taxonomy editor, etc.) so the control is identical
+   everywhere. */
+.bn-color-row {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-a-s2);
+}
+.bn-color-row input[type="color"],
+.bn-color-swatch {
+	width: 36px;
+	height: 36px;
+	border: 1px solid var(--bn-a-border);
+	border-radius: var(--bn-a-r-sm);
+	padding: 2px;
+	cursor: pointer;
+	background: none;
+	flex-shrink: 0;
+}
+.bn-color-hex {
+	max-width: 120px;
+	font-family: var(--bn-a-font-mono, monospace);
+}
+.bn-color-row .bn-field-hint {
+	margin: 0;
+}
+
+/* Media picker row (AdminPageBase::render_media_row) — thumbnail preview +
+   Select / Remove buttons + the URL input that carries the posted value
+   (and doubles as the no-JS fallback). Wired by js/admin/media-picker.js. */
+.bn-media-preview {
+	margin-bottom: var(--bn-a-s3);
+}
+
+.bn-media-preview img {
+	display: block;
+}
+
+.bn-media-controls {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--bn-a-s2);
+}
+
+.bn-media-controls .bn-media-url {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+/* --------------------------------------------------------------------------
+   Section cards
+   -------------------------------------------------------------------------- */
+
+/* Settings reading width — on a wide monitor an uncapped settings card pushes
+   the control ~1000px away from its label. Cap settings form stacks at a
+   comfortable reading width. Scoped to the settings wrappers only
+   (.bn-settings-form on options.php tabs, .bn-settings-content on
+   admin-post forms) so full-width data surfaces — Members/Spaces tables,
+   directories, the nav manager — are NOT capped. */
+/* UNIFORM CONTAINER CONTRACT (owner, 2026-07-02): section cards fill the
+   panel width on EVERY tab - the visual container level is the card, never
+   the form/wrapper. Readability comes from capping the CONTROLS inside the
+   full-width card (the Learnomy/WooCommerce model), not from capping the
+   page. */
+.bn-settings-section .bn-ss-body input[type="text"],
+.bn-settings-section .bn-ss-body input[type="email"],
+.bn-settings-section .bn-ss-body input[type="url"],
+.bn-settings-section .bn-ss-body input[type="number"],
+.bn-settings-section .bn-ss-body input[type="password"],
+.bn-settings-section .bn-ss-body select,
+.bn-settings-section .bn-ss-body textarea {
+	max-width: var(--bn-a-control-max-w, 560px);
+}
+
+/* …except in a filter bar, where a control sizes to its own content.
+ *
+ * The rule above is for SETTINGS FORMS, where a field filling the column up to
+ * 560px is right. A filter bar is a different thing: several small controls on
+ * one row above the list they filter. The blanket rule caught those too, so each
+ * select computed to 558px inside a 560px flex row and wrapped one per line -
+ * the moderation Reports queue rendered its three filters as three full-width
+ * stacked bars, which reads as a broken form rather than a toolbar.
+ *
+ * `.bn-filter-bar` is the shared marker; add it to any filter form and the
+ * exception plus the row layout below both apply. `.bn-mod-queue-filters` is the
+ * original one-off kept so that screen cannot regress - retire it by adding the
+ * shared class to its markup the next time that template is touched, rather than
+ * adding a third screen-specific selector here.
+ *
+ * Same specificity as the rule it excepts, placed immediately after it, so the
+ * cascade resolves deterministically and the two stay adjacent. */
+.bn-settings-section .bn-ss-body .bn-mod-queue-filters select,
+.bn-settings-section .bn-ss-body .bn-mod-queue-filters input[type="text"],
+.bn-settings-section .bn-ss-body .bn-mod-queue-filters input[type="search"],
+.bn-settings-section .bn-ss-body .bn-filter-bar select,
+.bn-settings-section .bn-ss-body .bn-filter-bar input[type="text"],
+.bn-settings-section .bn-ss-body .bn-filter-bar input[type="search"] {
+	width: auto;
+	max-width: none;
+}
+
+/* The row itself: several controls above the list they filter, on one line, with
+   the free-text search taking whatever slack is left. */
+.bn-filter-bar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--bn-a-s2);
+	margin-bottom: var(--bn-a-s4);
+}
+
+.bn-filter-bar input[type="text"],
+.bn-filter-bar input[type="search"] {
+	flex: 1 1 16rem;
+}
+
+.bn-filter-bar select {
+	flex: 0 0 auto;
+}
+
+/* At the WP admin breakpoint a row of four controls is four slivers, and the
+   search is the one that has to stay usable. */
+@media screen and ( max-width: 782px ) {
+
+	.bn-filter-bar {
+		flex-direction: column;
+		align-items: stretch;
+	}
+
+	.bn-filter-bar select,
+	.bn-filter-bar .bn-btn {
+		max-width: none;
+		width: 100%;
+	}
+
+	/* Release the desktop flex-basis. `flex: 1 1 16rem` above sizes the search
+	   along the MAIN axis, and the main axis is now vertical — so the basis
+	   became a height and the field rendered as a 256px-tall box with the
+	   placeholder floating in the middle of it. Auto height, full width.
+	   The matching select override cannot live here — see the note beside the
+	   `.bn-ss-body .bn-filter-bar select` cap further down. */
+	.bn-filter-bar input[type="text"],
+	.bn-filter-bar input[type="search"] {
+		flex: 0 0 auto;
+		max-width: none;
+		width: 100%;
+	}
+}
+
+.bn-settings-section .bn-ss-body .bn-field-hint,
+.bn-settings-section .bn-ss-body p.description {
+	max-width: 72ch;
+}
+
+.bn-settings-section {
+	background: var(--bn-a-bg);
+	border: 1px solid var(--bn-a-border);
+	border-radius: var(--bn-a-r-lg);
+	box-shadow: var(--bn-a-shadow-sm);
+	margin-bottom: var(--bn-a-s5);
+	overflow: hidden;
+}
+
+.bn-ss-header {
+	padding: var(--bn-a-s4) var(--bn-a-s5);
+	border-bottom: 1px solid var(--bn-a-border-soft);
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--bn-a-s3);
+}
+
+.bn-ss-title {
+	font-family: var(--bn-a-font-display);
+	font-weight: var(--bn-a-fw-semibold);
+	font-size: var(--bn-a-text-base);
+	color: var(--bn-a-text-1);
+}
+
+.bn-ss-body {
+	/* Sides + bottom keep the card's s5 gutter; top is tighter so the first row
+	   binds to the section header instead of floating below an empty gap. The
+	   first field's own top padding (e.g. .bn-toggle-row) supplies the rest, so
+	   header-to-first-field reads consistent with the spacing between fields. */
+	padding: var(--bn-a-s2) var(--bn-a-s5) var(--bn-a-s5);
+}
+
+/* Section-body intro paragraph. Shared by every admin tab that opens a
+   section with a lead sentence (Tools, Appearance, Roles, Demo, Members).
+   It lives in this always-loaded sheet — not a page-specific one — so every
+   page gets the same tight top spacing instead of the browser's default
+   <p> margin (which read as an inconsistent gap on non-Members tabs). */
+.bn-av-section-desc {
+	font-size: var(--bn-a-text-sm);
+	color: var(--bn-a-text-2);
+	margin: 0 0 var(--bn-a-s4);
+}
+
+/* --------------------------------------------------------------------------
+   Form fields
+   -------------------------------------------------------------------------- */
+
+.bn-field {
+	margin-bottom: var(--bn-a-s4);
+}
+
+.bn-field:last-child {
+	margin-bottom: 0;
+}
+
+.bn-field > label,
+.bn-field > .bn-field-label {
+	display: block;
+	font-weight: var(--bn-a-fw-semibold);
+	font-size: var(--bn-a-text-sm);
+	margin-bottom: var(--bn-a-s1);
+	color: var(--bn-a-text-1);
+}
+
+/* A limit that can be switched off (render_optional_limit_row).
+ *
+ * The checkbox and the number are one control, so they sit on one line and read
+ * left to right: "Limit redemptions [x] [25]". Stacked, the pair reads as two
+ * unrelated settings and the checkbox looks like it governs the whole card.
+ * Wraps rather than compresses on a narrow screen — a number input squeezed to
+ * three characters is worse than a second line. */
+.bn-field--optional-limit {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--bn-a-s2);
+}
+
+.bn-field--optional-limit > label:first-child {
+	flex-basis: 100%;
+	margin-bottom: 0;
+}
+
+/* A checkbox with its own words, sitting INSIDE a .bn-field.
+ *
+ * `.bn-field > label` (0,2,0) makes every direct-child label a block-level bold
+ * field title, which is right for the label naming a control and wrong for a
+ * checkbox whose label IS the sentence beside the box — it rendered them bold,
+ * full-width and looking like three separate settings. Matched at the same
+ * specificity and declared after, so the field-title rule stops applying to
+ * checkbox rows without being weakened for the labels it was written for. */
+.bn-field > .bn-check-inline,
+.bn-field .bn-check-inline {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-a-s1);
+	margin-bottom: 0;
+	font-weight: var(--bn-a-fw-normal, 400);
+	font-size: var(--bn-a-text-sm);
+	color: var(--bn-a-text-2);
+}
+
+.bn-field--optional-limit .bn-field-hint {
+	flex-basis: 100%;
+}
+
+/* Form-control sizing inside admin section cards (.bn-ss-body).
+ *
+ * The cards are full-width, so a bare input would either sit tiny at its content
+ * size or sprawl edge-to-edge. Make text inputs / selects fill their container
+ * but cap at a readable width, and give textareas a wider cap. Number and colour
+ * inputs keep their natural compact size. Settings' inline max-widths
+ * (render_*_row) still win where set. */
+.bn-ss-body input.bn-text-input:not([type="number"]):not([type="color"]),
+.bn-ss-body input.bn-input:not([type="number"]):not([type="color"]),
+.bn-ss-body input[type="email"].regular-text,
+.bn-ss-body input[type="url"].regular-text {
+	width: 100%;
+	max-width: 560px;
+	box-sizing: border-box;
+}
+
+/* Selects size to their own options, not to a blanket 560px.
+ *
+ * A text input has no natural width — 560px is a reading measure and the right
+ * answer for one. A select does: it is exactly as wide as the longest thing it
+ * can say. Stretching all 61 of them to one width was wrong in BOTH directions,
+ * which is only visible once you count them:
+ *
+ *   18 hold options under 20 characters ("Forever", "Public") in a 560px control
+ *    8 hold options over 40, one of them 80 ("Restricted — they can look around,
+ *      but cannot post or comment until they confirm")
+ *
+ * The short ones are where this was reported. macOS draws a select's popup at
+ * the CONTROL's width, so an over-wide control makes an over-wide menu that runs
+ * off the right of the screen — Apple devices are where it shows, not where it
+ * is. The long ones are the same rule failing the other way, with the option
+ * ellipsised in the closed state.
+ *
+ * `width: auto` lets the browser do what it is already good at, and it is the
+ * translation-safe choice rather than the risky one: a German label that would
+ * overflow a fixed cap simply widens its own control. min-width stops a
+ * two-option select shrinking to a stub; max-width keeps the longest inside the
+ * card. Measured on Registration: 560px became 192 / 328 / 365 / 555 — each the
+ * width of what it actually says. */
+.bn-ss-body select.bn-select,
+.bn-ss-body select.bn-select-input,
+.bn-ss-body select:not([multiple]) {
+	width: auto;
+	min-width: 12rem;
+	max-width: 100%;
+	box-sizing: border-box;
+}
+
+/* The filter-bar exception again, against the CLASS-based sizing above.
+ *
+ * There are two blanket rules capping controls at 560px, and a filter bar has to
+ * be excepted from both: the first matches by input type, this one by the
+ * .bn-text-input / .bn-select classes. Excepting only the first left a search
+ * field that still stopped growing at 560px in a 928px toolbar, so the row read
+ * as "one big field and some leftovers" rather than a bar. Placed immediately
+ * after the rule it excepts, same specificity, for the same reason as above. */
+.bn-ss-body .bn-filter-bar input.bn-text-input,
+.bn-ss-body .bn-filter-bar input.bn-input {
+	width: auto;
+	max-width: none;
+}
+
+.bn-ss-body .bn-filter-bar select.bn-select,
+.bn-ss-body .bn-filter-bar select:not([multiple]) {
+	width: auto;
+	/* No floor here, unlike the settings default above.
+	   That default gives every select a 12rem minimum so a two-option control in
+	   a settings column is not a stub. A filter bar is the opposite situation:
+	   it packs a search field, a select and two buttons onto ONE line, so its
+	   controls have to be able to shrink. With the floor inherited, this select
+	   stayed 192px at every width — wider than the whole bar once the bar was
+	   130px, which pushed a one-line toolbar to five rows. */
+	min-width: 0;
+	/* Sized to its own content like every other control on the bar, but capped:
+	   one long tier or label name must not push the rest of the row off the
+	   line. The cap lives here rather than on .bn-filter-bar because only a
+	   selector at this specificity can outrank the blanket rule above. */
+	max-width: 14rem;
+}
+
+/* Once the bar stacks, that cap is the wrong answer: the select sat at ~93px in
+ * a column where the search, the buttons and everything else ran the full
+ * width, so it read as a broken control rather than a compact one.
+ *
+ * This override HAS to live here rather than in the ≤782px block above. It ties
+ * with the cap on specificity, so the later of the two wins — and the cap is
+ * further down the file. Being inside a media query buys nothing; source order
+ * decides. Moving it up there is exactly the edit that silently does nothing. */
+@media screen and ( max-width: 782px ) {
+
+	.bn-ss-body .bn-filter-bar select.bn-select,
+	.bn-ss-body .bn-filter-bar select:not([multiple]) {
+		width: 100%;
+		max-width: none;
+	}
+}
+
+.bn-ss-body textarea.bn-text-input,
+.bn-ss-body textarea.bn-textarea,
+.bn-ss-body textarea.bn-input {
+	width: 100%;
+	max-width: 760px;
+	box-sizing: border-box;
+}
+.bn-ss-body input[type="number"] {
+	width: 120px;
+}
+
+/* Icon slot inside a bn-btn (used by Settings → Registration → Manage invitations). */
+.bn-btn .bn-btn__icon {
+	width: 14px;
+	height: 14px;
+	margin-inline-start: var(--bn-a-s1);
+}
+
+.bn-field-hint {
+	display: block;
+	font-size: var(--bn-a-text-xs);
+	color: var(--bn-a-text-3);
+	margin-top: var(--bn-a-s1);
+}
+
+/* Input + action buttons on one row (e.g. the webhook secret: Show/Copy/
+   Generate). The text input flexes to fill; the buttons keep their size. */
+.bn-input-group {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: stretch;
+	gap: var(--bn-a-s2);
+}
+
+.bn-input-group > input.bn-text-input {
+	flex: 1 1 280px;
+	min-width: 0;
+}
+
+.bn-input-group > .bn-btn {
+	flex: 0 0 auto;
+}
+
+.bn-secret-msg {
+	display: block;
+	font-size: var(--bn-a-text-xs);
+	color: var(--bn-a-green);
+	margin-top: var(--bn-a-s1);
+}
+
+.bn-secret-msg:empty {
+	display: none;
+}
+
+/* ONE uniform admin field. Every option control — the admin primitive
+ * (.bn-text-input / .bn-select-input) AND the frontend primitive
+ * (.bn-input / .bn-select / .bn-textarea) that admin screens reuse — resolves
+ * to the same look: same padding, radius, crisp border, and focus ring. This
+ * file is admin-only and loads after bn-base.css, so the frontend .bn-input is
+ * untouched; only its admin usage converges here. */
+input.bn-text-input,
+textarea.bn-text-input,
+select.bn-text-input,
+select.bn-select-input,
+.bn-input,
+.bn-textarea,
+.bn-select {
+	padding: var(--bn-a-input-pad-y) var(--bn-a-input-pad-x) !important;
+	font-size: var(--bn-a-text-sm) !important;
+	line-height: 1.4 !important;
+	color: var(--bn-a-text-1) !important;
+	background: var(--bn-a-bg) !important;
+	border: 1px solid var(--bn-a-input-border) !important;
+	border-radius: var(--bn-a-input-radius) !important;
+	box-shadow: none !important;
+	height: auto !important;
+	transition: border-color var(--bn-a-transition), box-shadow var(--bn-a-transition);
+}
+
+input.bn-text-input:focus,
+textarea.bn-text-input:focus,
+select.bn-text-input:focus,
+select.bn-select-input:focus,
+.bn-input:focus,
+.bn-textarea:focus,
+.bn-select:focus {
+	border-color: var(--bn-a-brand) !important;
+	box-shadow: var(--bn-a-focus-ring) !important;
+	/* A transparent outline (never `none`) so Windows High-Contrast / forced-colors
+	   mode — which drops box-shadow — still paints a focus ring. */
+	outline: 2px solid transparent !important;
+	outline-offset: 2px;
+}
+
+select.bn-select-input {
+	min-width: var(--bn-a-input-min-w);
+}
+
+select.bn-text-input {
+	display: block;
+	width: 100%;
+	max-width: var(--bn-a-field-max-w);
+}
+
+/* Baseline: ANY native / no-class form control inside the BuddyNext admin
+ * shell converges to the uniform field look — e.g. the Pages & URLs
+ * "Backing Page" <select>s that carry no BN class and would otherwise show
+ * the browser default (square 2px radius, grey border). The class rules above
+ * (with !important) still win where a primitive class is present and set the
+ * identical values, so the two layers never visibly conflict. Excludes
+ * checkbox / radio / colour / file / range / submit / button via the type
+ * whitelist. */
+.bn-admin-hub select,
+.bn-admin-hub textarea,
+.bn-admin-hub input[type="text"],
+.bn-admin-hub input[type="url"],
+.bn-admin-hub input[type="email"],
+.bn-admin-hub input[type="search"],
+.bn-admin-hub input[type="password"],
+.bn-admin-hub input[type="number"],
+.bn-admin-hub input[type="tel"],
+.bn-admin-hub input[type="date"],
+.bn-admin-hub input[type="datetime-local"] {
+	padding: var(--bn-a-input-pad-y) var(--bn-a-input-pad-x);
+	font-size: var(--bn-a-text-sm);
+	line-height: 1.4;
+	color: var(--bn-a-text-1);
+	background: var(--bn-a-bg);
+	border: 1px solid var(--bn-a-input-border);
+	border-radius: var(--bn-a-input-radius);
+	box-shadow: none;
+	height: auto;
+	transition: border-color var(--bn-a-transition), box-shadow var(--bn-a-transition);
+}
+
+/* Native <select> keeps room for the UA dropdown arrow on the inline-end. */
+.bn-admin-hub select {
+	padding-inline-end: var(--bn-a-s6);
+}
+
+.bn-admin-hub select:focus,
+.bn-admin-hub textarea:focus,
+.bn-admin-hub input[type="text"]:focus,
+.bn-admin-hub input[type="url"]:focus,
+.bn-admin-hub input[type="email"]:focus,
+.bn-admin-hub input[type="search"]:focus,
+.bn-admin-hub input[type="password"]:focus,
+.bn-admin-hub input[type="number"]:focus,
+.bn-admin-hub input[type="tel"]:focus,
+.bn-admin-hub input[type="date"]:focus,
+.bn-admin-hub input[type="datetime-local"]:focus {
+	border-color: var(--bn-a-brand);
+	box-shadow: var(--bn-a-focus-ring);
+	outline: 2px solid transparent;
+	outline-offset: 2px;
+}
+
+/* Edit member form rows (used by MemberEditForm) */
+.bn-field-row {
+	margin-bottom: var(--bn-a-s4);
+}
+
+.bn-field-row:last-child {
+	margin-bottom: 0;
+}
+
+.bn-label {
+	display: block;
+	font-weight: var(--bn-a-fw-semibold);
+	font-size: var(--bn-a-text-sm);
+	color: var(--bn-a-text-1);
+	margin-bottom: var(--bn-a-s1);
+}
+
+.bn-label label {
+	font-weight: var(--bn-a-fw-semibold);
+	font-size: var(--bn-a-text-sm);
+	color: var(--bn-a-text-1);
+	cursor: pointer;
+}
+
+/* --------------------------------------------------------------------------
+   Toggle rows
+   -------------------------------------------------------------------------- */
+
+.bn-toggle-row {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: var(--bn-a-s4);
+	/* 16px vertical band. Rows separate by this padding rhythm alone - no divider
+	   line - so a toggle row reads the same as a select/input field in the same
+	   section. (Some sections mix the two; a per-row divider appeared only under
+	   toggles, never under fields, which read as an inconsistent stray line.) */
+	padding: var(--bn-a-s4) 0;
+}
+
+/* Toggle-row copy column + nested sub-tab group (Integration Display cards). */
+.bn-toggle-row__copy {
+	min-width: 0;
+}
+
+.bn-toggle-row__label {
+	font-weight: var(--bn-fw-medium, 500);
+	color: var(--bn-a-text-1);
+}
+
+.bn-toggle-row__copy .bn-field-hint {
+	margin: var(--bn-a-s1) 0 0;
+}
+
+.bn-int-subtab-group {
+	margin-top: var(--bn-a-s3);
+	padding: var(--bn-a-s2) var(--bn-a-s4);
+	background: var(--bn-sunken);
+	border-radius: var(--bn-a-r-md);
+}
+
+.bn-int-subtab-group__kicker {
+	display: block;
+	padding-top: var(--bn-a-s2);
+	font-size: var(--bn-text-2xs, 11px);
+	font-weight: var(--bn-fw-semibold, 600);
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	color: var(--bn-a-text-3);
+}
+
+/* Descriptor-driven option rows (AdminPageBase::render_sections) wrap EVERY control in
+   a `<div class="bn-opt" id="…">` anchor (command-palette deep links). Give the WRAPPER
+   the row's vertical rhythm so every row separates identically - a toggle reads the same
+   as a select/input field, and a section that mixes the two spaces the same as an
+   all-toggle or all-field one. The inner control's own vertical padding/margin is zeroed
+   inside the wrapper so it is not double-counted. Rows OUTSIDE a wrapper (e.g. the
+   Integration Display sub-tab cards) keep the base .bn-toggle-row padding. */
+.bn-opt {
+	padding: var(--bn-a-s3) 0;
+}
+.bn-opt > .bn-toggle-row {
+	padding-top: 0;
+	padding-bottom: 0;
+}
+.bn-opt > .bn-field {
+	margin-bottom: 0;
+}
+
+/* A toggle disabled because a required plugin is inactive — reads as unavailable. */
+.bn-toggle-row.is-disabled .bn-tl-title,
+.bn-toggle-row.is-disabled .bn-toggle {
+	opacity: 0.55;
+}
+.bn-toggle-row.is-disabled .bn-toggle {
+	pointer-events: none;
+}
+
+.bn-tl-label {
+	flex: 1;
+}
+
+.bn-tl-title {
+	display: block;
+	font-weight: var(--bn-a-fw-semibold);
+	font-size: var(--bn-a-text-sm);
+	color: var(--bn-a-text-1);
+	cursor: pointer;
+}
+
+.bn-tl-desc {
+	display: block;
+	font-size: var(--bn-a-text-xs);
+	color: var(--bn-a-text-2);
+	margin-top: var(--bn-a-s1);
+}
+
+/*
+ * Toggle: the canonical geometry lives in bn-base.css (.bn-toggle, ::before
+ * thumb, [aria-checked] state). The admin settings template uses class .on
+ * for the active state — wire it into the base ::before thumb so we paint
+ * a single, correct track + thumb everywhere, instead of two competing
+ * pseudo-element thumbs (one from base, one from admin).
+ */
+/*
+ * A toggle paints from the DOM, never from a server-rendered class.
+ *
+ * When the checkbox lives INSIDE the .bn-toggle label (screen-reader-only),
+ * :has(:checked) is the whole state — pure CSS, correct on load, no flash, and
+ * it follows the member's click with no JS at all.
+ *
+ * The legacy `.on` class remains for genuinely JS-driven toggles that have no
+ * nested checkbox, but it is now scoped AWAY from the ones that do. Written as
+ * a plain OR it painted the track lit whenever either matched, so a template
+ * that baked `.on` in server-side (PushPrefsAdmin did) kept the toggle looking
+ * ON after the member switched it OFF: :has() correctly stopped matching and
+ * the stale class outvoted it. A control must never be able to claim a state
+ * the DOM contradicts.
+ */
+.bn-toggle:not( :has( input[type="checkbox"] ) ).on,
+.bn-toggle:has( input[type="checkbox"]:checked ) { background: var(--bn-accent); }
+.bn-toggle:not( :has( input[type="checkbox"] ) ).on::before,
+.bn-toggle:has( input[type="checkbox"]:checked )::before { transform: translateX(var(--bn-toggle-travel, 18px)); }
+[dir="rtl"] .bn-toggle:not( :has( input[type="checkbox"] ) ).on::before,
+[dir="rtl"] .bn-toggle:has( input[type="checkbox"]:checked )::before { transform: translateX(calc(-1 * var(--bn-toggle-travel, 18px))); }
+
+/* Make sure the hidden checkbox inside the label stays clipped. */
+.bn-toggle .screen-reader-text {
+	border: 0;
+	clip: rect(1px, 1px, 1px, 1px);
+	-webkit-clip-path: inset(50%);
+	clip-path: inset(50%);
+	height: 1px;
+	margin: -1px;
+	overflow: hidden;
+	padding: 0;
+	position: absolute;
+	width: 1px;
+	word-wrap: normal !important;
+}
+
+/* --------------------------------------------------------------------------
+   Save bar
+   -------------------------------------------------------------------------- */
+
+.bn-save-bar {
+	background: var(--bn-a-bg);
+	border: 1px solid var(--bn-a-border);
+	border-radius: var(--bn-a-r-md);
+	padding: var(--bn-a-s3) var(--bn-a-s4);
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: var(--bn-a-s3);
+	margin-top: var(--bn-a-s2);
+}
+
+.bn-save-msg {
+	font-size: var(--bn-a-text-xs);
+	color: var(--bn-a-green);
+	font-weight: var(--bn-a-fw-semibold);
+	margin-inline-end: auto;
+}
+
+/* Legacy .bn-stats-row / .bn-stat-card component removed — every stat surface
+   now renders the shared .bn-stat-grid > .bn-stat tiles (bn-base.css). */
+
+/* --------------------------------------------------------------------------
+   Data table
+   -------------------------------------------------------------------------- */
+
+.bn-data-table {
+	background: var(--bn-a-bg);
+	border: 1px solid var(--bn-a-border);
+	border-radius: var(--bn-a-r-md);
+	overflow: hidden;
+	margin-bottom: var(--bn-a-s4);
+}
+
+.bn-table-header {
+	padding: var(--bn-a-s3) var(--bn-a-s4);
+	border-bottom: 1px solid var(--bn-a-border-soft);
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--bn-a-s3);
+	flex-wrap: wrap;
+}
+
+input.bn-table-search {
+	border: 1px solid var(--bn-a-border) !important;
+	border-radius: var(--bn-a-r-sm) !important;
+	padding: var(--bn-a-s2) var(--bn-a-s3) !important;
+	font-size: var(--bn-a-text-sm) !important;
+	width: var(--bn-a-table-search-w) !important;
+	box-shadow: none !important;
+	background: var(--bn-a-bg) !important;
+	color: var(--bn-a-text-1) !important;
+}
+
+input.bn-table-search:focus {
+	border-color: var(--bn-a-brand) !important;
+	box-shadow: var(--bn-a-focus-ring) !important;
+	/* A transparent outline (never `none`) so Windows High-Contrast / forced-colors
+	   mode — which drops box-shadow — still paints a focus ring. */
+	outline: 2px solid transparent !important;
+	outline-offset: 2px;
+}
+
+table.bn-table {
+	width: 100%;
+	border-collapse: collapse;
+}
+
+table.bn-table th {
+	padding: var(--bn-a-s2) var(--bn-a-s4);
+	text-align: start;
+	font-size: var(--bn-a-text-xs);
+	font-weight: var(--bn-a-fw-bold);
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: var(--bn-a-text-3);
+	border-bottom: 1px solid var(--bn-a-border-soft);
+	background: var(--bn-a-bg-subtle);
+}
+
+table.bn-table td {
+	padding: var(--bn-a-s3) var(--bn-a-s4);
+	font-size: var(--bn-a-text-sm);
+	color: var(--bn-a-text-1);
+	border-bottom: 1px solid var(--bn-a-border-soft);
+	vertical-align: middle;
+}
+
+table.bn-table tr:last-child td {
+	border-bottom: none;
+}
+
+table.bn-table tr:hover td {
+	background: var(--bn-a-bg-hover);
+}
+
+/* --------------------------------------------------------------------------
+   S3 — Wide-table actions column never clips
+   --------------------------------------------------------------------------
+   This is Shape B of THE ADMIN TABLE CONTRACT (stated in full further down this
+   file, above "Shape A: core-style tables must scroll, not vanish"). Same three
+   rules, different markup: here the scroll wrapper is explicit in the HTML
+   instead of being selected with :has(). The `overflow: visible` below is
+   contract rule 3 - the table must not be its own scroll context - and it is
+   the reason the sticky column can pin at all.
+
+   A list table wider than the admin content area lives inside a horizontal
+   scroll wrapper — Members/Spaces use .bn-table-wrap__scroll, the Pro
+   Subscriptions table uses .bn-table-scroll. When it scrolls, the last column
+   (the row's actions: View / Revoke / Manage) would slide out of sight and the
+   owner loses the control the row exists for. Pin the last column to the
+   inline-end edge so it stays put while the data columns scroll under it.
+
+   Scoped to those two scroll wrappers ONLY. Every table inside them has its
+   actions in the last column (audited 2026-07-21: Members, Spaces,
+   Subscriptions), so pinning the last cell is safe. Tables that are NOT
+   scroll-wrapped — Email-log, Reports, Moderation:Log — are untouched, so a
+   data-bearing last column is never pinned.
+
+   A pinned cell needs an opaque background or the scrolling cells show through
+   it. The two wrappers carry different table primitives, so their row fills
+   differ: a .bn-table row sits on the card surface, a WP-core .widefat row on
+   the table's own canvas fill (the zebra is stripped in S8 below). Match each.
+
+   Admin tables get `overflow: hidden` from the card-corner clip in S8
+   (`.bn-admin-hub__content table:not(.form-table):not(.screen-reader-text)`),
+   and WP-core .widefat adds its own. That makes the table its own scroll
+   container, so a sticky cell pins to the never-scrolling table box instead of
+   the wrapper and the pin does nothing. Clear it inside the scroll wrappers —
+   the wrapper already does the clipping — so the wrapper stays the horizontal
+   scroll context.
+
+   MUST OUT-SPECIFY THE S8 CLIP RULE, AND THAT IS NARROWER THAN IT LOOKS. This
+   rule and the clip rule are both (0,3,1): each `:not()` contributes its inner
+   class, so the clip rule's `:not(.form-table):not(.screen-reader-text)` counts
+   two. An exact tie is decided by source order, and S8 comes later in this
+   file — so at (0,3,1) this rule LOSES and every sticky actions column in the
+   admin silently stops pinning.
+
+   That is not hypothetical: it is what shipped. The clip rule originally read
+   `table:not(.form-table)` at (0,2,1) and this rule genuinely outweighed it.
+   Adding `:not(.screen-reader-text)` to stop the clip eating screen-reader text
+   was correct on its own terms and looked local, but it raised that rule into a
+   tie and killed the pin on Members, Spaces, Member Types and Subscriptions at
+   once. Nothing failed loudly — the actions column just scrolled out of sight,
+   which reads as "the table scrolls", not "a fix regressed". Measured on Member
+   Types at 1024px: the Edit/Delete cell sat 128px past the wrapper's right edge
+   instead of pinned at 0.
+
+   So the third `:not()` below is load-bearing, not decoration. It takes this
+   rule to (0,4,1) and puts it decisively above the clip rule rather than level
+   with it. Do not "simplify" it away, and if you add another `:not()` to the S8
+   clip rule, add one here too. */
+.bn-admin-hub__content .bn-table-wrap__scroll > table:not(.form-table):not(.screen-reader-text),
+.bn-admin-hub__content .bn-table-scroll > table:not(.form-table):not(.screen-reader-text) {
+	overflow: visible;
+}
+
+/*
+ * The per-row lift that used to live here is gone. It raised the actions cell
+ * while its menu was open, to stop the sticky cell's own stacking context
+ * trapping the dropdown's z-index. The dropdown is now re-parented to <body>
+ * while open (more-menu.js), so it is not inside that stacking context at all
+ * and there is nothing left to lift.
+ */
+.bn-table-wrap__scroll .bn-table th:last-child {
+	z-index: 5;
+}
+
+.bn-table-wrap__scroll .bn-table td:last-child {
+	position: sticky;
+	inset-inline-end: 0;
+	text-align: end;
+}
+
+.bn-table-wrap__scroll .bn-table th:last-child {
+	background: var(--bn-a-bg-subtle);
+	z-index: 2;
+}
+
+.bn-table-wrap__scroll .bn-table td:last-child {
+	background: var(--bn-surface);
+	z-index: 1;
+}
+
+.bn-table-wrap__scroll .bn-table tr:hover td:last-child {
+	background: var(--bn-a-bg-hover);
+}
+
+/* A wrap-enabled flex cluster reports a tiny min-content width, so the auto
+   table layout starves the pinned column and the buttons stack one-per-line
+   (Spaces: 3 controls got a 114px cell). Inside a STICKY actions cell the
+   cluster must not wrap - nowrap + max-content makes the column size to the
+   full control row, and the sticky pin keeps it visible while data scrolls. */
+.bn-table-wrap__scroll .bn-table td:last-child .bn-row-actions,
+.bn-table-scroll table td:last-child .bn-row-actions {
+	flex-wrap: nowrap;
+	width: max-content;
+	margin-inline-start: auto;
+}
+
+.bn-table-scroll table th:last-child,
+.bn-table-scroll table td:last-child {
+	position: sticky;
+	inset-inline-end: 0;
+	text-align: end;
+}
+
+.bn-table-scroll table th:last-child {
+	background: var(--bn-a-bg-subtle);
+	z-index: 2;
+}
+
+.bn-table-scroll table td:last-child {
+	background: var(--bn-a-bg);
+	z-index: 1;
+}
+
+/* --------------------------------------------------------------------------
+   S8 — One row style: no zebra striping
+   --------------------------------------------------------------------------
+   BN's own .bn-table uses a plain row + a light bottom divider. WP-core list
+   tables (.widefat.striped) rendered by Email-log, Reports, Moderation:Log /
+   Bulk and Subscriptions ship alternating-row striping instead, so the admin
+   showed two different table looks. Drop the WP stripe (it lives on the odd
+   <tr>) and restore the same light divider so every admin table reads the
+   same. Scoped to the admin hub; this sheet only loads in wp-admin.
+
+   Target only the striped <tr> (WP core puts the stripe fill there, not on the
+   cells). Leaving the td/th untouched lets the S3 pinned-column background win
+   on odd rows too — otherwise a transparent last cell would let the scrolling
+   data show through the pinned actions on every other row. */
+.bn-admin-hub .striped > tbody > tr:nth-child(odd) {
+	background-color: transparent;
+}
+
+.bn-admin-hub .widefat tbody td,
+.bn-admin-hub .widefat tbody th {
+	border-bottom: 1px solid var(--bn-a-border-soft);
+}
+
+.bn-admin-hub .widefat tbody tr:last-child td,
+.bn-admin-hub .widefat tbody tr:last-child th {
+	border-bottom: none;
+}
+
+/* --------------------------------------------------------------------------
+   S4 — Shared empty state (.bn-empty)
+   --------------------------------------------------------------------------
+   ONE empty-state look for every "No X yet" message in the admin: a centered,
+   muted block that sits in the card body — not a bare sentence left-aligned
+   under the first column. Works as a <div> wrapping copy or as a standalone
+   <p class="bn-empty">, and supports an optional title + sub line:
+     <div class="bn-empty">
+       <p class="bn-empty__title">No webhooks yet</p>
+       <p class="bn-empty__sub">Add one to start receiving events.</p>
+     </div>
+   The .bn-empty__icon primitive (48px, dimmed) is shared from bn-base.css.
+   Callers are swept onto the title/sub structure in a later wave; existing
+   single-<p> blocks already centre correctly under this rule. */
+.bn-empty {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	text-align: center;
+	gap: var(--bn-a-s1);
+	padding: var(--bn-a-s8) var(--bn-a-s4);
+	color: var(--bn-a-text-3);
+	font-size: var(--bn-a-text-sm);
+}
+
+.bn-empty > p {
+	margin: 0;
+	max-width: 42ch;
+}
+
+.bn-empty__title {
+	font-size: var(--bn-a-text-md);
+	font-weight: var(--bn-a-fw-semibold);
+	color: var(--bn-a-text-2);
+}
+
+.bn-empty__sub {
+	font-size: var(--bn-a-text-sm);
+	color: var(--bn-a-text-3);
+}
+
+/* --------------------------------------------------------------------------
+   B5 — Wrapping filter chips (.bn-segment--wrap)
+   --------------------------------------------------------------------------
+   A .bn-segment holding a data-driven number of filter chips (e.g. the
+   Email Log event-type filter) wraps to new lines instead of clipping at
+   the card edge. Wrapping is preferred over horizontal scroll for filters. */
+.bn-segment--wrap {
+	flex-wrap: wrap;
+	max-width: 100%;
+	/* The base .bn-segment pill radius (--bn-r-full) reads as an odd oval once
+	   the chips wrap onto several lines - a tall wrapped box gets a normal
+	   rounded-rect radius instead. */
+	border-radius: var(--bn-r-lg, 12px);
+}
+
+/* --------------------------------------------------------------------------
+   Badges
+   -------------------------------------------------------------------------- */
+
+/* Row-action cluster for a list table's Actions column.
+   A shared admin primitive, like .bn-btn and .bn-badge: Pro's screens consume it.
+
+   The controls in an Actions cell are a mix of <form>-wrapped buttons (they need the
+   nonce + hidden inputs) and bare <a>s. Dropped loose into the <td> they are separate
+   inline boxes, so the moment the column narrows they stack on their own lines flush
+   against one another with no vertical gap, each keeping whatever spacing its element
+   happened to have. A flex row gives them one consistent gap in both axes. */
+.bn-row-actions {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: var(--bn-s2);
+}
+
+/* The <form> is a carrier for the nonce, not a layout box. Without this it forms its own
+   line box and the gap applies to the wrapper rather than to the button inside it. The
+   internal gap only matters for the rare form that carries a visible control beside its
+   button (e.g. Subscriptions' day-count input + Extend); single-button forms are
+   unaffected. */
+.bn-row-actions__form {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	margin: 0;
+}
+
+/* A control's own label never breaks mid-phrase - the CLUSTER wraps (flex-wrap above),
+   the buttons don't. This used to be a blanket `white-space: nowrap` on .bn-row-actions,
+   which inherited into every descendant and would force a wrapping status/hint sentence
+   onto one overflowing line. Scope it to the controls that actually need it. */
+.bn-row-actions > .bn-btn,
+.bn-row-actions__form > .bn-btn {
+	white-space: nowrap;
+}
+
+.bn-badge {
+	display: inline-block;
+	padding: 2px var(--bn-a-s2);
+	border-radius: var(--bn-a-r-lg);
+	font-size: var(--bn-a-text-xs);
+	font-weight: var(--bn-a-fw-bold);
+}
+
+/* Status tones use the canonical .bn-badge[data-tone] API defined in
+   bn-base.css (success / warn / danger / neutral / info). Admin screens
+   render those directly, so the old standalone status modifiers
+   (.bn-badge-active/-suspended/-open/-private/-secret) are gone. */
+
+/* Role badges — role-specific colour set, layered on the .bn-badge base. */
+.bn-badge-role-admin {
+	background: var(--bn-a-red-bg);
+	color: var(--bn-a-red);
+}
+
+.bn-badge-role-editor {
+	background: var(--bn-a-amber-bg);
+	color: var(--bn-a-amber);
+}
+
+.bn-badge-role-author {
+	background: var(--bn-a-career-bg);
+	color: var(--bn-a-career);
+}
+
+.bn-badge-role-contrib {
+	background: var(--bn-a-jetonomy-bg);
+	color: var(--bn-a-jetonomy);
+}
+
+.bn-badge-role-member {
+	background: var(--bn-a-green-bg);
+	color: var(--bn-a-green);
+}
+
+.bn-feature-check {
+	color: var(--bn-a-green);
+	flex-shrink: 0;
+	margin-top: 1px;
+}
+
+.bn-feature-check svg {
+	width: 13px;
+	height: 13px;
+}
+
+/* --------------------------------------------------------------------------
+   Settings — Integrations companion list (compact row variant)
+   Used by Settings.php → render_tab_integrations() to render the companion
+   plugin roster (active / inactive / not installed) with one-click EDD
+   install + activate. Data comes from CompanionRegistry.
+   -------------------------------------------------------------------------- */
+
+.bn-addon-list {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-a-s3);
+}
+
+.bn-addon-row {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--bn-a-s3);
+	padding: var(--bn-a-s3) var(--bn-a-s4);
+	border-radius: var(--bn-a-r-md);
+	border: 1px solid var(--bn-a-border);
+	background: var(--bn-a-bg-subtle);
+}
+
+.bn-addon-row__status {
+	flex-shrink: 0;
+	margin-top: 2px;
+}
+
+.bn-addon-row__meta {
+	flex: 1;
+	min-width: 0;
+}
+
+.bn-addon-row__label {
+	display: block;
+	font-size: var(--bn-a-text-sm);
+	font-weight: var(--bn-a-fw-semibold);
+	color: var(--bn-a-text-1);
+}
+
+.bn-addon-row__desc {
+	font-size: var(--bn-a-text-xs);
+	color: var(--bn-a-text-2);
+	margin: var(--bn-a-s1) 0 0;
+	line-height: 1.5;
+}
+
+.bn-addon-row__action {
+	flex-shrink: 0;
+	align-self: center;
+	font-size: var(--bn-a-text-xs);
+	font-weight: var(--bn-a-fw-semibold);
+	color: var(--bn-a-brand);
+	text-decoration: none;
+	padding: var(--bn-a-s1) var(--bn-a-s2);
+	border-radius: var(--bn-a-r-sm);
+	min-height: 40px;
+	display: inline-flex;
+	align-items: center;
+}
+
+.bn-addon-row__action:hover,
+.bn-addon-row__action:focus {
+	color: var(--bn-a-brand-hover);
+	background: var(--bn-a-brand-light);
+}
+
+.bn-addon-row__action:focus-visible {
+	outline: 2px solid var(--bn-a-brand);
+	outline-offset: var(--bn-a-outline-offset);
+}
+
+/* Ghost variant - the companion card's "Learn more".
+   The base .bn-addon-row__action is a LIST-ROW control: a 40px tap-target box with
+   inline padding, sized to sit at the end of an addon row next to its copy. Inside a
+   companion CARD the same box renders as a 48px band of empty space and pushes the
+   label 8px out of the card's own text column, so the link reads as an oversized,
+   mis-indented button rather than as a link under the card's copy. The ghost variant
+   drops the box and matches the card body (.bn-companion-card__why): same size, same
+   leading, same left edge. Buttons in the row ("Activate" / "Install free") keep the
+   base treatment and their tap target. Colours stay tokened, so dark mode follows. */
+.bn-addon-row__action--ghost {
+	min-height: 0;
+	padding: 0;
+	font-size: var(--bn-a-text-sm);
+	font-weight: var(--bn-a-fw-medium);
+	line-height: 1.5;
+}
+
+.bn-addon-row__action--ghost:hover,
+.bn-addon-row__action--ghost:focus {
+	background: none;
+	text-decoration: underline;
+}
+
+/* --------------------------------------------------------------------------
+   Integrations tab - Wbcom family header + companion card grid
+   Rendered by Settings::render_tab_integrations().
+   Tokens: --bn-a-* aliases map directly to the --bn-* design-token layer.
+   -------------------------------------------------------------------------- */
+
+.bn-fam-header {
+	display: flex;
+	align-items: center;
+	gap: 18px;
+	padding: 20px 22px;
+	margin: 0 0 20px;
+	border: 1px solid var(--bn-a-border);
+	border-radius: var(--bn-a-r-lg);
+	background: var(--bn-a-bg);
+}
+
+/* The Recommended themes block follows the companion section on the Integrations
+   tab; give it a clear top gap so the two read as distinct sections. */
+.bn-fam-header--themes {
+	margin-block-start: 28px;
+}
+
+.bn-fam-header__mark {
+	flex: 0 0 auto;
+	width: 52px;
+	height: 52px;
+	object-fit: contain;
+}
+
+.bn-fam-header__body { flex: 1; min-width: 0; }
+
+.bn-fam-header__title {
+	margin: 0 0 2px;
+	font-size: 17px;
+	font-weight: var(--bn-a-fw-bold);
+	color: var(--bn-a-text-1);
+}
+
+.bn-fam-header__desc {
+	margin: 0 0 8px;
+	color: var(--bn-a-text-2);
+	max-width: 70ch;
+	line-height: 1.5;
+}
+
+.bn-fam-header__link {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	font-weight: var(--bn-a-fw-semibold);
+	text-decoration: none;
+	color: var(--bn-a-brand);
+}
+
+.bn-fam-header__link:hover { text-decoration: underline; }
+.bn-fam-header__link svg { flex-shrink: 0; }
+
+/* Card grid */
+.bn-companion-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+	gap: 16px;
+	margin: 0 0 16px;
+}
+
+.bn-companion-card {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	padding: 18px;
+	border: 1px solid var(--bn-a-border);
+	border-radius: var(--bn-a-r-lg);
+	background: var(--bn-a-bg);
+}
+
+.bn-companion-card__head {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+
+.bn-companion-card__logo {
+	flex: 0 0 auto;
+	width: 40px;
+	height: 40px;
+	object-fit: contain;
+	border-radius: var(--bn-a-r-sm);
+}
+
+.bn-companion-card__title {
+	flex: 1;
+	margin: 0;
+	font-size: 15px;
+	font-weight: var(--bn-a-fw-semibold);
+	color: var(--bn-a-text-1);
+}
+
+.bn-companion-card__why {
+	margin: 0;
+	color: var(--bn-a-text-2);
+	font-size: var(--bn-a-text-sm);
+	line-height: 1.5;
+}
+
+.bn-companion-card__unlocks {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin: 0;
+	font-size: var(--bn-a-text-xs);
+	color: var(--bn-a-green);
+}
+
+.bn-companion-card__unlocks svg { flex-shrink: 0; }
+
+.bn-companion-card__actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px;
+	margin-top: auto;
+	padding-top: 4px;
+}
+
+/* Status badge - companion variant */
+.bn-companion-badge {
+	flex: 0 0 auto;
+	padding: 3px 10px;
+	border-radius: 999px;
+	font-size: var(--bn-a-text-xs);
+	font-weight: var(--bn-a-fw-bold);
+	line-height: 1.6;
+	white-space: nowrap;
+}
+
+.bn-companion-badge--success {
+	background: var(--bn-a-green-bg);
+	color: var(--bn-a-green);
+}
+
+.bn-companion-badge--warning {
+	background: var(--bn-a-amber-bg);
+	color: var(--bn-a-amber);
+}
+
+.bn-companion-badge--muted {
+	background: var(--bn-a-bg-subtle);
+	color: var(--bn-a-text-3);
+}
+
+.bn-companion-foot {
+	margin-top: 4px;
+	color: var(--bn-a-text-3);
+}
+
+/* Live-status message slot inside each card */
+.bn-companion-msg {
+	font-size: var(--bn-a-text-xs);
+	color: var(--bn-a-text-2);
+}
+
+@media (max-width: 782px) {
+	.bn-fam-header { flex-wrap: wrap; }
+	.bn-companion-grid { grid-template-columns: 1fr; }
+}
+
+/* --------------------------------------------------------------------------
+   Nav manager rows
+   -------------------------------------------------------------------------- */
+
+.bn-nav-row {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-a-s3);
+	padding: var(--bn-a-s3) var(--bn-a-s4);
+	border-bottom: 1px solid var(--bn-a-border-soft);
+}
+
+.bn-nav-row:last-child {
+	border-bottom: none;
+}
+
+.bn-drag-handle {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-a-drag-bar-gap);
+	padding: var(--bn-a-s1) var(--bn-a-drag-bar-h);
+	flex-shrink: 0;
+	cursor: grab;
+	opacity: 0.5;
+}
+
+.bn-drag-handle span {
+	display: block;
+	width: var(--bn-a-drag-bar-w);
+	height: var(--bn-a-drag-bar-h);
+	background: var(--bn-a-border);
+	border-radius: var(--bn-a-drag-bar-h);
+}
+
+.bn-row-info {
+	flex: 1;
+}
+
+.bn-row-name {
+	font-weight: var(--bn-a-fw-semibold);
+	font-size: var(--bn-a-text-sm);
+	color: var(--bn-a-text-1);
+}
+
+.bn-row-desc {
+	font-size: var(--bn-a-text-xs);
+	color: var(--bn-a-text-2);
+	margin-top: var(--bn-a-s1);
+}
+
+/* --------------------------------------------------------------------------
+   Row badge
+   -------------------------------------------------------------------------- */
+
+.bn-row-badge {
+	display: inline-block;
+	font-size: var(--bn-a-text-xs);
+	font-weight: var(--bn-a-fw-bold);
+	padding: var(--bn-a-row-badge-py) var(--bn-a-row-badge-px);
+	border-radius: var(--bn-a-r-lg);
+	margin-inline-start: var(--bn-a-s2);
+	background: var(--bn-a-brand);
+	color: var(--bn-a-bg);
+	vertical-align: middle;
+}
+
+/* --------------------------------------------------------------------------
+   Buttons
+   -------------------------------------------------------------------------- */
+
+.bn-btn {
+	display: inline-flex;
+	align-items: center;
+	/* WP's admin reset gives <button> border-box but leaves <a> at content-box, so an
+	   <a class="bn-btn"> came out 2px taller than the <button class="bn-btn"> beside it —
+	   the border was added to the height instead of absorbed. Any Actions cell mixing a
+	   link and a form button showed it. State it here, once, for both. */
+	box-sizing: border-box;
+	gap: var(--bn-a-s2);
+	padding: var(--bn-a-s2) var(--bn-a-s4);
+	border-radius: var(--bn-a-r-md);
+	font-size: var(--bn-a-text-sm);
+	font-weight: var(--bn-a-fw-semibold);
+	cursor: pointer;
+	text-decoration: none;
+	border: 1px solid var(--bn-a-border);
+	background: var(--bn-a-bg);
+	color: var(--bn-a-text-1);
+	transition: background var(--bn-a-transition), border-color var(--bn-a-transition), color var(--bn-a-transition), box-shadow var(--bn-a-transition);
+}
+
+.bn-btn:hover {
+	background: var(--bn-a-bg-subtle);
+}
+
+.bn-btn:focus-visible {
+	outline: 2px solid transparent;
+	outline-offset: 2px;
+	box-shadow: 0 0 0 3px color-mix(in oklch, var(--bn-a-brand) 25%, transparent);
+}
+
+.bn-btn-primary {
+	background: var(--bn-a-brand);
+	color: var(--bn-a-bg);
+	border-color: transparent;
+}
+
+.bn-btn-primary:hover {
+	background: var(--bn-a-brand-hover);
+	color: var(--bn-a-bg);
+}
+
+.bn-btn-secondary {
+	background: var(--bn-a-bg);
+	border: 1px solid var(--bn-a-border);
+	color: var(--bn-a-text-1);
+	border-radius: var(--bn-a-r-md);
+	padding: var(--bn-a-s2) var(--bn-a-s4);
+	font-size: var(--bn-a-text-sm);
+	font-weight: var(--bn-a-fw-semibold);
+	cursor: pointer;
+	font-family: var(--bn-a-font-body);
+}
+
+.bn-btn-secondary:hover {
+	background: var(--bn-a-bg-subtle);
+	border-color: var(--bn-a-text-3);
+}
+
+a.bn-btn-danger,
+button.bn-btn-danger {
+	border-color: var(--bn-a-red) !important;
+	color: var(--bn-a-red) !important;
+	background: var(--bn-a-red-bg);
+}
+
+a.bn-btn-danger:hover,
+button.bn-btn-danger:hover {
+	background: var(--bn-a-red-bg);
+	border-color: var(--bn-a-red) !important;
+}
+
+/* Solid danger buttons use the attribute API (data-variant="danger") and inherit
+   their red fill + white label from bn-base.css. The generic .bn-btn:hover above
+   repaints the background to the subtle grey, which on a solid danger button
+   leaves the white label on a near-white fill (the button reads as blank on
+   hover). Re-assert the solid danger fill at the higher [data-variant] specificity
+   and darken it with filter:brightness() for the hover affordance. Using the solid
+   token + filter (not color-mix) keeps the fill visible even where color-mix is
+   unsupported, so the label never disappears. */
+.bn-btn[data-variant="danger"]:hover,
+.bn-btn[data-variant="danger"]:focus-visible {
+	background: var(--bn-a-red);
+	border-color: var(--bn-a-red);
+	filter: brightness(0.94);
+}
+
+/* S9 — One secondary/outline button color (gray, not blue).
+   BN's own outline button (.bn-btn / .bn-btn-secondary) is a gray outline. A
+   WP-core <button class="button"> renders with the admin accent as its text +
+   border (a blue outline), so utility actions still using the WP class —
+   Automod "Test phrase", Moderation:Bulk "Filter" — read as a different,
+   louder button than everything around them. Neutralize the WP-core secondary
+   button inside the hub to the same gray outline as .bn-btn-secondary. Primary
+   (.button-primary, re-skinned to the BN accent in bn-admin-hub.css), the red
+   link-delete, and bare link buttons (.button-link) are left alone. */
+.bn-admin-hub .button:not(.button-primary):not(.button-link):not(.button-link-delete) {
+	background: var(--bn-a-bg);
+	border-color: var(--bn-a-border);
+	color: var(--bn-a-text-1);
+}
+
+.bn-admin-hub .button:not(.button-primary):not(.button-link):not(.button-link-delete):hover,
+.bn-admin-hub .button:not(.button-primary):not(.button-link):not(.button-link-delete):focus {
+	background: var(--bn-a-bg-subtle);
+	border-color: var(--bn-a-text-3);
+	color: var(--bn-a-text-1);
+}
+
+.bn-toolbar {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-a-s2);
+	flex-wrap: wrap;
+}
+
+/* C4 — One bulk-actions select width. The select is content-sized by default,
+   so a short option list (Members: Suspend/Unsuspend) rendered a stubby
+   control while longer lists (Spaces, Moderation:Bulk) stretched wide. Every
+   .bn-bulk-bar select gets the same fixed width so the bulk toolbar reads
+   identically on all list screens. */
+.bn-admin-hub .bn-bulk-bar select {
+	width: 240px;
+	max-width: 100%;
+}
+
+/* --------------------------------------------------------------------------
+   Pagination
+   -------------------------------------------------------------------------- */
+
+/* Pagination bar: "Showing X-Y of N" summary on the left, windowed page
+   links on the right. The summary shows even on a single page. */
+.bn-pagination-bar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	flex-wrap: wrap;
+	gap: var(--bn-a-s2);
+	padding: var(--bn-a-s3) var(--bn-a-s4);
+	border-top: 1px solid var(--bn-a-border-soft);
+}
+
+.bn-pagination-summary {
+	font-size: var(--bn-a-text-xs);
+	color: var(--bn-a-text-3);
+}
+
+.bn-pagination {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-a-s1);
+	justify-content: flex-end;
+}
+
+.bn-page-link {
+	padding: 5px var(--bn-a-s3);
+	border: 1px solid var(--bn-a-border);
+	border-radius: var(--bn-a-r-sm);
+	font-size: var(--bn-a-text-xs);
+	color: var(--bn-a-text-1);
+	text-decoration: none;
+	transition: background var(--bn-a-transition), color var(--bn-a-transition);
+}
+
+.bn-page-link.current {
+	background: var(--bn-a-brand);
+	color: var(--bn-a-bg) !important;
+	border-color: var(--bn-a-brand);
+}
+
+.bn-page-link:hover:not(.current):not(.is-disabled) {
+	background: var(--bn-a-bg-hover);
+}
+
+.bn-page-link--nav {
+	font-weight: var(--bn-a-fw-medium);
+}
+
+.bn-page-link.is-disabled {
+	color: var(--bn-a-text-3);
+	background: var(--bn-a-bg-subtle);
+	cursor: default;
+	opacity: 0.6;
+}
+
+.bn-page-ellipsis {
+	padding: 0 var(--bn-a-s1);
+	color: var(--bn-a-text-3);
+	font-size: var(--bn-a-text-xs);
+}
+
+/* --------------------------------------------------------------------------
+   Member cell
+   -------------------------------------------------------------------------- */
+
+.bn-member-cell {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-a-s2);
+}
+
+.bn-member-info {
+	display: flex;
+	flex-direction: column;
+}
+
+.bn-member-name {
+	font-weight: var(--bn-a-fw-semibold);
+	font-size: var(--bn-a-text-sm);
+	color: var(--bn-a-text-1);
+	line-height: 1.2;
+}
+
+.bn-member-username {
+	font-size: var(--bn-a-text-xs);
+	color: var(--bn-a-text-3);
+	margin-top: var(--bn-a-s1);
+}
+
+/* --------------------------------------------------------------------------
+   Avatar initials
+   -------------------------------------------------------------------------- */
+
+.bn-avatar-initials {
+	width: var(--bn-a-avatar-sz);
+	height: var(--bn-a-avatar-sz);
+	border-radius: 50%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: var(--bn-a-text-xs);
+	font-weight: var(--bn-a-fw-bold);
+	color: var(--bn-a-bg);
+	flex-shrink: 0;
+	letter-spacing: 0.02em;
+}
+
+.av-brand  { background: var(--bn-a-brand); }
+.av-green  { background: var(--bn-a-green); }
+.av-purple { background: var(--bn-a-jetonomy); }
+.av-orange { background: var(--bn-a-gamif); }
+.av-pink   { background: var(--bn-a-av-pink); }
+.av-teal   { background: var(--bn-a-mvs); }
+.av-rose   { background: var(--bn-a-red); }
+.av-indigo { background: var(--bn-a-career); }
+
+/* --------------------------------------------------------------------------
+   Filter bar
+   -------------------------------------------------------------------------- */
+
+.bn-filter-bar {
+	padding: var(--bn-a-s3) var(--bn-a-s4);
+	border-bottom: 1px solid var(--bn-a-border-soft);
+	background: var(--bn-a-bg-subtle);
+}
+
+.bn-filter-form {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-a-s2);
+	flex-wrap: wrap;
+}
+
+.bn-search-input {
+	flex: 1;
+	min-width: var(--bn-a-input-min-w);
+	border: 1px solid var(--bn-a-border) !important;
+	border-radius: var(--bn-a-r-sm) !important;
+	padding: var(--bn-a-s2) var(--bn-a-s3) !important;
+	font-size: var(--bn-a-text-sm) !important;
+	box-shadow: none !important;
+	background: var(--bn-a-bg) !important;
+	color: var(--bn-a-text-1) !important;
+}
+
+.bn-search-input:focus {
+	border-color: var(--bn-a-brand) !important;
+	box-shadow: var(--bn-a-focus-ring) !important;
+	/* A transparent outline (never `none`) so Windows High-Contrast / forced-colors
+	   mode — which drops box-shadow — still paints a focus ring. */
+	outline: 2px solid transparent !important;
+	outline-offset: 2px;
+}
+
+.bn-filter-select {
+	border: 1px solid var(--bn-a-border);
+	border-radius: var(--bn-a-r-sm);
+	padding: var(--bn-a-s2) var(--bn-a-s3);
+	font-size: var(--bn-a-text-sm);
+	background: var(--bn-a-bg);
+	color: var(--bn-a-text-1);
+	height: auto;
+	cursor: pointer;
+}
+
+/* --------------------------------------------------------------------------
+   Action row
+   -------------------------------------------------------------------------- */
+
+.bn-action-row {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-a-s2);
+	margin-bottom: var(--bn-a-s3);
+	flex-wrap: wrap;
+}
+
+.bn-filter-tab {
+	padding: var(--bn-a-s1) var(--bn-a-s3);
+	border-radius: var(--bn-a-r-lg);
+	font-size: var(--bn-a-text-xs);
+	font-weight: var(--bn-a-fw-semibold);
+	color: var(--bn-a-text-2);
+	text-decoration: none;
+	background: transparent;
+	transition: background var(--bn-a-transition), color var(--bn-a-transition);
+}
+
+.bn-filter-tab.active {
+	background: var(--bn-a-brand);
+	color: var(--bn-a-bg);
+}
+
+.bn-filter-tab:hover:not(.active) {
+	background: var(--bn-a-bg-hover);
+	color: var(--bn-a-text-1);
+}
+
+/* --------------------------------------------------------------------------
+   Table columns
+   -------------------------------------------------------------------------- */
+
+.bn-col-email {
+	color: var(--bn-a-text-1);
+	font-size: var(--bn-a-text-sm);
+}
+
+.bn-col-muted {
+	color: var(--bn-a-text-3);
+	font-size: var(--bn-a-text-xs);
+	white-space: nowrap;
+}
+
+/* --------------------------------------------------------------------------
+   More menu dropdown
+   -------------------------------------------------------------------------- */
+
+.bn-more-menu {
+	position: relative;
+	display: inline-block;
+}
+
+.bn-more-btn {
+	background: transparent;
+	border: 1px solid var(--bn-a-border);
+	border-radius: var(--bn-a-r-sm);
+	width: var(--bn-a-more-btn-sz);
+	height: var(--bn-a-more-btn-sz);
+	font-size: var(--bn-a-text-lg);
+	color: var(--bn-a-text-3);
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0;
+	line-height: 1;
+	transition: background var(--bn-a-transition), color var(--bn-a-transition), border-color var(--bn-a-transition);
+}
+
+.bn-more-btn:hover {
+	background: var(--bn-a-bg-hover);
+	color: var(--bn-a-text-1);
+	border-color: var(--bn-a-text-3);
+}
+
+/* Positioned with position:fixed and placed by JS (admin/members.js) so the
+   menu escapes the overflow:hidden on the rounded card/table ancestors that
+   used to clip it on the bottom rows. JS sets top/left on open; the static
+   offsets are gone so left+right are never both constrained. */
+.bn-more-dropdown {
+	display: none;
+	position: fixed;
+	background: var(--bn-a-bg);
+	border: 1px solid var(--bn-a-border);
+	border-radius: var(--bn-a-r-md);
+	box-shadow: var(--bn-a-shadow-md);
+	min-width: var(--bn-a-dropdown-min-w);
+	z-index: 1000;
+	overflow: hidden;
+}
+
+/*
+ * Two selectors for one state, because the open dropdown does not stay where it
+ * is written: more-menu.js re-parents it to <body> to escape the table
+ * wrapper's paint containment and the sticky cell's stacking context. Once
+ * moved it is no longer a descendant of .bn-more-menu, so a descendant selector
+ * alone would hide the very menu that had just been opened. The class on the
+ * element itself is what survives the move.
+ */
+.bn-more-menu.open .bn-more-dropdown,
+.bn-more-dropdown.is-open {
+	display: block;
+}
+
+.bn-dropdown-item {
+	display: block;
+	width: 100%;
+	text-align: start;
+	padding: var(--bn-a-s2) var(--bn-a-s4);
+	font-size: var(--bn-a-text-sm);
+	font-weight: var(--bn-a-fw-medium);
+	color: var(--bn-a-text-1);
+	background: none;
+	border: none;
+	cursor: pointer;
+	font-family: var(--bn-a-font-body);
+	white-space: nowrap;
+	transition: background var(--bn-a-transition);
+}
+
+.bn-dropdown-item:hover {
+	background: var(--bn-a-bg-subtle);
+}
+
+.bn-dropdown-danger {
+	color: var(--bn-a-red);
+}
+
+.bn-dropdown-danger:hover {
+	background: var(--bn-a-red-bg);
+}
+
+/* --------------------------------------------------------------------------
+   Developer bar
+   -------------------------------------------------------------------------- */
+
+.bn-dev-bar {
+	background: var(--bn-a-bg-code);
+	border-radius: var(--bn-a-r-md);
+	padding: var(--bn-a-s4);
+}
+
+.bn-dev-bar code {
+	font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+	font-size: var(--bn-a-text-xs);
+	color: var(--bn-a-code-text);
+	word-break: break-all;
+	background: transparent;
+	display: block;
+	line-height: 1.6;
+}
+
+/* ==========================================================================
+   4. RESPONSIVE BREAKPOINTS
+   ========================================================================== */
+
+@media (max-width: 782px) {
+	.bn-admin-tabs {
+		flex-wrap: wrap;
+	}
+
+	.bn-atab {
+		border-inline-end: none;
+		border-bottom: 1px solid var(--bn-a-border);
+		flex: 1 1 auto;
+		text-align: center;
+	}
+
+	.bn-table-header {
+		flex-direction: column;
+		align-items: flex-start;
+	}
+
+	input.bn-table-search {
+		width: 100% !important;
+	}
+}
+
+@media (max-width: 640px) {
+	.bn-member-cell {
+		gap: var(--bn-a-s2);
+	}
+
+	.bn-avatar-initials {
+		width: var(--bn-a-avatar-sz-sm);
+		height: var(--bn-a-avatar-sz-sm);
+		font-size: var(--bn-a-text-xs);
+	}
+
+	.bn-col-email,
+	.bn-col-muted {
+		display: none;
+	}
+
+	.bn-save-bar {
+		flex-direction: column;
+		align-items: stretch;
+	}
+
+	.bn-save-msg {
+		margin-inline-end: 0;
+		text-align: center;
+	}
+}
+
+/* ==========================================================================
+   6. SHARED PRIMITIVES — modal + drag-row
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Modal backdrop + panel (used by destructive-action confirms in
+   MemberTypesManager and AvatarSettings)
+   -------------------------------------------------------------------------- */
+
+.bn-modal-backdrop {
+	position: fixed;
+	inset: 0;
+	background: color-mix(in oklch, var(--bn-ink) 55%, transparent);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	z-index: 100050;
+	padding: var(--bn-a-s4);
+}
+
+.bn-modal-backdrop[hidden] {
+	display: none;
+}
+
+.bn-modal__panel {
+	background: var(--bn-a-bg);
+	border: 1px solid var(--bn-a-border);
+	border-radius: var(--bn-a-r-md);
+	box-shadow: var(--bn-a-shadow-md);
+	max-width: 420px;
+	width: 100%;
+	padding: var(--bn-a-s5) var(--bn-a-s5) var(--bn-a-s4);
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-a-s3);
+}
+
+.bn-modal__panel[data-tone="danger"] {
+	border-top: 3px solid var(--bn-a-red);
+}
+
+.bn-modal__title {
+	font-family: var(--bn-a-font-display);
+	font-size: var(--bn-a-text-lg);
+	font-weight: var(--bn-a-fw-bold);
+	color: var(--bn-a-text-1);
+	margin: 0;
+	line-height: 1.3;
+}
+
+.bn-modal__msg {
+	font-size: var(--bn-a-text-sm);
+	color: var(--bn-a-text-2);
+	margin: 0;
+	line-height: 1.5;
+}
+
+.bn-modal__actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: var(--bn-a-s2);
+	margin-top: var(--bn-a-s2);
+}
+
+.bn-modal__actions .bn-btn[data-variant="danger"] {
+	background: var(--bn-a-red);
+	border-color: var(--bn-a-red);
+	color: var(--bn-a-bg);
+}
+
+.bn-modal__actions .bn-btn[data-variant="danger"]:hover {
+	background: color-mix(in oklch, var(--bn-a-red) 85%, var(--bn-ink));
+	border-color: color-mix(in oklch, var(--bn-a-red) 85%, var(--bn-ink));
+}
+
+.bn-modal__actions .bn-btn[data-variant="ghost"] {
+	background: transparent;
+	border-color: var(--bn-a-border);
+	color: var(--bn-a-text-2);
+}
+
+.bn-modal__actions .bn-btn[data-variant="ghost"]:hover {
+	background: var(--bn-a-bg-subtle);
+	color: var(--bn-a-text-1);
+}
+
+/* ==========================================================================
+   Spaces admin — row-meta + table-wrap spacing
+   ==========================================================================
+
+   The Spaces page composes the v2 .bn-stat-grid + .bn-table-wrap +
+   .bn-tabs primitives from bn-base.css. The rules below only add the
+   small admin-specific bits that don't belong in the global vocabulary.
+   -------------------------------------------------------------------------- */
+
+.bn-table-wrap + .bn-stat-grid,
+.bn-stat-grid + .bn-table-wrap {
+	margin-top: var(--bn-a-s5);
+}
+
+.bn-space-row-info {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+}
+
+.bn-row-meta {
+	font-size: var(--bn-a-text-xs);
+	color: var(--bn-a-text-3);
+}
+
+.bn-delete-space-form {
+	display: inline-block;
+	margin: 0;
+}
+
+/* The bn-table-header inherits from the v2 .bn-table-wrap; align inner
+ * filters + search to that. */
+.bn-table-wrap > .bn-table-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--bn-a-s3);
+	flex-wrap: wrap;
+	padding: var(--bn-a-s3) var(--bn-a-s4);
+	border-bottom: 1px solid var(--bn-a-border-soft);
+}
+
+.bn-table-wrap > .bn-table-header .bn-input {
+	width: 260px;
+	max-width: 100%;
+}
+
+
+/* ════════════════════════════════════════════════════════════════════════
+ * Features tab — Settings → Features
+ * Site-owner control catalogue driven by FeatureRegistry::by_group().
+ * ════════════════════════════════════════════════════════════════════════ */
+.bn-feature-search {
+	margin: var(--bn-s3) 0 var(--bn-s4);
+}
+.bn-feature-search__input {
+	width: 100%;
+	max-width: 360px;
+	padding: var(--bn-s2) var(--bn-s3);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-md);
+	background: var(--bn-surface);
+	color: var(--bn-ink);
+	font-size: var(--bn-text-sm);
+}
+.bn-feature-search__input:focus {
+	border-color: var(--bn-accent);
+	outline: none;
+	box-shadow: 0 0 0 1px var(--bn-accent);
+}
+.bn-feature-search__empty {
+	margin: var(--bn-s3) 0 0;
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink-2);
+}
+
+.bn-feature-group {
+	font-family: var(--bn-font-display);
+	font-size: var(--bn-text-md);
+	font-weight: 600;
+	color: var(--bn-ink);
+	margin: var(--bn-s5) 0 var(--bn-s3);
+	padding-bottom: var(--bn-s2);
+	border-bottom: 1px solid var(--bn-line-faint);
+}
+.bn-feature-group:first-of-type { margin-top: 0; }
+
+.bn-feature-grid {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s2);
+}
+
+.bn-feature-row {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--bn-s4);
+	padding: var(--bn-s4);
+	background: var(--bn-surface);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-md);
+	transition: border-color var(--bn-dur) var(--bn-ease);
+}
+.bn-feature-row:hover { border-color: var(--bn-line-strong); }
+.bn-feature-row[data-tier="mandatory"] { opacity: 0.85; }
+
+.bn-feature-row__copy { flex: 1; min-width: 0; }
+.bn-feature-row__head { display: flex; align-items: center; gap: var(--bn-s2); flex-wrap: wrap; }
+.bn-feature-row__label { font-weight: 600; color: var(--bn-ink); font-size: var(--bn-text-sm); }
+.bn-feature-row__desc { font-size: var(--bn-text-sm); color: var(--bn-ink-2); margin: 4px 0 0; line-height: 1.5; }
+.bn-feature-row__deps { font-size: var(--bn-text-xs); color: var(--bn-ink-3); font-family: var(--bn-font-mono); margin: 4px 0 0; }
+
+.bn-feature-row__toggle { flex-shrink: 0; padding-top: 2px; }
+.bn-feature-row__locked {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 36px;
+	height: 22px;
+	color: var(--bn-ink-3);
+}
+.bn-feature-row__locked .bn-icon { width: 16px; height: 16px; }
+
+/* Toggle styled as a checkbox + visual track. The standard form post
+ * submits the checkbox state; the .bn-toggle sibling renders the visual. */
+.bn-toggle-label {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	cursor: pointer;
+	user-select: none;
+}
+.bn-toggle-label input[type="checkbox"] {
+	position: absolute;
+	opacity: 0;
+	pointer-events: none;
+	width: 40px;
+	height: 22px;
+}
+.bn-toggle--inline {
+	position: relative;
+	width: 40px;
+	height: 22px;
+	border-radius: 11px;
+	background: var(--bn-line-strong);
+	transition: background var(--bn-dur) var(--bn-ease);
+}
+.bn-toggle--inline::after {
+	content: '';
+	position: absolute;
+	top: 3px;
+	inset-inline-start: 3px;
+	width: 16px;
+	height: 16px;
+	border-radius: 50%;
+	background: var(--bn-surface);
+	box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+	transition: transform var(--bn-dur) var(--bn-ease);
+}
+.bn-toggle-label input[type="checkbox"]:checked + .bn-toggle--inline { background: var(--bn-accent); }
+.bn-toggle-label input[type="checkbox"]:checked + .bn-toggle--inline::after { transform: translateX(var(--bn-toggle-travel, 18px)); }
+[dir="rtl"] .bn-toggle-label input[type="checkbox"]:checked + .bn-toggle--inline::after { transform: translateX(calc(-1 * var(--bn-toggle-travel, 18px))); }
+.bn-toggle-label input[type="checkbox"]:focus-visible + .bn-toggle--inline {
+	outline: 2px solid var(--bn-accent);
+	outline-offset: 2px;
+}
+
+/* Bridge feature whose required plugin is inactive: the toggle is disabled and
+   shown muted so the owner sees it cannot be configured until the plugin is on. */
+.bn-toggle-label input[type="checkbox"]:disabled + .bn-toggle--inline {
+	opacity: 0.45;
+	cursor: not-allowed;
+}
+
+@media (max-width: 640px) {
+	.bn-feature-row { flex-direction: column; }
+	.bn-feature-row__toggle { align-self: flex-end; }
+}
+/* Webhook "Events to forward" rows — each checkbox label sits on its own line
+   but only spans its own content width, so clicking whitespace beside it no
+   longer toggles the checkbox (was display:block, full fieldset width). */
+.bn-webhook-event-row {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-a-s2);
+	padding: var(--bn-a-s2) var(--bn-a-s3);
+	border: 1px solid var(--bn-a-border-soft);
+	border-radius: var(--bn-a-r-md);
+	cursor: pointer;
+}
+
+.bn-webhook-event-row:hover {
+	background: var(--bn-sunken);
+}
+
+.bn-webhook-event-row code {
+	margin-inline-start: auto;
+	font-size: var(--bn-text-2xs, 11px);
+	color: var(--bn-a-text-3);
+}
+
+/* The events fieldset lays rows out as a responsive two-column grid - the
+   previous compact single-column pile read as raw markup (owner). */
+.bn-settings-form fieldset.bn-field:has(.bn-webhook-event-row) {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+	gap: var(--bn-a-s2) var(--bn-a-s3);
+}
+
+.bn-settings-form fieldset.bn-field:has(.bn-webhook-event-row) legend {
+	margin-bottom: var(--bn-a-s2);
+	font-weight: var(--bn-fw-semibold, 600);
+}
+
+.bn-settings-form--wide {
+	max-width: none;
+}
+
+/* Endpoint row code element — the URL inside the webhook table. */
+.bn-ep-code {
+	font-family: var(--bn-font-mono, ui-monospace, SFMono-Regular, monospace);
+	font-size: 12px;
+	background: var(--bn-sunken, #f3f4f6);
+	padding: 1px 6px;
+	border-radius: 4px;
+	word-break: break-all;
+}
+
+/* ── Moderation queue (Moderation section) ──────────────────────────────── */
+.bn-ss-count {
+	display: inline-block;
+	min-width: 20px;
+	padding: 1px 8px;
+	margin-inline-start: 8px;
+	border-radius: 999px;
+	background: var(--bn-sunken, #e2e8f0);
+	color: var(--bn-ink, #1e293b);
+	font-size: 12px;
+	font-weight: 600;
+	text-align: center;
+}
+.bn-mod-actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 10px;
+}
+
+/* Each action form is a row of its own controls (e.g. Import: a file picker and
+   the button that submits it), so they line up beside each other rather than the
+   button dropping below the picker. */
+.bn-mod-actions form {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px;
+}
+
+/* A file picker is not a text field. It used to wear .bn-input, which meant
+   width:100% and height:36px -- so it stretched the full width of the panel and
+   shoved the button that submits it onto its own line. It sizes to its content
+   and sits beside its button. */
+.bn-file-input {
+	max-inline-size: 100%;
+	color: var(--bn-ink, #1e293b);
+	font-size: 13px;
+}
+
+.bn-file-input::file-selector-button {
+	margin-inline-end: 8px;
+	padding: 5px 10px;
+	border: 1px solid var(--bn-a-border, #d1d5db);
+	border-radius: 6px;
+	background: var(--bn-a-surface, #fff);
+	color: var(--bn-ink, #1e293b);
+	font-size: 13px;
+	cursor: pointer;
+}
+
+.bn-file-input::file-selector-button:hover {
+	border-color: var(--bn-brand, #0073aa);
+}
+.bn-mod-action-form {
+	display: inline-block;
+	margin: 0;
+}
+
+/* Empty-state "sample data" preview — dimmed, inert illustration of what a
+   moderation tab shows once it has live data. */
+.bn-mod-preview {
+	margin-top: var(--bn-s4);
+	opacity: 0.5;
+	pointer-events: none;
+	user-select: none;
+}
+.bn-mod-preview__badge {
+	display: inline-block;
+	margin-bottom: var(--bn-s2);
+	padding: var(--bn-s1) var(--bn-s3);
+	font-size: var(--bn-text-xs);
+	font-weight: 600;
+	color: var(--bn-ink-2);
+	background: var(--bn-sunken);
+	border: 1px dashed var(--bn-line);
+	border-radius: var(--bn-r-full);
+}
+.bn-mod-preview__table {
+	filter: grayscale(0.35);
+}
+
+/* AI connector status — shown on AI admin screens. Green when a provider is
+   connected via the core Settings > Connectors page, amber otherwise. */
+.bn-ai-status {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	margin-bottom: var(--bn-s4);
+	padding: var(--bn-s2) var(--bn-s3);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-md);
+	background: var(--bn-sunken);
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink-2);
+}
+.bn-ai-status__dot {
+	width: 10px;
+	height: 10px;
+	border-radius: var(--bn-r-full);
+	flex: none;
+	background: var(--bn-warn);
+}
+.bn-ai-status.is-connected .bn-ai-status__dot {
+	background: var(--bn-success);
+}
+.bn-ai-status.is-connected {
+	background: var(--bn-success-bg);
+	border-color: var(--bn-success);
+}
+.bn-ai-status__text a {
+	margin-inline-start: var(--bn-s1);
+}
+
+/* ── Roles & Capabilities matrix ────────────────────────────────────────── */
+.bn-roles-group {
+	margin: 20px 0 6px;
+	font-size: 13px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: var(--bn-ink-2, #475569);
+}
+.bn-roles-table { max-width: 720px; }
+.bn-roles-table td { vertical-align: middle; }
+.bn-roles-table select { min-width: 200px; }
+
+/* ── Insights (Growth section + dashboard widget) ───────────────────────── */
+/* The Insights stat tiles render via the shared stat-strip template part
+   (.bn-stat-grid > .bn-stat, styled in bn-base.css) — the old .bn-insight-*
+   card component is retired. Only the signup spark strip and the wp-admin
+   dashboard widget keep page-specific rules. */
+.bn-spark {
+	display: flex;
+	align-items: flex-end;
+	gap: 6px;
+	height: 90px;
+	padding-top: 4px;
+}
+.bn-spark__bar {
+	flex: 1 1 0;
+	min-height: 2px;
+	border-radius: 3px 3px 0 0;
+	background: var(--bn-accent, #2563eb);
+	opacity: 0.85;
+}
+.bn-spark__bar:hover { opacity: 1; }
+.bn-insights-widget { margin: 0 0 8px; }
+.bn-insights-widget li { margin: 0 0 6px; }
+.bn-insights-widget strong { font-size: 16px; }
+.bn-insights-delta { color: var(--bn-success, #16a34a); font-size: 12px; margin-inline-start: 4px; }
+
+/* Container for buddynext_profile_field_type_options hook rows (Pro emits
+   <tr><td>). Seamless so it blends into the field panel, not a boxed table. */
+.bn-pf-hook-rows {
+	width: 100%;
+	border-collapse: collapse;
+	margin: 0;
+	background: none;
+	border: 0;
+	box-shadow: none;
+}
+.bn-pf-hook-rows td {
+	padding: 4px 8px 4px 0;
+	border: 0;
+	vertical-align: top;
+}
+.bn-pf-hook-rows:empty,
+.bn-pf-hook-rows tbody:empty { display: none; }
+
+/* Reactions enable palette (Settings → Social). Stacked under its label, the
+   reaction toggles wrap as compact chips instead of being flung to the far
+   right by the toggle-row layout. */
+.bn-reaction-field .bn-tl-title {
+	display: block;
+	font-weight: var(--bn-a-fw-semibold);
+	font-size: var(--bn-a-text-sm);
+	color: var(--bn-a-text-1);
+}
+.bn-reaction-field .bn-tl-desc {
+	display: block;
+	font-size: var(--bn-a-text-sm);
+	color: var(--bn-a-text-2);
+	margin-bottom: var(--bn-a-s3);
+}
+.bn-reaction-palette {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--bn-a-s2);
+}
+.bn-reaction-palette__item {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 6px 12px 6px 8px;
+	border: 1px solid var(--bn-a-border);
+	border-radius: 999px;
+	background: var(--bn-a-bg);
+	cursor: pointer;
+	font-size: var(--bn-a-text-sm);
+	user-select: none;
+	transition: border-color 0.12s, background 0.12s;
+}
+.bn-reaction-palette__item:hover {
+	border-color: var(--bn-a-text-3);
+	background: var(--bn-a-bg-subtle);
+}
+.bn-reaction-palette__item:has(input:checked) {
+	border-color: var(--bn-accent);
+	background: color-mix(in oklch, var(--bn-accent) 8%, var(--bn-a-bg));
+}
+.bn-reaction-palette__emoji {
+	width: 20px;
+	height: 20px;
+	display: inline-block;
+	vertical-align: middle;
+}
+/* When the master Reactions feature is off (Settings → Features), the "which
+   emoji" palette has no effect, so it is rendered disabled with an explanatory
+   note. Dim it and block pointer interaction so it reads as inert. */
+.bn-reaction-field.is-disabled .bn-reaction-palette {
+	opacity: 0.55;
+	pointer-events: none;
+}
+.bn-reaction-field__off-note {
+	font-size: var(--bn-a-text-sm);
+	color: var(--bn-a-text-2);
+	margin: 0 0 var(--bn-a-s3);
+}
+
+/* Custom-reaction emoji picker (Pro Reactions tab). A grid of Fluent emoji
+   tiles; the selected tile gets an accent ring. Visual, so admins see exactly
+   what they're adding instead of typing a hex colour. */
+.bn-cr-emoji-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+	gap: 8px;
+	margin-top: 8px;
+	max-width: 760px;
+}
+.bn-cr-emoji-tile {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 4px;
+	padding: 10px 6px;
+	border: 1px solid var(--bn-a-border);
+	border-radius: var(--bn-a-r-md, 8px);
+	background: var(--bn-a-bg);
+	cursor: pointer;
+	text-align: center;
+	transition: border-color 0.12s, background 0.12s, box-shadow 0.12s;
+}
+.bn-cr-emoji-tile:hover { border-color: var(--bn-a-text-3); background: var(--bn-a-bg-subtle); }
+.bn-cr-emoji-tile input { position: absolute; opacity: 0; pointer-events: none; }
+.bn-cr-emoji-tile:has(input:checked) {
+	border-color: var(--bn-accent);
+	box-shadow: 0 0 0 1px var(--bn-accent);
+	background: color-mix(in oklch, var(--bn-accent) 8%, var(--bn-a-bg));
+}
+.bn-cr-emoji-tile__img { width: 28px; height: 28px; }
+.bn-cr-emoji-tile__name {
+	font-size: 11px;
+	color: var(--bn-a-text-2);
+	line-height: 1.2;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	max-width: 100%;
+}
+.bn-cr-emoji-tile:has(input:checked) .bn-cr-emoji-tile__name { color: var(--bn-a-text-1); font-weight: 600; }
+
+/* ── Social login provider cards (Settings → Registration) ─────────────────── */
+.bn-social-intro {
+	max-width: 760px;
+	margin-bottom: var(--bn-a-s4);
+}
+
+.bn-social-card {
+	border: 1px solid var(--bn-a-border);
+	border-radius: var(--bn-a-radius, 10px);
+	background: var(--bn-a-bg);
+	margin-bottom: var(--bn-a-s4);
+	overflow: hidden;
+}
+
+.bn-social-card__head {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-a-s3);
+	padding: var(--bn-a-s3) var(--bn-a-s4);
+	background: var(--bn-a-bg-subtle);
+	border-bottom: 1px solid var(--bn-a-border-soft);
+}
+
+.bn-social-card__icon {
+	display: inline-flex;
+	font-size: 22px;
+	line-height: 0;
+}
+
+.bn-social-card__name {
+	font-weight: var(--bn-a-fw-bold, 600);
+	color: var(--bn-a-text-1);
+}
+
+.bn-social-card__status {
+	font-size: var(--bn-a-text-xs);
+	padding: 2px 10px;
+	border-radius: 999px;
+	font-weight: 600;
+}
+.bn-social-card__status.is-ready  { background: var(--bn-a-green-bg); color: var(--bn-a-green); }
+.bn-social-card__status.is-paused { background: var(--bn-a-amber-bg); color: var(--bn-a-amber); }
+.bn-social-card__status.is-empty  { background: var(--bn-a-bg-hover); color: var(--bn-a-text-3); }
+
+.bn-social-card__toggle {
+	margin-inline-start: auto;
+	white-space: nowrap;
+}
+
+.bn-social-card__body {
+	padding: var(--bn-a-s4);
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-a-s3);
+}
+
+.bn-copy-row {
+	display: flex;
+	gap: var(--bn-a-s2);
+	align-items: stretch;
+}
+.bn-copy-row .bn-input {
+	flex: 1;
+	font-family: var(--bn-a-font-mono, monospace);
+	font-size: var(--bn-a-text-xs);
+}
+.bn-copy-btn { white-space: nowrap; }
+
+.bn-social-help {
+	margin-top: var(--bn-a-s1);
+	border-top: 1px dashed var(--bn-a-border-soft);
+	padding-top: var(--bn-a-s3);
+}
+.bn-social-help > summary {
+	cursor: pointer;
+	font-weight: 600;
+	color: var(--bn-a-brand);
+	list-style: none;
+}
+.bn-social-help > summary::-webkit-details-marker { display: none; }
+/* Disclosure caret drawn in CSS (no glyph character) — a triangle pointing along
+   the inline direction (right under LTR) that rotates to point down when the
+   details is open. The solid edge is border-inline-start, so under RTL the
+   triangle mirrors to point left on its own. The open-state rotation must then
+   flip too: rotating a left-pointing triangle +90deg would aim it UP, so RTL
+   rotates the other way to land on the same downward caret. */
+.bn-social-help > summary::before {
+	content: "";
+	display: inline-block;
+	width: 0;
+	height: 0;
+	margin-inline-end: var(--bn-a-s2, 6px);
+	border-inline-start: 5px solid currentColor;
+	border-top: 4px solid transparent;
+	border-bottom: 4px solid transparent;
+	vertical-align: middle;
+	transition: transform 0.15s ease;
+}
+.bn-social-help[open] > summary::before { transform: rotate(90deg); }
+[dir="rtl"] .bn-social-help[open] > summary::before { transform: rotate(-90deg); }
+.bn-social-help__steps {
+	margin: var(--bn-a-s3) 0;
+	padding-inline-start: var(--bn-a-s5);
+	color: var(--bn-a-text-2);
+	line-height: 1.6;
+}
+.bn-social-help__steps li { margin-bottom: var(--bn-a-s2); }
+
+@media ( max-width: 640px ) {
+	.bn-social-card__head { flex-wrap: wrap; }
+	.bn-social-card__toggle { margin-inline-start: 0; width: 100%; }
+	.bn-copy-row { flex-direction: column; }
+	.bn-media-controls { flex-direction: column; align-items: stretch; }
+}
+
+/* --------------------------------------------------------------------------
+   Uniform premium tables — every admin list/queue (not WP form-table layouts)
+   -------------------------------------------------------------------------- */
+/* :not(.screen-reader-text) — a visually-hidden table is not a data table.
+   Without the exclusion this rule out-specifies the utility that hides one
+   (2 classes + an element beats a single class), forcing width:100% onto a
+   table meant to be 1px. It still occupies layout while clipped, so it
+   extended the page's scroll width and put a horizontal scrollbar on the
+   Pro analytics screen at EVERY viewport width, 1440 included. */
+.bn-admin-hub__content table:not(.form-table):not(.screen-reader-text) {
+	width: 100%;
+	border-collapse: collapse;
+	background: var(--bn-a-bg);
+	border: 1px solid var(--bn-a-border);
+	border-radius: var(--bn-a-r-lg);
+	font-size: var(--bn-a-text-sm);
+	overflow: hidden;
+}
+.bn-admin-hub__content table:not(.form-table) th {
+	text-align: start;
+	font-size: var(--bn-a-text-xs);
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: var(--bn-a-text-3);
+	font-weight: var(--bn-a-fw-semibold);
+	padding: var(--bn-a-s3) var(--bn-a-s4);
+	border-bottom: 1px solid var(--bn-a-border);
+	background: var(--bn-a-bg-subtle);
+}
+.bn-admin-hub__content table:not(.form-table) td {
+	padding: var(--bn-a-s3) var(--bn-a-s4);
+	border-top: 1px solid var(--bn-a-border-soft);
+	color: var(--bn-a-text-1);
+	vertical-align: middle;
+}
+.bn-admin-hub__content table:not(.form-table) tbody tr:hover td { background: var(--bn-a-bg-subtle); }
+
+/* ── Identifier columns and long technical values ────────────────────────────
+   Two admin cards, one cause: a list table starves its identifier column, and a
+   long unbreakable value in it then wraps to as many lines as it takes.
+
+   Measured before this rule, at an 800px viewport:
+     Webhooks    Endpoint cell 140px wide, 285px tall - 14 lines. The URL broke
+                 mid-token into a ladder of ~8 fragments, and the Actions column
+                 (Send test / View log / Remove) was pushed off the right edge.
+     Member Labels  Name cell 110px wide, 5 lines for one label name, while the
+                 Icon column next to it got 128px and Actions 157px.
+
+   Two separate problems, so two rules.
+
+   1. The identifier column gets a floor. `column-primary` is already the marker
+      for "this cell names the row" (core's responsive stacking uses it), so it
+      is the honest place to hang a minimum on - no new vocabulary, and every
+      current and future list table gets it. Without a floor, `table-layout: auto`
+      is free to hand the naming column less room than a status chip.
+
+   The second half of the fix is per-value, not per-column: see `code.bn-ep-code`
+   further down for how a long unbreakable value (a URL) is allowed to wrap. The
+   floor here is what makes that wrap reasonable - a URL in a 140px column is a
+   ladder whatever the break rule says. */
+.bn-admin-hub__content table:not(.form-table) td.column-primary {
+	min-width: 12rem;
+}
+
+/* Below the stacking breakpoint the row becomes a card and the primary cell owns
+   the full width, so the floor would only fight core's layout. */
+@media screen and ( max-width: 782px ) {
+
+	.bn-admin-hub__content table:not(.form-table) td.column-primary {
+		min-width: 0;
+	}
+}
+
+/* ── Extracted inline-style helpers ──────────────────────────────────────
+   Static presentation lifted out of style="" attributes (ux F1). Dynamic
+   values (user-chosen colours, computed widths, JS-toggled visibility) stay
+   inline — that is the correct use of the attribute. */
+.bn-a-narrow-form   { max-width: 620px; }
+.bn-a-input-tiny    { max-width: 100px; }
+.bn-a-logo-preview  { max-height: 40px; max-width: 240px; }
+.bn-a-flush-top     { margin-top: 0; }
+.bn-a-gap-top       { margin-top: var(--bn-a-s3, 16px); }
+.bn-a-gap-top-sm    { margin-top: var(--bn-a-s2, 8px); }
+.bn-a-block-gap     { margin-block-end: var(--bn-s4, 16px); }
+.bn-a-flush         { padding: 0; }
+.bn-a-readonly-hint { cursor: default; opacity: 0.7; }
+.bn-a-pf-col        { flex: 0 0 180px; }
+.bn-a-pf-col-wide   { flex: 0 0 220px; }
+.bn-a-pf-col-narrow { flex: 0 0 160px; }
+.bn-a-pf-swatch     { width: 64px; }
+
+/* Range sliders take the house control width, like every other settings control.
+ *
+ * They were missing from it. The control-width rule further up this file
+ * (--bn-a-control-max-w, 560px) enumerates input TYPES — text, email, url,
+ * number, … — and `range` is not among them, so a slider fell through to the
+ * browser default of roughly 129px. Both AI-moderation threshold sliders therefore
+ * carried an inline `max-width:420px;width:100%` to look deliberate, and a third
+ * field nearby carried 400px, and a textarea 640px: three different widths in one
+ * form, none of them the house value, each one a local repair of the same gap.
+ *
+ * Worth recording how close this came to being fixed the wrong way. The first
+ * attempt introduced a `data-bn-fw="xs|sm|md|lg"` scale and mapped those inline
+ * pixel values onto it — which would have preserved every deviation, given it a
+ * blessed vocabulary, and left the admin with TWO competing width systems: the
+ * house 560px that most controls already use, and a parallel ladder that only the
+ * fields someone had touched would opt into. That is the same defect as the five
+ * toolbar classes and the .bn-pagination-bar-versus-nav.bn-pager miss documented
+ * elsewhere in this file: a fix shaped like the thing it is fixing.
+ *
+ * The actual defect was a missing type in an existing rule. One line, and the
+ * inline widths become unnecessary rather than renamed. */
+.bn-settings-section .bn-ss-body input[type="range"] {
+	width: 100%;
+	max-width: var(--bn-a-control-max-w, 560px);
+}
+
+/* ...and the narrow step has to be able to WIN, which .bn-a-input-tiny could not.
+ *
+ * That helper is declared in the block above as a bare `.bn-a-input-tiny` (0,1,0),
+ * while the control-width rule that sets 560px is
+ * `.bn-settings-section .bn-ss-body input[type="number"]` (0,2,1). Inside a
+ * settings body — which is everywhere it is used — the helper always lost, so a
+ * field marked as tiny rendered at the full house width and nothing in the markup
+ * suggested why.
+ *
+ * This is the root of the whole inline-width family, not a separate issue: an
+ * author would add the class, see no change, and reach for `style="width:90px"`
+ * because an inline style was the only thing in the file that could outrank the
+ * house rule. Three of the inline widths removed in this pass were exactly that.
+ * Re-declaring the helper at the specificity of the rule it must override is what
+ * makes the class usable, and therefore what stops the next author reaching for
+ * the attribute again. */
+.bn-settings-section .bn-ss-body input.bn-a-input-tiny {
+	/* width:auto, not 100% — a field holding at most three digits should be sized
+	   by its content, not stretched to a cap it will never reach. */
+	width: auto;
+	max-width: var(--bn-a-control-max-w-xs, 100px);
+}
+
+/* Command-palette deep-link: transient highlight on the targeted setting row. */
+.bn-opt-highlight {
+	border-radius: var(--bn-r-md);
+	box-shadow: 0 0 0 2px var(--bn-accent);
+	transition: box-shadow 0.2s ease;
+}
+
+/* --------------------------------------------------------------------------
+   Moderation queue filters + Avatar tools description
+   Both were inline `style=` attributes built on --bn-a-space-2 / --bn-a-space-3,
+   which have never existed — the real names are --bn-a-s2 / --bn-a-s3. The
+   fallbacks silently hardcoded 8px/12px, so the spacing could not respond to
+   the token scale, and the inline styles also broke the no-inline-style rule.
+   -------------------------------------------------------------------------- */
+/* ── ONE listing-toolbar standard ────────────────────────────────────────────
+   Filters, search and the table they filter are separate blocks and must read as
+   separate blocks. They were not: measured on Monetization > Subscriptions at
+   390px, the filter tab pills, the search form and the table each had
+   margin-bottom 0, so the tabs touched the search row and the search row touched
+   the table — three controls fused into one slab. Orders showed the same, its
+   tabs flush against the table head. Inside the search row the controls touched
+   each other too, because .bnpro-subs-filter had no CSS at all.
+
+   The moderation queue was already correct, which is the actual problem: the
+   spacing was fixed once, on one class, instead of being made a standard. Pro's
+   two filter rows never got it. So this is the primitive now, and the three
+   toolbar classes are aliases of it rather than three rules free to drift.
+
+   .bn-listing-filter is the class new toolbars should carry. */
+.bn-listing-filter,
+.bn-mod-queue-filters,
+.bnpro-queue-filters,
+.bnpro-subs-filter {
+	display: flex;
+	gap: var(--bn-a-s2);
+	flex-wrap: wrap;
+	align-items: center;
+	/* margin-bottom lives in bn-admin-hub.css, as a documented exception to the
+	   form reset there — it needs that selector's specificity to apply. */
+}
+
+/* Uniform gap under a toolbar, whatever follows it — another filter row, or the
+   table. 16px matches the .bn-stat-grid gap directly above these toolbars, so a
+   listing header reads as one evenly spaced stack.
+ *
+ * Set as the toolbar's OWN margin-bottom rather than the next sibling's
+ * margin-top. The sibling form is reset to `margin: 0 ...` by a
+ * higher-specificity rule in bn-admin-hub.css, so a `+ *` margin-top silently
+ * lost — measured: the selector matched, and computed margin-top stayed 0px.
+ * Owning the space from above avoids that fight entirely and is also the
+ * property a reader expects to find on the toolbar itself. */
+/* THE CONTAINER OWNS THE RHYTHM. Every direct child of a section body is spaced
+   16px from the next one, and the handful of deliberately-tight relationships are
+   named as exceptions below.
+ *
+ * This is deliberately the inverse of how it was written twice before, because
+ * both earlier versions were enumerations and both shipped with holes:
+ *
+ *   attempt 1 — listed three filter classes. There were five. Members > Directory
+ *               kept its toolbar flush against the table.
+ *   attempt 2 — matched [class*="-toolbar"] / [class*="-filter"] by category, which
+ *               fixed all five toolbars, and then Subscriptions still had its table
+ *               flush against the pager: the rule for that end of the stack named
+ *               .bn-pagination-bar, and the element is nav.bn-pager.
+ *
+ * Enumerating the participants cannot work, because the defect is a property of the
+ * STACK, not of any class in it — a gap needs a value whatever happens to sit on
+ * either side of it, including markup added after this rule is written. Measured
+ * across 14 listing screens at 390px before this change: every gap that any rule
+ * covered was already 16px, and every gap that no rule covered was 0, 8, 12, 13 or
+ * 24. So 16px is not a new value being imposed here, it is the value the admin
+ * already uses wherever it was set at all — this makes it the default instead of an
+ * opt-in, so the next component inherits it instead of arriving flush.
+ *
+ * margin-top is zeroed alongside it so a child cannot contribute a second gap on
+ * top of the one the container just gave it; the space between two children is one
+ * value in one place, readable off this rule alone.
+ *
+ * Internal spacing is untouched. The five toolbars keep their own display:flex and
+ * gap (12px for a row of button groups, 8px for a tight filter row) because those
+ * differ on purpose — this rule is about the stack, not the contents. */
+.bn-settings-section .bn-ss-body > *,
+.bn-card__body > * {
+	margin-top: 0;
+	margin-bottom: var(--bn-a-s4, 16px);
+}
+
+/* Exception 1 — option rows stack tight and are separated by their own dividers,
+   not by space. .bn-opt carries `padding: 12px 0`, so the breathing room is inside
+   each row; a margin between them would double the divider's visual weight and
+   break the scanned-list rhythm that Settings screens rely on. Verified as
+   intentional before this rule was written, not assumed. */
+.bn-settings-section .bn-ss-body > .bn-opt,
+.bn-card__body > .bn-opt {
+	margin-bottom: 0;
+}
+
+/* Exception 2 — a heading belongs to the block it introduces. Full 16px on both
+   sides would orphan it midway between the group above and the group it labels,
+   which is the standard heading-proximity problem; the tighter step keeps the
+   pairing legible. */
+.bn-settings-section .bn-ss-body > h2,
+.bn-settings-section .bn-ss-body > h3,
+.bn-settings-section .bn-ss-body > h4,
+.bn-card__body > h2,
+.bn-card__body > h3,
+.bn-card__body > h4 {
+	margin-bottom: var(--bn-a-s2, 8px);
+}
+
+/* ...and never below the last thing in the card, where the container's own padding
+   already provides the edge and this would read as padding the card does not have. */
+.bn-settings-section .bn-ss-body > :last-child,
+.bn-card__body > :last-child {
+	margin-bottom: 0;
+}
+
+/* .bn-card is not a body element but hosts the same stack when used bare. */
+.bn-card > .bn-segment,
+.bn-card > .bn-pagination-bar {
+	margin-bottom: var(--bn-a-s4, 16px);
+}
+
+/* The filter FORMS get their bottom margin in bn-admin-hub.css instead — a form
+   inside a settings section is reset to `margin: 0` by a four-class selector
+   there, so only a rule at that specificity applies. It is documented as an
+   exception next to the rule it excepts; adding a competing one here would just
+   lose silently, which is exactly what happened on the first attempt. */
+
+/* A hidden input is still a flex item, and the row's `gap` applies around it —
+   which produced visible 1px slivers and an uneven 30px step between the real
+   controls. Taking them out of the layout makes the gaps actually uniform. */
+.bn-listing-filter > input[type="hidden"],
+.bn-mod-queue-filters > input[type="hidden"],
+.bnpro-queue-filters > input[type="hidden"],
+.bnpro-subs-filter > input[type="hidden"] {
+	display: none;
+}
+
+.bn-av-section-desc {
+	margin: 0 0 var(--bn-a-s3);
+}
+
+/* ══ THE ADMIN TABLE CONTRACT — one rule, two markup shapes ══════════════════
+
+   Admin data tables exist in two shapes, and BOTH obey the same three rules.
+   This is the single statement of that contract; the blocks below and the
+   `.bn-table-wrap__scroll` rules near the top of this file are its two
+   implementations, not two different policies.
+
+     Shape A  table dropped straight into `.bn-ss-body` (with or without a form)
+     Shape B  table wrapped in `.bn-table-wrap__scroll` / `.bn-table-scroll`
+
+     1. The table STAYS A TABLE BOX. Never `display: block` on a <table>. It
+        stops generating a table box, so its rows get laid out by an anonymous
+        table wrapper that shrink-wraps to content while width/min-width
+        stretches only the outer block - two boxes at two widths.
+     2. The rows FILL the table. Border, background and rounded corners are
+        painted by the table box; the header band and row separators are painted
+        by the rows. Disagreement renders as a table cut off partway across.
+     3. The SCROLL CONTEXT IS THE WRAPPER, never the table. A table that is its
+        own scroll container pins sticky cells to a box that never scrolls, and
+        clips its own rounded corners.
+
+   Enforced by tests/e2e/admin/table-layout-contract.spec.ts, which discovers
+   every admin screen from the navigation and measures every table at two
+   widths. Add a third shape and the contract still applies - make the test
+   pass, do not exempt it.
+
+   None of these failures produce overflow, so no static gate can see them:
+   ux-audit.sh passed clean while rows rendered at 713px inside a 980px table.
+   That is why the check is a browser assertion and not a grep. */
+
+/* ── Shape A: core-style tables must scroll, not vanish ──────────────────────
+   WordPress core list tables (.widefat / .wp-list-table) have a natural width
+   set by their columns and no scroll container of their own. Dropped into a BN
+   settings section they render wider than the body - measured at 390px:
+   Automod Rules 544px in a 366px body, Moderation Log 506px, Drip 501px, Email
+   Log 427px - and .bn-settings-section carries overflow:hidden (it clips child
+   backgrounds to the card's rounded corners), so the spill was not merely ugly,
+   it was CUT OFF. Nothing scrolled: up to 178px of columns, including the whole
+   Actions column, were permanently unreachable.
+
+   Fixing it on the section would mean dropping that overflow:hidden and losing
+   the rounded corners, and wrapping each table would mean touching every render
+   site in Free and Pro and remembering to do it again for the next one. So the
+   scroll container is the table's PARENT, selected with :has() - no markup
+   change, and it matches the rule this file already states elsewhere: the
+   wrapper is the horizontal scroll context, never the table itself.
+
+   This previously put display:block + width:max-content ON THE TABLE, and that
+   HALVED EVERY ROW. A table with display:block stops generating a table box:
+   its rows are laid out by an anonymous table wrapper that shrink-wraps to
+   content, while min-width:100% stretches only the outer block. On Bulk
+   Moderation the block measured 980px - so the border, background and rounded
+   corners drew 980px wide - and the rows measured 713px, leaving the header
+   band and every row separator stopping dead two-thirds of the way across the
+   card. The table looked cut in half because two different boxes were being
+   sized by two different rules.
+
+   Keeping the table a real table fixes both halves at once, and needs no
+   min-width threshold: table-layout:auto already refuses to shrink a table
+   below its min-content width, so it fills the body when it fits and overflows
+   into the parent's scroller when it does not. Browser-verified on Bulk
+   Moderation: 980px body -> table 980, row 979, no scrollbar; 420px body ->
+   table 617 (its natural minimum), row 616, parent scrolls with 197px
+   reachable; 300px body -> same 617 with 317px reachable. Nothing is ever
+   clipped and nothing is ever crushed.
+
+   The child combinator is load-bearing. Tables that ALREADY sit in a scroll
+   wrapper (.bn-table-wrap__scroll / .bn-table-scroll - Subscriptions uses both)
+   are nested deeper and must not be touched: a descendant selector matched them
+   too, and display:block wrapped their 8-column header row so the Action header
+   landed under column 1 while its cells stayed at column 8. They were never
+   broken - they scroll via their wrapper and their columns line up - so the
+   selector must reach only the tables dropped straight into the body with no
+   wrapper at all. */
+@media (min-width: 783px) {
+
+/* The scroll host is whichever element directly contains the table. Most render
+   sites nest it in `.bn-ss-body`, but some (Announcements) put the table
+   straight into `.bn-settings-section` - and that section carries
+   `overflow: hidden` for its rounded corners, so at 820px the table was clipped
+   with nothing to scroll and its right-hand columns were unreachable. Only the
+   inline axis opens up; overflow-y stays hidden so the corners still clip. */
+.bn-settings-section .bn-ss-body:has(> table.widefat),
+.bn-settings-section .bn-ss-body > form:has(> table.widefat),
+.bn-settings-section:has(> table.widefat),
+.bn-settings-section:has(> form > table.widefat) {
+	overflow-x: auto;
+}
+
+.bn-settings-section .bn-ss-body > table.widefat,
+.bn-settings-section .bn-ss-body > form > table.widefat,
+.bn-settings-section > table.widefat,
+.bn-settings-section > form > table.widefat {
+	display: table;
+	width: 100%;
+	/* table-layout:auto is the point, not a detail.
+	 *
+	 * WordPress's .fixed helper sets table-layout:fixed, which divides the
+	 * container evenly between the columns and NEVER overflows - so a narrow
+	 * container does not clip the table, it crushes it. Bulk Moderation at 390px
+	 * gave each of five columns 52px and rendered the "Content" header as
+	 * C/O/N/T/E/N/T, one letter per line, with a single row 700px tall. Nothing
+	 * scrolled because nothing overflowed; the text was simply destroyed in
+	 * place, which is why an overflow-based check reports the screen as clean.
+	 *
+	 * Letting the columns take their natural width turns an unreadable table
+	 * back into a readable one that scrolls. */
+	table-layout: auto;
+}
+
+} /* min-width: 783px */
+
+/* Below 782px WordPress core stacks a .wp-list-table into labelled rows - the
+   pattern the Users and Posts screens use on a phone. That is a far better
+   answer than a horizontally scrolling five-column table, so the scroll
+   treatment above deliberately stops at core's own breakpoint and gets out of
+   the way. A table only gets the stacked layout if its markup opts in with
+   column-primary / data-colname / .toggle-row. */
+
+/* ── The gap between those two mechanisms ────────────────────────────────────
+   The paragraph above used to end "one that does not simply keeps the desktop
+   layout", and that was wrong in a way that clipped real screens: the desktop
+   rule lives inside `min-width: 783px`, so below 782px a table that opted into
+   nothing gets NO mechanism at all - it neither stacks nor scrolls, and its
+   right-hand columns are simply unreachable.
+
+   Measured at 390px on the moderation queues, which opt into neither:
+
+       Reports      5 columns   199px past the content column
+       Suspensions  4 columns    78px
+       Pending      5 columns    39px
+       Appeals      4 columns    37px
+
+   Page spill was 0 in every case, which is why a document-overflow check calls
+   this clean: the content column CLIPS the table rather than the page growing,
+   so the columns are lost silently. That is the worst failure mode - Dismiss,
+   Resolve, Remove and Suspend all live in the last column of the Reports queue.
+
+   So this is a floor, not a preference. Stacking into labelled cards is still
+   the better answer and opted-in tables still get it; this only guarantees that
+   a table which opted into nothing scrolls instead of losing its columns.
+
+   Excludes:
+     .wp-list-table          - rides core's own stacking
+     :has(td.column-primary) - opted in, gets the card layout below
+   and the wrapper reset below puts already-wrapped tables back, because giving
+   `display:block` to a table inside a scroll wrapper is what broke header
+   alignment when this rule was first attempted with a descendant selector. */
+@media screen and (max-width: 782px) {
+
+	.bn-admin-hub__content table.widefat:not(.wp-list-table):not(.form-table):not(:has(td.column-primary)),
+	.bn-admin-hub__content table.bn-table:not(.wp-list-table):not(:has(td.column-primary)) {
+		display: block;
+		overflow-x: auto;
+		max-width: 100%;
+		width: max-content;
+		table-layout: auto;
+	}
+
+	/* A table already inside a scroll wrapper scrolls via the wrapper; making it
+	   its own block scroller as well wraps its header row independently of its
+	   cells, which is the misalignment the desktop rule's comment describes. */
+	.bn-table-wrap__scroll > table:not(:has(td.column-primary)),
+	.bn-table-wrap__scroll > form > table:not(:has(td.column-primary)),
+	.bn-table-scroll > table:not(:has(td.column-primary)) {
+		display: table;
+		width: 100%;
+		max-width: none;
+	}
+
+} /* max-width: 782px safety net */
+
+/* ── Slug / identifier chips must not shatter ────────────────────────────────
+   A <code> slug in a data table inherits overflow-wrap:anywhere from the admin
+   styles. `anywhere` does not merely permit mid-word breaks - unlike
+   `break-word` it also collapses the element's MIN-CONTENT width to a single
+   character, so the table is free to squeeze the column to nothing. On Spaces >
+   Categories at 390px the Slug column shrank to 29px and rendered "general" as
+   gen / era / l and "announcements" as ann / ounc / emen / ts: one fragment per
+   line, unreadable, and impossible to copy by eye.
+
+   A slug is a single identifier - it is read and retyped as one unit, so it
+   should never break at all. Keeping it whole restores an honest min-content
+   width for the column; the table already lives in a horizontal scroll wrapper,
+   so a long slug widens the scroll region instead of destroying the layout.
+
+   Worth noting for the next case: a purely numeric probe missed this. The
+   columns were all technically reachable by scrolling, so nothing "overflowed" -
+   the text was simply destroyed in place. It was caught by looking at it. */
+.bn-table td code,
+.bn-table th code,
+.bn-settings-section .bn-ss-body table td code {
+	white-space: nowrap;
+	overflow-wrap: normal;
+	word-break: normal;
+}
+
+/* ── .bn-table: real cards on phones, not a squeezed table ───────────────────
+   Eight columns cannot be read on a 390px screen, and scrolling sideways to
+   read a list is the wrong answer when the platform has a better one. Below
+   WordPress's own 782px admin breakpoint each row becomes a card: title first,
+   supporting fields as label/value pairs behind a per-row expander, exactly the
+   shape the Users and Posts screens use on a phone.
+
+   Built as a card layout rather than by reusing core's .wp-list-table rules.
+   Core's version leans on percentage padding and an absolutely positioned
+   ::before label, which assumes core's own cell metrics; dropped onto
+   .bn-table's borders and padding it produced a dead left gutter, a checkbox
+   floating halfway down the card and labels colliding with their values. A
+   two-column grid states the same intent directly and cannot drift out of
+   alignment.
+
+   The behaviour is still core's: its common.js toggles .is-expanded on any
+   .toggle-row in any tbody, so nothing here needs its own script. A table opts
+   in the same way it would for core - .column-primary FIRST, data-colname on
+   the rest, a .toggle-row button in the primary cell - and a .bn-table that has
+   not opted in is untouched. */
+@media screen and (max-width: 782px) {
+
+	/* Only opted-in tables become cards. :has keeps every other .bn-table on the
+	   ordinary table rendering it already had. */
+	.bn-table:has(td.column-primary) {
+		display: block;
+		border: 0;
+	}
+
+	.bn-table:has(td.column-primary) thead {
+		/* Every value carries its own label once stacked, so the header row is
+		   redundant - and a header row above a stack of cards reads as a stray
+		   fragment. */
+		display: none;
+	}
+
+	.bn-table:has(td.column-primary) tbody,
+	.bn-table:has(td.column-primary) tbody tr,
+	.bn-table:has(td.column-primary) tbody td {
+		display: block;
+		width: auto;
+	}
+
+	.bn-table:has(td.column-primary) tbody tr {
+		position: relative;
+		margin-block-end: var(--bn-a-s3, 12px);
+		padding: var(--bn-a-s3, 12px);
+		padding-inline-end: 44px; /* room for the expander */
+		border: 1px solid var(--bn-a-border, var(--bn-line));
+		border-radius: var(--bn-a-r-lg, 12px);
+		background: var(--bn-a-bg, var(--bn-surface));
+	}
+
+	/* The checkbox rides with the title instead of owning a column of its own -
+	   a whole column for a 16px control leaves a dead gutter down the card. */
+	.bn-table:has(td.column-primary) tbody td.bn-table__cb {
+		display: inline-block;
+		width: auto;
+		padding: 0;
+		margin-inline-end: var(--bn-a-s2, 8px);
+		border: 0;
+		vertical-align: text-top;
+	}
+
+	.bn-table:has(td.column-primary) tbody td.column-primary {
+		display: inline-block;
+		width: auto;
+		/* Never wider than the room left beside the checkbox, so the TEXT wraps
+		   inside this cell instead of the whole cell wrapping below the checkbox.
+		 *
+		 * Both the checkbox and this title are inline-blocks sharing one line (see
+		 * the rule above - the checkbox rides with the title rather than owning a
+		 * column). Without a cap, a title too wide for the remaining space wraps as
+		 * a UNIT onto the next line, so its left edge lands under the checkbox
+		 * instead of after it. Measured at 390px on the Spaces directory: a normal
+		 * row's title started at x=82, a long sub-space title at x=45 - the two
+		 * left edges the alignment card describes. Sub-spaces "hit it almost every
+		 * time" only because their names carry a parent prefix and are the longest
+		 * on the screen; any long name does it.
+		 *
+		 * 2.5rem covers the checkbox (~16px) plus its inline-end margin plus the
+		 * inline-block whitespace, with room to spare - erring generous costs a few
+		 * px of text width and guarantees the cell stays on line one. */
+		max-width: calc(100% - 2.5rem);
+		padding: 0;
+		border: 0;
+		font-weight: var(--bn-fw-semibold, 600);
+	}
+
+	/* Supporting fields: hidden until the row is expanded, then a clean
+	   label/value pair. minmax(0,*) on both tracks so a long value wraps instead
+	   of forcing the card wider than the screen. */
+	.bn-table:has(td.column-primary) tbody td:not(.column-primary):not(.bn-table__cb) {
+		display: none;
+		/* The label track is capped, not fixed: 10rem left only 98px of a 390px
+		   card for the value itself. max-content lets a short label like "Type"
+		   take what it needs and no more, and the cap stops a long translation
+		   from swallowing the row. */
+		grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
+		gap: var(--bn-a-s2, 8px);
+		align-items: baseline;
+		/* Values size to their content instead of being stretched across the
+		   track - without this a status badge became a full-width pill and the
+		   card read as a row of stretched blobs rather than values. */
+		justify-items: start;
+		/* Cells inherit the column's data-align from the desktop table; a card is
+		   always read start-aligned, so reset it or the "Actions" label ends up
+		   floated to the right of its own buttons. */
+		text-align: start;
+		padding: var(--bn-a-s2, 8px) 0 0;
+		border: 0;
+		border-block-start: 1px solid var(--bn-a-border-soft, var(--bn-line-faint));
+		margin-block-start: var(--bn-a-s2, 8px);
+	}
+
+	.bn-table:has(td.column-primary) tbody tr.is-expanded td:not(.column-primary):not(.bn-table__cb) {
+		display: grid;
+	}
+
+	.bn-table:has(td.column-primary) tbody td:not(.column-primary):not(.bn-table__cb)::before {
+		content: attr(data-colname);
+		color: var(--bn-a-text-3, var(--bn-ink-3));
+		font-weight: var(--bn-fw-semibold, 600);
+	}
+
+	/* Row actions get the full card width and wrap; six buttons never fit a
+	   phone on one line. min-width:0 lets the cluster shrink below its widest
+	   button rather than pushing the card wider - the flex min-content floor. */
+	/* Row actions get the whole card width with the label above them, rather than
+	   a label column and a narrow value column: a button cluster squeezed into
+	   the value track overflowed the card by 89px because buttons cannot wrap
+	   below their own width. */
+	.bn-table:has(td.column-primary) tbody tr.is-expanded td[data-colname]:has(.bn-row-actions) {
+		display: block;
+		text-align: start;
+	}
+
+	.bn-table:has(td.column-primary) tbody td[data-colname] .bn-row-actions {
+		flex-wrap: wrap;
+		min-width: 0;
+		margin-block-start: var(--bn-a-s2, 8px);
+		/* The desktop table right-aligns this cluster against the table edge. In a
+		   card every label and value reads from the start, so buttons hanging off
+		   the right were the one thing breaking the alignment. */
+		justify-content: flex-start;
+		/* justify-content alone was not enough: the desktop rule also pushes the
+		   cluster itself over with an auto inline margin, so the flex box was
+		   left-aligning its buttons inside a box that had already been shoved to
+		   the right edge of the card. */
+		margin-inline: 0 auto;
+		width: 100%;
+	}
+
+	/* An opted-in table is no longer wider than the screen, so its scroll
+	   wrapper has nothing left to scroll. */
+	.bn-table-wrap__scroll:has(.bn-table td.column-primary) {
+		overflow-x: visible;
+	}
+}
+
+/* ── .bn-table row expander ──────────────────────────────────────────────────
+   Uses BuddyNext's own Lucide chevron, not the dashicons font. Dashicons are
+   reserved for the WordPress admin menu; every other admin surface draws from
+   assets/icons, so the icon is an inline SVG that inherits currentColor and
+   needs no font to load. Rotating the same chevron covers the open state, so
+   there is no second icon to keep in sync. */
+.bn-table .toggle-row {
+	position: absolute;
+	inset-inline-end: var(--bn-a-s2, 8px);
+	top: var(--bn-a-s2, 8px);
+	display: none;
+	align-items: center;
+	justify-content: center;
+	width: 32px;
+	height: 32px;
+	padding: 0;
+	border: 1px solid transparent;
+	border-radius: var(--bn-a-r-md, 6px);
+	background: transparent;
+	color: var(--bn-a-text-3, var(--bn-ink-3));
+	cursor: pointer;
+}
+
+.bn-table .toggle-row:hover {
+	background: var(--bn-a-bg-soft, var(--bn-sunken));
+	color: var(--bn-a-text, var(--bn-ink));
+}
+
+.bn-table .toggle-row:focus-visible {
+	outline: 2px solid var(--bn-accent);
+	outline-offset: 1px;
+}
+
+.bn-toggle-row__icon {
+	width: 18px;
+	height: 18px;
+	transition: transform 150ms ease;
+}
+
+.bn-table .is-expanded .toggle-row .bn-toggle-row__icon {
+	transform: rotate(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.bn-toggle-row__icon { transition: none; }
+}
+
+/* Only shown where the card layout is active. */
+@media screen and (max-width: 782px) {
+	.bn-table:has(td.column-primary) .toggle-row {
+		display: inline-flex;
+	}
+}
+
+/* ── Core list tables inside BuddyNext: Lucide expander, not dashicons ───────
+   The Pro admin screens use WordPress's .wp-list-table so they inherit core's
+   responsive stacking for free - but that also brings core's dashicon chevron
+   on .toggle-row::before. Our buttons now carry an inline Lucide chevron, so
+   without this the row would show two arrows stacked on each other.
+
+   Dashicons are reserved for the WordPress admin menu; every other BuddyNext
+   admin surface draws from assets/icons. Suppressing core's glyph here keeps
+   that rule true on the one surface where core would otherwise inject one. */
+.bn-admin-hub__content .wp-list-table .toggle-row::before {
+	content: none;
+}
+
+.bn-admin-hub__content .wp-list-table .toggle-row {
+	display: none;
+	align-items: center;
+	justify-content: center;
+	color: var(--bn-a-text-3, var(--bn-ink-3));
+	border-radius: var(--bn-a-r-md, 6px);
+}
+
+.bn-admin-hub__content .wp-list-table .toggle-row:hover {
+	background: var(--bn-a-bg-soft, var(--bn-sunken));
+	color: var(--bn-a-text, var(--bn-ink));
+}
+
+.bn-admin-hub__content .wp-list-table .is-expanded .toggle-row .bn-toggle-row__icon {
+	transform: rotate(180deg);
+}
+
+@media screen and (max-width: 782px) {
+	.bn-admin-hub__content .wp-list-table .column-primary .toggle-row {
+		display: inline-flex;
+	}
+
+	/* The actions cell, once core has stacked the row.
+	 *
+	 * Its column is right-aligned on desktop, which is correct for the last
+	 * column of a table — the buttons line up against the right edge. Stacked,
+	 * that same rule is applied to a full-width block, so the label drifts right
+	 * and each action form lands on its own line looking centred: on the
+	 * Subscriptions row, "Action" sat inline with a 30-day input while Revoke
+	 * floated alone underneath, which is what made an ordinary row look broken.
+	 *
+	 * Reading order is the fix. The label goes back to the start edge like every
+	 * other stacked row's label, and the forms become one wrapping row so
+	 * "add 30 days" reads as one action and Revoke sits beside it rather than
+	 * below it. */
+	.bn-admin-hub__content .wp-list-table td.column-action,
+	.bn-admin-hub__content .wp-list-table td[data-colname="Action"] {
+		text-align: start;
+	}
+
+	/* Text-align only on the cell itself. Core stacks these cells with
+	   `tr:not(.inline-edit-row):not(.no-items) td:not(.check-column)`, which
+	   outranks anything reasonable here — a `display: flex` on this cell is
+	   silently discarded, and measuring rather than assuming is the only way to
+	   know which half of a rule survived. The label keeps core's own width, so
+	   Action lines up with ID and Plan above it (all three measure 103.68px).
+	   The layout below does the rest, at a specificity core does not contest. */
+
+	/* Both action forms are inline participants in that row, not blocks that
+	   push each other onto new lines. */
+	.bn-admin-hub__content .wp-list-table td.column-action .bn-row-actions,
+	.bn-admin-hub__content .wp-list-table td[data-colname="Action"] .bn-row-actions,
+	.bn-admin-hub__content .wp-list-table td.column-action .bn-row-actions__form,
+	.bn-admin-hub__content .wp-list-table td[data-colname="Action"] .bn-row-actions__form {
+		display: inline-flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: var(--bn-a-s2);
+		margin: 0;
+	}
+}
+
+/* ── Bulk toolbar: one control height, one separating gap ───────────────────
+   The bar sits between the filter chips and the list and read as part of
+   neither: flush against the section edge above and the first row below, with a
+   40px select next to a 28px button.
+
+   The height gap comes from the select inheriting the settings-form control
+   size, which is meant for a stacked form field rather than a toolbar beside a
+   button. Both are set with longhands here: the component's own
+   `margin: 0 0 var(--bn-s3)` shorthand was not reaching the element in the
+   admin - measured as a computed margin-bottom of 0 - and an explicit longhand
+   is both verifiable and immune to whatever is beating the shorthand. */
+.bn-admin-hub .bn-settings-section .bn-ss-body form.bn-bulk-bar {
+	margin-block-start: var(--bn-a-s3, 12px);
+	margin-block-end: var(--bn-a-s3, 12px);
+}
+
+/* Specificity is the whole point of this selector, not decoration. The
+   settings-form control rule is `.bn-settings-section .bn-ss-body select`
+   (0,3,1), which is meant for a stacked form field and beat the shorter
+   `.bn-admin-hub .bn-bulk-bar select` (0,2,1) - so the select kept the form
+   height and sat 10px taller than the button beside it. This scores (0,4,2). */
+.bn-admin-hub .bn-settings-section .bn-ss-body form.bn-bulk-bar select {
+	/* Match .bn-btn[data-size="sm"] so the control and its button share a
+	   baseline instead of sitting 12px apart in height. */
+	box-sizing: border-box;
+	min-height: 0;
+	padding-block: 0;
+	line-height: 1;
+}
+
+/* Height is matched by stretching, not by a number.
+ *
+ * Pinning the select to the button's pixel height meant chasing whichever rule
+ * won that week - the settings-form control rule is more specific than anything
+ * reasonable to write here, and the button's own size comes from
+ * data-size="sm". Stretching the toolbar's items makes the two controls share a
+ * height by construction, at every breakpoint, with nothing to keep in sync. */
+.bn-admin-hub .bn-settings-section .bn-ss-body form.bn-bulk-bar {
+	align-items: stretch;
+}
+
+@media screen and (max-width: 640px) {
+	/* Below this the 240px select plus the button no longer share a line, and a
+	   button orphaned under a full-width select reads as accidental - so the
+	   select takes the remaining width and the pair stays on one row. */
+	.bn-admin-hub .bn-settings-section .bn-ss-body form.bn-bulk-bar select {
+		flex: 1 1 auto;
+		width: auto;
+	}
+}
+
+/* A webhook URL is one long unbroken token, so it wraps - but only where it has
+   to, and in a column wide enough that it does not become a ladder.
+ *
+ * History matters here because this rule has now been wrong in both directions.
+ * It used to be `word-break: break-all`, which breaks at EVERY opportunity rather
+ * than only when a line cannot fit. Combined with a starved column that produced,
+ * measured at an 800px viewport with a realistic 92-character endpoint: a 14-line
+ * stack of ~11-character fragments, a 285px-tall row, and the Actions column
+ * (Send test / View log / Remove) pushed off the card.
+ *
+ * Forcing it onto ONE line with an ellipsis was the other extreme and was worse:
+ * the table went to 1263px inside a 602px section that carries overflow-x: hidden
+ * for its card corners, so Actions was clipped away at 800, 1024 AND 1440 with no
+ * way to scroll to it. Trading a tall row for unreachable controls is not a trade.
+ *
+ * So: wrap, with `overflow-wrap: anywhere` instead of `word-break: break-all`.
+ * Both can split a long token, but `anywhere` only does it when the token will not
+ * fit the line, and it lets the column shrink without forcing a break at every
+ * character. Paired with the `min-width` floor on `td.column-primary` further up,
+ * the URL now gets a real column and lands in two or three lines.
+ *
+ * The render site also carries a `title` with the full URL - cheap, and it means
+ * an owner can read the whole endpoint on hover without selecting the text. */
+.bn-table td code.bn-ep-code,
+.bn-settings-section .bn-ss-body table td code.bn-ep-code,
+code.bn-ep-code {
+	white-space: normal;
+	overflow-wrap: anywhere;
+	word-break: normal;
+}
+
+/* Members directory — identity as one block.
+ *
+ * The Email column was folded into the identifier cell, so handle and email now
+ * share one line under the name. Two things follow. The cell needs a bigger
+ * floor than the generic 12rem `column-primary` minimum, or the meta line wraps
+ * and every row in the table grows by a line. And the email truncates rather
+ * than wrapping: a directory is scanned down the name column, and an address
+ * long enough to wrap would cost height on every row to show a value nobody is
+ * reading in full. The full address stays available via the mailto link. */
+.bn-admin-hub__content table.bn-table td.column-primary,
+.bn-admin-hub__content table.bn-table th.column-primary {
+	min-width: 16rem;
+}
+
+/* The cap lives on the inner block, NOT the cell. `max-width` on a `td` is
+   ignored under `table-layout: auto` — the algorithm sizes the column to its
+   widest content whatever the cell says, so capping the cell left the column at
+   416px, still pushing Status and Last Active out of view, with the ellipsis
+   never engaging because nothing was ever too narrow. Constraining the block
+   inside the cell is what actually bounds the column. */
+.bn-member-info {
+	min-width: 0;
+	max-width: 20rem;
+}
+
+.bn-member-meta {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-a-s1);
+	min-width: 0;
+	margin-top: var(--bn-a-s1);
+	font-size: var(--bn-a-text-xs);
+	color: var(--bn-a-text-3);
+}
+
+/* The standalone rule adds its own top margin; inside the meta row the flex gap
+   owns the spacing. */
+.bn-member-meta .bn-member-username {
+	margin-top: 0;
+	white-space: nowrap;
+}
+
+.bn-member-email {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	color: var(--bn-a-text-3);
+	text-decoration: none;
+}
+
+.bn-member-email:hover,
+.bn-member-email:focus {
+	text-decoration: underline;
+}
+
+@media screen and ( max-width: 782px ) {
+
+	/* Stacked card layout: the cell owns the full width, so let the meta wrap
+	   rather than truncating an address in a column that is no longer narrow. */
+	.bn-admin-hub__content table.bn-table td.column-primary {
+		min-width: 0;
+	}
+
+	.bn-member-meta {
+		flex-wrap: wrap;
+	}
+
+	.bn-member-email {
+		overflow: visible;
+		white-space: normal;
+		word-break: break-all;
+	}
+}

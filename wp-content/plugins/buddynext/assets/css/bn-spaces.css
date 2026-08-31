@@ -1,0 +1,3833 @@
+/*
+ * BuddyNext — Spaces CSS
+ *
+ * Layout + composition rules for the Spaces hub. All buttons, badges,
+ * avatars, tabs, inputs come from v2 primitives in bn-base.css — this
+ * file only owns the per-surface composition (card structure, hero
+ * layout, grid sizing, member-row spacing, etc).
+ *
+ * Anything that touched colors, button states, or generic chip / pill
+ * styling has been deleted in favour of `.bn-btn[data-variant]`,
+ * `.bn-badge[data-tone]`, `.bn-avatar[data-size]`, `.bn-tabs` / `.bn-tab`.
+ */
+
+/* ── Screen-reader-only utility ──────────────────────────────────────── */
+
+.bn-screen-reader {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	margin: -1px;
+	padding: 0;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
+}
+
+/* ── Spaces directory ──────────────────────────────────────────────────
+ * v2 prototype: docs/v2 Plans/v2/spaces-directory.html.
+ * Composes from v2 primitives in bn-base.css — buttons, badges, tabs,
+ * inputs, cards, avatars, section-head, filter-strip, pagination, and
+ * sidebar-card all come from base.
+ * ──────────────────────────────────────────────────────────────────── */
+
+.bn-sd-stack {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s5);
+}
+
+/* Filter strip composition — inside .bn-sd-stack the search input takes
+ * remaining space and selects size to content. Without these overrides
+ * the base `.bn-input { width: 100% }` declaration combines with the
+ * flex container to stack each control full-width. Search keeps a sane
+ * min-width so it stays usable when the strip wraps. Selects collapse
+ * to their content width. */
+.bn-sd-stack .bn-filter-strip__form {
+	flex: 1 1 auto;
+	flex-wrap: wrap;
+	margin-inline-start: var(--bn-s4);
+}
+
+.bn-sd-stack .bn-filter-strip__form .bn-input {
+	flex: 1 1 220px;
+	width: auto;
+	min-width: 220px;
+}
+
+.bn-sd-stack .bn-filter-strip__form .bn-select {
+	flex: 0 1 auto;
+	width: auto;
+	min-width: 140px;
+}
+
+/* Pill chip strip beneath the filter row */
+.bn-tabs.bn-sd-chips {
+	flex-wrap: wrap;
+	gap: var(--bn-s2);
+	border-block-end: none;
+	/* This chip strip wraps (flex-wrap), so it never scrolls horizontally —
+	   override the base .bn-tabs "overflow-x: auto", which forced overflow-y to
+	   clip and shaved ~1px off the 36px pills (rounded top/bottom cut off). */
+	overflow: visible;
+}
+
+.bn-tab.bn-sd-chip {
+	/* Wider pill padding: set the shared --bn-tab-px token only — the base .bn-tab
+	   rule AND the .bn-app theme-defense lock both read it, so rest and hover stay
+	   in sync automatically (no separate per-state re-lock needed). */
+	--bn-tab-px: var(--bn-s4);
+	padding: var(--bn-s2) var(--bn-tab-px);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-full);
+	background: var(--bn-surface);
+	color: var(--bn-ink-2);
+	/* 40px floor. These category chips are the directory's primary filter — a
+	   target, not decoration — and 36px put them under it. .bn-tab's own base is
+	   40px now; this line only ever pulled them back down. */
+	min-height: 40px;
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-s1);
+	font-size: var(--bn-text-sm);
+	font-weight: var(--bn-fw-medium);
+}
+
+/* Category colour + icon swatch inside a filter chip. A self-contained bg/fg
+   pair (set inline from the category's colour / text_color) so it keeps its
+   contrast on both the light rest chip and the dark selected chip — the same
+   treatment the admin category pill and the space-card badge use. */
+.bn-sd-chip__icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	inline-size: 18px;
+	block-size: 18px;
+	border-radius: var(--bn-r-full);
+	/* Fallback tint when a category carries no colour pair (no inline style). */
+	background: var(--bn-surface-2, var(--bn-surface));
+	color: var(--bn-ink-2);
+	flex: 0 0 auto;
+}
+
+.bn-sd-chip__icon svg {
+	width: 12px;
+	height: 12px;
+}
+
+.bn-tab.bn-sd-chip:hover {
+	border-color: var(--bn-line-strong);
+	color: var(--bn-ink);
+}
+
+.bn-tab.bn-sd-chip[aria-selected="true"] {
+	background: var(--bn-ink);
+	border-color: var(--bn-ink);
+	color: var(--bn-surface);
+}
+
+/* Space card grid */
+.bn-sd-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+	gap: var(--bn-s4);
+}
+
+/* List layout — one column of compact ROWS, not one column of stretched cards.
+   The Space Directory and Spaces Showcase blocks thread a Layout=List setting
+   through to data-layout="list" on the grid (and the block wrapper). Collapsing
+   to a single column is only half of it: a grid card at full width keeps its
+   80px cover band and its full body and gains a wide empty gutter, so six spaces
+   cost 1713px in List against 882px in Grid — twice the scroll to show the same
+   thing, and the extra width buys nothing. The row treatment below is in
+   `.bn-sd-card` further down, next to the other card-size variant.
+   Rows sit closer together than cards, so the gap tightens with them. */
+.bn-sd-grid[data-layout="list"],
+[data-layout="list"] .bn-sd-grid {
+	grid-template-columns: 1fr;
+	gap: var(--bn-s2);
+}
+
+/* "My Spaces" labelled sections (managed / joined). */
+.bn-sd-section {
+	margin-block-end: var(--bn-s8);
+}
+
+.bn-sd-section:last-child {
+	margin-block-end: 0;
+}
+
+.bn-sd-section__head {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: var(--bn-s3);
+	margin-block-end: var(--bn-s4);
+}
+
+.bn-sd-section__title {
+	display: flex;
+	align-items: baseline;
+	gap: var(--bn-s2);
+	margin: 0;
+	font-family: var(--bn-font-display);
+	font-size: var(--bn-text-lg);
+	font-weight: var(--bn-fw-bold);
+	color: var(--bn-ink);
+}
+
+.bn-sd-section__count {
+	font-family: var(--bn-font-mono);
+	font-size: var(--bn-text-sm);
+	font-weight: var(--bn-fw-medium);
+	color: var(--bn-ink-3);
+}
+
+.bn-sd-section__viewall {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-s1);
+	flex: 0 0 auto;
+	font-size: var(--bn-text-sm);
+	font-weight: var(--bn-fw-medium);
+	color: var(--bn-accent);
+	text-decoration: none;
+	white-space: nowrap;
+}
+
+.bn-sd-section__viewall:hover,
+.bn-sd-section__viewall:focus-visible {
+	text-decoration: underline;
+}
+
+.bn-sd-section__viewall svg {
+	width: 14px;
+	height: 14px;
+}
+
+/* Owner-set fixed desktop column count (Settings > Spaces > Directory columns).
+   Applies only on desktop (≥1025px); the responsive breakpoints below still step
+   the directory down to 2 then 1 on tablet/mobile. */
+@media (min-width: 1025px) {
+	.bn-sd-grid[data-cols="2"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+	.bn-sd-grid[data-cols="3"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+	.bn-sd-grid[data-cols="4"] { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+/* Space card — sits on `.bn-card[data-interactive]` from base.
+   Doubled with .bn-card for the same reason bn-members.css does it: on a block
+   surface bn-spaces.css can print BEFORE bn-base.css, and a plain .bn-sd-card
+   then loses `padding: 0` to `.bn-card`'s 24px, insetting the cover band.
+   The print order itself is fixed in BlockRegistrar::enqueue_block_styles_early();
+   this covers the block-widget / template-part surfaces that fix cannot see. */
+.bn-card.bn-sd-card {
+	padding: 0;
+}
+
+.bn-sd-card {
+	display: flex;
+	flex-direction: column;
+	padding: 0;
+	overflow: hidden;
+}
+
+.bn-sd-card__cover-link {
+	display: block;
+	color: inherit;
+	text-decoration: none;
+}
+
+.bn-sd-card__cover {
+	position: relative;
+	height: 80px;
+	width: 100%;
+	/* No overflow:hidden — the emblem (.bn-sd-card__emblem) is anchored to this
+	   cover and intentionally overhangs its bottom edge by var(--bn-s6). The
+	   card's own overflow:hidden still rounds the cover's top corners, so the
+	   gradient/image stays clipped to the card radius. */
+	background: var(--bn-accent-100);
+}
+
+/*
+ * Tone gradient covers. Lightness pair (LStart/LEnd) is themed:
+ *   light mode: 80% → 55% (bright, decorative).
+ *   dark mode:  45% → 30% (recede so cards don't blast).
+ * Chroma/hue per tone stays constant so each tone reads as the same
+ * "color family" across themes.
+ */
+.bn-sd-card__cover {
+	--bn-tone-l-start: 80%;
+	--bn-tone-l-end:   55%;
+}
+[data-bn-theme="dark"] .bn-sd-card__cover,
+[data-theme="dark"] .bn-sd-card__cover,
+[data-bx-mode="dark"] .bn-sd-card__cover {
+	--bn-tone-l-start: 45%;
+	--bn-tone-l-end:   30%;
+}
+/*
+ * Brand-safe community palette: a blue → green → warm sweep. Purple,
+ * violet, indigo and pink/rose hues are deliberately excluded — they read
+ * as the synthetic "AI" palette BN never uses. All single-hue (no rainbow
+ * gradient), so a cover identifies a space without looking generated.
+ */
+.bn-sd-card__cover[data-tone="sky"]     { background: linear-gradient(135deg, oklch(var(--bn-tone-l-start) 0.13 240) 0%, oklch(var(--bn-tone-l-end) 0.18 240) 100%); }
+.bn-sd-card__cover[data-tone="cyan"]    { background: linear-gradient(135deg, oklch(var(--bn-tone-l-start) 0.12 200) 0%, oklch(var(--bn-tone-l-end) 0.16 200) 100%); }
+.bn-sd-card__cover[data-tone="emerald"] { background: linear-gradient(135deg, oklch(var(--bn-tone-l-start) 0.13 160) 0%, oklch(var(--bn-tone-l-end) 0.18 160) 100%); }
+.bn-sd-card__cover[data-tone="lime"]    { background: linear-gradient(135deg, oklch(var(--bn-tone-l-start) 0.13 130) 0%, oklch(var(--bn-tone-l-end) 0.17 130) 100%); }
+.bn-sd-card__cover[data-tone="amber"]   { background: linear-gradient(135deg, oklch(var(--bn-tone-l-start) 0.13 70)  0%, oklch(var(--bn-tone-l-end) 0.18 70)  100%); }
+.bn-sd-card__cover[data-tone="coral"]   { background: linear-gradient(135deg, oklch(var(--bn-tone-l-start) 0.13 35)  0%, oklch(var(--bn-tone-l-end) 0.18 35)  100%); }
+
+.bn-sd-card__cover img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+}
+
+.bn-sd-card__emblem {
+	position: absolute;
+	inset-block-end: calc(-1 * var(--bn-s6));
+	inset-inline-start: var(--bn-s4);
+	width: 56px;
+	height: 56px;
+	border-radius: var(--bn-r-md);
+	background: var(--bn-surface);
+	border: 3px solid var(--bn-surface);
+	box-shadow: var(--bn-shadow-sm);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	color: var(--bn-accent);
+}
+
+.bn-sd-card__emblem svg {
+	width: 24px;
+	height: 24px;
+}
+
+.bn-sd-card__emblem img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	border-radius: inherit;
+}
+
+/* First-letter fallback glyph — when a space has neither an avatar
+   nor a category icon. Matches the .bn-avatar fallback style so the
+   directory and the user profile share an aesthetic for "no image". */
+.bn-sd-card__emblem-letter,
+.bn-sh-hero__emblem-letter {
+	font-family: var(--bn-font-ui, ui-sans-serif, system-ui, sans-serif);
+	font-weight: 700;
+	color: var(--bn-accent);
+}
+.bn-sd-card__emblem-letter { font-size: 24px; line-height: 1; }
+.bn-sh-hero__emblem-letter { font-size: 32px; line-height: 1; }
+
+/* Category row under the directory card title. Holds one .bn-badge carrying the
+   category's own colour pair (bn_space_categories.color / .text_color, applied inline
+   from the row) - the same badge treatment the admin category list gives it. The label
+   is the bare category name, so a card and the directory's filter chips print the same
+   string for the same category. */
+.bn-sd-card__category {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s1);
+	margin-block-start: 4px;
+}
+/* Both halves of the colour pair arrive together on the inline style, so the badge is
+   self-contained and needs no per-mode override; the tokened .bn-badge[data-tone] base
+   (dark-mode aware) is the fallback when a category has no colour stored. */
+.bn-sd-card__cat {
+	max-width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.bn-sd-card__category svg { width: 12px; height: 12px; }
+
+.bn-sd-card__body {
+	padding-block: var(--bn-s8) var(--bn-s4);
+	padding-inline: var(--bn-s4);
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s2);
+	flex: 1;
+}
+
+.bn-sd-card__name-link {
+	color: inherit;
+	text-decoration: none;
+}
+
+.bn-sd-card__name-link:hover .bn-sd-card__name {
+	color: var(--bn-accent);
+}
+
+.bn-sd-card__name {
+	font-family: var(--bn-font-display);
+	font-size: var(--bn-text-base);
+	font-weight: var(--bn-fw-bold);
+	letter-spacing: var(--bn-ls-tight);
+	color: var(--bn-ink);
+	margin: 0;
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	flex-wrap: wrap;
+}
+
+.bn-sd-card__desc {
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink-2);
+	line-height: var(--bn-leading-snug);
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+	margin: 0;
+}
+
+.bn-sd-card__stats {
+	display: flex;
+	gap: var(--bn-s3);
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+	font-family: var(--bn-font-mono);
+}
+
+.bn-sd-card__foot {
+	margin-block-start: auto;
+	padding-block-start: var(--bn-s2);
+	border-block-start: 1px solid var(--bn-line-faint);
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: var(--bn-s2);
+}
+
+/* Compact card — the featured-space block's narrow-column size.
+   An 80px cover band is most of a sidebar's height, so compact drops the band
+   and keeps the emblem, moved out of the cover's absolute positioning to sit
+   beside the name. Everything else is the same card: same name, badge, category,
+   description, stats and action, so the two sizes stay one implementation.
+
+   The body becomes a grid rather than a nested head/text wrapper, which keeps
+   the markup a flat list of children — the category, description and footer are
+   each optional, and a wrapper-based layout would need the emblem's row span
+   recalculated every time one of them is absent.
+
+   Only the NAME shares the emblem's row. Everything below it spans the full
+   card, because the sidebar this size exists for is around 230px wide: running
+   the emblem down the whole card left the description and stats in a ~140px
+   gutter, wrapping "Creative Builders #240" over three lines beside empty
+   space. The emblem earns its column for one row and then gets out of the way. */
+.bn-sd-card[data-size="compact"] .bn-sd-card__body {
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr);
+	column-gap: var(--bn-s3);
+	row-gap: var(--bn-s2);
+	align-content: start;
+	padding-block: var(--bn-s4);
+}
+
+.bn-sd-card[data-size="compact"] .bn-sd-card__emblem-link {
+	grid-column: 1;
+	grid-row: 1;
+	align-self: center;
+	display: block;
+	line-height: 0;
+}
+
+.bn-sd-card[data-size="compact"] .bn-sd-card__name-link {
+	grid-column: 2;
+	grid-row: 1;
+	align-self: center;
+}
+
+.bn-sd-card[data-size="compact"] .bn-sd-card__body > :not(.bn-sd-card__emblem-link):not(.bn-sd-card__name-link) {
+	grid-column: 1 / -1;
+}
+
+/* On the full card the emblem reads because it sits on the coloured cover: its
+   surface-coloured fill and 3px surface border are a cut-out from that band.
+   With the band gone it would be surface on surface — an invisible container,
+   leaving a bare letter or icon floating next to the name. Compact therefore
+   draws the emblem as a real tile: sunken fill, a line border, no cut-out. */
+.bn-sd-card[data-size="compact"] .bn-sd-card__emblem {
+	position: static;
+	width: 40px;
+	height: 40px;
+	background: var(--bn-sunken);
+	border: 1px solid var(--bn-line);
+	box-shadow: none;
+}
+
+.bn-sd-card[data-size="compact"] .bn-sd-card__emblem svg {
+	width: 20px;
+	height: 20px;
+}
+
+.bn-sd-card[data-size="compact"] .bn-sd-card__emblem-letter {
+	font-size: var(--bn-text-lg);
+}
+
+/* No auto margin: with the cover gone there is no tall band to push the action
+   away from, and a compact card in a sidebar should close up under its content
+   rather than stretch to a neighbour's height. */
+.bn-sd-card[data-size="compact"] .bn-sd-card__foot {
+	margin-block-start: var(--bn-s1);
+}
+
+/* ── List rows (Layout = List) ────────────────────────────────────────────────
+ *
+ * The same card markup laid out as a row: emblem tile on the left, name and one
+ * meta line in the middle, action on the right. An owner who picks "List" is
+ * asking to see MORE spaces per screen, so the row has to be shorter than the
+ * card — a full-width card is taller per space than a grid card, which is the
+ * opposite of what the setting promises.
+ *
+ * The cover band goes. It is 80px of the card's height and its whole job is
+ * identity, which the emblem does in 48px: the emblem carries the space's
+ * avatar, falling back to the category icon and then a letter. That is compact's
+ * argument too, so the emblem gets compact's treatment here — a real tile with a
+ * sunken fill and a line border, because the cut-out look only reads when it
+ * sits on the coloured band it is cut out of.
+ *
+ * The description stays, clamped to one line. It is the only thing on the row
+ * that says what the space IS, and dropping it entirely leaves six rows that
+ * differ by a name and a number. One line is what the height budget affords.
+ *
+ * Scoped away from data-size="compact" so a compact card dropped into a list
+ * grid keeps its own layout instead of being half-converted by these rules.
+ * Neither block renders one today; the guard costs one selector and removes the
+ * question. */
+.bn-sd-grid[data-layout="list"] .bn-sd-card:not([data-size="compact"]) {
+	flex-direction: row;
+	align-items: center;
+	gap: var(--bn-s3);
+	padding-block: var(--bn-s3);
+	padding-inline: var(--bn-s4);
+}
+
+/* The cover-link becomes the tile wrapper: the band's height and gradient go,
+   the link to the space stays. line-height:0 keeps the inline-block emblem from
+   adding a text baseline's worth of height under the tile. */
+.bn-sd-grid[data-layout="list"] .bn-sd-card:not([data-size="compact"]) .bn-sd-card__cover-link {
+	flex: 0 0 auto;
+	line-height: 0;
+}
+
+.bn-sd-grid[data-layout="list"] .bn-sd-card:not([data-size="compact"]) .bn-sd-card__cover {
+	position: static;
+	width: auto;
+	height: auto;
+	background: none;
+}
+
+/* A cover PHOTO is composed for an 80px-tall band; the same image cropped to a
+   48px square is mud, and the emblem is the identity signal at this size. */
+.bn-sd-grid[data-layout="list"] .bn-sd-card:not([data-size="compact"]) .bn-sd-card__cover > img {
+	display: none;
+}
+
+.bn-sd-grid[data-layout="list"] .bn-sd-card:not([data-size="compact"]) .bn-sd-card__emblem {
+	position: static;
+	width: 48px;
+	height: 48px;
+	background: var(--bn-sunken);
+	border: 1px solid var(--bn-line);
+	box-shadow: none;
+}
+
+.bn-sd-grid[data-layout="list"] .bn-sd-card:not([data-size="compact"]) .bn-sd-card__emblem svg {
+	width: 22px;
+	height: 22px;
+}
+
+.bn-sd-grid[data-layout="list"] .bn-sd-card:not([data-size="compact"]) .bn-sd-card__emblem-letter {
+	font-size: var(--bn-text-lg);
+}
+
+/* Three columns: category | member stats | action. The name and the description
+   span the first two, so the meta line reads "General   9 members" the way a
+   directory row is expected to. Both meta children are optional and both of
+   their columns are `auto`, so an absent one collapses rather than leaving a
+   hole. The action spans every row and centres against the whole block.
+   The three rows are declared EXPLICITLY, and they have to be: the action is
+   placed `1 / -1`, and `-1` resolves against the explicit grid, so without this
+   line it means `1 / 1` — the action lands in the name's row, inflates it from
+   20px to its own 40px, and the row grows by half the description's height while
+   the button sits level with the title instead of centred. */
+.bn-sd-grid[data-layout="list"] .bn-sd-card:not([data-size="compact"]) .bn-sd-card__body {
+	flex: 1;
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr) auto;
+	grid-template-rows: auto auto auto;
+	align-items: center;
+	column-gap: var(--bn-s3);
+	row-gap: var(--bn-s1);
+	padding: 0;
+}
+
+.bn-sd-grid[data-layout="list"] .bn-sd-card:not([data-size="compact"]) .bn-sd-card__name-link {
+	grid-column: 1 / 3;
+	grid-row: 1;
+}
+
+.bn-sd-grid[data-layout="list"] .bn-sd-card:not([data-size="compact"]) .bn-sd-card__category {
+	grid-column: 1;
+	grid-row: 2;
+	margin-block-start: 0;
+}
+
+.bn-sd-grid[data-layout="list"] .bn-sd-card:not([data-size="compact"]) .bn-sd-card__stats {
+	grid-column: 2;
+	grid-row: 2;
+}
+
+.bn-sd-grid[data-layout="list"] .bn-sd-card:not([data-size="compact"]) .bn-sd-card__desc {
+	grid-column: 1 / 3;
+	grid-row: 3;
+	-webkit-line-clamp: 1;
+}
+
+/* The divider and the auto margin exist to push the action to the bottom of a
+   card; on a row it sits at the end instead, so both go. */
+.bn-sd-grid[data-layout="list"] .bn-sd-card:not([data-size="compact"]) .bn-sd-card__foot {
+	grid-column: 3;
+	grid-row: 1 / -1;
+	align-self: center;
+	margin-block-start: 0;
+	padding-block-start: 0;
+	border-block-start: 0;
+}
+
+/* Under 480px there is no room for a name, its meta and an action on one line.
+   The tile and the text keep their row — dropping the tile too would leave a
+   wall of text with nothing to scan — and the action moves to its own full-width
+   row beneath, where it is a comfortable target rather than a 60px stub in a
+   corner. The 44px floor comes from the coarse-pointer rule in bn-base.css. */
+@media (max-width: 480px) {
+	/* With the action stacked underneath, the text column is roughly twice the
+	   tile's height, and a centred tile floats in the middle of it with space
+	   above and below. Top-aligned, it reads as the row's leading element and
+	   sits level with the name. */
+	.bn-sd-grid[data-layout="list"] .bn-sd-card:not([data-size="compact"]) {
+		align-items: flex-start;
+	}
+
+	.bn-sd-grid[data-layout="list"] .bn-sd-card:not([data-size="compact"]) .bn-sd-card__body {
+		grid-template-columns: auto minmax(0, 1fr);
+	}
+
+	.bn-sd-grid[data-layout="list"] .bn-sd-card:not([data-size="compact"]) .bn-sd-card__foot {
+		grid-column: 1 / -1;
+		grid-row: auto;
+		justify-content: stretch;
+		margin-block-start: var(--bn-s1);
+	}
+
+	.bn-sd-grid[data-layout="list"] .bn-sd-card:not([data-size="compact"]) .bn-sd-card__foot .bn-btn {
+		flex: 1;
+		justify-content: center;
+	}
+}
+
+/* Sidebar list inside .bn-sidebar-card body */
+.bn-sd-side-list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+/* "Your spaces" sidebar sub-group label (You manage / You joined). */
+.bn-sd-side-grouplabel {
+	margin: var(--bn-s3) 0 var(--bn-s1);
+	font-size: var(--bn-text-2xs);
+	font-weight: var(--bn-fw-semibold);
+	text-transform: uppercase;
+	letter-spacing: var(--bn-ls-wide, 0.04em);
+	color: var(--bn-ink-3);
+}
+
+.bn-sd-side-grouplabel:first-child {
+	margin-block-start: 0;
+}
+
+.bn-sd-side-row {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	padding: var(--bn-s2) var(--bn-s2);
+	border-radius: var(--bn-r-sm);
+	color: var(--bn-ink);
+	font-size: var(--bn-text-sm);
+	font-weight: var(--bn-fw-medium);
+	text-decoration: none;
+	transition: background var(--bn-dur-fast) var(--bn-ease), color var(--bn-dur-fast) var(--bn-ease);
+	width: 100%;
+}
+
+.bn-sd-side-row:hover {
+	background: var(--bn-sunken);
+}
+
+.bn-sd-side-row.is-active {
+	background: var(--bn-accent-100);
+	color: var(--bn-accent-700);
+}
+
+.bn-sd-side-row__icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 28px;
+	height: 28px;
+	border-radius: var(--bn-r-md);
+	background: var(--bn-sunken);
+	color: var(--bn-ink-2);
+	flex-shrink: 0;
+	overflow: hidden;
+}
+
+.bn-sd-side-row__icon img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+.bn-sd-side-row__icon svg {
+	width: 16px;
+	height: 16px;
+}
+
+.bn-sd-side-row__main {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+}
+
+.bn-sd-side-row__meta {
+	font-family: var(--bn-font-mono);
+	font-size: 11px;
+	color: var(--bn-ink-3);
+	font-weight: var(--bn-fw-normal);
+}
+
+/* ── Space home ──────────────────────────────────────────────────────
+ * v2 prototype: docs/v2 Plans/v2/space-home.html.
+ * ──────────────────────────────────────────────────────────────────── */
+
+.bn-sh-stack {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s4);
+}
+
+/* Hero card */
+.bn-sh-hero {
+	background: var(--bn-surface);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-lg);
+	/* visible (not hidden) so the notification-pref dropdown can extend past the
+	   hero; the cover clips itself to the top rounded corners (see below). */
+	overflow: visible;
+}
+
+.bn-sh-hero__cover {
+	height: 180px;
+	background:
+		radial-gradient(circle at 18% 30%, color-mix(in oklch, var(--bn-accent) 30%, transparent), transparent 55%),
+		radial-gradient(circle at 78% 75%, color-mix(in oklch, var(--bn-accent-600, var(--bn-accent)) 20%, transparent), transparent 50%),
+		linear-gradient(135deg, var(--bn-accent-100), var(--bn-sunken));
+	position: relative;
+	overflow: hidden;
+	/* Round the top corners here (the hero is now overflow:visible) so the cover
+	   gradient/image still clips to the card's rounded top edge. */
+	border-start-start-radius: var(--bn-r-lg);
+	border-start-end-radius: var(--bn-r-lg);
+}
+
+.bn-sh-hero__cover-tone {
+	position: absolute;
+	inset: 0;
+	background: repeating-linear-gradient(
+		-42deg,
+		transparent 0 22px,
+		color-mix(in oklch, var(--bn-ink) 4%, transparent) 22px 23px
+	);
+	opacity: 0.6;
+	mix-blend-mode: multiply;
+	pointer-events: none;
+}
+
+.bn-sh-hero__head {
+	padding-block: 0 var(--bn-s5);
+	padding-inline: var(--bn-s6);
+	display: flex;
+	align-items: flex-end;
+	gap: var(--bn-s5);
+	position: relative;
+	flex-wrap: wrap;
+}
+
+.bn-sh-hero__emblem {
+	width: 96px;
+	height: 96px;
+	/* Half-overlap the cover, matching the 96px profile hero avatar
+	   (.bn-pf-avatar-wrap → -s12). --bn-s9 does not exist in the token scale
+	   (s8 then s10), so the old value silently resolved to nothing and the
+	   emblem never pulled up into the cover. */
+	margin-block-start: calc(-1 * var(--bn-s12));
+	background: var(--bn-surface);
+	border: 4px solid var(--bn-surface);
+	border-radius: var(--bn-r-lg);
+	box-shadow: var(--bn-shadow-md);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+	color: var(--bn-accent);
+	background-image: linear-gradient(135deg, var(--bn-accent-100), var(--bn-surface));
+}
+
+/*
+ * An uploaded space icon must take the container's rounding.
+ *
+ * templates/parts/space-hero.php renders the icon as a bare <img> inside the
+ * emblem. The emblem is rounded (--bn-r-lg) but does not clip (no overflow
+ * hidden — the box-shadow needs to escape), so the image kept hard square
+ * corners inside a rounded, bordered box. `border-radius: inherit` is the
+ * pattern .bn-sd-card__emblem img already uses on the directory cards, so the
+ * icon rounds identically in both places and follows the token if it changes.
+ */
+.bn-sh-hero__emblem img,
+.bn-sh-avatar img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	border-radius: inherit;
+}
+
+.bn-sh-hero__emblem svg {
+	width: 36px;
+	height: 36px;
+}
+
+.bn-sh-hero__info {
+	flex: 1;
+	/* Give the title a readable minimum so a two-word name never crushes into a
+	   stacked column; when the row is tight the action cluster wraps below
+	   instead (the head is flex-wrap). Falls back to 100% on very narrow heads. */
+	min-width: min(100%, 16rem);
+	padding-block-end: var(--bn-s1);
+}
+
+/* Sub-space breadcrumb — parent context above the space name. */
+.bn-sh-hero__breadcrumb {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s1);
+	/* Sits below the title: a comfortable gap above (collapses with the title's
+	   own margin-bottom) and a small gap before the category handle / content. */
+	margin-block: var(--bn-s2) var(--bn-s1);
+	font-size: var(--bn-text-xs);
+	font-weight: var(--bn-fw-medium);
+	line-height: var(--bn-leading-tight);
+	min-width: 0;
+}
+
+.bn-sh-hero__crumb {
+	color: var(--bn-ink-3);
+	text-decoration: none;
+	max-width: 16ch;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+a.bn-sh-hero__crumb:hover,
+a.bn-sh-hero__crumb:focus-visible {
+	color: var(--bn-accent);
+	text-decoration: underline;
+}
+
+.bn-sh-hero__crumb--current {
+	color: var(--bn-ink-2);
+	font-weight: var(--bn-fw-semibold);
+}
+
+.bn-sh-hero__crumb-sep {
+	display: inline-flex;
+	align-items: center;
+	color: var(--bn-ink-4);
+	flex: 0 0 auto;
+}
+
+.bn-sh-hero__crumb-sep svg {
+	width: 14px;
+	height: 14px;
+}
+
+.bn-sh-hero__name {
+	font-family: var(--bn-font-display);
+	font-size: var(--bn-text-2xl);
+	font-weight: var(--bn-fw-extrabold);
+	letter-spacing: var(--bn-ls-tight);
+	color: var(--bn-ink);
+	margin: 0 0 var(--bn-s1);
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	flex-wrap: wrap;
+}
+
+.bn-sh-hero__handle {
+	font-family: var(--bn-font-mono);
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-s1);
+}
+
+.bn-sh-hero__handle svg {
+	width: 12px;
+	height: 12px;
+}
+
+.bn-sh-hero__actions {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	flex-wrap: wrap;
+	padding-block-end: var(--bn-s1);
+}
+
+.bn-sh-hero__actions svg {
+	width: 14px;
+	height: 14px;
+}
+
+/* 4-tile stat strip inside the hero, lives on `.bn-stat-grid` */
+.bn-sh-hero__stats.bn-stat-grid {
+	grid-template-columns: repeat(4, 1fr);
+	padding-inline: var(--bn-s6);
+	padding-block: var(--bn-s2) var(--bn-s4);
+	border-block-start: 1px solid var(--bn-line-faint);
+	gap: var(--bn-s4);
+}
+
+/* Stat pill band inside the hero — a compact pill row (Members / Posts /
+   Active / Created) that mirrors the profile hero's pills for a consistent
+   look. Defined here (not shared) because space pages don't load
+   bn-profile.css — asset isolation keeps each hub's CSS self-contained. */
+.bn-sh-statrow {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: 0;
+	padding-inline: var(--bn-s6);
+	padding-block: var(--bn-s3) var(--bn-s4);
+	border-block-start: 1px solid var(--bn-line-faint);
+}
+/* Passive metadata, not buttons: flat inline text with middot separators so it
+ * never reads as a clickable chip. Matches how Reddit / Discord / LinkedIn
+ * present community header stats. */
+.bn-sh-statpill {
+	display: inline-flex;
+	align-items: baseline;
+	gap: 5px;
+	padding: 0;
+	background: none;
+	border: 0;
+	border-radius: 0;
+	color: var(--bn-ink-2);
+	font: inherit;
+	font-size: var(--bn-text-sm);
+	text-decoration: none;
+	white-space: nowrap;
+	line-height: 1.5;
+}
+.bn-sh-statpill + .bn-sh-statpill::before {
+	content: "\00B7";
+	margin-inline: var(--bn-s2);
+	color: var(--bn-ink-4);
+	font-weight: 400;
+}
+/* Only the genuinely-linked stats get an interactive cue (underline on hover). */
+a.bn-sh-statpill:hover,
+a.bn-sh-statpill:focus-visible {
+	outline: 2px solid transparent;
+	outline-offset: 2px;
+	text-decoration: underline;
+	text-underline-offset: 2px;
+}
+.bn-sh-statpill__value {
+	font-weight: var(--bn-fw-semibold, 600);
+	color: var(--bn-ink);
+}
+.bn-sh-statpill__label {
+	color: var(--bn-ink-3);
+}
+.bn-sh-statpill__delta {
+	font-size: var(--bn-text-xs, 11px);
+	font-weight: 600;
+	color: var(--bn-success, #16a34a);
+}
+.bn-sh-statpill__delta[data-trend="down"] {
+	color: var(--bn-danger, #dc2626);
+}
+.bn-sh-statpill__delta[data-trend="flat"] {
+	color: var(--bn-ink-4);
+}
+
+/* Tabs strip inside the hero — overflow/scrollbar inherited from base .bn-tabs */
+.bn-tabs.bn-sh-hero__tabs {
+	padding-inline: var(--bn-s6);
+	border-block-start: 1px solid var(--bn-line);
+}
+
+/* Body (tab content) */
+.bn-sh-body {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s4);
+}
+
+/* Pinned card */
+.bn-sh-pinned {
+	padding: var(--bn-s5);
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s3);
+	position: relative;
+}
+
+.bn-sh-pinned::before {
+	content: '';
+	position: absolute;
+	inset-block-start: 0;
+	inset-inline-start: var(--bn-s5);
+	width: 32px;
+	height: 3px;
+	background: var(--bn-paid, var(--bn-accent));
+	border-radius: 0 0 2px 2px;
+}
+
+.bn-sh-pinned__label {
+	/* Full-width row so the unpin control can sit at the end (margin-auto). */
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s1);
+	font-family: var(--bn-font-mono);
+	font-size: 10px;
+	font-weight: var(--bn-fw-semibold);
+	text-transform: uppercase;
+	letter-spacing: var(--bn-ls-wide);
+	color: var(--bn-paid, var(--bn-accent));
+}
+
+.bn-sh-pinned__label svg {
+	width: 12px;
+	height: 12px;
+}
+
+.bn-sh-pinned__unpin {
+	margin-inline-start: auto;
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-s1);
+	padding: var(--bn-s1) var(--bn-s2);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-sm);
+	background: transparent;
+	color: var(--bn-ink-3);
+	font-family: var(--bn-font-ui);
+	font-size: var(--bn-text-2xs);
+	font-weight: var(--bn-fw-medium);
+	text-transform: none;
+	letter-spacing: normal;
+	cursor: pointer;
+	transition: color 0.14s ease, border-color 0.14s ease, background 0.14s ease;
+}
+
+.bn-sh-pinned__unpin:hover,
+.bn-sh-pinned__unpin:focus-visible {
+	color: var(--bn-danger);
+	border-color: var(--bn-danger);
+	background: var(--bn-danger-bg);
+}
+
+.bn-sh-pinned__title {
+	font-family: var(--bn-font-display);
+	font-size: var(--bn-text-lg);
+	font-weight: var(--bn-fw-semibold);
+	color: var(--bn-ink);
+	margin: 0;
+}
+
+.bn-sh-pinned__meta {
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+	margin: 0;
+}
+
+/* Bounded pinned strip: a few pins inline, the rest folded in a <details>. */
+.bn-sh-pinned-strip {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s3);
+}
+
+.bn-sh-pinned-strip .bn-sh-pinned {
+	margin: 0;
+}
+
+.bn-sh-pinned-strip__more {
+	margin: 0;
+}
+
+.bn-sh-pinned-strip__more > summary {
+	cursor: pointer;
+	list-style: none;
+	padding: var(--bn-s2) var(--bn-s3);
+	font-size: var(--bn-text-sm);
+	font-weight: 600;
+	color: var(--bn-accent);
+	border-radius: var(--bn-r-md);
+	background: var(--bn-sunken);
+	min-height: var(--bn-tap, 40px);
+	display: flex;
+	align-items: center;
+}
+
+.bn-sh-pinned-strip__more > summary::-webkit-details-marker {
+	display: none;
+}
+
+.bn-sh-pinned-strip__more[open] > summary {
+	margin-block-end: var(--bn-s3);
+}
+
+.bn-sh-pinned-strip__more > .bn-sh-pinned + .bn-sh-pinned {
+	margin-block-start: var(--bn-s3);
+}
+
+/* Gate (private-space teaser) */
+.bn-sh-gate {
+	padding: var(--bn-s8) var(--bn-s5);
+	text-align: center;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: var(--bn-s3);
+}
+
+.bn-sh-gate__icon {
+	display: inline-flex;
+	color: var(--bn-ink-3);
+}
+
+.bn-sh-gate__icon svg {
+	width: 40px;
+	height: 40px;
+}
+
+.bn-sh-gate__title {
+	font-family: var(--bn-font-display);
+	font-size: var(--bn-text-lg);
+	font-weight: var(--bn-fw-bold);
+	color: var(--bn-ink);
+	margin: 0;
+}
+
+.bn-sh-gate__lede {
+	color: var(--bn-ink-2);
+	font-size: var(--bn-text-sm);
+	margin: 0;
+	max-width: 420px;
+}
+
+/* Guest CTA — replaces the composer for logged-out viewers + non-member
+   viewers of open spaces. */
+.bn-sh-guest-cta {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s3);
+	padding: var(--bn-s4) var(--bn-s5);
+}
+
+.bn-sh-guest-cta__icon {
+	display: inline-flex;
+	color: var(--bn-ink-3);
+}
+
+.bn-sh-guest-cta__icon svg {
+	width: 28px;
+	height: 28px;
+}
+
+.bn-sh-guest-cta__copy {
+	flex: 1;
+	min-width: 0;
+}
+
+.bn-sh-guest-cta__title {
+	font-family: var(--bn-font-display);
+	font-size: var(--bn-text-md);
+	font-weight: var(--bn-fw-semibold);
+	color: var(--bn-ink);
+	margin: 0;
+}
+
+.bn-sh-guest-cta__lede {
+	color: var(--bn-ink-2);
+	font-size: var(--bn-text-sm);
+	margin: 0;
+}
+
+@media (max-width: 480px) {
+	.bn-sh-guest-cta {
+		flex-direction: column;
+		align-items: stretch;
+		text-align: center;
+	}
+	.bn-sh-guest-cta__icon { align-self: center; }
+}
+
+/* About-tab card */
+.bn-sh-about {
+	padding: var(--bn-s5);
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s3);
+}
+
+/* Shared section-title treatment for every space tab panel (About, Members,
+ * Moderation, Media) so each tab opens consistently — no jarring size jump
+ * between tabs. Members/Moderation titles previously had no rule and inherited
+ * the theme's oversized default <h2>. */
+.bn-sh-about__title,
+.bn-sh-members__title,
+.bn-sh-moderation__title,
+.bn-sh-media__title {
+	font-family: var(--bn-font-display);
+	font-size: var(--bn-text-xl);
+	font-weight: var(--bn-fw-bold);
+	line-height: 1.3;
+	color: var(--bn-ink);
+	margin: 0;
+}
+
+.bn-sh-about__desc {
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink-2);
+	line-height: var(--bn-leading-body);
+	margin: 0;
+}
+
+.bn-sh-about__section-title {
+	font-family: var(--bn-font-display);
+	font-size: var(--bn-text-sm);
+	font-weight: var(--bn-fw-semibold);
+	color: var(--bn-ink);
+	text-transform: uppercase;
+	letter-spacing: var(--bn-ls-wide);
+	margin: 0 0 var(--bn-s2);
+}
+
+.bn-sh-about__rules-list {
+	margin: 0;
+	padding-inline-start: var(--bn-s5);
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s1);
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink);
+}
+
+.bn-sh-about__cat-chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--bn-s2);
+}
+
+.bn-sh-about__meta {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+	gap: var(--bn-s3);
+	padding-block-start: var(--bn-s3);
+	border-block-start: 1px solid var(--bn-line-faint);
+	margin: 0;
+}
+
+.bn-sh-about__meta div {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.bn-sh-about__meta dt {
+	font-family: var(--bn-font-mono);
+	font-size: 10px;
+	text-transform: uppercase;
+	letter-spacing: var(--bn-ls-wide);
+	color: var(--bn-ink-3);
+	margin: 0;
+}
+
+.bn-sh-about__meta dd {
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink);
+	margin: 0;
+}
+
+/* Feed list inside the feed-tab body */
+.bn-sh-feed {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s3);
+}
+
+/* Sidebar content (about / members / contributors), used inside
+ * `.bn-sidebar-card__body` rendered by parts/sidebar-card.php. */
+.bn-sh-side-text {
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink-2);
+	line-height: var(--bn-leading-body);
+	margin: 0 0 var(--bn-s3);
+}
+
+.bn-sh-side-stats {
+	display: grid;
+	grid-template-columns: repeat(2, 1fr);
+	gap: var(--bn-s3);
+	padding-block: var(--bn-s3);
+	border-block-start: 1px solid var(--bn-line-faint);
+}
+
+.bn-sh-side-stat {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.bn-sh-side-stat__num {
+	font-family: var(--bn-font-display);
+	font-size: var(--bn-text-xl);
+	font-weight: var(--bn-fw-semibold);
+	color: var(--bn-ink);
+	letter-spacing: var(--bn-ls-tight);
+}
+
+.bn-sh-side-stat__label {
+	font-family: var(--bn-font-mono);
+	font-size: 10px;
+	color: var(--bn-ink-3);
+	text-transform: uppercase;
+	letter-spacing: var(--bn-ls-wide);
+}
+
+.bn-sh-side-meta {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s2);
+	padding-block-start: var(--bn-s3);
+	border-block-start: 1px solid var(--bn-line-faint);
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-2);
+}
+
+.bn-sh-side-meta__row {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-s1);
+}
+
+.bn-sh-side-meta__row svg {
+	width: 12px;
+	height: 12px;
+}
+
+.bn-sh-side-members {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s2);
+}
+
+.bn-sh-side-member {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	font-size: var(--bn-text-sm);
+}
+
+/* Moderator row — clickable identity that fills the row, with an optional
+   trailing Message action pushed to the end. */
+.bn-sh-side-mod {
+	gap: var(--bn-s2);
+}
+.bn-sh-side-mod__id,
+.bn-sh-side-member__id {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	flex: 1;
+	min-width: 0;
+	text-decoration: none;
+	color: inherit;
+}
+.bn-sh-side-mod__id:hover .bn-sh-side-member__name,
+.bn-sh-side-member__id:hover .bn-sh-side-member__name { color: var(--bn-accent); }
+.bn-sh-side-mod__msg {
+	flex-shrink: 0;
+	padding: var(--bn-s1);
+	width: 28px;
+	height: 28px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+}
+.bn-sh-side-mod__msg svg { width: 15px; height: 15px; }
+
+.bn-sh-side-member__avatar {
+	flex-shrink: 0;
+	color: var( --bn-accent-fg, #fff );
+	font-weight: var(--bn-fw-bold);
+}
+
+.bn-sh-side-member__name {
+	flex: 1;
+	font-weight: var(--bn-fw-medium);
+	color: var(--bn-ink);
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-s1);
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.bn-sh-side-member__rank {
+	font-family: var(--bn-font-mono);
+	font-size: var(--bn-text-xs);
+	font-weight: var(--bn-fw-bold);
+	color: var(--bn-ink-3);
+	width: 16px;
+	text-align: center;
+	flex-shrink: 0;
+}
+
+.bn-sh-side-member__count {
+	font-family: var(--bn-font-mono);
+	font-size: 11px;
+	color: var(--bn-ink-3);
+}
+
+/* Promoted custom field tab (U3) — a field's value rendered as its own space
+   tab body: textarea -> formatted content, url -> a labelled CTA. */
+.bn-space-field-tab {
+	padding: var(--bn-s6);
+}
+
+.bn-space-field-tab__head {
+	margin-block-end: var(--bn-s4);
+}
+
+.bn-space-field-tab__title {
+	margin: 0;
+	font-family: var(--bn-font-display);
+	font-size: var(--bn-text-xl);
+	font-weight: var(--bn-fw-bold);
+	color: var(--bn-ink);
+}
+
+.bn-space-field-tab__desc {
+	margin: var(--bn-s1) 0 0;
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink-3);
+}
+
+.bn-space-field-tab__content {
+	font-size: var(--bn-text-base);
+	line-height: var(--bn-leading-body);
+	color: var(--bn-ink);
+}
+
+.bn-space-field-tab__content p {
+	margin: 0 0 var(--bn-s3);
+}
+
+.bn-space-field-tab__cta {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: var(--bn-s2);
+}
+
+.bn-space-field-tab__cta .bn-btn svg {
+	width: 16px;
+	height: 16px;
+}
+
+.bn-space-field-tab__url {
+	margin: 0;
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+	word-break: break-all;
+}
+
+.bn-space-field-tab__empty {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: var(--bn-s3);
+	color: var(--bn-ink-3);
+	font-size: var(--bn-text-sm);
+}
+
+/* Sub-spaces rail — children of a space as compact navigation rows, plus the
+   manager "Add sub-space" CTA. Reuses the side-member row rhythm; the emblem is
+   square-cornered (via .bn-avatar override) so a space reads distinct from a
+   person's round avatar. */
+.bn-sh-side-spaces {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s1);
+}
+
+.bn-sh-side-space__id {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	min-width: 0;
+	padding: var(--bn-s1);
+	margin-inline: calc(-1 * var(--bn-s1));
+	border-radius: var(--bn-r-md);
+	text-decoration: none;
+	color: inherit;
+	transition: background-color 0.14s ease;
+}
+
+.bn-sh-side-space__id:hover,
+.bn-sh-side-space__id:focus-visible {
+	background: var(--bn-sunken);
+}
+
+.bn-sh-side-space__emblem {
+	flex-shrink: 0;
+	border-radius: var(--bn-r-md);
+	color: var( --bn-accent-fg, #fff );
+	font-weight: var(--bn-fw-bold);
+}
+
+.bn-sh-side-space__body {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	gap: 1px;
+}
+
+.bn-sh-side-space__name {
+	font-size: var(--bn-text-sm);
+	font-weight: var(--bn-fw-semibold);
+	color: var(--bn-ink);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.bn-sh-side-space__id:hover .bn-sh-side-space__name,
+.bn-sh-side-space__id:focus-visible .bn-sh-side-space__name {
+	color: var(--bn-accent);
+}
+
+.bn-sh-side-space__meta {
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+}
+
+.bn-sh-side-spaces__cta {
+	margin-block-start: var(--bn-s2);
+}
+
+/* Sub-space capacity. The button used to render regardless of the cap, so the only
+   way to find the limit was to fill in the modal and be refused by the server. */
+.bn-sh-side-spaces__capacity,
+.bn-space-subspaces__capacity {
+	margin: 0 0 var(--bn-s1);
+	color: var(--bn-ink-3, #64748b);
+	font-size: var(--bn-fs-xs, 12px);
+}
+
+.bn-sh-side-spaces__full,
+.bn-space-subspaces__full {
+	margin: var(--bn-s1) 0 0;
+	color: var(--bn-ink-3, #64748b);
+	font-size: var(--bn-fs-xs, 12px);
+}
+
+.bn-sh-side-spaces__add {
+	width: 100%;
+	justify-content: center;
+	gap: var(--bn-s1);
+}
+
+.bn-sh-side-spaces__add svg {
+	width: 15px;
+	height: 15px;
+}
+
+
+/* ── Legacy space-hero shell (still used by spaces/members.php,
+ * spaces/moderation.php, spaces/settings.php — Phase 3 templates).
+ * The v2 hero on spaces/home.php uses `.bn-sh-hero__*` above.
+ * These three sub-page hero classes will migrate when those templates
+ * pick up the section-head + hero pattern.
+ * ──────────────────────────────────────────────────────────────────── */
+
+.bn-sh-header {
+	background: var(--bn-surface);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-lg);
+	overflow: hidden;
+	margin-block-end: var(--bn-s4);
+}
+
+.bn-sh-cover {
+	height: 120px;
+	background: linear-gradient(135deg, var(--bn-accent-100), var(--bn-sunken));
+	position: relative;
+	overflow: hidden;
+}
+
+.bn-sh-cover img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+.bn-sh-inner {
+	padding-block: 0 var(--bn-s4);
+	padding-inline: var(--bn-s6);
+	display: flex;
+	align-items: flex-end;
+	gap: var(--bn-s4);
+	flex-wrap: wrap;
+	/*
+	 * Paint above the cover.
+	 *
+	 * .bn-sh-avatar is pulled up into the cover by a negative margin, but
+	 * .bn-sh-cover is `position: relative` while this row was static — and a
+	 * positioned element paints above non-positioned content regardless of DOM
+	 * order. So the cover image covered the avatar's top ~13px: hit-testing at
+	 * the avatar's top-centre returned the cover <img>, not the avatar.
+	 *
+	 * Making this row positioned puts it in the same paint tier as the cover,
+	 * where it wins on DOM order (it comes after). No z-index needed — adding
+	 * one here would start a ladder every sibling then has to join.
+	 */
+	position: relative;
+}
+
+.bn-sh-avatar {
+	width: 80px;
+	height: 80px;
+	border-radius: var(--bn-r-lg);
+	background: var(--bn-surface);
+	/* Half-overlap the cover with the same token the public hero emblem uses
+	   (.bn-sh-hero__emblem → -s12). At -s8 this avatar barely touched the
+	   banner while the hero straddled it — the two headers are meant to read
+	   as the same component.
+	   align-self: flex-start is load-bearing: the row is align-items:flex-end,
+	   under which a negative top margin only shrinks this item's line
+	   contribution and the visible overlap becomes a function of the INFO
+	   block's height (measured: 19px of the 48 showed). Anchoring the avatar
+	   to the row's top makes the pull-up exactly -s12 regardless of what its
+	   siblings measure. */
+	align-self: flex-start;
+	margin-block-start: calc(-1 * var(--bn-s12));
+	border: 4px solid var(--bn-surface);
+	box-shadow: var(--bn-shadow-md);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+	color: var(--bn-accent);
+}
+
+.bn-sh-avatar svg {
+	width: 36px;
+	height: 36px;
+}
+
+.bn-sh-info {
+	flex: 1;
+	padding-block-start: var(--bn-s2);
+	min-width: 0;
+}
+
+.bn-sh-name {
+	font-family: var(--bn-font-display);
+	font-size: var(--bn-text-2xl);
+	font-weight: var(--bn-fw-extrabold);
+	letter-spacing: var(--bn-ls-tight);
+	margin: 0 0 var(--bn-s1);
+	color: var(--bn-ink);
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	flex-wrap: wrap;
+}
+
+.bn-sh-meta {
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-2);
+	display: flex;
+	gap: var(--bn-s3);
+	flex-wrap: wrap;
+}
+
+.bn-sh-meta svg {
+	width: 14px;
+	height: 14px;
+	vertical-align: text-bottom;
+}
+
+.bn-sh-actions {
+	display: flex;
+	gap: var(--bn-s2);
+	padding-block-start: var(--bn-s4);
+	align-items: center;
+	flex-wrap: wrap;
+}
+
+.bn-sh-actions svg {
+	width: 14px;
+	height: 14px;
+}
+
+.bn-tabs.bn-sh-tabs {
+	padding-inline: var(--bn-s6);
+	border-block-start: 1px solid var(--bn-line);
+}
+
+/* ── Space media tab ─────────────────────────────────────────────────── */
+
+.bn-space-media-grid {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: var(--bn-s2);
+}
+
+.bn-space-media-item {
+	aspect-ratio: 1;
+	border-radius: var(--bn-r-md);
+	overflow: hidden;
+	background: var(--bn-sunken);
+}
+
+.bn-space-media-item a {
+	display: block;
+	width: 100%;
+	height: 100%;
+}
+
+.bn-space-media-item img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	transition: transform var(--bn-dur) var(--bn-ease);
+}
+
+.bn-space-media-item:hover img {
+	transform: scale(1.03);
+}
+
+/* .bn-empty-state is defined ONCE in bn-base.css. No copy here. */
+
+/* ── Space members tab ───────────────────────────────────────────────── */
+
+.bn-space-members {
+	font-family: var(--bn-font-ui);
+	font-size: var(--bn-text-base);
+	color: var(--bn-ink);
+	line-height: var(--bn-leading-body);
+	/* Box model (flex column + gap + outer padding) comes from the shared
+	   .bn-sh-stack the space home tab uses, so the hero + content sit at the
+	   SAME width and rhythm on every space tab. The old per-tab padding-inline
+	   here inset the hero ~s5 narrower than Feed, which read as the layout
+	   "jumping" between tabs. */
+	min-block-size: 60vh;
+}
+
+.bn-space-members__filter {
+	padding: var(--bn-s4);
+	margin-block: var(--bn-s4);
+}
+
+.bn-space-members__filter-form {
+	display: flex;
+	gap: var(--bn-s2);
+	align-items: center;
+	flex-wrap: wrap;
+}
+
+.bn-space-members__filter-search {
+	flex: 1 1 220px;
+	/* Override the .bn-input width:100% base so the flex-basis wins and the
+	   field shares the row instead of forcing each control onto its own line. */
+	inline-size: auto;
+	min-inline-size: 0;
+}
+
+.bn-space-members__filter-role {
+	flex: 0 0 auto;
+	/* Same: override the .bn-select width:100% base. */
+	inline-size: auto;
+	min-inline-size: 160px;
+}
+
+.bn-space-members__grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+	gap: var(--bn-s4);
+}
+
+.bn-space-members__empty {
+	grid-column: 1 / -1;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	text-align: center;
+	gap: var(--bn-s2);
+	padding: var(--bn-s10) var(--bn-s6);
+	color: var(--bn-ink-2);
+}
+
+.bn-space-members__empty-icon {
+	display: inline-flex;
+	color: var(--bn-ink-3);
+}
+
+.bn-space-members__empty-icon svg {
+	inline-size: 40px;
+	block-size: 40px;
+}
+
+.bn-space-members__empty-title {
+	font-weight: var(--bn-fw-bold);
+	font-size: var(--bn-text-lg);
+	color: var(--bn-ink);
+}
+
+.bn-space-members__empty-desc {
+	font-size: var(--bn-text-sm);
+	margin: 0;
+	max-inline-size: 46ch;
+}
+
+/* Locked-roster state (private/secret space, non-member): the CTA back to the
+   space, where the Join / Request to join action lives. */
+.bn-space-members__empty-actions {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	gap: var(--bn-s2);
+	margin-block-start: var(--bn-s2);
+}
+
+.bn-space-members__pagination {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	gap: var(--bn-s1);
+	margin-block-start: var(--bn-s6);
+	flex-wrap: wrap;
+}
+
+/* .bn-member-list is gone entirely, not relocated. It lived here — a member
+ * class in the spaces stylesheet, resolving only because bn-spaces depends on
+ * bn-members — and was moved to bn-members.css on 2026-08-09. It then turned out
+ * that the Member Directory block's bespoke list was its ONLY emitter, and that
+ * block now renders the shared .bn-md-card instead, so the class has no markup
+ * left anywhere (Basecamp 10182506250 secondary finding, 10184505772).
+ *
+ * .bn-pagination is the shared component — defined once in bn-base.css. */
+
+/* ── Space settings ─────────────────────────────────────────────────────
+ * Composes from v2 primitives: .bn-card panels, .bn-tabs/.bn-tab for nav,
+ * .bn-input/.bn-textarea/.bn-select, .bn-toggle-row + form-controlled
+ * checkbox bridged to a .bn-toggle visual track via :checked ~ .
+ * ──────────────────────────────────────────────────────────────────── */
+
+.bn-space-settings__shell {
+	max-inline-size: 900px;
+	margin: 0 auto;
+	padding-block: var(--bn-s5);
+	padding-inline: var(--bn-s5);
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s4);
+}
+
+.bn-space-settings__notice {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	padding: var(--bn-s3) var(--bn-s4);
+	font-size: var(--bn-text-sm);
+	font-weight: var(--bn-fw-semibold);
+}
+
+.bn-space-settings__notice[data-tone="success"] {
+	background: var(--bn-success-bg);
+	color: var(--bn-success);
+	border-color: transparent;
+}
+
+.bn-space-settings__notice[data-tone="danger"] {
+	background: var(--bn-danger-bg);
+	color: var(--bn-danger);
+	border-color: transparent;
+}
+
+.bn-space-settings__notice-icon {
+	display: inline-flex;
+}
+
+.bn-space-settings__notice-icon svg {
+	inline-size: 18px;
+	block-size: 18px;
+}
+
+.bn-space-settings__panel {
+	padding: var(--bn-s5);
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s4);
+}
+
+.bn-space-settings__panel-head {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s1);
+}
+
+.bn-space-settings__panel-title {
+	font-family: var(--bn-font-display);
+	font-size: var(--bn-text-lg);
+	font-weight: var(--bn-fw-bold);
+	color: var(--bn-ink);
+	margin: 0;
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2);
+}
+
+.bn-space-settings__panel-title--danger {
+	color: var(--bn-danger);
+}
+
+.bn-space-settings__panel-desc {
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink-2);
+	margin: 0;
+}
+
+.bn-space-settings__field {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s2);
+}
+
+.bn-space-settings__field label {
+	font-size: var(--bn-text-sm);
+	font-weight: var(--bn-fw-semibold);
+	color: var(--bn-ink);
+}
+
+/* Sub-option block (e.g. auto-join member-type filter under its toggle). */
+.bn-space-settings__field--sub {
+	margin-inline-start: var(--bn-s4);
+	padding-inline-start: var(--bn-s4);
+	border-inline-start: 2px solid var(--bn-line);
+}
+
+/* Checkbox grid — member-type picker and similar multi-select rows. */
+.bn-checkbox-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+	gap: var(--bn-s2);
+}
+
+.bn-checkbox-row {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	font-size: var(--bn-text-sm);
+	font-weight: var(--bn-fw-normal);
+	color: var(--bn-ink-2);
+	cursor: pointer;
+}
+
+.bn-checkbox-row input {
+	flex: none;
+}
+
+/* Custom-fields panel — "Show as a tab" promotion toggle (eligible fields). */
+.bn-space-settings__tab-toggle {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	margin-block-start: var(--bn-s1);
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink-2);
+	cursor: pointer;
+}
+
+/* Custom-fields panel — per-field validation error + required marker. */
+.bn-space-settings__field-error {
+	font-size: var(--bn-text-xs);
+	color: var(--bn-danger);
+	margin: 0;
+}
+
+.bn-space-settings__required {
+	color: var(--bn-danger);
+	margin-inline-start: 2px;
+}
+
+.bn-space-settings__hint {
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+	margin: 0;
+}
+
+.bn-space-settings__upload {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s4);
+}
+
+.bn-space-settings__upload-current {
+	inline-size: 72px;
+	block-size: 72px;
+	border-radius: var(--bn-r-lg);
+	background: var(--bn-accent-100);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border: 1px solid var(--bn-line);
+	flex-shrink: 0;
+	color: var(--bn-accent);
+}
+
+.bn-space-settings__upload-current svg {
+	inline-size: 28px;
+	block-size: 28px;
+}
+
+.bn-space-settings__upload-actions {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s1);
+}
+
+.bn-space-settings__cover {
+	position: relative;
+	block-size: 96px;
+	border-radius: var(--bn-r-md);
+	border: 2px dashed var(--bn-line);
+	background: var(--bn-sunken);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: var(--bn-s2);
+	color: var(--bn-ink-2);
+	font-size: var(--bn-text-sm);
+	font-weight: var(--bn-fw-semibold);
+	cursor: pointer;
+	transition: border-color var(--bn-dur-fast) var(--bn-ease), color var(--bn-dur-fast) var(--bn-ease);
+}
+
+/*
+ * Cover upload in flight. spaces/store.js toggles aria-busy on this drop-zone
+ * while the POST /spaces/{id}/cover runs, but there was no rule targeting it —
+ * so the busy state was announced to assistive tech yet invisible to sighted
+ * users (no spinner, no dim). Render a centered spinner over a dim scrim and
+ * block re-clicks (pointer-events) so the upload cannot be double-submitted.
+ * Reuses the global bn-spin keyframes from bn-base.css.
+ */
+.bn-space-settings__cover[aria-busy="true"] {
+	pointer-events: none;
+}
+
+.bn-space-settings__cover[aria-busy="true"]::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	border-radius: inherit;
+	background: color-mix(in srgb, var(--bn-sunken) 70%, transparent);
+}
+
+.bn-space-settings__cover[aria-busy="true"]::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	margin: auto;
+	inline-size: var(--bn-s6);
+	block-size: var(--bn-s6);
+	border: 2px solid var(--bn-line);
+	border-top-color: var(--bn-accent);
+	border-radius: var(--bn-r-full);
+	animation: bn-spin 0.6s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.bn-space-settings__cover[aria-busy="true"]::after { animation: none; }
+}
+
+.bn-space-settings__cover:hover,
+.bn-space-settings__cover:focus-visible {
+	border-color: var(--bn-accent);
+	color: var(--bn-accent);
+	outline: 2px solid transparent;
+	outline-offset: 2px;
+}
+
+.bn-space-settings__cover.has-image {
+	border-style: solid;
+	border-color: var(--bn-line);
+	block-size: 180px;
+}
+
+.bn-space-settings__cover-actions {
+	display: inline-flex;
+	gap: var(--bn-s2);
+	margin-block-start: var(--bn-s2);
+}
+
+.bn-space-settings__cover-empty[hidden] {
+	display: none !important;
+}
+
+.bn-space-settings__cover-input {
+	position: absolute;
+	inline-size: 1px;
+	block-size: 1px;
+	clip: rect(0 0 0 0);
+	overflow: hidden;
+}
+
+.bn-space-settings__inline-select {
+	margin-block-start: var(--bn-s2);
+	max-inline-size: 320px;
+}
+
+/* Discussion-link typeahead picker (Integrations panel). */
+.bn-space-settings__discussion-picker {
+	position: relative;
+	margin-block-start: var(--bn-s2);
+	max-inline-size: 420px;
+}
+
+.bn-space-settings__discussion-picker-label {
+	display: block;
+	margin-block-end: var(--bn-s1);
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+}
+
+.bn-space-settings__discussion-search {
+	inline-size: 100%;
+	padding-inline-end: var(--bn-s6);
+}
+
+.bn-space-settings__discussion-clear {
+	position: absolute;
+	inset-block-start: var(--bn-s2);
+	inset-inline-end: var(--bn-s2);
+	inline-size: 24px;
+	block-size: 24px;
+	border: 0;
+	border-radius: var(--bn-r-md);
+	background: transparent;
+	color: var(--bn-ink-3);
+	font-size: var(--bn-text-lg);
+	line-height: 1;
+	cursor: pointer;
+}
+
+.bn-space-settings__discussion-clear:hover {
+	background: var(--bn-accent-100);
+	color: var(--bn-ink-2);
+}
+
+.bn-space-settings__discussion-results {
+	position: absolute;
+	inset-inline: 0;
+	inset-block-start: calc(100% + var(--bn-s1));
+	z-index: 20;
+	margin: 0;
+	padding: var(--bn-s1);
+	list-style: none;
+	background: var(--bn-surface);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-lg);
+	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+	max-block-size: 260px;
+	overflow-y: auto;
+}
+
+.bn-space-settings__discussion-result {
+	padding: var(--bn-s2) var(--bn-s3);
+	border-radius: var(--bn-r-md);
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink-2);
+	cursor: pointer;
+}
+
+.bn-space-settings__discussion-result:hover,
+.bn-space-settings__discussion-result:focus {
+	background: var(--bn-accent-100);
+	outline: 2px solid transparent;
+	outline-offset: 2px;
+}
+
+/* Toggle shell — checkbox-input bridged to a .bn-toggle visual track. */
+.bn-space-settings__toggle-shell {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	flex-shrink: 0;
+	cursor: pointer;
+}
+
+.bn-space-settings__toggle-input {
+	position: absolute;
+	inline-size: 100%;
+	block-size: 100%;
+	opacity: 0;
+	cursor: pointer;
+	margin: 0;
+}
+
+.bn-space-settings__toggle-input:focus-visible + .bn-toggle {
+	box-shadow: var(--bn-ring);
+}
+
+.bn-space-settings__toggle-input:checked + .bn-toggle {
+	background: var(--bn-accent);
+}
+
+.bn-space-settings__toggle-input:checked + .bn-toggle::before {
+	transform: translateX(var(--bn-toggle-travel, 18px));
+}
+
+[dir="rtl"] .bn-space-settings__toggle-input:checked + .bn-toggle::before {
+	transform: translateX(calc(-1 * var(--bn-toggle-travel, 18px)));
+}
+
+/* Disabled toggle — a moderator sees the owner-only Integrations controls but may
+   not change them. Without this the disabled track renders identically to a live
+   one: same accent fill, same cursor, no hint that it will not respond. A control
+   that LOOKS interactive and silently is not is the same dead-control problem we
+   are removing, just wearing a different coat. Say it visually. */
+.bn-space-settings__toggle-input:disabled,
+.bn-space-settings__toggle-input:disabled + .bn-toggle {
+	cursor: not-allowed;
+}
+
+.bn-space-settings__toggle-input:disabled + .bn-toggle {
+	opacity: 0.45;
+}
+
+.bn-space-settings__toggle-shell:has( .bn-space-settings__toggle-input:disabled ) {
+	cursor: not-allowed;
+}
+
+/* The read-only explanation shown to a non-owner above a locked panel. */
+.bn-space-settings__hint--locked {
+	display: flex;
+	gap: var(--bn-space-2, 0.5rem);
+	margin-block-end: var(--bn-space-4, 1rem);
+	padding: var(--bn-space-3, 0.75rem);
+	border: 1px solid var(--bn-border);
+	border-radius: var(--bn-r-md);
+	background: var(--bn-surface-2, transparent);
+	color: var(--bn-text-muted);
+}
+
+.bn-space-settings__save-row {
+	display: flex;
+	justify-content: flex-end;
+	gap: var(--bn-s2);
+	padding-block: var(--bn-s2);
+}
+
+.bn-space-settings__empty {
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink-3);
+	margin: 0;
+}
+
+/* Members sub-tab on settings. */
+.bn-space-settings__member-list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s2);
+}
+
+.bn-space-settings__member-row {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s3);
+	padding: var(--bn-s2);
+	border-radius: var(--bn-r-md);
+	background: var(--bn-sunken);
+	flex-wrap: wrap;
+}
+
+.bn-space-settings__member-info {
+	flex: 1;
+	min-inline-size: 0;
+}
+
+.bn-space-settings__member-name {
+	font-weight: var(--bn-fw-semibold);
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink);
+	margin: 0;
+}
+
+.bn-space-settings__member-meta {
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+	margin: 0;
+}
+
+.bn-space-settings__member-actions {
+	display: flex;
+	gap: var(--bn-s1);
+	flex-wrap: wrap;
+}
+
+.bn-space-settings__invite-row {
+	display: flex;
+	gap: var(--bn-s2);
+	flex-wrap: wrap;
+	align-items: center;
+}
+
+.bn-space-settings__invite-row .bn-input {
+	flex: 1 1 220px;
+	min-inline-size: 0;
+}
+
+/* Danger zone */
+.bn-space-settings__danger-list {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s3);
+}
+
+.bn-space-settings__danger-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--bn-s4);
+	padding: var(--bn-s4);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-md);
+	background: var(--bn-canvas);
+	flex-wrap: wrap;
+}
+
+.bn-space-settings__danger-title {
+	font-weight: var(--bn-fw-semibold);
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink);
+}
+
+.bn-space-settings__danger-desc {
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+	max-inline-size: 540px;
+	margin-block-start: 2px;
+}
+
+/* ── Space moderation ───────────────────────────────────────────────────
+ * Composes from v2 primitives: .bn-card sections, .bn-tabs/.bn-tab for
+ * filter chrome, .bn-stat tiles, .bn-badge tones, .bn-avatar + .bn-btn.
+ * ──────────────────────────────────────────────────────────────────── */
+
+.bn-space-mod__shell {
+	max-inline-size: 1060px;
+	margin: 0 auto;
+	padding-block: var(--bn-s5);
+	padding-inline: var(--bn-s5);
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s5);
+}
+
+.bn-space-mod__stats {
+	grid-template-columns: repeat(4, 1fr);
+}
+
+.bn-space-mod__content {
+	display: grid;
+	grid-template-columns: 1fr 280px;
+	gap: var(--bn-s5);
+	align-items: flex-start;
+}
+
+.bn-space-mod__main {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s3);
+	min-inline-size: 0;
+}
+
+.bn-space-mod__aside {
+	min-inline-size: 0;
+}
+
+/* Report card */
+.bn-space-mod__report {
+	padding: 0;
+	border-inline-start-width: 4px;
+}
+
+.bn-space-mod__report[data-tone="danger"] { border-inline-start-color: var(--bn-danger); }
+.bn-space-mod__report[data-tone="warn"]   { border-inline-start-color: var(--bn-warn); }
+.bn-space-mod__report[data-tone="info"]   { border-inline-start-color: var(--bn-info); }
+
+.bn-space-mod__report-head {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s3);
+	padding: var(--bn-s3) var(--bn-s4);
+	background: var(--bn-sunken);
+	border-block-end: 1px solid var(--bn-line-faint);
+	flex-wrap: wrap;
+}
+
+.bn-space-mod__report-who {
+	flex: 1;
+	min-inline-size: 0;
+}
+
+.bn-space-mod__report-name {
+	font-weight: var(--bn-fw-semibold);
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink);
+}
+
+.bn-space-mod__report-meta {
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+	display: inline-flex;
+	gap: var(--bn-s1);
+	flex-wrap: wrap;
+}
+
+.bn-space-mod__report-body {
+	padding: var(--bn-s4);
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s3);
+}
+
+.bn-space-mod__report-quote {
+	background: var(--bn-canvas);
+	border-inline-start: 3px solid var(--bn-line);
+	border-radius: 0 var(--bn-r-sm) var(--bn-r-sm) 0;
+	padding: var(--bn-s2) var(--bn-s3);
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink-2);
+	line-height: var(--bn-leading-snug);
+	margin: 0;
+}
+
+.bn-space-mod__report-summary {
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-2);
+	margin: 0;
+}
+
+.bn-space-mod__report-actions {
+	display: flex;
+	gap: var(--bn-s2);
+	flex-wrap: wrap;
+}
+
+.bn-space-mod__report-note {
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+	margin: 0;
+	padding-block-start: var(--bn-s2);
+	border-block-start: 1px solid var(--bn-line-faint);
+}
+
+/* List card (pending members, activity log) */
+.bn-space-mod__list {
+	padding: 0;
+}
+
+.bn-space-mod__list-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--bn-s2);
+	padding: var(--bn-s3) var(--bn-s4);
+	border-block-end: 1px solid var(--bn-line-faint);
+	flex-wrap: wrap;
+}
+
+.bn-space-mod__list-title {
+	font-family: var(--bn-font-display);
+	font-size: var(--bn-text-md);
+	font-weight: var(--bn-fw-bold);
+	color: var(--bn-ink);
+	margin: 0;
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-s2);
+}
+
+.bn-space-mod__pending-list,
+.bn-space-mod__log-list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.bn-space-mod__pending-row {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s3);
+	padding: var(--bn-s3) var(--bn-s4);
+	border-block-end: 1px solid var(--bn-line-faint);
+	flex-wrap: wrap;
+}
+
+.bn-space-mod__pending-row:last-child {
+	border-block-end: none;
+}
+
+.bn-space-mod__pending-info {
+	flex: 1;
+	min-inline-size: 0;
+}
+
+.bn-space-mod__pending-name {
+	font-weight: var(--bn-fw-semibold);
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink);
+}
+
+.bn-space-mod__pending-meta {
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+}
+
+.bn-space-mod__pending-actions {
+	display: flex;
+	gap: var(--bn-s2);
+}
+
+.bn-space-mod__log-row {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s3);
+	padding: var(--bn-s2) var(--bn-s4);
+	font-size: var(--bn-text-xs);
+	border-block-end: 1px solid var(--bn-line-faint);
+}
+
+.bn-space-mod__log-row:last-child {
+	border-block-end: none;
+}
+
+.bn-space-mod__log-icon {
+	display: inline-flex;
+	color: var(--bn-ink-3);
+	flex-shrink: 0;
+}
+
+.bn-space-mod__log-icon svg {
+	inline-size: 16px;
+	block-size: 16px;
+}
+
+.bn-space-mod__log-desc {
+	flex: 1;
+	color: var(--bn-ink-2);
+	line-height: var(--bn-leading-snug);
+}
+
+.bn-space-mod__log-actor,
+.bn-space-mod__log-time {
+	color: var(--bn-ink-3);
+	white-space: nowrap;
+	flex-shrink: 0;
+}
+
+/* Empty state */
+.bn-space-mod__empty {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	text-align: center;
+	gap: var(--bn-s2);
+	padding: var(--bn-s8) var(--bn-s6);
+	color: var(--bn-ink-2);
+}
+
+.bn-space-mod__empty-icon {
+	display: inline-flex;
+	color: var(--bn-ink-3);
+}
+
+.bn-space-mod__empty-icon svg {
+	inline-size: 40px;
+	block-size: 40px;
+}
+
+.bn-space-mod__empty-title {
+	font-weight: var(--bn-fw-bold);
+	font-size: var(--bn-text-lg);
+	color: var(--bn-ink);
+	margin: 0;
+}
+
+.bn-space-mod__empty-desc {
+	font-size: var(--bn-text-sm);
+	margin: 0;
+}
+
+/* Scope sidebar */
+.bn-space-mod__scope {
+	padding: 0;
+	position: sticky;
+	inset-block-start: var(--bn-s5);
+}
+
+.bn-space-mod__scope-head {
+	background: var(--bn-accent-100);
+	color: var(--bn-accent-700);
+	padding: var(--bn-s3) var(--bn-s4);
+	border-block-end: 1px solid var(--bn-line);
+	font-weight: var(--bn-fw-bold);
+	font-size: var(--bn-text-sm);
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2);
+}
+
+.bn-space-mod__scope-list {
+	list-style: none;
+	margin: 0;
+	padding: var(--bn-s3) var(--bn-s4);
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s2);
+}
+
+.bn-space-mod__scope-item {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--bn-s2);
+	font-size: var(--bn-text-xs);
+	line-height: var(--bn-leading-snug);
+	color: var(--bn-ink-2);
+}
+
+.bn-space-mod__scope-icon {
+	flex-shrink: 0;
+	display: inline-flex;
+	margin-block-start: 1px;
+}
+
+.bn-space-mod__scope-icon svg {
+	inline-size: 14px;
+	block-size: 14px;
+}
+
+.bn-space-mod__scope-icon--ok { color: var(--bn-success); }
+.bn-space-mod__scope-icon--no { color: var(--bn-danger); }
+
+.bn-space-mod__scope-note {
+	color: var(--bn-ink-3);
+	margin-inline-start: var(--bn-s1);
+}
+
+.bn-space-mod__scope-foot {
+	padding: var(--bn-s3) var(--bn-s4);
+	border-block-start: 1px solid var(--bn-line);
+	background: var(--bn-canvas);
+}
+
+.bn-space-mod__scope-link {
+	font-size: var(--bn-text-xs);
+	font-weight: var(--bn-fw-semibold);
+	color: var(--bn-accent);
+	text-decoration: none;
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-s1);
+}
+
+.bn-space-mod__scope-link:hover,
+.bn-space-mod__scope-link:focus-visible {
+	text-decoration: underline;
+	outline: 2px solid transparent;
+	outline-offset: 2px;
+}
+
+.bn-space-mod__scope-link svg {
+	inline-size: 12px;
+	block-size: 12px;
+}
+
+
+/* ── Reduced motion ──────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+	.bn-sd-card,
+	.bn-space-media-item img,
+	.bn-tab.bn-sd-chip,
+	.bn-sd-side-row,
+	.bn-space-settings__cover {
+		transition: none;
+	}
+}
+
+/* ── Responsive ────────────────────────────────────────────────────────
+ * Desktop 1440: 3-col directory grid + sidebar (sidebar managed by shell).
+ * iPad 820:     2-col grid (shell drops sidebar at <= 1024px).
+ * Mobile 390:   1-col, hero stacks vertical (shell drops rail at <= 768px).
+ * ──────────────────────────────────────────────────────────────────── */
+
+@media (max-width: 1024px) {
+	.bn-sd-grid {
+		grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+	}
+
+	.bn-sh-hero__stats.bn-stat-grid {
+		grid-template-columns: repeat(2, 1fr);
+	}
+
+	.bn-space-mod__content {
+		grid-template-columns: 1fr;
+	}
+
+	.bn-space-mod__scope {
+		position: static;
+	}
+
+	.bn-space-mod__stats {
+		grid-template-columns: repeat(2, 1fr);
+	}
+}
+
+@media (max-width: 768px) {
+	.bn-sd-grid {
+		grid-template-columns: 1fr;
+	}
+
+	.bn-sh-hero__cover {
+		height: 120px;
+	}
+
+	.bn-sh-hero__head {
+		padding-inline: var(--bn-s4);
+		flex-direction: column;
+		align-items: flex-start;
+		gap: var(--bn-s3);
+	}
+
+	.bn-sh-hero__emblem {
+		width: 72px;
+		height: 72px;
+		margin-block-start: calc(-1 * var(--bn-s6));
+	}
+
+	.bn-sh-hero__emblem svg {
+		width: 28px;
+		height: 28px;
+	}
+
+	.bn-sh-hero__name {
+		font-size: var(--bn-text-xl);
+	}
+
+	.bn-sh-hero__actions {
+		width: 100%;
+	}
+
+	.bn-sh-hero__stats.bn-stat-grid {
+		padding-inline: var(--bn-s4);
+		grid-template-columns: repeat(2, 1fr);
+		gap: var(--bn-s2);
+	}
+
+	.bn-tabs.bn-sh-hero__tabs {
+		padding-inline: var(--bn-s4);
+	}
+
+	.bn-space-settings__shell {
+		padding-inline: var(--bn-s3);
+	}
+
+	.bn-space-settings__danger-row,
+	.bn-space-settings__member-row {
+		align-items: flex-start;
+	}
+
+	.bn-space-mod__shell {
+		padding-inline: var(--bn-s3);
+	}
+}
+
+@media (max-width: 640px) {
+	.bn-sh-hero__cover {
+		height: 100px;
+	}
+
+	.bn-sh-hero__head {
+		padding-inline: var(--bn-s3);
+	}
+
+	.bn-sh-hero__emblem {
+		width: 60px;
+		height: 60px;
+		margin-block-start: calc(-1 * var(--bn-s6));
+	}
+
+	.bn-sh-hero__emblem svg {
+		width: 24px;
+		height: 24px;
+	}
+
+	.bn-tabs.bn-sh-hero__tabs {
+		padding-inline: var(--bn-s3);
+	}
+
+	.bn-space-members__grid {
+		grid-template-columns: repeat(2, 1fr);
+		gap: var(--bn-s3);
+	}
+
+	.bn-space-mod__stats {
+		grid-template-columns: repeat(2, 1fr);
+		gap: var(--bn-s2);
+	}
+
+	.bn-space-mod__report-actions,
+	.bn-space-settings__member-actions {
+		gap: var(--bn-s1);
+	}
+
+	.bn-space-settings__invite-row .bn-input {
+		flex: 1 1 100%;
+	}
+}
+
+/* ── Spaces directory: reactive filter + sort popover + skeleton ─────── */
+
+.bn-sd-filter-row {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	flex-wrap: wrap;
+}
+
+.bn-sd-filter-row .bn-sd-chips {
+	flex: 1 1 auto;
+}
+
+.bn-filter-strip__status {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-s2);
+}
+
+.bn-filter-strip__dot {
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	background: var(--bn-accent, #5b8def);
+	animation: bn-sd-pulse 1s ease-in-out infinite;
+}
+
+@keyframes bn-sd-pulse {
+	0%, 100% { opacity: 0.4; }
+	50%      { opacity: 1; }
+}
+
+/* Sort chip-button + popover */
+.bn-sd-sort {
+	position: relative;
+}
+
+.bn-sd-sort__trigger {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-s1);
+}
+
+.bn-sd-sort__list {
+	position: absolute;
+	inset-inline-end: 0;
+	top: calc(100% + var(--bn-s1));
+	min-width: 220px;
+	background: var(--bn-surface, #fff);
+	border: 1px solid var(--bn-border, #e5e7eb);
+	border-radius: var(--bn-r-md);
+	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+	padding: var(--bn-s1) 0;
+	margin: 0;
+	list-style: none;
+	z-index: 40;
+}
+
+.bn-sd-sort__option {
+	display: block;
+	width: 100%;
+	text-align: start;
+	background: none;
+	border: 0;
+	padding: var(--bn-s2) var(--bn-s3);
+	font: inherit;
+	color: inherit;
+	cursor: pointer;
+}
+
+.bn-sd-sort__option:hover,
+.bn-sd-sort__option:focus-visible {
+	background: var(--bn-surface-soft, #f3f4f6);
+	outline: 2px solid transparent;
+	outline-offset: 2px;
+}
+
+.bn-sd-sort__option[aria-selected="true"] {
+	font-weight: 600;
+	color: var(--bn-accent, #5b8def);
+}
+
+/* Skeleton */
+.bn-sd-loading {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+	gap: var(--bn-s3);
+}
+
+.bn-sd-skeleton {
+	background: var(--bn-surface, #fff);
+	border: 1px solid var(--bn-border, #e5e7eb);
+	border-radius: var(--bn-r-md);
+	overflow: hidden;
+	padding-bottom: var(--bn-s3);
+}
+
+.bn-sd-skeleton__cover {
+	height: 80px;
+	background: linear-gradient(90deg, var(--bn-surface-soft, #f3f4f6) 0%, #e5e7eb 50%, var(--bn-surface-soft, #f3f4f6) 100%);
+	background-size: 200% 100%;
+	animation: bn-sd-shimmer 1.4s linear infinite;
+}
+
+.bn-sd-skeleton__line {
+	height: 12px;
+	margin: var(--bn-s3) var(--bn-s3) var(--bn-s2);
+	border-radius: 4px;
+	background: linear-gradient(90deg, var(--bn-surface-soft, #f3f4f6) 0%, #e5e7eb 50%, var(--bn-surface-soft, #f3f4f6) 100%);
+	background-size: 200% 100%;
+	animation: bn-sd-shimmer 1.4s linear infinite;
+}
+
+.bn-sd-skeleton__line--short {
+	width: 50%;
+}
+
+@keyframes bn-sd-shimmer {
+	0%   { background-position: 200% 0; }
+	100% { background-position: -200% 0; }
+}
+
+.bn-sd-error {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: var(--bn-s2);
+	padding: var(--bn-s5);
+	border: 1px solid var(--bn-danger-border, #fecaca);
+	background: var(--bn-danger-bg, #fef2f2);
+	border-radius: var(--bn-r-md);
+}
+
+.bn-sd-empty {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: var(--bn-s3);
+}
+
+/* Create-space modal form */
+.bn-create-space-form {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s3);
+}
+
+.bn-create-space-form__field {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s1);
+}
+
+/* Fixed-parent field (sub-space creation) — a read-only label + a chip showing
+   the locked parent, in place of the parent-picker select. */
+.bn-create-space-form__label-text {
+	font-size: var(--bn-text-sm);
+	font-weight: var(--bn-fw-semibold);
+	color: var(--bn-ink-2);
+}
+
+.bn-create-space-form__fixed-parent {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	margin: 0;
+	padding: var(--bn-s2) var(--bn-s3);
+	background: var(--bn-sunken);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-md);
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink);
+	align-self: flex-start;
+	max-width: 100%;
+}
+
+.bn-create-space-form__fixed-parent svg {
+	width: 16px;
+	height: 16px;
+	color: var(--bn-ink-3);
+	flex-shrink: 0;
+}
+
+.bn-create-space-form__fixed-parent strong {
+	font-weight: var(--bn-fw-semibold);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.bn-create-space-form__hint {
+	font-size: 12px;
+	color: var(--bn-ink-3);
+	margin: 0;
+}
+
+.bn-create-space-form__error {
+	font-size: 12px;
+	color: var(--bn-danger, #b91c1c);
+	margin: 0;
+}
+
+.bn-create-space-form__error--global {
+	padding: var(--bn-s2) var(--bn-s3);
+	background: var(--bn-danger-bg, #fef2f2);
+	border: 1px solid var(--bn-danger-border, #fecaca);
+	border-radius: var(--bn-r-sm);
+}
+
+/* ── Space home: notif popover, members grid, moderation ─────────────── */
+
+.bn-sh-notif {
+	position: relative;
+}
+
+.bn-sh-notif__list {
+	position: absolute;
+	inset-inline-end: 0;
+	top: calc(100% + var(--bn-s1));
+	min-width: 200px;
+	background: var(--bn-surface, #fff);
+	border: 1px solid var(--bn-border, #e5e7eb);
+	border-radius: var(--bn-r-md);
+	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+	padding: var(--bn-s1) 0;
+	margin: 0;
+	list-style: none;
+	z-index: 40;
+}
+
+.bn-sh-notif__option {
+	display: block;
+	width: 100%;
+	text-align: start;
+	background: none;
+	border: 0;
+	padding: var(--bn-s2) var(--bn-s3);
+	font: inherit;
+	color: inherit;
+	cursor: pointer;
+}
+
+.bn-sh-notif__option:hover,
+.bn-sh-notif__option:focus-visible {
+	background: var(--bn-surface-soft, #f3f4f6);
+	outline: 2px solid transparent;
+	outline-offset: 2px;
+}
+
+.bn-sh-notif__option[aria-selected="true"] {
+	font-weight: 600;
+	color: var(--bn-accent, #5b8def);
+}
+
+.bn-sh-members__head {
+	display: flex;
+	justify-content: space-between;
+	align-items: baseline;
+	margin-bottom: var(--bn-s3);
+}
+
+.bn-sh-members__filter-chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--bn-s2);
+	margin-block-end: var(--bn-s3);
+	/* These are pill chips, not an underline tab strip — drop the .bn-tabs
+	 * bottom border so the line doesn't cut through the rounded chips. */
+	border-bottom: 0;
+}
+
+.bn-sh-members__grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+	gap: var(--bn-s3);
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.bn-sh-members__card {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: var(--bn-s2);
+	padding: var(--bn-s3);
+	border: 1px solid var(--bn-border, #e5e7eb);
+	border-radius: var(--bn-r-md);
+	background: var(--bn-surface, #fff);
+}
+
+.bn-sh-members__info {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: var(--bn-s1);
+}
+
+.bn-sh-members__name {
+	font-weight: 600;
+	color: inherit;
+	text-decoration: none;
+}
+
+.bn-sh-members__actions {
+	margin-top: var(--bn-s2);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: var(--bn-s2);
+	flex-wrap: wrap;
+}
+
+.bn-sh-moderation {
+	padding: var(--bn-s4);
+}
+
+.bn-sh-moderation__stats {
+	display: flex;
+	gap: var(--bn-s3);
+	margin-top: var(--bn-s4);
+}
+
+.bn-sh-moderation__stat {
+	flex: 1 1 0;
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s1);
+	padding: var(--bn-s3) var(--bn-s4);
+	border: 1px solid var(--bn-border, #e5e7eb);
+	border-radius: var(--bn-r-md);
+	background: var(--bn-surface-soft, #f9fafb);
+	text-decoration: none;
+	transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.bn-sh-moderation__stat:hover,
+.bn-sh-moderation__stat:focus-visible {
+	border-color: var(--bn-accent, #5b8def);
+	background: var(--bn-accent-100, #eaf1fe);
+}
+
+.bn-sh-moderation__stat-num {
+	font-size: var(--bn-text-xl);
+	font-weight: 700;
+	line-height: 1.1;
+	color: var(--bn-ink);
+}
+
+.bn-sh-moderation__stat-label {
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+}
+
+@media (max-width: 640px) {
+	.bn-sh-moderation__stats {
+		flex-direction: column;
+	}
+}
+
+.bn-sh-about__desc {
+	line-height: 1.6;
+}
+
+/* ── Settings: branding upsell + transfer modal ──────────────────────── */
+
+.bn-space-settings__upsell {
+	display: flex;
+	gap: var(--bn-s3);
+	align-items: flex-start;
+	padding: var(--bn-s4);
+	border-radius: var(--bn-r-md);
+	background: color-mix(in oklab, var(--bn-accent) 6%, transparent);
+	border: 1px solid var(--bn-border, #e5e7eb);
+}
+
+.bn-space-settings__upsell-icon {
+	font-size: 24px;
+	color: var(--bn-accent, #5b8def);
+	flex-shrink: 0;
+}
+
+.bn-space-settings__upsell-title {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	margin: 0 0 var(--bn-s1);
+	font-size: 16px;
+	font-weight: 600;
+}
+
+.bn-space-settings__upsell-desc {
+	margin: 0 0 var(--bn-s3);
+	color: var(--bn-ink-3);
+}
+
+.bn-modal__error {
+	margin: var(--bn-s2) 0 0;
+	color: var(--bn-danger, #b91c1c);
+	font-size: 13px;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * Space settings — sticky save bar.
+ *
+ * Mirrors the Profile edit + Notification prefs save-bar contract: fixed to
+ * the viewport bottom, surfaces only when a form is dirty, swaps between
+ * dirty / saving / saved status pills via [data-bn-savebar-state].
+ * ────────────────────────────────────────────────────────────────────────── */
+
+.bn-space-settings__savebar {
+	position: fixed;
+	inset-block-end: 0;
+	inset-inline: 0;
+	background: var(--bn-surface);
+	border-block-start: 1px solid var(--bn-line);
+	box-shadow: var(--bn-shadow-sm);
+	padding-inline: var(--bn-s5);
+	min-height: 64px;
+	display: flex;
+	align-items: center;
+	z-index: 180;
+}
+
+.bn-space-settings__savebar[hidden] {
+	display: none !important;
+}
+
+/* Clear the fixed mobile bottom nav, exactly as the Edit-Profile save bar does.
+   This bar sits at inset-block-end:0 z-180 while .bn-mobile-nav is fixed at the
+   bottom at z-9500 <=768px, so on a phone the nav painted straight over the
+   Save/Cancel buttons and a space owner could not save their settings at all.
+   The profile save bar had been fixed for this; this one was missed — the same
+   bug, one surface later. --bn-mobile-nav-h is the nav's measured height (see
+   the shared block in bn-base.css); the fallback is pre-hydration only. */
+@media (max-width: 768px) {
+	.bn-space-settings__savebar {
+		inset-block-end: var( --bn-mobile-nav-h, calc( 60px + env( safe-area-inset-bottom, 0px ) ) );
+	}
+}
+
+.bn-space-settings__savebar-inner {
+	max-width: 1080px;
+	margin-inline: auto;
+	width: 100%;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--bn-s3);
+}
+
+.bn-space-settings__savebar-status {
+	font-size: var(--bn-text-sm);
+	font-weight: 600;
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-s1);
+}
+
+.bn-space-settings__savebar-status[hidden] {
+	display: none !important;
+}
+
+.bn-space-settings__savebar-status svg {
+	width: 14px;
+	height: 14px;
+}
+
+.bn-space-settings__savebar-status--dirty {
+	color: var(--bn-ink);
+}
+
+.bn-space-settings__savebar-status--saving {
+	color: var(--bn-ink-3);
+}
+
+.bn-space-settings__savebar-status--saved {
+	color: var(--bn-success, #047857);
+}
+
+.bn-space-settings__savebar-dot {
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	background: var(--bn-warn, #d97706);
+}
+
+.bn-space-settings__savebar-spinner {
+	width: 12px;
+	height: 12px;
+	border-radius: 50%;
+	border: 2px solid var(--bn-line);
+	border-block-start-color: var(--bn-ink);
+	animation: bn-space-settings-savebar-spin 0.8s linear infinite;
+}
+
+@keyframes bn-space-settings-savebar-spin {
+	to { transform: rotate(360deg); }
+}
+
+.bn-space-settings__savebar-actions {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	margin-inline-start: auto;
+}
+
+/* ── Gated-space paywall (Pro membership gate) ───────────────────────── */
+.bn-paywall {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	text-align: center;
+	gap: var(--bn-s4);
+	margin-block-start: var(--bn-s4);
+	padding: var(--bn-s8) var(--bn-s5);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-lg);
+	background: var(--bn-surface-soft, var(--bn-surface));
+}
+
+/* Blurred/locked preview band — the spec's "blurred space preview". */
+.bn-paywall__preview {
+	position: relative;
+	inline-size: 100%;
+	block-size: 96px;
+	border-radius: var(--bn-r-md);
+	overflow: hidden;
+	background:
+		linear-gradient(
+			120deg,
+			color-mix(in oklch, var(--bn-accent) 18%, transparent),
+			color-mix(in oklch, var(--bn-ink) 10%, transparent)
+		);
+	filter: blur(2px);
+}
+
+.bn-paywall__lock {
+	position: absolute;
+	inset-block-start: 50%;
+	inset-inline-start: 50%;
+	transform: translate(-50%, -50%);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	inline-size: var(--bn-s10, 40px);
+	block-size: var(--bn-s10, 40px);
+	border-radius: var(--bn-r-full);
+	background: var(--bn-surface);
+	color: var(--bn-ink-2);
+	filter: none;
+}
+
+.bn-paywall__body {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: var(--bn-s3);
+	max-inline-size: 42ch;
+}
+
+.bn-paywall__heading {
+	margin: 0;
+	font-size: 1.125rem;
+	font-weight: var(--bn-fw-semibold);
+	color: var(--bn-ink);
+}
+
+.bn-paywall__tier,
+.bn-paywall__description {
+	margin: 0;
+	color: var(--bn-ink-2);
+	line-height: var(--bn-leading-body);
+}
+
+.bn-paywall__cta {
+	margin-block-start: var(--bn-s2);
+}
+
+.bn-paywall__unconfigured {
+	margin: 0;
+	color: var(--bn-ink-3);
+	font-size: 0.875rem;
+}
+
+@media (max-width: 768px) {
+	.bn-paywall { padding: var(--bn-s6) var(--bn-s4); }
+
+	.bn-space-settings__savebar { padding-inline: var(--bn-s4); }
+	.bn-space-settings__savebar-status { display: none; }
+	.bn-space-settings__savebar-inner { justify-content: flex-end; }
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * Sub-480 viewport sweep (covers 390px iPhone Pro / 360px common Android).
+ *
+ * The 768/640 blocks above already handle the tablet → small-tablet glide.
+ * This block targets the actual mobile-portrait surface area gaps observed
+ * during the live walk: hero stats compress to two columns, tab nav scrolls
+ * horizontally, settings rows stack vertically with full-width actions, and
+ * the savebar collapses to icon-only actions so it doesn't overflow.
+ * ────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 480px) {
+	/* Directory cards already 1col at 768; tighten card padding + stats. */
+	.bn-sd-card { padding: 0; }
+	/* Keep the top padding large enough to clear the emblem's overhang
+	   (var(--bn-s6)); only the side/bottom padding tightens on small screens. */
+	.bn-sd-card__body { padding: var(--bn-s8) var(--bn-s3) var(--bn-s3); gap: var(--bn-s2); }
+
+	/* Filter row stacks: chips above, sort below. */
+	.bn-sd-filter-row {
+		flex-direction: column;
+		align-items: stretch;
+		gap: var(--bn-s2);
+	}
+	.bn-sd-sort { align-self: stretch; }
+	.bn-sd-sort__trigger { inline-size: 100%; justify-content: space-between; }
+
+	/* Space-home hero — emblem tightens, stats two-up. */
+	.bn-sh-hero__emblem { width: 56px; height: 56px; margin-block-start: calc(-1 * var(--bn-s6)); }
+	.bn-sh-hero__name { font-size: var(--bn-text-lg); }
+	.bn-sh-hero__stats.bn-stat-grid { grid-template-columns: repeat(2, 1fr); }
+
+	/* Hero tab nav scrolls horizontally so all tabs stay reachable. */
+	.bn-tabs.bn-sh-hero__tabs {
+		overflow-x: auto;
+		-webkit-overflow-scrolling: touch;
+		flex-wrap: nowrap;
+		scrollbar-width: none;
+	}
+	.bn-tabs.bn-sh-hero__tabs::-webkit-scrollbar { display: none; }
+	.bn-tabs.bn-sh-hero__tabs .bn-tab { flex-shrink: 0; }
+
+	/* Settings tab nav scrolls horizontally too. */
+	.bn-space-settings__sidenav,
+	.bn-space-settings__tabs {
+		overflow-x: auto;
+		-webkit-overflow-scrolling: touch;
+		flex-wrap: nowrap;
+		flex-direction: row;
+		scrollbar-width: none;
+	}
+	.bn-space-settings__sidenav::-webkit-scrollbar,
+	.bn-space-settings__tabs::-webkit-scrollbar { display: none; }
+
+	/* Members tab cards keep avatar + name + role stacked, full-width actions. */
+	.bn-sh-members__grid { grid-template-columns: 1fr; }
+	.bn-sh-members__card { padding: var(--bn-s3); }
+	.bn-sh-members__actions { inline-size: 100%; justify-content: stretch; flex-wrap: wrap; }
+	.bn-sh-members__actions > * { flex: 1 1 auto; min-inline-size: 0; }
+
+	/* Danger zone + Transfer modals — full-width minus 16px gutter. */
+	.bn-space-settings__danger-modal .bn-modal__panel,
+	.bn-space-settings__transfer-modal .bn-modal__panel,
+	.bn-modal-backdrop[data-bn-modal="delete-space"] .bn-modal__panel {
+		max-inline-size: calc(100vw - 32px);
+		inline-size: calc(100vw - 32px);
+		margin-inline: var(--bn-s4);
+	}
+
+	/* Cover preview height taper. */
+	.bn-space-settings__cover.has-image { block-size: 140px; }
+}
+
+
+/* ── Pending space invitation banner (space home) ─────────────────────────── */
+.bn-sh-invite {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--bn-s4);
+	flex-wrap: wrap;
+	margin-block-end: var(--bn-s4);
+	padding: var(--bn-s3) var(--bn-s4);
+}
+
+.bn-sh-invite__text {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	color: var(--bn-ink);
+	font-weight: var(--bn-fw-medium);
+}
+
+.bn-sh-invite__icon {
+	display: inline-flex;
+	color: var(--bn-accent);
+}
+
+.bn-sh-invite__actions {
+	display: inline-flex;
+	gap: var(--bn-s2);
+}
+
+@media (max-width: 640px) {
+	.bn-sh-invite {
+		align-items: flex-start;
+	}
+
+	.bn-sh-invite__actions {
+		width: 100%;
+	}
+
+	.bn-sh-invite__actions .bn-btn {
+		flex: 1;
+	}
+}
+
+/* ── Space admin hub (templates/spaces/admin.php) ─────────────────────────── */
+.bn-space-admin__stats {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: var(--bn-s4);
+	margin-block-start: var(--bn-s4);
+}
+
+.bn-space-admin__stat {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: var(--bn-s1);
+	padding: var(--bn-s4);
+}
+
+.bn-space-admin__stat-icon {
+	display: inline-flex;
+	color: var(--bn-accent);
+}
+
+.bn-space-admin__stat-value {
+	font-size: var(--bn-text-2xl);
+	font-weight: var(--bn-fw-bold);
+	line-height: var(--bn-leading-tight);
+	color: var(--bn-ink);
+}
+
+.bn-space-admin__stat-label {
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink-2);
+}
+
+.bn-space-admin__nav {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s3);
+	margin-block-start: var(--bn-s4);
+}
+
+.bn-space-admin__tile {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s4);
+	padding: var(--bn-s4);
+	text-decoration: none;
+	color: var(--bn-ink);
+	transition: border-color 0.14s ease, background 0.14s ease;
+}
+
+.bn-space-admin__tile:hover,
+.bn-space-admin__tile:focus-visible {
+	border-color: var(--bn-accent);
+	background: var(--bn-raised);
+}
+
+.bn-space-admin__tile:focus-visible {
+	outline: 2px solid var(--bn-accent);
+	outline-offset: 2px;
+}
+
+.bn-space-admin__tile-icon {
+	display: inline-flex;
+	flex-shrink: 0;
+	color: var(--bn-accent);
+}
+
+.bn-space-admin__tile-body {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s1);
+	flex: 1;
+	min-width: 0;
+}
+
+.bn-space-admin__tile-title {
+	font-size: var(--bn-text-base);
+	font-weight: var(--bn-fw-semibold);
+	color: var(--bn-ink);
+}
+
+.bn-space-admin__tile-desc {
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink-2);
+}
+
+.bn-space-admin__tile-chevron {
+	display: inline-flex;
+	flex-shrink: 0;
+	color: var(--bn-ink-3);
+}
+
+@media (max-width: 640px) {
+	.bn-space-admin__stats {
+		grid-template-columns: 1fr;
+	}
+}
+
+/* ── Sub-spaces panel (space tab) ─────────────────────────────────────────────
+   The viewport-independent home for a space's children. Their only entry point
+   used to be the right-sidebar card, which is display:none below 1024px — so on
+   phones and tablets sub-spaces were unreachable, and uncreatable. Token-driven
+   throughout, so dark mode and RTL come for free.
+   ------------------------------------------------------------------------- */
+
+.bn-space-subspaces__list {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: var(--bn-s3);
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.bn-space-subspaces__item {
+	padding: 0;
+	overflow: hidden;
+}
+
+.bn-space-subspaces__link {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--bn-s3);
+	min-width: 0;
+	padding: var(--bn-s3);
+	border-radius: var(--bn-r-md);
+	text-decoration: none;
+	color: inherit;
+	transition: background-color 0.14s ease;
+}
+
+.bn-space-subspaces__link:hover,
+.bn-space-subspaces__link:focus-visible {
+	background: var(--bn-sunken);
+	text-decoration: none;
+	color: inherit;
+}
+
+.bn-space-subspaces__emblem {
+	flex-shrink: 0;
+	border-radius: var(--bn-r-md);
+	color: var( --bn-accent-fg, #fff );
+	font-weight: var(--bn-fw-bold);
+}
+
+.bn-space-subspaces__body {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	gap: var(--bn-s1);
+}
+
+.bn-space-subspaces__name {
+	font-size: var(--bn-text-sm);
+	font-weight: var(--bn-fw-semibold);
+	color: var(--bn-ink);
+}
+
+.bn-space-subspaces__desc {
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-2);
+	overflow-wrap: anywhere;
+}
+
+.bn-space-subspaces__meta {
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+}
+
+.bn-space-subspaces__cta {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	margin-block-start: var(--bn-s4);
+}
+
+.bn-space-subspaces__add {
+	min-height: var(--bn-tap, 40px);
+}
+
+/* Phones: one column, and the CTA goes full width so it clears the 40px tap
+   target comfortably. This tab is the ONLY sub-space entry point at this width. */
+@media (max-width: 640px) {
+	.bn-space-subspaces__list {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.bn-space-subspaces__cta,
+	.bn-space-subspaces__add {
+		width: 100%;
+	}
+}
+
+/* ── In-space post search ───────────────────────────────────────────────────
+ * The search bar above a space's feed (templates/parts/space-feed-panel.php).
+ * Mirrors the Members tab's filter bar (.bn-space-members__filter) so the two
+ * in-space search affordances look like one feature, not two.
+ */
+.bn-space-search {
+	display: flex;
+	gap: var(--bn-s2);
+	align-items: center;
+	flex-wrap: wrap;
+	padding: var(--bn-s3) var(--bn-s4);
+	margin-block-end: var(--bn-s4);
+}
+
+.bn-space-search__icon {
+	display: inline-flex;
+	flex: 0 0 auto;
+	color: var(--bn-ink-3);
+}
+
+.bn-space-search__icon svg {
+	width: var(--bn-s4);
+	height: var(--bn-s4);
+}
+
+.bn-space-search__input {
+	flex: 1 1 220px;
+	/* Override the .bn-input width:100% base so the flex-basis wins and the
+	   field shares the row instead of forcing each control onto its own line —
+	   same reason .bn-space-members__filter-search does it. */
+	inline-size: auto;
+	min-inline-size: 0;
+}
+
+.bn-space-search__summary {
+	margin-block: 0 var(--bn-s4);
+	padding-inline: var(--bn-s1);
+	color: var(--bn-ink-2);
+	font-size: var(--bn-text-sm);
+}
+
+@media (max-width: 640px) {
+	.bn-space-search {
+		padding: var(--bn-s3);
+	}
+
+	/* The icon is decoration next to a placeholder that already says what the
+	   field does; at this width the row needs the space for the input and its
+	   two buttons more than it needs the glyph. */
+	.bn-space-search__icon {
+		display: none;
+	}
+
+	.bn-space-search__input {
+		flex: 1 1 100%;
+	}
+
+	.bn-space-search .bn-btn {
+		flex: 1 1 0;
+	}
+}
+
+/* Search results pager (prev / page / next). */
+.bn-space-search__pager {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: var(--bn-s3);
+	margin-block: var(--bn-s5);
+}
+
+.bn-space-search__pager-page {
+	color: var(--bn-ink-2);
+	font-size: var(--bn-text-sm);
+	font-variant-numeric: tabular-nums;
+}

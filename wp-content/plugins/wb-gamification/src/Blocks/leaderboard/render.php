@@ -1,0 +1,297 @@
+<?php
+/**
+ * Leaderboard block — Wbcom Block Quality Standard render.
+ *
+ * @package WB_Gamification
+ *
+ * @var array $attributes Block attributes.
+ */
+
+defined( 'ABSPATH' ) || exit;
+// Silencing convention-driven false positives so Plugin Check signal stays clean:
+//   - PrefixAllGlobals.NonPrefixedHooknameFound — plugin uses `wb_gam_*` as its
+//     established hook prefix (documented in CLAUDE.md, declared in .phpcs.xml).
+//     Plugin Check auto-detects `wb_gamification` from the text-domain header
+//     and doesn't share the .phpcs.xml prefix list; hooks like
+//     `wb_gam_points_redeemed` are part of the public 1.0 API and can't rename.
+//   - PrefixAllGlobals.NonPrefixedFunctionFound — same convention. Helper
+//     functions exported under `wb_gam_*` are documented in `src/Extensions/`.
+//   - PluginCheck.Security.DirectDB.UnescapedDBParameter +
+//     WordPress.DB.PreparedSQL.InterpolatedNotPrepared — this file does custom-
+//     table work. Table names are interpolated from `{$wpdb->prefix}` plus
+//     literal constants (no user input); user-supplied values pass through
+//     `$wpdb->prepare()`. MySQL doesn't allow placeholder table names, so the
+//     interpolation is unavoidable.
+// phpcs:disable WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound
+
+// Block render.php files are invoked from inside render_callback by the
+// WP block registrar, so every $wb_gam_* in this file is function-scoped,
+// not global. PrefixAllGlobals can't tell — its `phpcs:disable` here is
+// the WP-standard way to silence the false positive. The plugin's own
+// .phpcs.xml already declares `wb_gam` as a valid prefix; this annotation
+// extends that signal to Plugin Check's internal phpcs invocation.
+// phpcs:disable WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
+
+
+use WBGam\Blocks\CSS as WB_Gam_Block_CSS;
+use WBGam\Engine\BlockHooks;
+use WBGam\Engine\LeaderboardEngine;
+
+$wb_gam_attrs    = is_array( $attributes ) ? $attributes : array();
+$wb_gam_unique   = ! empty( $wb_gam_attrs['uniqueId'] )
+	? sanitize_html_class( (string) $wb_gam_attrs['uniqueId'] )
+	: substr( md5( wp_json_encode( $wb_gam_attrs ) ), 0, 8 );
+
+$wb_gam_period       = (string) ( $wb_gam_attrs['period'] ?? 'all' );
+$wb_gam_limit        = max( 1, min( 100, (int) ( $wb_gam_attrs['limit'] ?? 10 ) ) );
+$wb_gam_scope_type   = sanitize_key( (string) ( $wb_gam_attrs['scope_type'] ?? '' ) );
+$wb_gam_scope_id     = (int) ( $wb_gam_attrs['scope_id'] ?? 0 );
+$wb_gam_show_avatars = ! isset( $wb_gam_attrs['show_avatars'] ) || ! empty( $wb_gam_attrs['show_avatars'] );
+
+WB_Gam_Block_CSS::add( $wb_gam_unique, $wb_gam_attrs );
+$wb_gam_visibility = WB_Gam_Block_CSS::get_visibility_classes( $wb_gam_attrs );
+
+$wb_gam_inline = '';
+if ( ! empty( $wb_gam_attrs['accentColor'] ) ) {
+	$wb_gam_inline .= sprintf( '--wb-gam-color-accent: %s;', sanitize_text_field( (string) $wb_gam_attrs['accentColor'] ) );
+}
+if ( ! empty( $wb_gam_attrs['cardBackground'] ) ) {
+	$wb_gam_inline .= sprintf( '--wb-gam-color-white: %s;', sanitize_text_field( (string) $wb_gam_attrs['cardBackground'] ) );
+}
+if ( ! empty( $wb_gam_attrs['cardBorderColor'] ) ) {
+	$wb_gam_inline .= sprintf( '--wb-gam-color-border: %s;', sanitize_text_field( (string) $wb_gam_attrs['cardBorderColor'] ) );
+}
+
+$wb_gam_classes = array_filter( array( 'wb-gam-leaderboard', 'wb-gam-block-' . $wb_gam_unique, $wb_gam_visibility ) );
+
+wp_enqueue_style( 'wb-gam-tokens' );
+
+$wb_gam_point_type = (string) ( $wb_gam_attrs['pointType'] ?? '' );
+$wb_gam_rows       = LeaderboardEngine::get_leaderboard( $wb_gam_period, $wb_gam_limit, $wb_gam_scope_type, $wb_gam_scope_id, $wb_gam_point_type );
+
+/**
+ * Filter the leaderboard rows before render.
+ *
+ * Use this hook to reorder, exclude, or add display fields to entries
+ * — e.g. tag VIP members, splice in a "you" row, or attach extra
+ * metadata that the surrounding theme renders below the block.
+ *
+ * @since 1.0.0
+ *
+ * @param array $rows       Array of {rank, user_id, display_name, points, …} rows.
+ * @param array $attributes Block attributes (period, limit, scope, pointType).
+ */
+$wb_gam_rows = (array) apply_filters( 'wb_gam_block_leaderboard_data', $wb_gam_rows, $wb_gam_attrs );
+
+// Resolve the currency label so leaderboard entries say "100 Coins" rather
+// than always "100 pts" once a site defines additional point types.
+$wb_gam_pt_service   = new \WBGam\Services\PointTypeService();
+$wb_gam_resolved_pt  = $wb_gam_pt_service->resolve( $wb_gam_point_type ?: null );
+$wb_gam_pt_record    = $wb_gam_pt_service->get( $wb_gam_resolved_pt );
+$wb_gam_points_label = (string) ( $wb_gam_pt_record['label'] ?? __( 'pts', 'wb-gamification' ) );
+
+$wb_gam_period_labels = array(
+	'all'   => __( 'All Time', 'wb-gamification' ),
+	'month' => __( 'This Month', 'wb-gamification' ),
+	'week'  => __( 'This Week', 'wb-gamification' ),
+	'day'   => __( 'Today', 'wb-gamification' ),
+);
+$wb_gam_period_label  = $wb_gam_period_labels[ $wb_gam_period ] ?? $wb_gam_period_labels['all'];
+
+// Realtime board signature — view.js registers this with the heartbeat
+// broker so the server returns fresh rows for this specific block every
+// tick. Stable signature (period + scope + limit + point_type + uniqueId)
+// lets two instances on the same page receive different snapshots.
+$wb_gam_board_sig = sprintf(
+	'lb:%s:%s:%d:%d:%s:%s',
+	$wb_gam_period,
+	$wb_gam_scope_type,
+	$wb_gam_scope_id,
+	$wb_gam_limit,
+	(string) ( $wb_gam_attrs['pointType'] ?? '' ),
+	$wb_gam_unique
+);
+
+$wb_gam_wrapper = get_block_wrapper_attributes(
+	array(
+		'class'                    => implode( ' ', $wb_gam_classes ),
+		'style'                    => '' !== $wb_gam_inline ? $wb_gam_inline : null,
+		'data-wb-gam-board'        => 'leaderboard',
+		'data-wb-gam-board-sig'    => $wb_gam_board_sig,
+		'data-wb-gam-period'       => $wb_gam_period,
+		'data-wb-gam-scope-type'   => $wb_gam_scope_type,
+		'data-wb-gam-scope-id'     => (string) $wb_gam_scope_id,
+		'data-wb-gam-limit'        => (string) $wb_gam_limit,
+		'data-wb-gam-point-type'   => (string) ( $wb_gam_attrs['pointType'] ?? '' ),
+		'data-wb-gam-points-label' => $wb_gam_points_label,
+	)
+);
+
+BlockHooks::before( 'leaderboard', $wb_gam_attrs );
+?>
+<div <?php echo $wb_gam_wrapper; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>>
+	<div class="wb-gam-leaderboard__header">
+		<h3 class="wb-gam-leaderboard__title">
+			<?php esc_html_e( 'Leaderboard', 'wb-gamification' ); ?>
+		</h3>
+		<span class="wb-gam-leaderboard__period" aria-label="<?php echo esc_attr( $wb_gam_period_label ); ?>">
+			<?php echo esc_html( $wb_gam_period_label ); ?>
+		</span>
+	</div>
+
+	<?php if ( empty( $wb_gam_rows ) ) : ?>
+		<p class="wb-gam-leaderboard__empty">
+			<?php esc_html_e( 'No members on the leaderboard yet.', 'wb-gamification' ); ?>
+		</p>
+	<?php else : ?>
+		<ol class="wb-gam-leaderboard__list">
+			<?php
+			// Warm the earned-badge cache for every row in one query so the
+			// per-row count_user_badges() below are cache hits — avoids an
+			// N+1 that would grow with the board size.
+			\WBGam\Engine\BadgeEngine::prime_earned_badges( array_column( $wb_gam_rows, 'user_id' ) );
+			foreach ( $wb_gam_rows as $wb_gam_row ) :
+				$wb_gam_rank_num   = (int) ( $wb_gam_row['rank'] ?? 0 );
+				$wb_gam_rank_label = '';
+				if ( 1 === $wb_gam_rank_num ) {
+					$wb_gam_rank_label = __( '1st place', 'wb-gamification' );
+				} elseif ( 2 === $wb_gam_rank_num ) {
+					$wb_gam_rank_label = __( '2nd place', 'wb-gamification' );
+				} elseif ( 3 === $wb_gam_rank_num ) {
+					$wb_gam_rank_label = __( '3rd place', 'wb-gamification' );
+				}
+				$wb_gam_rank_aria = $wb_gam_rank_label ? $wb_gam_rank_label : __( 'Rank', 'wb-gamification' );
+				?>
+				<li class="wb-gam-leaderboard__entry wb-gam-rank-<?php echo (int) $wb_gam_rank_num; ?>"
+					data-user-id="<?php echo (int) ( $wb_gam_row['user_id'] ?? 0 ); ?>"
+					data-rank="<?php echo (int) $wb_gam_rank_num; ?>">
+					<span class="wb-gam-leaderboard__rank" aria-label="<?php echo esc_attr( $wb_gam_rank_aria ); ?>">
+						<?php echo (int) $wb_gam_rank_num; ?>
+						<?php if ( $wb_gam_rank_label ) : ?>
+							<span class="wb-gam-leaderboard__rank-ordinal"><?php echo esc_html( $wb_gam_rank_label ); ?></span>
+						<?php endif; ?>
+					</span>
+
+					<?php if ( $wb_gam_show_avatars ) : ?>
+						<span class="wb-gam-leaderboard__avatar">
+							<?php echo get_avatar( (int) ( $wb_gam_row['user_id'] ?? 0 ), 40, '', esc_attr( (string) ( $wb_gam_row['display_name'] ?? '' ) ) ); ?>
+						</span>
+					<?php endif; ?>
+
+					<span class="wb-gam-leaderboard__name">
+						<?php
+						$wb_gam_uid     = (int) ( $wb_gam_row['user_id'] ?? 0 );
+						$wb_gam_dn      = (string) ( $wb_gam_row['display_name'] ?? '' );
+						$wb_gam_bp_link = \WBGam\BuddyPress\UserUrl::resolve( $wb_gam_uid );
+						if ( '' !== $wb_gam_bp_link ) {
+							printf(
+								'<a href="%1$s">%2$s</a>',
+								esc_url( $wb_gam_bp_link ),
+								esc_html( $wb_gam_dn )
+							);
+						} else {
+							echo esc_html( $wb_gam_dn );
+						}
+						?>
+					</span>
+
+					<span class="wb-gam-leaderboard__points" aria-label="<?php echo esc_attr( $wb_gam_points_label ); ?>">
+						<?php
+						// Inline SVG so the icon renders without a font dependency.
+						echo \WBGam\Admin\Icon::svg( 'sparkles', array( 'size' => 16, 'class' => 'wb-gam-leaderboard__points-icon' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Static SVG built from fixed allowlist.
+						?>
+						<span class="wb-gam-leaderboard__points-number">
+							<?php
+							printf(
+								/* translators: 1: formatted amount, 2: currency label. */
+								esc_html__( '%1$s %2$s', 'wb-gamification' ),
+								esc_html( number_format_i18n( (int) ( $wb_gam_row['points'] ?? 0 ) ) ),
+								esc_html( $wb_gam_points_label )
+							);
+							?>
+						</span>
+					</span>
+
+					<?php
+					/*
+					 * Badge count beside points — added in 1.4.0 (B15).
+					 * Reads the materialised count, never the per-badge rows, so
+					 * even 1000-row leaderboards stay O(N) on the per-user lookup.
+					 *
+					 * Always emit the .wb-gam-leaderboard__badges span (even
+					 * when count = 0) so the heartbeat patcher has a stable
+					 * target to update when a member earns their first badge
+					 * mid-session. The `hidden` attribute keeps it visually
+					 * absent for zero-badge members until JS reveals it.
+					 */
+					$wb_gam_badge_count = (int) \WBGam\Engine\BadgeEngine::count_user_badges( (int) ( $wb_gam_row['user_id'] ?? 0 ) );
+					?>
+					<span class="wb-gam-leaderboard__badges" aria-label="<?php
+						/* translators: %d: number of badges earned. */
+						echo esc_attr( sprintf( _n( '%d badge', '%d badges', max( 1, $wb_gam_badge_count ), 'wb-gamification' ), $wb_gam_badge_count ) );
+					?>" <?php echo $wb_gam_badge_count > 0 ? '' : 'hidden'; ?>>
+						<?php
+						echo \WBGam\Admin\Icon::svg( 'medal', array( 'size' => 16, 'class' => 'wb-gam-leaderboard__badges-icon' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Static SVG built from fixed allowlist.
+						?>
+						<span class="wb-gam-leaderboard__badges-count">
+							<?php
+							printf(
+								/* translators: %d: number of badges earned. */
+								esc_html( _n( '%d badge', '%d badges', max( 1, $wb_gam_badge_count ), 'wb-gamification' ) ),
+								(int) $wb_gam_badge_count
+							);
+							?>
+						</span>
+					</span>
+				</li>
+			<?php endforeach; ?>
+		</ol>
+	<?php endif; ?>
+
+	<?php
+	$wb_gam_current_uid = get_current_user_id();
+	if ( $wb_gam_current_uid > 0 && ! empty( $wb_gam_rows ) ) {
+		$wb_gam_visible_ids = array_column( $wb_gam_rows, 'user_id' );
+		if ( ! in_array( $wb_gam_current_uid, $wb_gam_visible_ids, true ) ) {
+			$wb_gam_my_rank = LeaderboardEngine::get_user_rank( $wb_gam_current_uid, $wb_gam_period, $wb_gam_scope_type, $wb_gam_scope_id );
+			if ( ! empty( $wb_gam_my_rank ) && (int) ( $wb_gam_my_rank['points'] ?? 0 ) > 0 ) :
+				?>
+				<div class="wb-gam-leaderboard__my-rank">
+					<span class="wb-gam-leaderboard__my-rank-label"><?php esc_html_e( 'Your rank', 'wb-gamification' ); ?></span>
+					<span class="wb-gam-leaderboard__my-rank-position">
+						<?php
+						/* translators: %s = rank number */
+						printf( esc_html__( '#%s', 'wb-gamification' ), esc_html( number_format_i18n( (int) ( $wb_gam_my_rank['rank'] ?? 0 ) ) ) );
+						?>
+					</span>
+					<span class="wb-gam-leaderboard__my-rank-points">
+						<?php
+						printf(
+							/* translators: 1: formatted amount, 2: currency label. */
+							esc_html__( '%1$s %2$s', 'wb-gamification' ),
+							esc_html( number_format_i18n( (int) ( $wb_gam_my_rank['points'] ?? 0 ) ) ),
+							esc_html( $wb_gam_points_label )
+						);
+						?>
+					</span>
+					<?php if ( null !== ( $wb_gam_my_rank['points_to_next'] ?? null ) ) : ?>
+						<span class="wb-gam-leaderboard__my-rank-gap">
+							<?php
+							printf(
+								/* translators: 1: points needed to move up one rank, 2: currency label. */
+								esc_html__( '%1$s %2$s from the next rank', 'wb-gamification' ),
+								esc_html( number_format_i18n( (int) $wb_gam_my_rank['points_to_next'] ) ),
+								esc_html( $wb_gam_points_label )
+							);
+							?>
+						</span>
+					<?php endif; ?>
+				</div>
+				<?php
+			endif;
+		}
+	}
+	?>
+</div>
+<?php
+BlockHooks::after( 'leaderboard', $wb_gam_attrs );

@@ -1,0 +1,62 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "buddynext/trending-hashtags",
+	"title": "Trending Hashtags",
+	"icon": "tag",
+	"category": "buddynext",
+	"description": "Displays trending hashtags as a list or tag cloud.",
+	"keywords": [
+		"buddynext",
+		"hashtags",
+		"trending",
+		"topics"
+	],
+	"textdomain": "buddynext",
+	"editorScript": "buddynext-blocks-editor",
+	"style": [
+		"file:../../assets/css/blocks.css",
+		"bn-hashtags"
+	],
+	"supports": {
+		"color": {
+			"background": true,
+			"text": true
+		},
+		"typography": {
+			"fontSize": true
+		},
+		"spacing": {
+			"padding": true,
+			"margin": true
+		}
+	},
+	"attributes": {
+		"count": {
+			"type": "integer",
+			"default": 8
+		},
+		"display": {
+			"type": "string",
+			"default": "list",
+			"enum": [
+				"list",
+				"cloud"
+			]
+		},
+		"from": {
+			"type": "string",
+			"default": "7d",
+			"enum": [
+				"24h",
+				"7d",
+				"30d"
+			]
+		}
+	},
+	"example": {},
+	"editorStyle": [
+		"file:../../assets/css/blocks.css",
+		"bn-hashtags"
+	]
+}

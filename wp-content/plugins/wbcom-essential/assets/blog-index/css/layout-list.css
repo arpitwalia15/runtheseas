@@ -1,0 +1,12 @@
+/**
+ * List Layout Styles
+ *
+ * Horizontal card list layout.
+ *
+ * @package Wbcom_Essential
+ * @since   4.3.0
+ */
+
+.wbcom-blog--list .wbcom-blog__container {
+	max-width: 960px;
+}

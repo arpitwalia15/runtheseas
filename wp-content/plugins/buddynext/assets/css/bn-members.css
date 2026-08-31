@@ -1,0 +1,1121 @@
+/* BuddyNext — Member Directory styles (v2 design system).
+ *
+ * The shell (templates/shell/hub-shell.php) owns the rail, main column,
+ * and the optional right-sidebar column (the active theme's get_header()
+ * is the top navigation). The inner member-directory
+ * template renders the section-head, filter-strip, card grid, and pagination
+ * inside the shell main column — there is no page-frame, no 2-column grid,
+ * no theme-aware wrapper in this stylesheet.
+ *
+ * Buttons, inputs, badges, avatars, and the card container come from the
+ * v2 attribute API in bn-base.css (.bn-btn[data-variant], .bn-input,
+ * .bn-badge[data-tone], .bn-avatar[data-size][data-presence],
+ * .bn-card[data-interactive]).
+ *
+ * Tokens-only — every value reads from --bn-* (canonical). Logical
+ * properties throughout for RTL parity.
+ *
+ * Legacy class rules (.bn-member-card, .bn-member-name, .bn-member-handle,
+ * .bn-card-actions, .bn-btn-message, .bn-pagination, .bn-page-btn) are
+ * preserved for templates/spaces/members.php and
+ * templates/profile/connections.php which still consume them. Those
+ * surfaces will migrate in their own sweeps.
+ */
+
+/* ── Inner stack (inside .bn-app__main from the shell) ─────────────────────
+ * Owns vertical rhythm only. The shell provides the column width and the
+ * top/side padding around the main content. */
+.bn-member-directory.bn-md-stack {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s5);
+}
+
+/* ── Filter strip overrides (composes parts/filter-strip.php) ─────────────
+ * The base .bn-filter-strip stacks tabs above the form on small screens.
+ * The members hub overlays a bottom border to separate the strip from the
+ * grid below. */
+.bn-md-strip {
+	padding-block-end: var(--bn-s3);
+	border-block-end: 1px solid var(--bn-line-faint);
+}
+
+/* ── Member grid ──────────────────────────────────────────────────────────
+ * Auto-fill grid that yields 4 cards desktop, 3 on iPad landscape, 2 on
+ * iPad portrait + small viewports, 1 on mobile. The shell collapses the
+ * right column at ≤ 1024px so the main column widens accordingly. */
+.bn-md-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+	gap: var(--bn-s4);
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+/* Featured Member block: one card. It keeps the directory's own responsive
+   track sizing — so it is a card-sized card in a wide column and fills a narrow
+   one — but is exempt from every rule that fixes a COLUMN COUNT. A count is a
+   statement about many cards; applied to one it just divides the container and
+   squeezes the single card into a fraction of it.
+
+   That exemption is the fix, and it was not decorative. The grid part emits
+   data-cols unconditionally, so this grid also carried data-cols="3" and was
+   laid out as three fixed tracks: in a 25% sidebar the card got 67px and
+   rendered the member's name one character per line. The 768px rule below
+   (a fixed 2-up) did the same thing on tablet.
+
+   Doubled class on purpose: three of those rules are later single-class
+   selectors on .bn-md-grid, so a plain `.bn-md-grid--single` lost to all of
+   them whatever it declared. Matching both classes outranks them by
+   specificity, which is what makes this hold without a counter-rule being added
+   to each new breakpoint. */
+.bn-md-grid.bn-md-grid--single {
+	grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+
+/* Owner-set fixed desktop column count (Settings > General > Member directory).
+	Applies only on desktop (≥1025px) so the responsive breakpoints below still
+	step the directory down to 2 then 1 on tablet/mobile; never overrides list view.
+
+	The --single exclusion is load-bearing, not defensive. The grid part emits
+	data-cols unconditionally, so the one-card Featured Member render carried
+	data-cols="3" too — and these rules are later AND more specific than
+	.bn-md-grid--single above, so they won. A featured member in a 25% sidebar
+	was laid out as three 67px tracks with the card in one of them, rendering the
+	member's name one character per line. It never showed at full width because a
+	third of the content column is roughly a normal card. An owner's directory
+	column preference is about the DIRECTORY; it has no meaning for one card. */
+@media (min-width: 1025px) {
+	.bn-md-grid[data-cols="2"]:not(.is-list):not(.bn-md-grid--single) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+	.bn-md-grid[data-cols="3"]:not(.is-list):not(.bn-md-grid--single) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+	.bn-md-grid[data-cols="4"]:not(.is-list):not(.bn-md-grid--single) { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+/* ── View toggle (grid / list) ──────────────────────────────────────────────
+ * Buttons live in the filter strip; the directory store (assets/js/members/
+ * store.js) toggles aria-pressed + adds .is-list to .bn-md-grid. */
+.bn-md-filters__view {
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
+}
+
+/* Icon-only toggle: the base ladder gives it the 40px height, but nothing gives
+   it width — there is no label to widen the box. Square it off. */
+.bn-md-filters__view-btn {
+	min-inline-size: 40px;
+}
+
+.bn-md-filters__view-btn[aria-pressed="true"] {
+	background: color-mix(in oklch, var(--bn-accent) 14%, var(--bn-surface));
+	border-color: color-mix(in oklch, var(--bn-accent) 40%, var(--bn-surface));
+	color: var(--bn-accent);
+}
+
+/* Identity group (name + handle) is transparent to layout in grid view via
+ * display:contents, so grid rendering is unchanged. It becomes the growing
+ * middle column only in list view. */
+.bn-md-card__identity {
+	display: contents;
+}
+
+/* ── List view ──────────────────────────────────────────────────────────────
+ * Single-column rows: avatar left, identity middle (grows), actions right.
+ * Activated when the store adds .is-list to .bn-md-grid. */
+.bn-md-grid.is-list {
+	grid-template-columns: 1fr;
+	gap: var(--bn-s2);
+}
+
+/* The compact horizontal row is a desktop/tablet affordance. Below 481px the
+	directory grid is already single-column, so list view keeps the full member
+	card there (the row would clip avatar + identity + two actions + kebab). */
+@media (min-width: 481px) {
+	/* Compact horizontal rows: avatar left, identity (grows), actions right — a
+		scannable people list (LinkedIn pattern). The grid card's cover banner and
+		absolutely-positioned overlapping avatar are reset to a plain inline row so
+		the row reads as one line per member, not a stack of full-bleed cards. */
+	.bn-md-grid.is-list .bn-md-card {
+		flex-direction: row;
+		align-items: center;
+		column-gap: var(--bn-s3);
+		padding: var(--bn-s3) var(--bn-s4);
+		/* Reserve room on the right so the action buttons never sit under the
+			absolute kebab (kebab is 30px wide at inset-inline-end: --bn-s2). */
+		padding-inline-end: calc(var(--bn-s2) + 30px + var(--bn-s3));
+	}
+
+	/* No cover band in list view. */
+	.bn-md-grid.is-list .bn-md-card__cover {
+		display: none;
+	}
+
+	/* Avatar rejoins the flow as the row's leading element. */
+	.bn-md-grid.is-list .bn-md-card__avatar-link {
+		position: static;
+		inset: auto;
+		flex: 0 0 auto;
+		margin: 0;
+	}
+	.bn-md-grid.is-list .bn-md-card__avatar-link .bn-avatar {
+		width: 48px;
+		height: 48px;
+	}
+
+	/* Body becomes the horizontal track holding identity + actions. */
+	.bn-md-grid.is-list .bn-md-card__body {
+		flex-direction: row;
+		align-items: center;
+		column-gap: var(--bn-s3);
+		padding: 0;
+		flex: 1 1 auto;
+		min-inline-size: 0;
+	}
+	.bn-md-grid.is-list .bn-md-card__identity {
+		flex: 1 1 auto;
+		min-inline-size: 0;
+	}
+	.bn-md-grid.is-list .bn-md-card__actions {
+		flex: 0 0 auto;
+		inline-size: auto;
+		margin-inline-start: auto;
+		margin-block-start: 0;
+		padding-block-start: 0;
+		flex-wrap: nowrap;
+	}
+	/* Compact, auto-width action buttons in a row — they must not stretch to fill
+		the row the way the grid card's equal-width pair does. */
+	.bn-md-grid.is-list .bn-md-card__actions .bn-btn,
+	.bn-md-grid.is-list .bn-md-card__actions .bn-md-card__follow,
+	.bn-md-grid.is-list .bn-md-card__actions .bn-md-card__connect-primary {
+		flex: 0 0 auto;
+		inline-size: auto;
+	}
+
+	/* Compact rows drop the bulkier card extras. */
+	.bn-md-grid.is-list .bn-md-card__bio,
+	.bn-md-grid.is-list .bn-md-card__mutual {
+		display: none;
+	}
+
+	/* Center the kebab on the row's right edge (it's absolute top-right by default). */
+	.bn-md-grid.is-list .bn-md-card__menu-wrap {
+		inset-block-start: 50%;
+		transform: translateY(-50%);
+	}
+}
+
+/* ── Member card composition (uses .bn-card[data-interactive] from base) ──
+ *
+ * Doubled with .bn-card so `padding: 0` outranks `.bn-card`'s own
+ * `padding: var(--bn-s6)` by specificity rather than by source order.
+ *
+ * The ordering itself is fixed in PHP — BlockRegistrar::enqueue_block_styles_early()
+ * puts a block's stylesheets in the queue during wp_enqueue_scripts, so they no
+ * longer print late and no longer get hoisted above bn-base by WordPress 6.9's
+ * wp_hoist_late_printed_styles(). Read that method for the full mechanism.
+ *
+ * This stays because that fix can only see blocks in the QUERIED POST's content.
+ * A card rendered from a block widget or a template part still takes the
+ * late-and-hoisted path, and there bn-members.css lands above bn-base.css again.
+ * Not redundant, and not a leftover: it is what covers the surfaces the PHP fix
+ * cannot reach. A component that overrides its base primitive should say so by
+ * specificity anyway. */
+.bn-card.bn-md-card {
+	padding: 0;
+}
+
+.bn-md-card {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	padding: 0;
+	text-align: start;
+	transition: transform var(--bn-dur-fast) var(--bn-ease);
+}
+
+.bn-md-card:hover {
+	transform: translateY(-1px);
+}
+
+/* Cover banner — the member's cover image, or a brand-safe tone gradient
+	matching the space cards (mirrors .bn-sd-card__cover). */
+.bn-md-card__cover {
+	height: 76px;
+	width: 100%;
+	border-radius: var(--bn-r-lg) var(--bn-r-lg) 0 0;
+	background-color: var(--bn-accent-100);
+	background-size: cover;
+	background-position: center;
+	/* The tone gradient is built from shared lightness + chroma stops and a
+		per-tone hue, so light / dark only retune two pairs of vars below — no
+		per-tone overrides to keep in sync. An uploaded cover image (inline
+		background-image) overrides this gradient. */
+	--bn-tone-l-start: 80%;
+	--bn-tone-l-end: 55%;
+	--bn-tone-c-start: 0.13;
+	--bn-tone-c-end: 0.18;
+	background-image: linear-gradient(135deg,
+		oklch(var(--bn-tone-l-start) var(--bn-tone-c-start) var(--bn-tone-h, 240)) 0%,
+		oklch(var(--bn-tone-l-end) var(--bn-tone-c-end) var(--bn-tone-h, 240)) 100%);
+}
+[data-bn-theme="dark"] .bn-md-card__cover,
+[data-theme="dark"] .bn-md-card__cover,
+[data-bx-mode="dark"] .bn-md-card__cover {
+	/* Recede in dark: drop lightness AND chroma so covers read as quiet
+		tinted bands behind the avatar, not glowing colour blocks. */
+	--bn-tone-l-start: 42%;
+	--bn-tone-l-end: 28%;
+	--bn-tone-c-start: 0.06;
+	--bn-tone-c-end: 0.08;
+}
+.bn-md-card__cover[data-tone="sky"]     { --bn-tone-h: 240; }
+.bn-md-card__cover[data-tone="cyan"]    { --bn-tone-h: 200; }
+.bn-md-card__cover[data-tone="emerald"] { --bn-tone-h: 160; }
+.bn-md-card__cover[data-tone="lime"]    { --bn-tone-h: 130; }
+.bn-md-card__cover[data-tone="amber"]   { --bn-tone-h: 70; }
+.bn-md-card__cover[data-tone="coral"]   { --bn-tone-h: 35; }
+
+/* Avatar overlaps the cover, bottom-left (mirrors .bn-sd-card__emblem). */
+.bn-md-card__avatar-link {
+	position: absolute;
+	inset-block-start: 46px;
+	inset-inline-start: var(--bn-s4);
+	display: inline-block;
+	text-decoration: none;
+	color: inherit;
+	z-index: 1;
+}
+.bn-md-card__avatar-link .bn-avatar {
+	width: 60px;
+	height: 60px;
+	font-size: var(--bn-text-lg);
+	border: 3px solid var(--bn-surface);
+	box-shadow: var(--bn-shadow-sm);
+}
+
+/* Padded content below the cover; top padding clears the overlapping avatar. */
+.bn-md-card__body {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: var(--bn-s1);
+	padding: 40px var(--bn-s4) var(--bn-s4);
+	flex: 1;
+}
+
+.bn-md-card__avatar {
+	overflow: hidden;
+}
+
+.bn-md-card__avatar img {
+	inline-size: 100%;
+	block-size: 100%;
+	object-fit: cover;
+	border-radius: var(--bn-r-full);
+	display: block;
+}
+
+.bn-md-card__name {
+	font-family: var(--bn-font-display);
+	font-size: var(--bn-text-base);
+	font-weight: var(--bn-fw-bold);
+	letter-spacing: var(--bn-ls-tight);
+	color: var(--bn-ink);
+	margin: 0;
+	line-height: var(--bn-leading-tight);
+	display: inline-flex;
+	align-items: baseline;
+	gap: 6px;
+	flex-wrap: wrap;
+}
+
+/* Connection degree badge — appears next to the member name on the
+	directory card. 1st = direct connection, 2nd = mutual connection. */
+.bn-md-card__degree {
+	font-family: var(--bn-font-mono, var(--bn-font-ui));
+	font-size: 10px;
+	font-weight: var(--bn-fw-semibold);
+	letter-spacing: 0.04em;
+	padding: 2px 6px;
+	border-radius: 999px;
+	color: var(--bn-accent);
+	background: color-mix(in oklch, var(--bn-accent) 14%, var(--bn-surface));
+	border: 1px solid color-mix(in oklch, var(--bn-accent) 28%, transparent);
+	line-height: 1.2;
+	white-space: nowrap;
+}
+.bn-md-card__degree[data-degree="2"] {
+	color: var(--bn-ink-2);
+	background: var(--bn-sunken);
+	border-color: var(--bn-line);
+}
+
+.bn-md-card__name a {
+	color: inherit;
+	text-decoration: none;
+}
+
+.bn-md-card__name a:hover,
+.bn-md-card__name a:focus-visible {
+	color: var(--bn-accent);
+}
+
+.bn-md-card__name a:focus-visible {
+	outline: 2px solid transparent;
+	outline-offset: 2px;
+	box-shadow: var(--bn-ring);
+	border-radius: var(--bn-r-sm);
+}
+
+.bn-md-card__handle {
+	font-family: var(--bn-font-mono);
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+	margin: 0;
+}
+
+.bn-md-card__headline {
+	font-size: var(--bn-text-sm);
+	font-weight: 500;
+	color: var(--bn-ink-2);
+	margin: var(--bn-s1) 0 0;
+	line-height: var(--bn-leading-snug);
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+	overflow: hidden;
+}
+
+.bn-md-card__bio,
+.bn-md-card__meta {
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink-2);
+	margin: 0;
+	line-height: var(--bn-leading-snug);
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+	overflow: hidden;
+}
+
+.bn-md-card__mutual {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+	margin: 0;
+}
+
+/* Overlapping mutual-connection avatar pile (shown before the count). */
+.bn-md-card__mutual-pile {
+	display: inline-flex;
+	flex-shrink: 0;
+	align-items: center;
+}
+.bn-md-card__mutual-pile-avatar {
+	width: 20px;
+	height: 20px;
+	border-radius: var(--bn-r-full, 999px);
+	object-fit: cover;
+	border: 2px solid var(--bn-surface);
+	background: var(--bn-sunken);
+}
+.bn-md-card__mutual-pile-avatar + .bn-md-card__mutual-pile-avatar {
+	margin-inline-start: -8px;
+}
+
+.bn-md-card__type {
+	margin-block-start: var(--bn-s1);
+}
+
+/* Two equal-width action buttons share ONE row on desktop (no wasted space);
+	they stack to two rows only on small screens. */
+.bn-md-card__actions {
+	display: flex;
+	gap: var(--bn-s2);
+	inline-size: 100%;
+	margin-block-start: auto;
+	padding-block-start: var(--bn-s3);
+	flex-wrap: wrap;
+}
+
+/* 40px is the tap-target floor. This said 38px — close enough to look
+   deliberate, and 2px under the rule. These are the card's primary actions
+   (Follow, Connect), not a compact admin list, so the density exception that
+   allows 34px does not apply to them. */
+.bn-md-card__actions .bn-btn {
+	flex: 1 1 0;
+	min-inline-size: 0;
+}
+
+
+.bn-md-card__actions .bn-md-card__follow,
+.bn-md-card__actions .bn-md-card__connect-primary {
+	flex: 1 1 0;
+	min-inline-size: 0;
+}
+
+/* Accept / Decline (pending-received) — the pair fills the row, each half. */
+.bn-md-card__connect-decide {
+	display: flex;
+	gap: var(--bn-s2);
+	flex: 1 1 100%;
+}
+.bn-md-card__connect-decide .bn-btn {
+	flex: 1 1 0;
+}
+
+/* Narrow cards (small screens / dense grid) — stack the two buttons. */
+@media ( max-width: 480px ) {
+	.bn-md-card__actions .bn-btn {
+		flex: 1 1 100%;
+	}
+}
+
+/* ── Sidebar widgets (rendered via parts/sidebar-card.php) ────────────────
+ * Two cards: online-now list (avatars + names) and by-type counts. */
+.bn-md-sidebar-list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s2);
+}
+
+.bn-md-sidebar-list--rows {
+	gap: 0;
+}
+
+.bn-md-sidebar-item__link {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	text-decoration: none;
+	color: inherit;
+	padding-block: var(--bn-s1);
+	border-radius: var(--bn-r-sm);
+	transition: background var(--bn-dur-fast) var(--bn-ease);
+}
+
+.bn-md-sidebar-item__link:hover,
+.bn-md-sidebar-item__link:focus-visible {
+	background: var(--bn-sunken);
+}
+
+.bn-md-sidebar-item__link:focus-visible {
+	outline: 2px solid transparent;
+	outline-offset: 2px;
+	box-shadow: var(--bn-ring);
+}
+
+.bn-md-sidebar-item__text {
+	display: flex;
+	flex-direction: column;
+	min-inline-size: 0;
+}
+
+.bn-md-sidebar-item__name {
+	font-size: var(--bn-text-sm);
+	font-weight: var(--bn-fw-medium);
+	color: var(--bn-ink);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.bn-md-sidebar-item__handle {
+	font-family: var(--bn-font-mono);
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+}
+
+.bn-md-sidebar-row__link {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--bn-s2);
+	padding-block: var(--bn-s2);
+	padding-inline: var(--bn-s2);
+	text-decoration: none;
+	color: var(--bn-ink);
+	border-radius: var(--bn-r-sm);
+	transition: background var(--bn-dur-fast) var(--bn-ease);
+}
+
+.bn-md-sidebar-row__link:hover,
+.bn-md-sidebar-row__link:focus-visible {
+	background: var(--bn-sunken);
+}
+
+.bn-md-sidebar-row__link.is-active {
+	background: var(--bn-accent-100);
+	color: var(--bn-accent-700);
+}
+
+.bn-md-sidebar-row__link:focus-visible {
+	outline: 2px solid transparent;
+	outline-offset: 2px;
+	box-shadow: var(--bn-ring);
+}
+
+.bn-md-sidebar-row__label {
+	font-size: var(--bn-text-sm);
+}
+
+.bn-md-sidebar-row__count {
+	font-family: var(--bn-font-mono);
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+}
+
+/* ── Reduced motion ──────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+	.bn-md-card,
+	.bn-md-card:hover,
+	.bn-md-sidebar-item__link,
+	.bn-md-sidebar-row__link {
+		transition: none;
+		transform: none;
+	}
+}
+
+/* ── Responsive ───────────────────────────────────────────────────────────
+ * The shell collapses its right rail at ≤ 1024px and the left rail at
+ * ≤ 768px — we only manage the inner grid density here. */
+@media (max-width: 1024px) {
+	.bn-md-grid {
+		grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+	}
+}
+
+@media (max-width: 768px) {
+	.bn-member-directory.bn-md-stack {
+		gap: var(--bn-s4);
+	}
+
+	.bn-md-grid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: var(--bn-s3);
+	}
+
+	/* No card-level padding on mobile: the cover banner is meant to sit flush
+		to the card edges and the body already supplies its own padding
+		(40px var(--bn-s4) var(--bn-s4)). Adding padding here pushed the cover
+		inward and double-padded the body, causing the excessive spacing. */
+
+	.bn-md-card__bio {
+		display: none;
+	}
+}
+
+@media (max-width: 480px) {
+	.bn-md-grid {
+		grid-template-columns: minmax(0, 1fr);
+	}
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+ * Legacy class rules — kept for templates/spaces/members.php and
+ * templates/profile/connections.php which still consume these names.
+ * Tokens-only; will be promoted into v2 attribute API in their own sweeps.
+ * ════════════════════════════════════════════════════════════════════════════ */
+
+/* .bn-member-card / .bn-member-name / .bn-member-handle / .bn-card-actions /
+	.bn-btn-message / .bn-pagination / .bn-page-btn are the SHARED member-card +
+	pagination component — now defined once in bn-base.css (loaded on every BN
+	page) so they render styled wherever member cards appear (directory, profile
+	panels + shortcodes, search results), not only where bn-members.css loads. */
+
+/* Block-template wrappers (.bn-block-member-card composes .bn-md-card) */
+.bn-block-member-card {
+	margin: 0;
+}
+
+/* ── Production wiring (Social Graph row 4) ───────────────────────────── */
+
+/* Reactive filter strip — no Apply button. */
+.bn-md-strip {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s3);
+	/* Stretch (not the inherited align-items:center from .bn-filter-strip) so
+		the relation tabs sit left-aligned and the filter toolbar spans full
+		width, matching the grid below. */
+	align-items: stretch;
+}
+
+.bn-md-strip__form {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--bn-s2);
+	align-items: center;
+	/* Full-width, left-aligned toolbar — was rendering as a narrow centred
+		column with each control stacked on its own row. */
+	inline-size: 100%;
+	max-inline-size: none;
+	margin-inline: 0;
+}
+/* Controls size by flex, not the 100%-wide .bn-input/.bn-select default, so
+	they sit inline instead of each taking a full row. */
+.bn-md-strip__form .bn-select { inline-size: auto; }
+
+.bn-md-strip__search {
+	flex: 1 1 260px;
+	min-width: 0;
+	position: relative;
+	display: flex;
+	align-items: center;
+}
+
+.bn-md-strip__search-input {
+	flex: 1 1 100%;
+	/* Room on the right for the clear (×) button. */
+	padding-inline-end: 32px;
+}
+/* Suppress the browser's native search clear so we don't show two ×'s. */
+.bn-md-strip__search-input::-webkit-search-cancel-button {
+	-webkit-appearance: none;
+	appearance: none;
+}
+
+/* Clear (×) button — shown only while there's a term (store toggles hidden). */
+.bn-md-strip__search-clear {
+	position: absolute;
+	inset-inline-end: 6px;
+	inset-block-start: 50%;
+	transform: translateY(-50%);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	inline-size: 22px;
+	block-size: 22px;
+	padding: 0;
+	border: 0;
+	border-radius: var(--bn-r-full, 999px);
+	background: transparent;
+	color: var(--bn-ink-3);
+	cursor: pointer;
+	transition: background var(--bn-dur-fast) var(--bn-ease), color var(--bn-dur-fast) var(--bn-ease);
+}
+.bn-md-strip__search-clear:hover,
+.bn-md-strip__search-clear:focus-visible {
+	background: var(--bn-sunken);
+	color: var(--bn-ink);
+	outline: 2px solid transparent;
+	outline-offset: 2px;
+}
+.bn-md-strip__search-clear svg {
+	inline-size: 15px;
+	block-size: 15px;
+}
+
+.bn-md-strip__searching {
+	position: absolute;
+	/* Sit left of the clear button. */
+	inset-inline-end: 32px;
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+	pointer-events: none;
+}
+
+.bn-md-strip__sort {
+	flex: 0 0 auto;
+}
+
+/* Member-type filter <select> — sits between search and the online toggle.
+   No min-block-size: .bn-select is 40px in bn-base.css already, and pinning it
+   here ALSO beat the touch block's 44px floor — same specificity (0,1,0), later
+   sheet — so this select stayed 40px on a phone while every input beside it grew. */
+.bn-md-strip__type {
+	flex: 0 1 auto;
+}
+
+/* "Online only" toggle — a checkbox styled as a pill-height control so the whole
+	LABEL is the tap target (the native checkbox inside it is 16px and is not
+	meant to be aimed at). 40px is the desktop floor; the touch block in
+	bn-base.css cannot reach a component class, so the 44px touch floor is
+	restated at the bottom of this file. Tokens only; presence dot reuses the
+	directory success token. */
+.bn-md-strip__online {
+	flex: 0 0 auto;
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	min-block-size: 40px;
+	padding-inline: var(--bn-s3);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-full, 999px);
+	background: var(--bn-surface);
+	color: var(--bn-ink-2);
+	font-size: var(--bn-text-sm);
+	font-weight: var(--bn-fw-medium);
+	line-height: var(--bn-leading-snug);
+	cursor: pointer;
+	transition:
+		background var(--bn-dur-fast) var(--bn-ease),
+		border-color var(--bn-dur-fast) var(--bn-ease),
+		color var(--bn-dur-fast) var(--bn-ease);
+}
+
+.bn-md-strip__online:hover {
+	border-color: var(--bn-line-strong, var(--bn-line));
+	color: var(--bn-ink);
+}
+
+.bn-md-strip__online-input {
+	inline-size: 16px;
+	block-size: 16px;
+	margin: 0;
+	accent-color: var(--bn-success);
+	cursor: pointer;
+}
+
+.bn-md-strip__online-input:focus-visible {
+	outline: 2px solid transparent;
+	outline-offset: 2px;
+	box-shadow: var(--bn-ring);
+	border-radius: var(--bn-r-sm);
+}
+
+.bn-md-strip__online-label {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-s2);
+}
+
+.bn-md-strip__online-dot {
+	inline-size: 8px;
+	block-size: 8px;
+	border-radius: var(--bn-r-full, 999px);
+	background: var(--bn-success);
+	flex: 0 0 auto;
+}
+
+/* Active (checked) state — light success wash so it reads as engaged. */
+.bn-md-strip__online:has(.bn-md-strip__online-input:checked) {
+	color: var(--bn-success);
+	border-color: color-mix(in oklch, var(--bn-success) 36%, transparent);
+	background: color-mix(in oklch, var(--bn-success) 12%, var(--bn-surface));
+}
+
+/* Loading skeleton. */
+.bn-md-skeleton {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+	gap: var(--bn-s4);
+}
+
+.bn-md-skeleton__card {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: var(--bn-s2);
+	padding: var(--bn-s4);
+	border-radius: var(--bn-r-lg);
+	background: var(--bn-surface);
+	border: 1px solid var(--bn-line-faint);
+}
+
+.bn-md-skeleton__avatar,
+.bn-md-skeleton__line,
+.bn-md-skeleton__actions {
+	background: linear-gradient(90deg, var(--bn-line-faint) 0%, var(--bn-line) 50%, var(--bn-line-faint) 100%);
+	background-size: 200% 100%;
+	animation: bn-md-shimmer 1.4s linear infinite;
+	border-radius: 6px;
+}
+
+.bn-md-skeleton__avatar {
+	width: 72px;
+	height: 72px;
+	border-radius: 50%;
+}
+
+.bn-md-skeleton__line {
+	width: 70%;
+	height: 10px;
+}
+
+.bn-md-skeleton__line--lg { width: 80%; height: 14px; }
+.bn-md-skeleton__line--sm { width: 40%; height: 8px; }
+
+.bn-md-skeleton__actions {
+	width: 100%;
+	height: 30px;
+	margin-block-start: var(--bn-s2);
+}
+
+@keyframes bn-md-shimmer {
+	from { background-position: 200% 0; }
+	to   { background-position: -200% 0; }
+}
+
+/* Error state. */
+.bn-md-error {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: var(--bn-s3);
+	padding: var(--bn-s6) var(--bn-s4);
+	border-radius: var(--bn-r-lg);
+	background: var(--bn-surface);
+	border: 1px solid var(--bn-danger-bg);
+	color: var(--bn-ink);
+	text-align: center;
+}
+
+.bn-md-error__copy {
+	margin: 0;
+	color: var(--bn-ink-3);
+}
+
+/* Empty-state action row. */
+.bn-md-empty__actions {
+	display: flex;
+	justify-content: center;
+	padding-block-start: var(--bn-s3);
+}
+
+/* Per-card kebab menu. */
+/* Pinned to the card's top-right, over the cover. */
+.bn-md-card__menu-wrap {
+	position: absolute;
+	inset-block-start: var(--bn-s2);
+	inset-inline-end: var(--bn-s2);
+	z-index: 3;
+}
+
+.bn-md-card__menu {
+	width: 30px;
+	height: 30px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	/* Translucent chip so the icon stays legible over any cover gradient. */
+	background: color-mix(in oklab, var(--bn-surface) 78%, transparent);
+	backdrop-filter: blur(4px);
+	border: 1px solid color-mix(in oklab, var(--bn-ink) 8%, transparent);
+	border-radius: var(--bn-r-full, 999px);
+	color: var(--bn-ink-2);
+	cursor: pointer;
+}
+
+.bn-md-card__menu:hover,
+.bn-md-card__menu:focus-visible {
+	background: var(--bn-surface);
+	color: var(--bn-ink);
+}
+
+.bn-md-card__menu:focus-visible {
+	outline: 2px solid transparent;
+	outline-offset: 2px;
+	box-shadow: var(--bn-ring);
+}
+
+.bn-md-card__menu-pop {
+	position: absolute;
+	z-index: 20;
+	inset-block-start: calc(100% + 6px);
+	inset-inline-end: 0;
+	min-width: 184px;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding: var(--bn-s2);
+	border-radius: var(--bn-r-lg, 12px);
+	background: var(--bn-surface);
+	border: 1px solid var(--bn-line);
+	box-shadow: var(--bn-shadow-md, 0 8px 24px rgba(0, 0, 0, 0.12));
+}
+
+/* Scoped under the popover so the text color wins over host-theme button/link
+	rules (e.g. Reign/Astra ".entry-content a, button { color:#fff }"), which at
+	single-class specificity would override --bn-ink and leave white-on-white,
+	unreadable menu items. Two-class specificity beats those without !important;
+	color is pinned on base + hover + focus so no theme state can wash it out. */
+.bn-md-card__menu-pop .bn-md-card__menu-item {
+	display: block;
+	width: 100%;
+	padding-block: var(--bn-s2);
+	padding-inline: var(--bn-s3);
+	border: 0;
+	background: transparent;
+	color: var(--bn-ink);
+	text-align: start;
+	font-family: inherit;
+	font-size: var(--bn-text-sm);
+	font-weight: 500;
+	line-height: 1.4;
+	text-decoration: none;
+	border-radius: var(--bn-r-sm, 6px);
+	cursor: pointer;
+}
+
+.bn-md-card__menu-pop .bn-md-card__menu-item:hover,
+.bn-md-card__menu-pop .bn-md-card__menu-item:focus-visible {
+	background: var(--bn-sunken);
+	color: var(--bn-ink);
+}
+
+.bn-md-card__menu-pop .bn-md-card__menu-item:focus-visible {
+	outline: 2px solid transparent;
+	outline-offset: 2px;
+	box-shadow: var(--bn-ring);
+}
+
+.bn-md-card__menu-pop .bn-md-card__menu-item--danger,
+.bn-md-card__menu-pop .bn-md-card__menu-item--danger:hover,
+.bn-md-card__menu-pop .bn-md-card__menu-item--danger:focus-visible {
+	color: var(--bn-danger);
+}
+
+/* List view: the translucent chip (tuned for legibility over a cover gradient)
+	washes out on a plain row, so the trigger looks invisible. Make it a solid,
+	clearly-bordered icon button in list view. */
+.bn-md-grid.is-list .bn-md-card__menu {
+	background: var(--bn-surface);
+	backdrop-filter: none;
+	border-color: var(--bn-line);
+	color: var(--bn-ink-2);
+}
+
+/* When a card's menu is open, raise that card above its siblings. Each
+	.bn-md-card is position:relative (its own stacking context), so without this
+	the dropdown is painted under the following row instead of overlaying it. */
+.bn-md-card:has( .bn-md-card__menu[aria-expanded="true"] ) {
+	z-index: 5;
+}
+
+.bn-md-card__connect-decide {
+	display: inline-flex;
+	gap: 4px;
+}
+
+/* Follow + Connect state-driven styling via data-state. */
+.bn-md-card__follow[data-state="following"]::before {
+	content: "";
+	display: inline-block;
+	width: 12px;
+	height: 12px;
+	margin-inline-end: 6px;
+	background: currentColor;
+	mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3'><polyline points='20 6 9 17 4 12'/></svg>") center / contain no-repeat;
+	-webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3'><polyline points='20 6 9 17 4 12'/></svg>") center / contain no-repeat;
+}
+
+.bn-md-card__follow[data-state="following"]:hover::after {
+	content: " " attr(data-hover-label);
+}
+
+/* Connected (accepted) — a settled, low-emphasis outline: transparent fill,
+	muted border + text, leading check. It reads as a confirmed state, not a
+	call-to-action, so it is visually distinct from "Connect" (which keeps the
+	stronger secondary fill). Hover hints at the disconnect affordance.
+	Scoped under .bn-md-card__actions so it wins over .bn-btn[data-variant]. */
+.bn-md-card__actions .bn-md-card__connect-primary[data-state="accepted"] {
+	background: transparent;
+	color: var(--bn-ink-3);
+	border-color: var(--bn-line);
+}
+.bn-md-card__actions .bn-md-card__connect-primary[data-state="accepted"]::before {
+	content: "";
+	display: inline-block;
+	width: 12px;
+	height: 12px;
+	margin-inline-end: 5px;
+	background: currentColor;
+	mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3'><polyline points='20 6 9 17 4 12'/></svg>") center / contain no-repeat;
+	-webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3'><polyline points='20 6 9 17 4 12'/></svg>") center / contain no-repeat;
+}
+.bn-md-card__actions .bn-md-card__connect-primary[data-state="accepted"]:hover {
+	color: var(--bn-danger);
+	border-color: color-mix(in oklab, var(--bn-danger) 35%, var(--bn-line));
+	background: var(--bn-danger-bg);
+}
+
+/* ── Compact member card ────────────────────────────────────────────────
+ *
+ * The featured-member block's narrow-column size. Mirrors the compact space
+ * card: the 76px cover band goes, the avatar comes out of its absolute
+ * overlap and sits beside the name.
+ *
+ * The card becomes the grid, not the body, because `.bn-md-card__avatar-link`
+ * is a SIBLING of the body — the avatar could not share a row with the name if
+ * the body owned the layout. `display: contents` on the body (and, already
+ * globally, on the identity group) hoists the name and handle up to the same
+ * grid, so avatar / name / handle line up without a single wrapper element
+ * being added to markup the directory also renders.
+ *
+ * Only the name and handle share the avatar's rows. Everything below them
+ * spans the card, so the ~230px sidebar this size exists for does not run a
+ * 44px gutter down its whole height.
+ */
+.bn-md-card[data-size="compact"] {
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr);
+	column-gap: var(--bn-s3);
+	row-gap: var(--bn-s1);
+	align-content: start;
+	padding: var(--bn-s4);
+}
+
+/* The body's own padding cleared the overlapping avatar; with display:contents
+   it generates no box, so the padding above moves onto the card. */
+.bn-md-card[data-size="compact"] .bn-md-card__body {
+	display: contents;
+}
+
+.bn-md-card[data-size="compact"] .bn-md-card__avatar-link {
+	position: static;
+	grid-column: 1;
+	grid-row: 1 / span 2;
+	align-self: center;
+}
+
+/* A 3px surface-coloured ring is a cut-out from the cover gradient. Without the
+   cover it is invisible, so compact draws a real border instead. */
+.bn-md-card[data-size="compact"] .bn-md-card__avatar-link .bn-avatar {
+	width: 44px;
+	height: 44px;
+	font-size: var(--bn-text-base);
+	border: 1px solid var(--bn-line);
+	box-shadow: none;
+}
+
+/* The kebab menu is absolutely pinned top-right. On the full card it floats
+   over the cover band, well clear of the name below it; in compact the name IS
+   the top row, so a long name (or its degree badge) ran underneath the button.
+   Reserve the gutter unconditionally so the row does not reflow between a
+   logged-out visitor, who gets no kebab, and a member, who does. */
+.bn-md-card[data-size="compact"] .bn-md-card__name {
+	grid-column: 2;
+	grid-row: 1;
+	padding-inline-end: var(--bn-s6);
+}
+
+.bn-md-card[data-size="compact"] .bn-md-card__handle {
+	grid-column: 2;
+	grid-row: 2;
+}
+
+.bn-md-card[data-size="compact"] .bn-md-card__body > :not(.bn-md-card__identity) {
+	grid-column: 1 / -1;
+}
+
+.bn-md-card[data-size="compact"] .bn-md-card__actions {
+	margin-block-start: 0;
+	padding-block-start: var(--bn-s2);
+}
+
+/* Touch floor for the directory's own composite controls. bn-base.css raises
+   every primitive to 44px on touch, but .bn-md-strip__online is a LABEL acting
+   as a control, so no primitive selector reaches it. */
+@media (pointer: coarse), (max-width: 768px) {
+	.bn-md-strip__online {
+		min-block-size: 44px;
+	}
+}

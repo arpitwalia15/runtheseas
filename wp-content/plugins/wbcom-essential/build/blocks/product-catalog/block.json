@@ -1,0 +1,166 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "wbcom-essential/product-catalog",
+  "version": "2.0.0",
+  "title": "Product Catalog",
+  "category": "essential-edd",
+  "icon": "grid-view",
+  "description": "An AJAX-powered product grid with category, price, and search filters for EDD products.",
+  "keywords": [
+    "catalog",
+    "products",
+    "filter",
+    "shop",
+    "edd",
+    "downloads",
+    "essential",
+    "wbcom"
+  ],
+  "textdomain": "wbcom-essential",
+  "supports": {
+    "html": false,
+    "align": [
+      "wide",
+      "full"
+    ],
+    "spacing": {
+      "margin": true,
+      "padding": true
+    }
+  },
+  "attributes": {
+    "columns": {
+      "type": "number",
+      "default": 3
+    },
+    "perPage": {
+      "type": "number",
+      "default": 12
+    },
+    "showSearch": {
+      "type": "boolean",
+      "default": true
+    },
+    "showCategoryFilter": {
+      "type": "boolean",
+      "default": true
+    },
+    "showPriceFilter": {
+      "type": "boolean",
+      "default": true
+    },
+    "showSort": {
+      "type": "boolean",
+      "default": true
+    },
+    "defaultCategory": {
+      "type": "number",
+      "default": 0
+    },
+    "defaultSort": {
+      "type": "string",
+      "default": "title"
+    },
+    "uniqueId": {
+      "type": "string",
+      "default": ""
+    },
+    "padding": {
+      "type": "object",
+      "default": {
+        "top": 24,
+        "right": 24,
+        "bottom": 24,
+        "left": 24
+      }
+    },
+    "paddingTablet": {
+      "type": "object",
+      "default": null
+    },
+    "paddingMobile": {
+      "type": "object",
+      "default": null
+    },
+    "paddingUnit": {
+      "type": "string",
+      "default": "px"
+    },
+    "margin": {
+      "type": "object",
+      "default": {
+        "top": 0,
+        "right": 0,
+        "bottom": 0,
+        "left": 0
+      }
+    },
+    "marginTablet": {
+      "type": "object",
+      "default": null
+    },
+    "marginMobile": {
+      "type": "object",
+      "default": null
+    },
+    "marginUnit": {
+      "type": "string",
+      "default": "px"
+    },
+    "boxShadow": {
+      "type": "boolean",
+      "default": false
+    },
+    "shadowHorizontal": {
+      "type": "number",
+      "default": 0
+    },
+    "shadowVertical": {
+      "type": "number",
+      "default": 4
+    },
+    "shadowBlur": {
+      "type": "number",
+      "default": 8
+    },
+    "shadowSpread": {
+      "type": "number",
+      "default": 0
+    },
+    "shadowColor": {
+      "type": "string",
+      "default": "rgba(0, 0, 0, 0.12)"
+    },
+    "borderRadius": {
+      "type": "object",
+      "default": {
+        "top": 0,
+        "right": 0,
+        "bottom": 0,
+        "left": 0
+      }
+    },
+    "borderRadiusUnit": {
+      "type": "string",
+      "default": "px"
+    },
+    "hideOnDesktop": {
+      "type": "boolean",
+      "default": false
+    },
+    "hideOnTablet": {
+      "type": "boolean",
+      "default": false
+    },
+    "hideOnMobile": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "editorScript": "file:./index.js",
+  "editorStyle": "file:./index.css",
+  "style": "file:./style-index.css",
+  "render": "file:./render.php",
+  "viewScript": "file:./view.js"
+}

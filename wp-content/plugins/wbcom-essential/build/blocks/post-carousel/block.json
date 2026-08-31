@@ -1,0 +1,233 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "wbcom-essential/post-carousel",
+  "version": "1.0.0",
+  "title": "Post Carousel",
+  "category": "essential-blog",
+  "icon": "admin-post",
+  "description": "Display WordPress posts in a carousel, slider, or grid with category filter and flexible card design.",
+  "keywords": [
+    "posts",
+    "carousel",
+    "slider",
+    "grid",
+    "blog",
+    "articles",
+    "query",
+    "essential",
+    "wbcom"
+  ],
+  "textdomain": "wbcom-essential",
+  "example": {
+    "attributes": {
+      "displayMode": "grid",
+      "postsPerPage": 3,
+      "slidesPerView": 3
+    }
+  },
+  "attributes": {
+    "uniqueId": {
+      "type": "string",
+      "default": ""
+    },
+    "postType": {
+      "type": "string",
+      "default": "post"
+    },
+    "postsPerPage": {
+      "type": "number",
+      "default": 6
+    },
+    "categories": {
+      "type": "array",
+      "default": []
+    },
+    "orderBy": {
+      "type": "string",
+      "default": "date"
+    },
+    "order": {
+      "type": "string",
+      "default": "DESC"
+    },
+    "displayMode": {
+      "type": "string",
+      "default": "carousel"
+    },
+    "slidesPerView": {
+      "type": "number",
+      "default": 3
+    },
+    "autoplay": {
+      "type": "boolean",
+      "default": true
+    },
+    "autoplayDelay": {
+      "type": "number",
+      "default": 5000
+    },
+    "showImage": {
+      "type": "boolean",
+      "default": true
+    },
+    "showExcerpt": {
+      "type": "boolean",
+      "default": true
+    },
+    "showDate": {
+      "type": "boolean",
+      "default": true
+    },
+    "showCategory": {
+      "type": "boolean",
+      "default": true
+    },
+    "showAuthor": {
+      "type": "boolean",
+      "default": false
+    },
+    "excerptLength": {
+      "type": "number",
+      "default": 20
+    },
+    "imageRatio": {
+      "type": "string",
+      "default": "16/9"
+    },
+    "cardBg": {
+      "type": "string",
+      "default": "#ffffff"
+    },
+    "titleColor": {
+      "type": "string",
+      "default": "#1e1e2e"
+    },
+    "excerptColor": {
+      "type": "string",
+      "default": "#6c757d"
+    },
+    "metaColor": {
+      "type": "string",
+      "default": "#999999"
+    },
+    "accentColor": {
+      "type": "string",
+      "default": "#667eea"
+    },
+    "padding": {
+      "type": "object",
+      "default": {
+        "top": 0,
+        "right": 0,
+        "bottom": 0,
+        "left": 0
+      }
+    },
+    "paddingTablet": {
+      "type": "object",
+      "default": null
+    },
+    "paddingMobile": {
+      "type": "object",
+      "default": null
+    },
+    "paddingUnit": {
+      "type": "string",
+      "default": "px"
+    },
+    "margin": {
+      "type": "object",
+      "default": {
+        "top": 0,
+        "right": 0,
+        "bottom": 0,
+        "left": 0
+      }
+    },
+    "marginTablet": {
+      "type": "object",
+      "default": null
+    },
+    "marginMobile": {
+      "type": "object",
+      "default": null
+    },
+    "marginUnit": {
+      "type": "string",
+      "default": "px"
+    },
+    "boxShadow": {
+      "type": "boolean",
+      "default": false
+    },
+    "shadowHorizontal": {
+      "type": "number",
+      "default": 0
+    },
+    "shadowVertical": {
+      "type": "number",
+      "default": 8
+    },
+    "shadowBlur": {
+      "type": "number",
+      "default": 24
+    },
+    "shadowSpread": {
+      "type": "number",
+      "default": 0
+    },
+    "shadowColor": {
+      "type": "string",
+      "default": "rgba(0, 0, 0, 0.08)"
+    },
+    "borderRadius": {
+      "type": "object",
+      "default": {
+        "top": 8,
+        "right": 8,
+        "bottom": 8,
+        "left": 8
+      }
+    },
+    "borderRadiusUnit": {
+      "type": "string",
+      "default": "px"
+    },
+    "hideOnDesktop": {
+      "type": "boolean",
+      "default": false
+    },
+    "hideOnTablet": {
+      "type": "boolean",
+      "default": false
+    },
+    "hideOnMobile": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "supports": {
+    "html": false,
+    "align": [
+      "wide",
+      "full"
+    ],
+    "color": {
+      "background": true,
+      "text": false
+    },
+    "spacing": {
+      "margin": true,
+      "padding": true
+    }
+  },
+  "editorScript": "file:./index.js",
+  "editorStyle": "file:./index.css",
+  "style": "file:./style-index.css",
+  "viewScript": [
+    "file:./view.js",
+    "swiper"
+  ],
+  "render": "file:./render.php"
+}

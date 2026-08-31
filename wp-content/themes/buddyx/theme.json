@@ -1,0 +1,586 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/theme.json",
+	"version": 3,
+	"settings": {
+		"customTemplates": [
+			{
+				"name": "blank",
+				"postTypes": [
+					"page",
+					"post"
+				],
+				"title": "Blank"
+			},
+			{
+				"name": "blog-alternative",
+				"postTypes": [
+					"page"
+				],
+				"title": "Blog (Alternative)"
+			},
+			{
+				"name": "404",
+				"postTypes": [
+					"page"
+				],
+				"title": "404"
+			}
+		],
+		"appearanceTools": true,
+		"color": {
+			"palette": [
+				{
+					"slug": "base",
+					"color": "#FFFFFF",
+					"name": "Base"
+				},
+				{
+					"slug": "base-2",
+					"color": "#FAFAFA",
+					"name": "Base 2"
+				},
+				{
+					"slug": "base-3",
+					"color": "#F4F4F4",
+					"name": "Base 3"
+				},
+				{
+					"slug": "contrast",
+					"color": "#1A1A1A",
+					"name": "Contrast"
+				},
+				{
+					"slug": "contrast-2",
+					"color": "#3D3D3D",
+					"name": "Contrast 2"
+				},
+				{
+					"slug": "contrast-3",
+					"color": "#6E6E6E",
+					"name": "Contrast 3"
+				},
+				{
+					"slug": "accent",
+					"color": "#D83734",
+					"name": "Accent"
+				},
+				{
+					"slug": "accent-2",
+					"color": "#3A7882",
+					"name": "Accent 2"
+				},
+				{
+					"slug": "accent-3",
+					"color": "#F4D35E",
+					"name": "Accent 3"
+				},
+				{
+					"slug": "surface-1",
+					"color": "#FFF8F2",
+					"name": "Surface Warm"
+				},
+				{
+					"slug": "surface-2",
+					"color": "#F2F7F8",
+					"name": "Surface Cool"
+				},
+				{
+					"slug": "surface-3",
+					"color": "#1F2937",
+					"name": "Surface Dark"
+				},
+				{
+					"slug": "primary",
+					"color": "#ef5455",
+					"name": "Primary"
+				},
+				{
+					"slug": "secondary",
+					"color": "#41848f",
+					"name": "Secondary"
+				},
+				{
+					"slug": "red",
+					"color": "#c0392b",
+					"name": "Red"
+				},
+				{
+					"slug": "green",
+					"color": "#27ae60",
+					"name": "Green"
+				},
+				{
+					"slug": "blue",
+					"color": "#2980b9",
+					"name": "Blue"
+				},
+				{
+					"slug": "yellow",
+					"color": "#f1c40f",
+					"name": "Yellow"
+				},
+				{
+					"slug": "black",
+					"color": "#1c2833",
+					"name": "Black"
+				},
+				{
+					"slug": "grey",
+					"color": "#95a5a6",
+					"name": "Grey"
+				},
+				{
+					"slug": "white",
+					"color": "#ecf0f1",
+					"name": "White"
+				},
+				{
+					"slug": "custom-daylight",
+					"color": "#97c0b7",
+					"name": "Dusty Daylight"
+				},
+				{
+					"slug": "custom-sun",
+					"color": "#eee9d1",
+					"name": "Dusty Sun"
+				}
+			],
+			"gradients": [
+				{
+					"slug": "subtle-base",
+					"name": "Subtle Base",
+					"gradient": "linear-gradient(180deg, #FFFFFF 0%, #FAFAFA 100%)"
+				},
+				{
+					"slug": "warm-glow",
+					"name": "Warm Glow",
+					"gradient": "linear-gradient(135deg, #FFF8F2 0%, #F4D35E 100%)"
+				},
+				{
+					"slug": "cool-mist",
+					"name": "Cool Mist",
+					"gradient": "linear-gradient(135deg, #F2F7F8 0%, #97C0B7 100%)"
+				},
+				{
+					"slug": "accent-bold",
+					"name": "Accent Bold",
+					"gradient": "linear-gradient(135deg, #D83734 0%, #3A7882 100%)"
+				},
+				{
+					"slug": "dark-velvet",
+					"name": "Dark Velvet",
+					"gradient": "linear-gradient(135deg, #1F2937 0%, #1A1A1A 100%)"
+				}
+			],
+			"duotone": [
+				{
+					"slug": "base-contrast",
+					"name": "Base / Contrast",
+					"colors": [
+						"#FFFFFF",
+						"#1A1A1A"
+					]
+				},
+				{
+					"slug": "warm",
+					"name": "Warm",
+					"colors": [
+						"#FFF8F2",
+						"#D83734"
+					]
+				}
+			]
+		},
+		"spacing": {
+			"blockGap": true,
+			"margin": true,
+			"padding": true,
+			"units": [
+				"%",
+				"px",
+				"em",
+				"rem",
+				"vh",
+				"vw"
+			],
+			"spacingScale": {
+				"operator": "*",
+				"increment": 1.5,
+				"steps": 0,
+				"mediumStep": 1.5,
+				"unit": "rem"
+			},
+			"spacingSizes": [
+				{ "slug": "10",  "size": "0.5rem",  "name": "1 (8px)" },
+				{ "slug": "20",  "size": "1rem",    "name": "2 (16px)" },
+				{ "slug": "30",  "size": "1.5rem",  "name": "3 (24px)" },
+				{ "slug": "40",  "size": "2rem",    "name": "4 (32px)" },
+				{ "slug": "50",  "size": "3rem",    "name": "5 (48px)" },
+				{ "slug": "60",  "size": "4rem",    "name": "6 (64px)" },
+				{ "slug": "70",  "size": "5rem",    "name": "7 (80px)" },
+				{ "slug": "80",  "size": "6rem",    "name": "8 (96px)" },
+				{ "slug": "90",  "size": "8rem",    "name": "9 (128px)" },
+				{ "slug": "100", "size": "10rem",   "name": "10 (160px)" }
+			]
+		},
+		"typography": {
+			"dropCap": false,
+			"fluid": true,
+			"defaultFontSizes": false,
+			"fontSizes": [
+				{
+					"slug": "x-small",
+					"size": "0.75rem",
+					"name": "Extra Small"
+				},
+				{
+					"slug": "small",
+					"size": "clamp(0.875rem, 0.75vw + 0.7rem, 1rem)",
+					"name": "Small"
+				},
+				{
+					"slug": "medium",
+					"size": "clamp(1rem, 0.4vw + 0.95rem, 1.125rem)",
+					"name": "Medium"
+				},
+				{
+					"slug": "large",
+					"size": "clamp(1.25rem, 1vw + 1.05rem, 1.5rem)",
+					"name": "Large"
+				},
+				{
+					"slug": "x-large",
+					"size": "clamp(1.875rem, 2vw + 1.5rem, 2.5rem)",
+					"name": "Extra Large"
+				},
+				{
+					"slug": "xx-large",
+					"size": "clamp(2.5rem, 3vw + 1.8rem, 3.75rem)",
+					"name": "Display"
+				},
+				{
+					"slug": "mega",
+					"size": "clamp(3.75rem, 6vw + 2rem, 6rem)",
+					"name": "Mega"
+				},
+				{
+					"slug": "larger",
+					"size": "39px",
+					"name": "Legacy Larger"
+				}
+			],
+			"fontFamilies": [
+				{
+					"slug": "inter",
+					"name": "Inter",
+					"fontFamily": "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+					"fontFace": [
+						{
+							"fontFamily": "Inter",
+							"fontWeight": "400",
+							"fontStyle": "normal",
+							"src": [
+								"file:./assets/fonts/inter/Inter-Regular.woff2"
+							]
+						},
+						{
+							"fontFamily": "Inter",
+							"fontWeight": "500",
+							"fontStyle": "normal",
+							"src": [
+								"file:./assets/fonts/inter/Inter-Medium.woff2"
+							]
+						},
+						{
+							"fontFamily": "Inter",
+							"fontWeight": "600",
+							"fontStyle": "normal",
+							"src": [
+								"file:./assets/fonts/inter/Inter-SemiBold.woff2"
+							]
+						},
+						{
+							"fontFamily": "Inter",
+							"fontWeight": "700",
+							"fontStyle": "normal",
+							"src": [
+								"file:./assets/fonts/inter/Inter-Bold.woff2"
+							]
+						}
+					]
+				},
+				{
+					"slug": "newsreader",
+					"name": "Newsreader",
+					"fontFamily": "'Newsreader', Georgia, serif",
+					"fontFace": [
+						{
+							"fontFamily": "Newsreader",
+							"fontWeight": "400",
+							"fontStyle": "normal",
+							"src": [
+								"file:./assets/fonts/newsreader/Newsreader-Regular.woff2"
+							]
+						},
+						{
+							"fontFamily": "Newsreader",
+							"fontWeight": "400",
+							"fontStyle": "italic",
+							"src": [
+								"file:./assets/fonts/newsreader/Newsreader-Italic.woff2"
+							]
+						},
+						{
+							"fontFamily": "Newsreader",
+							"fontWeight": "500",
+							"fontStyle": "normal",
+							"src": [
+								"file:./assets/fonts/newsreader/Newsreader-Medium.woff2"
+							]
+						}
+					]
+				},
+				{
+					"slug": "system",
+					"name": "System UI",
+					"fontFamily": "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+				}
+			]
+		},
+		"layout": {
+			"contentSize": "720px",
+			"wideSize": "1200px"
+		}
+	},
+	"styles": {
+		"typography": {
+			"fontFamily": "var(--wp--preset--font-family--inter)",
+			"fontWeight": "400",
+			"lineHeight": "1.6",
+			"fontSize": "var(--wp--preset--font-size--medium)"
+		},
+		"elements": {
+			"link": {
+				"typography": {
+					"textDecoration": "none"
+				}
+			},
+			"caption": {
+				"typography": {
+					"fontSize": "var:preset|font-size|small",
+					"fontStyle": "italic"
+				}
+			},
+			"h1": {
+				"typography": {
+					"fontFamily": "var(--wp--preset--font-family--inter)",
+					"fontWeight": "700",
+					"lineHeight": "1.1",
+					"letterSpacing": "-0.02em",
+					"fontSize": "var(--wp--preset--font-size--xx-large)"
+				}
+			},
+			"h2": {
+				"typography": {
+					"fontFamily": "var(--wp--preset--font-family--inter)",
+					"fontWeight": "700",
+					"lineHeight": "1.15",
+					"letterSpacing": "-0.015em",
+					"fontSize": "var(--wp--preset--font-size--x-large)"
+				}
+			},
+			"h3": {
+				"typography": {
+					"fontFamily": "var(--wp--preset--font-family--inter)",
+					"fontWeight": "600",
+					"lineHeight": "1.2",
+					"fontSize": "var(--wp--preset--font-size--large)"
+				}
+			}
+		},
+		"blocks": {
+			"core/avatar": {
+				"border": {
+					"radius": "100px"
+				}
+			},
+			"core/buttons": {
+				"spacing": {
+					"blockGap": "16px"
+				}
+			},
+			"core/columns": {
+				"spacing": {
+					"blockGap": "30px"
+				}
+			},
+			"core/comment-author-name": {
+				"typography": {
+					"fontSize": "var:preset|font-size|small",
+					"fontWeight": "700"
+				}
+			},
+			"core/comment-content": {
+				"typography": {
+					"fontSize": "var:preset|font-size|medium"
+				}
+			},
+			"core/comment-date": {
+				"typography": {
+					"fontSize": "var:preset|font-size|small"
+				}
+			},
+			"core/comment-edit-link": {
+				"typography": {
+					"fontSize": "var:preset|font-size|small"
+				}
+			},
+			"core/comment-reply-link": {
+				"typography": {
+					"fontSize": "var:preset|font-size|small"
+				}
+			},
+			"core/comments-pagination": {
+				"typography": {
+					"fontSize": "var:preset|font-size|medium"
+				}
+			},
+			"core/list": {
+				"css": "& li { margin-top: 0.5rem; }"
+			},
+			"core/navigation": {
+				"typography": {
+					"fontSize": "var:preset|font-size|medium"
+				},
+				"elements": {
+					"link": {
+						"typography": {
+							"textDecoration": "none"
+						},
+						":hover": {
+							"typography": {
+								"textDecoration": "underline"
+							}
+						}
+					}
+				}
+			},
+			"core/post-date": {
+				"typography": {
+					"fontSize": "var:preset|font-size|small"
+				}
+			},
+			"core/post-navigation-link": {
+				"typography": {
+					"fontSize": "var:preset|font-size|medium"
+				}
+			},
+			"core/post-terms": {
+				"typography": {
+					"fontSize": "var:preset|font-size|small",
+					"fontWeight": "600"
+				}
+			},
+			"core/post-title": {
+				"elements": {
+					"link": {
+						"typography": {
+							"textDecoration": "none"
+						},
+						":hover": {
+							"typography": {
+								"textDecoration": "underline"
+							}
+						}
+					}
+				}
+			},
+			"core/pullquote": {
+				"typography": {
+					"fontWeight": "300",
+					"lineHeight": "1.4"
+				}
+			},
+			"core/query-pagination": {
+				"typography": {
+					"fontSize": "var:preset|font-size|medium",
+					"fontWeight": "500"
+				}
+			},
+			"core/quote": {
+				"typography": {
+					"fontWeight": "300"
+				},
+				"elements": {
+					"cite": {
+						"typography": {
+							"fontSize": "var:preset|font-size|small",
+							"fontStyle": "normal"
+						}
+					}
+				}
+			},
+			"core/search": {
+				"typography": {
+					"fontSize": "var:preset|font-size|medium"
+				}
+			},
+			"core/separator": {
+				"border": {
+					"color": "currentColor",
+					"style": "solid",
+					"width": "0 0 1px 0"
+				}
+			},
+			"core/site-tagline": {
+				"typography": {
+					"fontSize": "var:preset|font-size|medium"
+				}
+			},
+			"core/site-title": {
+				"typography": {
+					"fontWeight": "700"
+				},
+				"elements": {
+					"link": {
+						"typography": {
+							"textDecoration": "none"
+						},
+						":hover": {
+							"typography": {
+								"textDecoration": "underline"
+							}
+						}
+					}
+				}
+			},
+			"core/term-description": {
+				"typography": {
+					"fontSize": "var:preset|font-size|medium"
+				}
+			}
+		}
+	},
+	"templateParts": [
+		{
+			"area": "header",
+			"name": "header",
+			"title": "Header"
+		},
+		{
+			"area": "footer",
+			"name": "footer",
+			"title": "Footer"
+		},
+		{
+			"area": "general",
+			"name": "comments",
+			"title": "Comments"
+		},
+		{
+			"area": "general",
+			"name": "post-meta",
+			"title": "Post Meta"
+		}
+	]
+}

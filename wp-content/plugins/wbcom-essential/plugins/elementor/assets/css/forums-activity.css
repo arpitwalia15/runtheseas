@@ -1,0 +1,285 @@
+/** common */
+.wbcom-essential-block-header {
+	margin: 0 0 22px;
+}
+
+.wbcom-essential-block-header h3 {
+	margin: 0;
+	font-weight: 500;
+}
+
+.wbcom-essential-block-header__extra {
+	font-size: 12px;
+	font-weight: 500;
+	text-align: right;
+	text-transform: uppercase;
+	letter-spacing: 0.3px;
+}
+
+.flex {
+	display: -webkit-box;
+	display: -ms-flexbox;
+	display: flex;
+}
+
+.align-items-center {
+	-webkit-box-align: center;
+	-ms-flex-align: center;
+	align-items: center;
+}
+
+.push-right {
+	margin-left: auto;
+}
+
+/* widget */
+.wbcom-essential-forums-activity {
+	border: 1px solid #e3e3e3;
+	padding: 20px;
+	background-color: #fff;
+	position: relative;
+	min-height: 250px;
+}
+
+.wbcom-essential-forums-activity-btn a.wbcom-essential-forums-activity-btn__link {
+	font-size: 13px;
+	display: inline-block;
+	border-radius: 100px;
+	padding: 2px 15px;
+	border: 1px solid #e3e3e3;
+	cursor: pointer;
+}
+
+.wbcom-essential-forums-activity-btn {
+	text-align: right;
+	position: absolute;
+	top: -50px;
+}
+
+.elementor-cta--fa-my-align-left .wbcom-essential-forums-activity-btn {
+	text-align: left;
+	left: 0;
+}
+
+.elementor-cta--fa-my-align-center .wbcom-essential-forums-activity-btn {
+	text-align: center;
+	left: 0;
+	right: 0;
+	margin: 0 auto;
+}
+
+.elementor-cta--fa-my-align-right .wbcom-essential-forums-activity-btn {
+	text-align: right;
+	right: 0;
+}
+
+.wbcom-essential-no-data {
+	text-align: center;
+	font-size: 14px;
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	-webkit-transform: translate(-50%,-50%);
+	-ms-transform: translate(-50%,-50%);
+	transform: translate(-50%,-50%);
+	width: 100%;
+}
+
+.wbcom-essential-no-data__image {
+	max-width: 50%;
+	margin: 0 auto 25px;
+}
+
+.wbcom-essential-no-data .wbcom-essential-no-data__link {
+	display: inline-block;
+	font-size: 14px;
+	padding: 4px 20px;
+	border: 1px solid #e3e3e3;
+	border-radius: 30px;
+	margin: 10px 0 0;
+}
+
+.wbcom-essential-no-data .bbp-template-notice {
+	box-shadow: none;
+	margin: 0;
+	padding: 0 10%;
+	background: #fff;
+	border: 0;
+}
+
+.wbcom-essential-no-data .bbp-template-notice ul {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.wbcom-essential-no-data__msg {
+	font-size: 14px;
+}
+
+@media (min-width: 768px) {
+	.elementor-widget-bbp-forums-activity,
+	.elementor-widget-bbp-forums-activity .elementor-widget-container,
+	.wbcom-essential-forums-activity,
+	.wbcom-essential-forums-activity-wrapper {
+		height: 100%;
+	}
+}
+
+.wbcom-essential-forums-activity {
+	border: 1px solid #e3e3e3;
+	padding: 20px;
+	background-color: #fff;
+	position: relative;
+	min-height: 250px;
+}
+
+.wbcom-essential-fa__forum-title {
+	text-transform: uppercase;
+	font-size: 13px;
+	color: #A3A5A9;
+	font-weight: 500;
+}
+
+.wbcom-essential-fa__topic-title h2 {
+	font-weight: 500;
+	margin-bottom: 10px;
+	line-height: 1.2;
+}
+
+.wbcom-essential-fa__meta {
+	line-height: 1;
+	margin: 0 0 20px;
+}
+
+.wbcom-essential-fa__meta span {
+	color: #A3A5A9;
+	font-size: 13px;
+}
+
+.wbcom-essential-fa__excerpt {
+	font-size: 14px;
+	margin: 0 0 20px 26px;
+	line-height: 1.4;
+	display: -webkit-box;
+	display: -ms-flexbox;
+	display: flex;
+	-webkit-box-align: start;
+	-ms-flex-align: start;
+	align-items: flex-start;
+	position: relative;
+}
+
+.wbcom-essential-fa__excerpt.no-link {
+	margin-left: 0;
+}
+
+.wbcom-essential-fa__excerpt a.bbp-reply-to-link i {
+	font-size: 14px;
+	line-height: 1.4;
+	opacity: 0.5;
+}
+
+.wbcom-essential-fa__excerpt a.bbp-reply-to-link {
+	color: #939597;
+	display: inline-block;
+	position: absolute;
+	left: -32px;
+	top: -3px;
+}
+
+.wbcom-essential-fa__excerpt.is-empty {
+	margin: 0;
+}
+
+.wbcom-essential-fa__excerpt.is-empty a.bbp-reply-to-link {
+	display: none;
+}
+
+.wbcom-essential-fa__link {
+	display: -webkit-box;
+	display: -ms-flexbox;
+	display: flex;
+}
+
+.wbcom-essential-fa__link a {
+	display: inline-block;
+	font-size: 14px;
+	padding: 4px 20px;
+	border: 1px solid #e3e3e3;
+	border-radius: 30px;
+}
+
+.elementor-cta--falign-right .wbcom-essential-fa__link a {
+	margin-left: auto;
+}
+
+.elementor-cta--falign-left .wbcom-essential-fa__link a {
+	margin-right: auto;
+}
+
+.elementor-cta--falign-center .wbcom-essential-fa__link a {
+	margin-right: auto;
+	margin-left: auto;
+}
+
+.elementor-cta--fa-my-align-right .wbcom-essential-forums-activity-btn {
+	text-align: right;
+	right: 0;
+}
+
+.elementor-cta--fa-my-align-left .wbcom-essential-forums-activity-btn {
+	text-align: left;
+	left: 0;
+}
+
+.elementor-cta--fa-my-align-center .wbcom-essential-forums-activity-btn {
+	text-align: center;
+	left: 0;
+	right: 0;
+	margin: 0 auto;
+}
+
+.wbcom-essential-forums-activity-wrapper {
+	position: relative;
+	min-height: 250px;
+}
+
+@media (max-width: 768px) {
+	.wbcom-essential-forums-activity-wrapper--ismy {
+		margin-top: 50px;
+	}
+}
+
+.wbcom-essential-forums-activity-btn {
+	text-align: right;
+	position: absolute;
+	top: -50px;
+}
+
+.wbcom-essential-forums-activity-btn a.wbcom-essential-forums-activity-btn__link {
+	font-size: 13px;
+	display: inline-block;
+	border-radius: 100px;
+	padding: 2px 15px;
+	color: #939597;
+	border: 1px solid #e3e3e3;
+	cursor: pointer;
+}
+
+.wbcom-essential-forums-activity-btn a.wbcom-essential-forums-activity-btn__link:hover {
+	color: #007CFF;
+}
+
+.wbcom-essential-forums-activity-btn a.wbcom-essential-forums-activity-btn__link i {
+	font-size: 20px;
+	position: relative;
+	top: 3px;
+	left: 3px;
+}
+
+body.rtl .wbcom-essential-forums-activity-btn__link i {
+	-webkit-transform: scaleX(-1);
+	-ms-transform: scaleX(-1);
+	transform: scaleX(-1);
+}

@@ -1,0 +1,1369 @@
+/*
+ * BuddyNext — Moderation (v2)
+ *
+ * Front-end moderation queue + community-admin aggregate surface. Composed
+ * from the v2 primitive layer in bn-base.css:
+ *   .bn-card[data-v2]           wraps the filter strip, report rows, and
+ *                               community-admin sections.
+ *   .bn-tabs / .bn-tab           Open / Resolved / Escalated and the
+ *                               community-admin section switcher.
+ *   .bn-tab__count              report count chip per tab.
+ *   .bn-input / .bn-select      search + reason / sort filters.
+ *   .bn-badge[data-tone]        severity + reason + status pills.
+ *   .bn-avatar[data-size]       offender + reporter + signup avatars.
+ *   .bn-btn[data-variant]       dismiss / remove / warn / strike / suspend.
+ *   .bn-modal-backdrop / __panel destructive-action confirm shells.
+ *   .bn-stat / .bn-stat-grid    queue-depth + resolution-time counters.
+ *
+ * No raw hex, no raw px in component selectors, no @media outside the
+ * dedicated responsive block at the bottom.
+ */
+
+/* Component-local tokens — sizes outside the global --bn-s* (4px) grid:
+   moderation avatar/icon dimensions and the shell/scroll max bounds. Hairline
+   borders, dividers, and strike dots stay raw px (structural, sub-grid). */
+:root {
+	--bn-mod-avatar:      56px;
+	--bn-mod-avatar-icon: 28px;
+	--bn-mod-icon:        16px;
+	--bn-mod-icon-sm:     14px;
+	--bn-mod-shell-max:   1060px;
+	--bn-mod-scroll-max:  320px;
+}
+
+
+/* ──────────────────────────────────────────────────────────────────────
+ * 1. Moderation queue — front-end (templates/moderation/queue.php)
+ * ────────────────────────────────────────────────────────────────────── */
+
+/* Page shell + header */
+.bn-mod-shell {
+	max-width: var(--bn-mod-shell-max);
+	margin: 0 auto;
+	padding: var(--bn-s6) var(--bn-s5);
+	font-family: var(--bn-font-ui);
+	font-size: var(--bn-text-base);
+	color: var(--bn-ink);
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s5);
+}
+
+.bn-mod-header {
+	display: flex;
+	align-items: flex-end;
+	justify-content: space-between;
+	gap: var(--bn-s3);
+	flex-wrap: wrap;
+}
+
+.bn-mod-header__copy {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s1);
+	min-width: 0;
+}
+
+.bn-mod-title {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	font-family: var(--bn-font-display);
+	font-size: var(--bn-text-2xl);
+	font-weight: var(--bn-fw-bold);
+	color: var(--bn-ink);
+	letter-spacing: var(--bn-ls-tight);
+	margin: 0;
+}
+
+.bn-mod-sub {
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink-3);
+}
+
+/* Stats — extends .bn-stat-grid primitive */
+.bn-mod-stat-grid {
+	display: grid;
+	grid-template-columns: repeat(5, 1fr);
+	gap: var(--bn-s3);
+}
+
+/* Filter strip — composed inside a .bn-card */
+.bn-mod-filterbar {
+	background: var(--bn-surface);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-lg);
+	padding: var(--bn-s3) var(--bn-s4);
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s4);
+	flex-wrap: wrap;
+}
+
+.bn-mod-filterbar__tabs {
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow-x: auto;
+	scrollbar-width: none;
+}
+
+.bn-mod-filterbar__tabs::-webkit-scrollbar { display: none; }
+
+.bn-mod-filterbar__controls {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	flex-shrink: 0;
+}
+
+.bn-mod-filterbar__sort {
+	min-width: 180px;
+}
+
+/* Report list — sequence of .bn-card[data-v2] report rows */
+.bn-mod-list {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s3);
+}
+
+.bn-report-row {
+	background: var(--bn-surface);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-lg);
+	display: flex;
+	gap: var(--bn-s3);
+	padding: var(--bn-s4);
+	position: relative;
+	transition: border-color var(--bn-dur-fast) var(--bn-ease);
+}
+
+.bn-report-row:hover { border-color: var(--bn-line-strong); }
+
+.bn-report-row[data-severity="urgent"] {
+	border-inline-start: 3px solid var(--bn-danger);
+}
+
+.bn-report-row[data-severity="medium"] {
+	border-inline-start: 3px solid var(--bn-warn);
+}
+
+.bn-report-row[data-severity="low"] {
+	border-inline-start: 3px solid var(--bn-line-strong);
+}
+
+.bn-report-row__avatar { flex-shrink: 0; }
+
+.bn-report-row__body {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s2);
+}
+
+.bn-report-row__head {
+	display: flex;
+	align-items: baseline;
+	gap: var(--bn-s2);
+	flex-wrap: wrap;
+}
+
+.bn-report-row__name {
+	font-size: var(--bn-text-sm);
+	font-weight: var(--bn-fw-semibold);
+	color: var(--bn-ink);
+}
+
+.bn-report-row__verb {
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink-3);
+}
+
+.bn-report-row__meta {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-4);
+	flex-wrap: wrap;
+}
+
+.bn-report-row__meta-dot {
+	width: 3px;
+	height: 3px;
+	background: currentColor;
+	border-radius: 50%;
+	opacity: 0.5;
+}
+
+.bn-report-row__time {
+	font-family: var(--bn-font-mono);
+	font-size: var(--bn-text-2xs);
+	color: var(--bn-ink-4);
+}
+
+.bn-report-row__excerpt {
+	background: var(--bn-sunken);
+	border-inline-start: 2px solid var(--bn-line);
+	border-radius: var(--bn-r-sm);
+	padding: var(--bn-s2) var(--bn-s3);
+	font-size: var(--bn-text-sm);
+	line-height: var(--bn-leading-normal);
+	color: var(--bn-ink-2);
+}
+
+.bn-report-row__reason {
+	display: flex;
+	align-items: baseline;
+	gap: var(--bn-s2);
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+	flex-wrap: wrap;
+}
+
+.bn-report-row__reason-label {
+	color: var(--bn-ink-2);
+	font-weight: var(--bn-fw-semibold);
+	letter-spacing: var(--bn-ls-wide);
+	text-transform: uppercase;
+	font-size: var(--bn-text-2xs);
+}
+
+.bn-report-row__reporters {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+	flex-wrap: wrap;
+}
+
+.bn-report-row__reporters-stack {
+	display: inline-flex;
+}
+
+.bn-report-row__reporters-stack > .bn-avatar {
+	margin-inline-start: -6px;
+	border: 2px solid var(--bn-surface);
+}
+
+.bn-report-row__reporters-stack > .bn-avatar:first-child {
+	margin-inline-start: 0;
+}
+
+.bn-report-row__context-link {
+	background: transparent;
+	border: none;
+	padding: 0;
+	font: inherit;
+	color: var(--bn-accent);
+	font-weight: var(--bn-fw-semibold);
+	cursor: pointer;
+	text-decoration: underline;
+	text-underline-offset: 2px;
+}
+
+.bn-report-row__context-link:focus-visible {
+	outline: 2px solid transparent;
+	outline-offset: 2px;
+	box-shadow: var(--bn-ring);
+	border-radius: var(--bn-r-sm);
+}
+
+.bn-report-row__actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--bn-s2);
+	margin-top: var(--bn-s1);
+}
+
+/* Empty / restricted states — shared v2 pattern. */
+.bn-mod-empty {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: var(--bn-s3);
+	padding: var(--bn-s10) var(--bn-s5);
+	background: var(--bn-surface);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-lg);
+	text-align: center;
+}
+
+.bn-mod-empty__icon {
+	width: var(--bn-mod-avatar);
+	height: var(--bn-mod-avatar);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 50%;
+	background: var(--bn-sunken);
+	color: var(--bn-ink-3);
+}
+
+.bn-mod-empty__icon svg {
+	width: var(--bn-mod-avatar-icon);
+	height: var(--bn-mod-avatar-icon);
+}
+
+.bn-mod-empty__title {
+	font-family: var(--bn-font-display);
+	font-size: var(--bn-text-lg);
+	font-weight: var(--bn-fw-semibold);
+	color: var(--bn-ink);
+	letter-spacing: var(--bn-ls-tight);
+	margin: 0;
+}
+
+.bn-mod-empty__body {
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink-3);
+	max-width: 420px;
+	line-height: var(--bn-leading-normal);
+	margin: 0;
+}
+
+.bn-mod-restricted {
+	max-width: 540px;
+	margin: var(--bn-s10) auto;
+	padding: 0 var(--bn-s5);
+}
+
+.bn-mod-restricted__panel {
+	background: var(--bn-danger-bg);
+	border: 1px solid var(--bn-danger);
+	border-radius: var(--bn-r-lg);
+	padding: var(--bn-s8) var(--bn-s6);
+	text-align: center;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: var(--bn-s3);
+}
+
+.bn-mod-restricted__icon {
+	width: var(--bn-mod-avatar);
+	height: var(--bn-mod-avatar);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 50%;
+	background: var(--bn-surface);
+	color: var(--bn-danger);
+}
+
+.bn-mod-restricted__icon svg {
+	width: var(--bn-mod-avatar-icon);
+	height: var(--bn-mod-avatar-icon);
+}
+
+.bn-mod-restricted__title {
+	font-family: var(--bn-font-display);
+	font-size: var(--bn-text-xl);
+	font-weight: var(--bn-fw-bold);
+	color: var(--bn-ink);
+	margin: 0;
+}
+
+.bn-mod-restricted__body {
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink-2);
+	line-height: var(--bn-leading-normal);
+	margin: 0;
+}
+
+/* Suspended pill in row header. */
+.bn-report-row__suspended {
+	color: var(--bn-danger);
+	font-weight: var(--bn-fw-bold);
+	font-size: var(--bn-text-2xs);
+	text-transform: uppercase;
+	letter-spacing: var(--bn-ls-wider);
+}
+
+/* Strike dots in the row header. */
+.bn-strike-dots {
+	display: inline-flex;
+	gap: 3px;
+	align-items: center;
+}
+
+.bn-strike-dots__dot {
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: var(--bn-line-strong);
+}
+
+.bn-strike-dots__dot[data-active] { background: var(--bn-danger); }
+
+/* ──────────────────────────────────────────────────────────────────────
+ * 2. Community admin (templates/community-admin.php)
+ * ────────────────────────────────────────────────────────────────────── */
+
+.bn-ca {
+	font-family: var(--bn-font-ui);
+	font-size: var(--bn-text-base);
+	color: var(--bn-ink);
+	background: var(--bn-canvas);
+}
+
+/* Subheader — warning-toned strip. */
+.bn-ca-subheader {
+	background: var(--bn-warn-bg);
+	border-bottom: 1px solid var(--bn-line);
+	padding: var(--bn-s2) var(--bn-s6);
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s3);
+	flex-wrap: wrap;
+}
+
+.bn-ca-subheader__title {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	font-size: var(--bn-text-sm);
+	font-weight: var(--bn-fw-bold);
+	color: var(--bn-ink);
+}
+
+.bn-ca-subheader__role {
+	display: inline-flex;
+	align-items: center;
+	padding: 2px var(--bn-s2);
+	background: var(--bn-warn);
+	color: var(--bn-accent-fg);
+	font-size: var(--bn-text-2xs);
+	font-weight: var(--bn-fw-bold);
+	letter-spacing: var(--bn-ls-wide);
+	text-transform: uppercase;
+	border-radius: var(--bn-r-full);
+}
+
+.bn-ca-subheader__site {
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-2);
+}
+
+.bn-ca-subheader__actions {
+	margin-inline-start: auto;
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-s3);
+}
+
+.bn-ca-subheader__link {
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-2);
+	text-decoration: none;
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.bn-ca-subheader__link:hover { color: var(--bn-ink); }
+
+.bn-ca-subheader__link[data-emphasis="primary"] {
+	color: var(--bn-accent);
+	font-weight: var(--bn-fw-semibold);
+}
+
+/* Main layout. */
+.bn-ca-wrap {
+	display: flex;
+	gap: var(--bn-s6);
+	min-width: 0;
+	padding-block-start: var(--bn-s5);
+}
+
+.bn-ca-sidebar {
+	width: 220px;
+	flex-shrink: 0;
+	align-self: flex-start;
+	position: sticky;
+	top: var(--bn-s6);
+}
+
+.bn-ca-sidebar__card {
+	background: var(--bn-surface);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-lg);
+	overflow: hidden;
+}
+
+.bn-ca-sidebar__heading {
+	font-family: var(--bn-font-mono);
+	font-size: var(--bn-text-2xs);
+	font-weight: var(--bn-fw-bold);
+	color: var(--bn-ink-4);
+	text-transform: uppercase;
+	letter-spacing: var(--bn-ls-wider);
+	padding: var(--bn-s3) var(--bn-s4) var(--bn-s2);
+}
+
+.bn-ca-nav-item {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	padding: var(--bn-s2) var(--bn-s4);
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink);
+	text-decoration: none;
+	border-inline-start: 3px solid transparent;
+	transition: background var(--bn-dur-fast) var(--bn-ease),
+				color var(--bn-dur-fast) var(--bn-ease);
+}
+
+.bn-ca-nav-item:hover {
+	background: var(--bn-sunken);
+	color: var(--bn-ink);
+}
+
+.bn-ca-nav-item[aria-current="page"] {
+	background: var(--bn-accent-100);
+	color: var(--bn-accent-700);
+	border-inline-start-color: var(--bn-accent);
+	font-weight: var(--bn-fw-semibold);
+}
+
+.bn-ca-nav-item[data-external] {
+	color: var(--bn-ink-3);
+	font-size: var(--bn-text-xs);
+}
+
+.bn-ca-nav-item__icon {
+	display: inline-flex;
+	width: var(--bn-mod-icon);
+	height: var(--bn-mod-icon);
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+}
+
+.bn-ca-nav-item__badge {
+	margin-inline-start: auto;
+	display: inline-flex;
+	align-items: center;
+	min-width: 18px;
+	height: 18px;
+	padding: 0 6px;
+	background: var(--bn-danger);
+	color: var(--bn-accent-fg);
+	font-size: var(--bn-text-2xs);
+	font-weight: var(--bn-fw-bold);
+	border-radius: var(--bn-r-full);
+	font-family: var(--bn-font-mono);
+}
+
+.bn-ca-nav-divider {
+	height: 1px;
+	background: var(--bn-line-faint);
+	margin: var(--bn-s1) 0;
+}
+
+.bn-ca-sidebar__note {
+	padding: var(--bn-s2) var(--bn-s4) var(--bn-s4);
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-4);
+	line-height: var(--bn-leading-normal);
+}
+
+.bn-ca-main {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s5);
+}
+
+/* Section header — used above each card stack. */
+.bn-ca-section-head {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: var(--bn-s3);
+	font-family: var(--bn-font-mono);
+	font-size: var(--bn-text-2xs);
+	font-weight: var(--bn-fw-semibold);
+	letter-spacing: var(--bn-ls-wider);
+	text-transform: uppercase;
+	color: var(--bn-ink-4);
+	padding: 0 2px;
+}
+
+.bn-ca-section-head__action {
+	font-family: var(--bn-font-ui);
+	font-size: var(--bn-text-xs);
+	text-transform: none;
+	letter-spacing: var(--bn-ls-normal);
+	color: var(--bn-accent);
+	font-weight: var(--bn-fw-semibold);
+	text-decoration: none;
+}
+
+.bn-ca-section-head__action:hover { text-decoration: underline; }
+
+/* Card primitive used for every card body (signups / pending / activity). */
+.bn-ca-card {
+	background: var(--bn-surface);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-lg);
+	overflow: hidden;
+	display: flex;
+	flex-direction: column;
+}
+
+.bn-ca-card__head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--bn-s3);
+	padding: var(--bn-s3) var(--bn-s4);
+	border-bottom: 1px solid var(--bn-line-faint);
+}
+
+/* Members-section search + Invites create form: inputs + button on one aligned
+   row, padded off the card edges (the form sits between the head and the row
+   body, so it needs its own inset rather than inheriting the row padding). */
+.bn-ca-members-search,
+.bn-ca-invite-form {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	padding: var(--bn-s3) var(--bn-s4);
+	border-bottom: 1px solid var(--bn-line-faint);
+	flex-wrap: wrap;
+}
+.bn-ca-members-search .bn-input,
+.bn-ca-invite-form .bn-input {
+	flex: 1 1 12rem;
+	min-width: 0;
+}
+.bn-ca-members-search .bn-btn,
+.bn-ca-invite-form .bn-btn {
+	flex: 0 0 auto;
+}
+
+/* Inline status notice (invite sent / skipped / error). Tinted from the tone. */
+.bn-ca-notice {
+	margin: var(--bn-s3) var(--bn-s4) 0;
+	padding: var(--bn-s2) var(--bn-s3);
+	border-radius: var(--bn-r-sm);
+	font-size: var(--bn-text-sm);
+	background: color-mix( in oklch, var(--bn-accent) 10%, var(--bn-surface) );
+	color: var(--bn-ink);
+}
+.bn-ca-notice[data-tone="success"] { background: color-mix( in oklch, var(--bn-success, #16a34a) 14%, var(--bn-surface) ); }
+.bn-ca-notice[data-tone="danger"]  { background: color-mix( in oklch, var(--bn-danger) 14%, var(--bn-surface) ); }
+.bn-ca-notice[data-tone="info"]    { background: color-mix( in oklch, var(--bn-accent) 12%, var(--bn-surface) ); }
+
+/* Give the role <select> a readable minimum so "Moderator" never truncates. */
+.bn-ca-role-select {
+	min-width: 8.5rem;
+}
+
+.bn-ca-card__title {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	font-size: var(--bn-text-sm);
+	font-weight: var(--bn-fw-semibold);
+	color: var(--bn-ink);
+}
+
+.bn-ca-card__link {
+	font-size: var(--bn-text-xs);
+	color: var(--bn-accent);
+	text-decoration: none;
+	font-weight: var(--bn-fw-semibold);
+}
+
+.bn-ca-card__link:hover { text-decoration: underline; }
+
+.bn-ca-card__empty {
+	padding: var(--bn-s5);
+	color: var(--bn-ink-4);
+	font-size: var(--bn-text-sm);
+	text-align: center;
+}
+
+.bn-ca-card__section-title {
+	font-family: var(--bn-font-mono);
+	font-size: var(--bn-text-2xs);
+	font-weight: var(--bn-fw-bold);
+	color: var(--bn-ink-4);
+	text-transform: uppercase;
+	letter-spacing: var(--bn-ls-wider);
+	padding: var(--bn-s2) var(--bn-s4) var(--bn-s1);
+}
+
+.bn-ca-card__divider {
+	height: 1px;
+	background: var(--bn-line-faint);
+	margin: var(--bn-s1) 0;
+}
+
+.bn-ca-card__more {
+	display: block;
+	padding: var(--bn-s2) var(--bn-s4);
+	font-size: var(--bn-text-xs);
+	color: var(--bn-accent);
+	text-decoration: none;
+	font-weight: var(--bn-fw-semibold);
+}
+
+.bn-ca-card__more:hover { text-decoration: underline; }
+
+/* Two-column row. */
+.bn-ca-two-col {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: var(--bn-s4);
+}
+
+/* Signup row. */
+.bn-ca-row {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s3);
+	padding: var(--bn-s2) var(--bn-s4);
+	border-bottom: 1px solid var(--bn-line-faint);
+	font-size: var(--bn-text-sm);
+}
+
+.bn-ca-row:last-child { border-bottom: none; }
+
+.bn-ca-row__body {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.bn-ca-row__title {
+	font-size: var(--bn-text-sm);
+	font-weight: var(--bn-fw-semibold);
+	color: var(--bn-ink);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.bn-ca-row__sub {
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-4);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.bn-ca-row__time {
+	font-family: var(--bn-font-mono);
+	font-size: var(--bn-text-2xs);
+	color: var(--bn-ink-4);
+	white-space: nowrap;
+	flex-shrink: 0;
+}
+
+.bn-ca-row__actions {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	flex-shrink: 0;
+}
+
+/* Appeal review card (community-admin Appeals tab). */
+.bn-ca-appeal {
+	padding: var(--bn-s4);
+	border-bottom: 1px solid var(--bn-line);
+}
+
+.bn-ca-appeal:last-child { border-bottom: none; }
+
+.bn-ca-appeal__head {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	margin-bottom: var(--bn-s3);
+}
+
+.bn-ca-appeal__who {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+}
+
+.bn-ca-appeal__name {
+	font-size: var(--bn-text-sm);
+	font-weight: var(--bn-fw-semibold);
+	color: var(--bn-ink-1);
+	text-decoration: none;
+}
+
+.bn-ca-appeal__name:hover { text-decoration: underline; }
+
+.bn-ca-appeal__meta {
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+}
+
+.bn-ca-appeal__contesting {
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink-2);
+	margin: 0 0 var(--bn-s2);
+}
+
+.bn-ca-appeal__label {
+	font-size: var(--bn-text-2xs);
+	font-weight: var(--bn-fw-semibold);
+	text-transform: uppercase;
+	letter-spacing: var(--bn-ls-wide, 0.04em);
+	color: var(--bn-ink-3);
+	margin-inline-end: var(--bn-s1);
+}
+
+.bn-ca-appeal__msg {
+	margin: 0 0 var(--bn-s3);
+	padding: var(--bn-s2) var(--bn-s3);
+	border-inline-start: 2px solid var(--bn-line-strong);
+	background: var(--bn-sunken);
+	border-radius: var(--bn-r-sm);
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink-1);
+}
+
+.bn-ca-appeal__actions {
+	display: flex;
+	gap: var(--bn-s2);
+}
+
+/* Report row — left bar shows severity. */
+.bn-ca-report-row {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	padding: var(--bn-s2) var(--bn-s4);
+	font-size: var(--bn-text-xs);
+	border-inline-start: 3px solid transparent;
+	border-bottom: 1px solid var(--bn-line-faint);
+}
+
+.bn-ca-report-row:last-child { border-bottom: none; }
+
+.bn-ca-report-row[data-severity="high"] {
+	border-inline-start-color: var(--bn-danger);
+	background: var(--bn-danger-bg);
+}
+
+.bn-ca-report-row[data-severity="medium"] {
+	border-inline-start-color: var(--bn-warn);
+	background: var(--bn-warn-bg);
+}
+
+.bn-ca-report-row[data-severity="low"] {
+	border-inline-start-color: var(--bn-line-strong);
+	background: var(--bn-sunken);
+}
+
+.bn-ca-report-row__body {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.bn-ca-report-row__type {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	font-size: var(--bn-text-xs);
+	font-weight: var(--bn-fw-semibold);
+	color: var(--bn-ink);
+}
+
+.bn-ca-report-row__meta {
+	font-family: var(--bn-font-mono);
+	font-size: var(--bn-text-2xs);
+	color: var(--bn-ink-4);
+}
+
+.bn-ca-status-dot {
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	background: var(--bn-line-strong);
+	display: inline-block;
+}
+
+.bn-ca-status-dot[data-severity="high"]   { background: var(--bn-danger); }
+.bn-ca-status-dot[data-severity="medium"] { background: var(--bn-warn); }
+
+/* Activity card scroller. */
+.bn-ca-activity-scroll {
+	max-height: var(--bn-mod-scroll-max);
+	overflow-y: auto;
+}
+
+.bn-ca-activity-row {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--bn-s3);
+	padding: var(--bn-s3) var(--bn-s4);
+	border-bottom: 1px solid var(--bn-line-faint);
+	font-size: var(--bn-text-sm);
+}
+
+.bn-ca-activity-row:last-child { border-bottom: none; }
+
+.bn-ca-activity-row__icon {
+	width: var(--bn-mod-avatar-icon);
+	height: var(--bn-mod-avatar-icon);
+	flex-shrink: 0;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	background: var(--bn-sunken);
+	border-radius: 50%;
+	color: var(--bn-ink-3);
+}
+
+.bn-ca-activity-row__icon svg {
+	width: var(--bn-mod-icon-sm);
+	height: var(--bn-mod-icon-sm);
+}
+
+.bn-ca-activity-row__body {
+	flex: 1;
+	min-width: 0;
+}
+
+.bn-ca-activity-row__desc {
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink);
+	line-height: var(--bn-leading-normal);
+}
+
+.bn-ca-activity-row__meta {
+	font-family: var(--bn-font-mono);
+	font-size: var(--bn-text-2xs);
+	color: var(--bn-ink-4);
+	margin-top: 2px;
+}
+
+.bn-ca-activity-row__action {
+	flex-shrink: 0;
+}
+
+/* Pending-count chip in card headers. */
+.bn-ca-card__count {
+	display: inline-flex;
+	align-items: center;
+	padding: 1px 8px;
+	background: var(--bn-sunken);
+	color: var(--bn-ink-2);
+	font-size: var(--bn-text-2xs);
+	font-weight: var(--bn-fw-bold);
+	border-radius: var(--bn-r-full);
+	font-family: var(--bn-font-mono);
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+ * 2b. Account status (member-facing — /me/account-status/)
+ *
+ * The viewer's own moderation standing. Reuses .bn-mod-shell / .bn-mod-header
+ * chrome; the banner + detail rows + standing lists are specific to this page.
+ * ────────────────────────────────────────────────────────────────────── */
+
+.bn-acct__header {
+	margin-bottom: var(--bn-s4);
+}
+
+/* Clean-standing state. */
+.bn-acct-clean {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	text-align: center;
+	gap: var(--bn-s3);
+	padding: var(--bn-s10) var(--bn-s6);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-lg);
+	background: var(--bn-surface);
+}
+
+.bn-acct-clean__icon {
+	display: inline-flex;
+	width: var(--bn-s10);
+	height: var(--bn-s10);
+	align-items: center;
+	justify-content: center;
+	border-radius: var(--bn-r-full);
+	background: var(--bn-success-bg);
+	color: var(--bn-success);
+}
+
+.bn-acct-clean__icon svg {
+	width: var(--bn-s6);
+	height: var(--bn-s6);
+}
+
+.bn-acct-clean__title {
+	font-size: var(--bn-text-lg);
+	font-weight: var(--bn-fw-bold);
+	color: var(--bn-ink-1);
+}
+
+.bn-acct-clean__text {
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink-2);
+	max-width: 42ch;
+}
+
+/* Suspension banner. */
+.bn-acct-banner {
+	display: flex;
+	gap: var(--bn-s4);
+	padding: var(--bn-s5);
+	border: 1px solid var(--bn-danger);
+	border-inline-start-width: 3px;
+	border-radius: var(--bn-r-lg);
+	background: var(--bn-danger-bg);
+	margin-bottom: var(--bn-s5);
+}
+
+.bn-acct-banner__icon {
+	flex-shrink: 0;
+	display: inline-flex;
+	width: var(--bn-s8);
+	height: var(--bn-s8);
+	align-items: center;
+	justify-content: center;
+	border-radius: var(--bn-r-full);
+	background: var(--bn-surface);
+	color: var(--bn-danger);
+}
+
+.bn-acct-banner__icon svg {
+	width: var(--bn-s5);
+	height: var(--bn-s5);
+}
+
+.bn-acct-banner__body {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.bn-acct-banner__title {
+	font-size: var(--bn-text-lg);
+	font-weight: var(--bn-fw-bold);
+	color: var(--bn-ink-1);
+	margin: 0 0 var(--bn-s1);
+}
+
+.bn-acct-banner__lead {
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink-2);
+	margin: 0 0 var(--bn-s4);
+}
+
+.bn-acct-banner__appeal {
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink-2);
+	margin: var(--bn-s4) 0 0;
+}
+
+/* Definition-list detail rows (reason / dates / restrictions). */
+.bn-acct-details {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s2);
+	margin: 0;
+}
+
+.bn-acct-details__row {
+	display: grid;
+	grid-template-columns: 9rem 1fr;
+	gap: var(--bn-s3);
+}
+
+.bn-acct-details__key {
+	font-size: var(--bn-text-xs);
+	font-weight: var(--bn-fw-semibold);
+	text-transform: uppercase;
+	letter-spacing: var(--bn-ls-wide, 0.04em);
+	color: var(--bn-ink-3);
+	margin: 0;
+}
+
+.bn-acct-details__val {
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink-1);
+	margin: 0;
+}
+
+/* Standing lists (strikes / warnings / appeals). */
+.bn-acct-section {
+	margin-bottom: var(--bn-s5);
+}
+
+.bn-acct-section__title {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	font-size: var(--bn-text-base);
+	font-weight: var(--bn-fw-bold);
+	color: var(--bn-ink-1);
+	margin: 0 0 var(--bn-s3);
+}
+
+.bn-acct-section__icon {
+	display: inline-flex;
+	color: var(--bn-ink-2);
+}
+
+.bn-acct-section__icon svg {
+	width: var(--bn-s4);
+	height: var(--bn-s4);
+}
+
+.bn-acct-list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s2);
+}
+
+.bn-acct-list__item {
+	display: flex;
+	gap: var(--bn-s3);
+	padding: var(--bn-s3) var(--bn-s4);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-md);
+	background: var(--bn-surface);
+}
+
+.bn-acct-list__body {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.bn-acct-list__head {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	margin-bottom: var(--bn-s1);
+}
+
+.bn-acct-list__reason {
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink-1);
+}
+
+.bn-acct-list__meta {
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+}
+
+/* Appeal form (inside the suspension banner). */
+.bn-acct-appeal {
+	margin-top: var(--bn-s4);
+	padding-top: var(--bn-s4);
+	border-top: 1px solid var(--bn-line);
+}
+
+.bn-acct-appeal__label {
+	display: block;
+	font-size: var(--bn-text-sm);
+	font-weight: var(--bn-fw-semibold);
+	color: var(--bn-ink-1);
+	margin-bottom: var(--bn-s1);
+}
+
+.bn-acct-appeal__hint {
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-2);
+	margin: 0 0 var(--bn-s2);
+}
+
+.bn-acct-appeal__field {
+	width: 100%;
+	resize: vertical;
+	min-height: calc(var(--bn-s10) + var(--bn-s6));
+	background: var(--bn-surface);
+}
+
+.bn-acct-appeal__actions {
+	display: flex;
+	justify-content: flex-end;
+	margin-top: var(--bn-s3);
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+ * 3. High-contrast + forced colours
+ * ────────────────────────────────────────────────────────────────────── */
+
+@media (forced-colors: active) {
+	.bn-report-row,
+	.bn-ca-card,
+	.bn-ca-sidebar__card,
+	.bn-mod-empty,
+	.bn-mod-restricted__panel {
+		border: 1px solid CanvasText;
+	}
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+ * 4. Responsive
+ * ────────────────────────────────────────────────────────────────────── */
+
+@media (max-width: 1024px) {
+	.bn-mod-stat-grid {
+		grid-template-columns: repeat(3, 1fr);
+	}
+
+	.bn-ca-wrap {
+		flex-direction: column;
+		gap: var(--bn-s4);
+	}
+
+	.bn-ca-sidebar {
+		width: 100%;
+		position: static;
+	}
+
+	.bn-ca-sidebar__card {
+		display: flex;
+		flex-wrap: nowrap;
+		overflow-x: auto;
+		scrollbar-width: none;
+	}
+
+	.bn-ca-sidebar__card::-webkit-scrollbar { display: none; }
+
+	.bn-ca-sidebar__heading,
+	.bn-ca-sidebar__note,
+	.bn-ca-nav-divider {
+		display: none;
+	}
+
+	.bn-ca-nav-item {
+		border-inline-start: none;
+		border-bottom: 2px solid transparent;
+		white-space: nowrap;
+	}
+
+	.bn-ca-nav-item[aria-current="page"] {
+		border-inline-start: none;
+		border-bottom-color: var(--bn-accent);
+	}
+}
+
+@media (max-width: 640px) {
+	.bn-mod-shell {
+		padding: var(--bn-s4) var(--bn-s3);
+		gap: var(--bn-s4);
+	}
+
+	.bn-mod-stat-grid {
+		grid-template-columns: repeat(2, 1fr);
+		gap: var(--bn-s2);
+	}
+
+	.bn-mod-filterbar {
+		flex-direction: column;
+		align-items: stretch;
+	}
+
+	.bn-mod-filterbar__controls {
+		justify-content: flex-end;
+		flex-wrap: wrap;
+	}
+
+	.bn-mod-filterbar__sort {
+		min-width: 0;
+		width: 100%;
+	}
+
+	.bn-report-row {
+		flex-direction: column;
+		gap: var(--bn-s3);
+	}
+
+	.bn-report-row__actions {
+		flex-direction: column;
+	}
+
+	.bn-report-row__actions > .bn-btn {
+		width: 100%;
+		justify-content: center;
+	}
+
+	.bn-ca-two-col {
+		grid-template-columns: 1fr;
+		gap: var(--bn-s3);
+	}
+
+	.bn-ca-subheader {
+		padding: var(--bn-s2) var(--bn-s3);
+	}
+
+	.bn-ca-subheader__actions {
+		margin-inline-start: 0;
+		width: 100%;
+	}
+
+	/* Account status: stack the detail rows under 640px. */
+	.bn-acct-details__row {
+		grid-template-columns: 1fr;
+		gap: var(--bn-s1);
+	}
+
+	.bn-acct-banner {
+		flex-direction: column;
+		gap: var(--bn-s3);
+		padding: var(--bn-s4);
+	}
+}
+
+/* Moderation queue pagination — lets mods page past the first 50 reports. */
+.bn-mq-pagination {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: var(--bn-s3);
+	margin-block: var(--bn-s5);
+	flex-wrap: wrap;
+}
+.bn-mq-pagination__status {
+	font-size: var(--bn-fs-sm, 0.875rem);
+	color: var(--bn-ink-2, inherit);
+}
+
+/* ── Already-actioned state ──────────────────────────────────────────────────
+   A row whose offender is already suspended shows this instead of a Suspend
+   button. Sized to sit on the same line as the sibling buttons so the action
+   row does not reflow when one row is in this state. */
+.bn-mod-queue__state {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	padding: var(--bn-s2) var(--bn-s3);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-md);
+	background: var(--bn-sunken);
+	color: var(--bn-ink-3);
+	font-size: var(--bn-text-sm);
+	font-weight: var(--bn-fw-medium);
+	line-height: var(--bn-leading-snug);
+}
+.bn-mod-queue__state svg { width: 16px; height: 16px; flex-shrink: 0; }
+.bn-mod-queue__state[data-state="suspended"] {
+	border-color: color-mix(in oklch, var(--bn-danger) 30%, var(--bn-line));
+	color: var(--bn-danger);
+}

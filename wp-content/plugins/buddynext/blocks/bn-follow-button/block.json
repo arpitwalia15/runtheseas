@@ -1,0 +1,47 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "buddynext/follow-button",
+	"title": "Follow Button",
+	"icon": "plus",
+	"category": "buddynext",
+	"description": "Standalone follow/unfollow button for any user.",
+	"keywords": [
+		"buddynext",
+		"follow",
+		"button",
+		"user"
+	],
+	"textdomain": "buddynext",
+	"editorScript": "buddynext-blocks-editor",
+	"viewScriptModule": "@buddynext/social-buttons",
+	"style": [
+		"file:../../assets/css/blocks.css",
+		"bn-base"
+	],
+	"supports": {
+		"inserter": false,
+		"color": {
+			"background": true,
+			"text": true
+		},
+		"typography": {
+			"fontSize": true
+		},
+		"spacing": {
+			"padding": true,
+			"margin": true
+		}
+	},
+	"attributes": {
+		"userId": {
+			"type": "integer",
+			"default": 0
+		}
+	},
+	"example": {},
+	"editorStyle": [
+		"file:../../assets/css/blocks.css",
+		"bn-base"
+	]
+}

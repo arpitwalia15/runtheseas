@@ -1,0 +1,388 @@
+.wbcom-timeline {
+    padding: 40px 0;
+    color: #000
+}
+
+.wbcom-timeline__container {
+    position: relative;
+    padding: 0
+}
+
+.wbcom-timeline__container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 4px;
+    background: #eee
+}
+
+.wbcom-timeline__block {
+    display: -webkit-box;
+    display: -ms-flexbox;
+    display: flex;
+    position: relative;
+    z-index: 1;
+    margin-bottom: 40px
+}
+
+.wbcom-timeline__block:last-child {
+    margin-bottom: 0
+}
+
+.wbcom-timeline__img {
+    display: -webkit-box;
+    display: -ms-flexbox;
+    display: flex;
+    -webkit-box-pack: center;
+    -ms-flex-pack: center;
+    justify-content: center;
+    -webkit-box-align: center;
+    -ms-flex-align: center;
+    align-items: center;
+    -ms-flex-negative: 0;
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: #2e5d9f;
+    text-align: center;
+    z-index: 9
+}
+
+.wbcom-timeline__img i {
+    line-height: 24px;
+    font-size: 24px;
+    color: #fff
+}
+
+.wbcom-timeline__img svg {
+    width: 24px;
+    height: auto;
+    fill: #fff
+}
+
+.wbcom-timeline__content {
+    -webkit-box-flex: 1;
+    -ms-flex-positive: 1;
+    flex-grow: 1;
+    position: relative;
+    margin-left: 40px;
+    background: #eee;
+    border-radius: 10px;
+    padding: 40px
+}
+
+@media screen and (max-width:767px) {
+    .wbcom-timeline__content {
+        margin-left: 20px;
+        padding: 20px
+    }
+}
+
+.wbcom-timeline__content::before {
+    content: '';
+    position: absolute;
+    top: 16px;
+    right: 100%;
+    width: 0;
+    height: 0;
+    border: 8px solid transparent;
+    border-right-color: #eee;
+    display: none
+}
+
+.wbcom-timeline__content.show-arrow::before {
+    display: block
+}
+
+.wbcom-timeline__content p:last-of-type {
+    margin: 0 !important
+}
+
+.wbcom-timeline__content .wbcom-timeline-title {
+    color: #000;
+    padding: 0;
+    -ms-word-wrap: break-word;
+    word-wrap: break-word
+}
+
+.wbcom-timeline__content .wbcom-timeline-title:after,
+.wbcom-timeline__content .wbcom-timeline-title:before {
+    display: none
+}
+
+.wbcom-timeline__content img {
+    max-width: 100%;
+    height: auto
+}
+
+.wbcom-timeline-date {
+    display: -webkit-box;
+    display: -ms-flexbox;
+    display: flex;
+    -webkit-box-pack: justify;
+    -ms-flex-pack: justify;
+    justify-content: space-between;
+    -webkit-box-align: center;
+    -ms-flex-align: center;
+    align-items: center
+}
+
+.wbcom-timeline__date {
+    color: #000;
+    width: 100%;
+    display: block;
+    line-height: 60px;
+    font-weight: 700
+}
+
+@-webkit-keyframes wbcom-bounce-1 {
+    0% {
+        opacity: 0;
+        -webkit-transform: scale(0.5);
+        transform: scale(0.5)
+    }
+
+    60% {
+        opacity: 1;
+        -webkit-transform: scale(1.2);
+        transform: scale(1.2)
+    }
+
+    100% {
+        -webkit-transform: scale(1);
+        transform: scale(1)
+    }
+}
+
+@keyframes wbcom-bounce-1 {
+    0% {
+        opacity: 0;
+        -webkit-transform: scale(0.5);
+        transform: scale(0.5)
+    }
+
+    60% {
+        opacity: 1;
+        -webkit-transform: scale(1.2);
+        transform: scale(1.2)
+    }
+
+    100% {
+        -webkit-transform: scale(1);
+        transform: scale(1)
+    }
+}
+
+@-webkit-keyframes wbcom-bounce-2 {
+    0% {
+        opacity: 0;
+        -webkit-transform: translateX(-100px);
+        transform: translateX(-100px)
+    }
+
+    60% {
+        opacity: 1;
+        -webkit-transform: translateX(20px);
+        transform: translateX(20px)
+    }
+
+    100% {
+        -webkit-transform: translateX(0);
+        transform: translateX(0)
+    }
+}
+
+@keyframes wbcom-bounce-2 {
+    0% {
+        opacity: 0;
+        -webkit-transform: translateX(-100px);
+        transform: translateX(-100px)
+    }
+
+    60% {
+        opacity: 1;
+        -webkit-transform: translateX(20px);
+        transform: translateX(20px)
+    }
+
+    100% {
+        -webkit-transform: translateX(0);
+        transform: translateX(0)
+    }
+}
+
+@-webkit-keyframes wbcom-bounce-2-inverse {
+    0% {
+        opacity: 0;
+        -webkit-transform: translateX(100px);
+        transform: translateX(100px)
+    }
+
+    60% {
+        opacity: 1;
+        -webkit-transform: translateX(-20px);
+        transform: translateX(-20px)
+    }
+
+    100% {
+        -webkit-transform: translateX(0);
+        transform: translateX(0)
+    }
+}
+
+@keyframes wbcom-bounce-2-inverse {
+    0% {
+        opacity: 0;
+        -webkit-transform: translateX(100px);
+        transform: translateX(100px)
+    }
+
+    60% {
+        opacity: 1;
+        -webkit-transform: translateX(-20px);
+        transform: translateX(-20px)
+    }
+
+    100% {
+        -webkit-transform: translateX(0);
+        transform: translateX(0)
+    }
+}
+
+@media screen and (min-width:1025px) {
+    .wbcom-timeline.wbcom-timeline-2-col .wbcom-timeline__container::before {
+        left: 50% !important;
+        -webkit-transform: translateX(-50%);
+        transform: translateX(-50%)
+    }
+}
+
+@media screen and (min-width:1025px) {
+    .wbcom-timeline.wbcom-timeline-2-col .wbcom-timeline__block:nth-child(even) {
+        -webkit-box-orient: horizontal;
+        -webkit-box-direction: reverse;
+        -ms-flex-direction: row-reverse;
+        flex-direction: row-reverse
+    }
+
+    .wbcom-timeline.wbcom-timeline-2-col .wbcom-timeline__block:nth-child(even) .wbcom-timeline__img {
+        margin-right: calc(5% - 30px)
+    }
+
+    .wbcom-timeline.wbcom-timeline-2-col .wbcom-timeline__block:nth-child(odd) .wbcom-timeline__content::before {
+        right: auto;
+        left: 100%;
+        width: 0;
+        height: 0;
+        border: 8px solid transparent;
+        border-left-color: #eee
+    }
+
+    .wbcom-timeline.wbcom-timeline-2-col .wbcom-timeline__block .wbcom-timeline__date {
+        text-align: left !important
+    }
+
+    .wbcom-timeline.wbcom-timeline-2-col .wbcom-timeline__block:nth-child(even) .wbcom-timeline__date {
+        left: auto;
+        right: 120%;
+        text-align: right !important
+    }
+}
+
+@media screen and (max-width:1024px) {
+    .wbcom-timeline.wbcom-timeline-2-col .wbcom-timeline__block:nth-child(even) .wbcom-timeline__img {
+        margin-right: 0 !important
+    }
+
+    .wbcom-timeline.wbcom-timeline-2-col .wbcom-timeline__block:nth-child(odd) .wbcom-timeline__content::before {
+        border-left-color: transparent !important
+    }
+}
+
+@media screen and (min-width:1025px) {
+    .wbcom-timeline.wbcom-timeline-2-col .wbcom-timeline__img {
+        width: 60px;
+        height: 60px;
+        -webkit-box-ordinal-group: 2;
+        -ms-flex-order: 1;
+        order: 1;
+        margin-left: calc(5% - 30px);
+        will-change: transform
+    }
+}
+
+@media screen and (max-width:1024px) {
+    .wbcom-timeline.wbcom-timeline-2-col .wbcom-timeline__img {
+        margin-left: 0 !important
+    }
+}
+
+@media screen and (min-width:1025px) {
+    .wbcom-timeline.wbcom-timeline-2-col .wbcom-timeline__content {
+        width: 45%;
+        -webkit-box-flex: 0;
+        -ms-flex-positive: 0;
+        flex-grow: 0;
+        will-change: transform;
+        margin: 0;
+        line-height: 1.2
+    }
+
+    .wbcom-timeline.wbcom-timeline-2-col .wbcom-timeline__content::before {
+        top: 24px
+    }
+}
+
+@media screen and (min-width:1025px) {
+    .wbcom-timeline.wbcom-timeline-2-col .wbcom-timeline__date {
+        position: absolute;
+        width: 100%;
+        left: 120%;
+        top: 0;
+        margin: 0
+    }
+}
+
+@media screen and (min-width:1025px) {
+
+    .wbcom-timeline.wbcom-timeline-2-col .wbcom-timeline__content--hidden,
+    .wbcom-timeline.wbcom-timeline-2-col .wbcom-timeline__img--hidden {
+        visibility: hidden
+    }
+
+    .wbcom-timeline.wbcom-timeline-2-col .wbcom-timeline__img--bounce-in {
+        -webkit-animation: wbcom-bounce-1 .6s;
+        animation: wbcom-bounce-1 .6s
+    }
+
+    .wbcom-timeline.wbcom-timeline-2-col .wbcom-timeline__content--bounce-in {
+        -webkit-animation: wbcom-bounce-2 .6s;
+        animation: wbcom-bounce-2 .6s
+    }
+
+    .wbcom-timeline.wbcom-timeline-2-col .wbcom-timeline__block:nth-child(even) .wbcom-timeline__content--bounce-in {
+        -webkit-animation-name: wbcom-bounce-2-inverse;
+        animation-name: wbcom-bounce-2-inverse
+    }
+}
+
+@media screen and (min-width:1025px) {
+
+    .wbcom-timeline.wbcom-timeline-1-col .wbcom-timeline__content--hidden,
+    .wbcom-timeline.wbcom-timeline-1-col .wbcom-timeline__img--hidden {
+        visibility: hidden
+    }
+
+    .wbcom-timeline.wbcom-timeline-1-col .wbcom-timeline__img--bounce-in {
+        -webkit-animation: wbcom-bounce-1 .6s;
+        animation: wbcom-bounce-1 .6s
+    }
+
+    .wbcom-timeline.wbcom-timeline-1-col .wbcom-timeline__content--bounce-in {
+        -webkit-animation: wbcom-bounce-2-inverse .6s;
+        animation: wbcom-bounce-2-inverse .6s
+    }
+}

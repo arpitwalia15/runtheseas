@@ -1,0 +1,1808 @@
+/* ==========================================================================
+   5. MEMBERS ADMIN (Phase 4 — v2 primitive layer)
+   ========================================================================== */
+
+/* List page: status filter segment.
+   Export CSV moved to AdminHub's standardized sub-header action slot;
+   All/Active/Suspended is a segment filter (shared .bn-segment primitive),
+   not navigation. */
+.bn-members-segment {
+	margin-bottom: var(--bn-s4);
+}
+
+/* Count badge inside a segment item — mirrors the segment's active accent. */
+.bn-segment__count {
+	font-variant-numeric: tabular-nums;
+	font-weight: var(--bn-fw-semibold);
+	color: var(--bn-ink-3);
+}
+
+.bn-segment__item.is-active .bn-segment__count,
+.bn-segment__item[aria-selected="true"] .bn-segment__count {
+	color: inherit;
+}
+
+/*
+ * Members toolbar: the search/filter form and the bulk-action form as ONE
+ * flex row. They used to be two structurally separate blocks (the bulk form
+ * even lived inside the table's scroll container), so they stacked as two
+ * misaligned rows, each with its own unbounded sizing.
+ */
+.bn-members-toolbar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--bn-s3);
+	flex-wrap: wrap;
+	padding: var(--bn-s3) var(--bn-s4);
+	border-bottom: 1px solid var(--bn-line-faint);
+}
+
+.bn-members-filter {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	flex: 1 1 420px;
+	min-width: 0;
+}
+
+.bn-members-filter .bn-input {
+	flex: 1 1 220px;
+	min-width: 160px;
+}
+
+/*
+ * Extra .bn-settings-section level: the generic bn-admin.css control cap
+ * (.bn-settings-section .bn-ss-body select -> max-width 560px) is more
+ * specific than a bare two-class rule and re-widened this select.
+ */
+.bn-settings-section .bn-members-filter .bn-select {
+	flex: 0 1 auto;
+	width: auto;
+	min-width: 130px;
+	max-width: 180px;
+}
+
+/*
+ * Scoped to the toolbar: the shared .bn-bulk-bar (bn-admin-hub.css) keeps its
+ * bottom margin for surfaces that still render it above their table.
+ */
+.bn-members-toolbar .bn-bulk-bar {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	flex: 0 0 auto;
+	margin: 0;
+}
+
+/* Select width intentionally NOT set here — the shared C4 rule in
+   bn-admin.css (.bn-admin-hub .bn-bulk-bar select, 240px) sizes every
+   bulk-actions select identically across Members, Spaces, and
+   Moderation:Bulk. Do not re-add a per-screen width override. */
+
+/* Member identity cell — avatar + name + handle. */
+.bn-table .bn-member-cell {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s3);
+}
+
+.bn-table .bn-member-info {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+}
+
+.bn-table .bn-member-name {
+	font-weight: 600;
+	color: var(--bn-ink);
+	line-height: 1.3;
+}
+
+.bn-table .bn-member-username {
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+	font-family: var(--bn-font-mono);
+}
+
+/* Row action menu rebuilt around v2 vocabulary. */
+.bn-table .bn-row-actions {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	justify-content: flex-end;
+	/* The shared .bn-row-actions primitive (bn-admin.css) wraps, which staircased
+	   View / Edit / kebab onto three right-aligned lines once the Actions column
+	   was squeezed narrower than their combined width. In a desktop admin table
+	   they belong on one line; nowrap keeps them together and lets the auto table
+	   layout widen the column to fit. */
+	flex-wrap: nowrap;
+	white-space: nowrap;
+}
+
+.bn-table .bn-more-menu {
+	position: relative;
+	display: inline-block;
+}
+
+.bn-table .bn-more-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 28px;
+	height: 28px;
+	border-radius: var(--bn-r-sm);
+	border: 1px solid transparent;
+	background: transparent;
+	color: var(--bn-ink-2);
+	cursor: pointer;
+	transition: background var(--bn-dur-fast) var(--bn-ease),
+				color var(--bn-dur-fast) var(--bn-ease),
+				border-color var(--bn-dur-fast) var(--bn-ease);
+}
+
+.bn-table .bn-more-btn:hover {
+	background: var(--bn-sunken);
+	color: var(--bn-ink);
+}
+
+.bn-table .bn-more-btn:focus-visible {
+	outline: 2px solid var(--bn-ring);
+	outline-offset: 2px;
+}
+
+/* position:fixed (placed by admin/members.js) so the menu escapes the
+   overflow:hidden on .bn-table / .bn-settings-section that clipped it on the
+   bottom rows. JS sets top/left on open; no static offsets here. */
+.bn-table .bn-more-dropdown {
+	position: fixed;
+	min-width: 160px;
+	background: var(--bn-surface);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-md);
+	box-shadow: var(--bn-shadow-md);
+	padding: var(--bn-s1);
+	z-index: 1000;
+	display: none;
+}
+
+.bn-table .bn-more-menu.open .bn-more-dropdown {
+	display: block;
+}
+
+/*
+ * Each row action in the dropdown is a single-button <form>. Nothing styled
+ * those forms, so they kept the hub's button-only-form inline-block box with
+ * stray margins - the button resolved its width:100% against an ~83px form
+ * inside a 160px menu and left dead space under itself. The form must be an
+ * inert full-width block so the .bn-dropdown-item button fills the menu row.
+ */
+.bn-table .bn-more-dropdown form {
+	display: block;
+	width: 100%;
+	margin: 0;
+}
+
+.bn-table .bn-dropdown-item {
+	display: block;
+	width: 100%;
+	padding: var(--bn-s2) var(--bn-s3);
+	background: transparent;
+	border: none;
+	text-align: start;
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink-2);
+	border-radius: var(--bn-r-sm);
+	cursor: pointer;
+}
+
+.bn-table .bn-dropdown-item:hover,
+.bn-table .bn-dropdown-item:focus-visible {
+	background: var(--bn-sunken);
+	color: var(--bn-ink);
+	outline: 2px solid transparent;
+	outline-offset: 2px;
+}
+
+.bn-table .bn-dropdown-danger {
+	color: var(--bn-danger);
+}
+
+.bn-table .bn-dropdown-danger:hover,
+.bn-table .bn-dropdown-danger:focus-visible {
+	background: var(--bn-danger-bg);
+	color: var(--bn-danger);
+}
+
+/* Pagination — re-skinned around v2 primitives. */
+.bn-pagination {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: var(--bn-s1);
+	padding: var(--bn-s3) var(--bn-s4);
+	border-top: 1px solid var(--bn-line-faint);
+}
+
+.bn-pagination .bn-page-link {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 32px;
+	height: 32px;
+	padding: 0 var(--bn-s2);
+	border-radius: var(--bn-r-sm);
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink-2);
+	text-decoration: none;
+	border: 1px solid transparent;
+}
+
+.bn-pagination .bn-page-link:hover:not(.current) {
+	background: var(--bn-sunken);
+	color: var(--bn-ink);
+}
+
+.bn-pagination .bn-page-link.current {
+	background: var(--bn-accent-100);
+	color: var(--bn-accent-700);
+	border-color: var(--bn-accent-200, var(--bn-line));
+}
+
+.bn-pagination .bn-page-link:focus-visible {
+	outline: 2px solid var(--bn-ring);
+	outline-offset: 2px;
+}
+
+/* ── Member edit form (Phase 4) ────────────────────────────────────── */
+
+.bn-edit-member-back {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	font-size: var(--bn-text-sm);
+	color: var(--bn-accent);
+	text-decoration: none;
+	margin-bottom: var(--bn-s3);
+	font-weight: 500;
+}
+
+.bn-edit-member-back:hover {
+	text-decoration: underline;
+}
+
+.bn-edit-member-back svg {
+	width: 14px;
+	height: 14px;
+}
+
+/* Member hero card. */
+.bn-member-hero {
+	background: var(--bn-surface);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-lg);
+	padding: var(--bn-s4) var(--bn-s5);
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s4);
+	margin-bottom: var(--bn-s4);
+}
+
+.bn-member-hero .bn-avatar {
+	flex-shrink: 0;
+}
+
+.bn-member-hero-info {
+	flex: 1;
+	min-width: 0;
+}
+
+.bn-hero-name {
+	font-family: var(--bn-font-display);
+	font-size: var(--bn-text-lg);
+	font-weight: 600;
+	color: var(--bn-ink);
+	margin-bottom: 4px;
+}
+
+.bn-hero-meta {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	font-size: var(--bn-text-sm);
+	flex-wrap: wrap;
+	margin-bottom: 4px;
+}
+
+.bn-hero-username {
+	color: var(--bn-ink-3);
+	font-family: var(--bn-font-mono);
+}
+
+.bn-hero-email {
+	color: var(--bn-ink-3);
+}
+
+.bn-hero-sep {
+	color: var(--bn-line-strong);
+}
+
+.bn-hero-stats {
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+	display: flex;
+	gap: var(--bn-s2);
+	flex-wrap: wrap;
+}
+
+.bn-member-hero-actions {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	flex-shrink: 0;
+}
+
+/* Edit form tabs (uses v2 .bn-tabs / .bn-tab primitive). */
+.bn-members-edit-tabs {
+	margin-bottom: var(--bn-s4);
+}
+
+.bn-tab-panel {
+	display: none;
+}
+
+.bn-tab-panel.is-active {
+	display: block;
+}
+
+/* Avatar / cover preview helpers (extracted from inline styles). */
+.bn-avatar-preview {
+	width: 80px;
+	height: 80px;
+	border-radius: 50%;
+	object-fit: cover;
+	display: block;
+	margin-bottom: var(--bn-s2);
+}
+
+.bn-avatar-placeholder {
+	width: 80px;
+	height: 80px;
+	font-size: 28px;
+	margin-bottom: var(--bn-s2);
+}
+
+.bn-cover-preview {
+	max-height: 80px;
+	max-width: 300px;
+	border-radius: var(--bn-r-md);
+	object-fit: cover;
+	display: block;
+	margin-bottom: var(--bn-s2);
+}
+
+.bn-edit-file-input {
+	font-size: var(--bn-text-sm);
+}
+
+.bn-edit-hint {
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+	margin: var(--bn-s1) 0 0;
+}
+
+.bn-edit-remove-toggle {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-size: var(--bn-text-sm);
+	color: var(--bn-danger);
+	margin-bottom: var(--bn-s2);
+}
+
+/* Pending-removal feedback: the preview dims while "Remove" is ticked, and the
+   note explains the change applies on save (members.js toggles both). */
+.bn-edit-media--removing {
+	opacity: 0.35;
+	filter: grayscale(1);
+}
+
+.bn-edit-remove-note {
+	font-size: var(--bn-text-xs);
+	color: var(--bn-danger);
+	margin: 0 0 var(--bn-s2);
+}
+
+.bn-edit-empty {
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink-3);
+	margin: 0 0 var(--bn-s2);
+}
+
+.bn-radio-group,
+.bn-checkbox-group {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--bn-s3);
+}
+
+.bn-radio-group label,
+.bn-checkbox-group label {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink-2);
+}
+
+.bn-toggle-inline {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink-2);
+}
+
+/* Repeater entries. */
+.bn-repeater-entry {
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-md);
+	padding: var(--bn-s3);
+	margin-bottom: var(--bn-s2);
+	background: var(--bn-sunken);
+}
+
+.bn-repeater-entry-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	font-size: var(--bn-text-xs);
+	font-weight: 700;
+	color: var(--bn-ink-3);
+	margin-bottom: var(--bn-s2);
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+
+.bn-repeater-remove {
+	background: none;
+	border: none;
+	color: var(--bn-ink-3);
+	cursor: pointer;
+	font-size: var(--bn-text-sm);
+	padding: 2px 6px;
+	line-height: 1;
+	border-radius: var(--bn-r-sm);
+	transition: color var(--bn-dur-fast) var(--bn-ease),
+				background var(--bn-dur-fast) var(--bn-ease);
+}
+
+.bn-repeater-remove svg {
+	width: 14px;
+	height: 14px;
+}
+
+.bn-repeater-remove:hover {
+	color: var(--bn-danger);
+	background: var(--bn-danger-bg);
+}
+
+.bn-repeater-remove:focus-visible {
+	outline: 2px solid var(--bn-ring);
+	outline-offset: 2px;
+}
+
+.bn-repeater-add {
+	margin-top: var(--bn-s1);
+	background: transparent;
+	border: 1px dashed var(--bn-line-strong);
+	border-radius: var(--bn-r-sm);
+	color: var(--bn-accent);
+	cursor: pointer;
+	font-size: var(--bn-text-xs);
+	font-weight: 600;
+	padding: var(--bn-s2) var(--bn-s3);
+	width: 100%;
+	transition: background var(--bn-dur-fast) var(--bn-ease),
+				border-color var(--bn-dur-fast) var(--bn-ease);
+}
+
+.bn-repeater-add:hover {
+	background: var(--bn-accent-100);
+	border-color: var(--bn-accent);
+}
+
+.bn-repeater-add:focus-visible {
+	outline: 2px solid var(--bn-ring);
+	outline-offset: 2px;
+}
+
+/* Make .bn-input / .bn-textarea / .bn-select usable inside admin forms. */
+.bn-admin-wrap .bn-input,
+.bn-admin-wrap .bn-textarea,
+.bn-admin-wrap .bn-select {
+	width: 100%;
+	box-sizing: border-box;
+}
+
+@media (max-width: 640px) {
+	.bn-member-hero {
+		flex-direction: column;
+		align-items: flex-start;
+		gap: var(--bn-s3);
+	}
+
+	.bn-member-hero-actions {
+		width: 100%;
+		flex-wrap: wrap;
+	}
+
+	.bn-members-filter {
+		flex-direction: column;
+		align-items: stretch;
+	}
+
+	.bn-members-filter .bn-input,
+	.bn-members-filter .bn-select {
+		width: 100%;
+		/* Reset the ROW flex. The desktop rule is `flex: 1 1 220px`, meaning
+		   "grow along the row, from a 220px width". Once this container turns
+		   into a column that same declaration means "grow along the COLUMN,
+		   from a 220px HEIGHT" - so the search field rendered as a 220px-tall
+		   block instead of a single-line input. The reported "several hundred
+		   pixels tall" is that basis, read down the wrong axis. */
+		flex: 0 0 auto;
+	}
+}
+
+
+/* ==========================================================================
+   7. MEMBER TYPES MANAGER
+   ========================================================================== */
+
+.bn-type-badge-preview {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-a-s1);
+	padding: 3px var(--bn-a-s3);
+	border-radius: var(--bn-a-r-lg);
+	font-size: var(--bn-a-text-xs);
+	font-weight: var(--bn-a-fw-bold);
+	line-height: 1.4;
+}
+
+.bn-type-badge-preview svg {
+	width: 13px;
+	height: 13px;
+	flex-shrink: 0;
+}
+
+.bn-type-form {
+	background: var(--bn-a-bg);
+	border: 1px solid var(--bn-a-border);
+	border-radius: var(--bn-a-r-md);
+	padding: var(--bn-a-s5);
+	margin-bottom: var(--bn-a-s4);
+}
+
+.bn-type-form h3 {
+	margin: 0 0 var(--bn-a-s4);
+	font-size: var(--bn-a-text-sm);
+	font-weight: var(--bn-a-fw-bold);
+	color: var(--bn-a-text-1);
+}
+
+.bn-type-grid {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: var(--bn-a-s3);
+}
+
+.bn-type-grid-3 {
+	display: grid;
+	grid-template-columns: 1fr 1fr 1fr;
+	gap: var(--bn-a-s3);
+}
+
+.bn-type-grid + .bn-field,
+.bn-type-grid-3 {
+	margin-top: var(--bn-a-s3);
+}
+
+.bn-type-full {
+	grid-column: 1 / -1;
+}
+
+.bn-type-form .bn-field--inline {
+	margin-bottom: 0;
+}
+
+.bn-type-form .bn-field--narrow {
+	max-width: 300px;
+}
+
+.bn-type-form .bn-field--narrower {
+	max-width: 220px;
+}
+
+.bn-type-form .bn-field--wide {
+	max-width: 580px;
+}
+
+.bn-type-form .bn-field--sort {
+	max-width: 80px;
+}
+
+.bn-type-form .bn-field-checks {
+	padding-top: 22px;
+}
+
+.bn-type-form .bn-check-row {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-a-s2);
+	cursor: pointer;
+	font-size: var(--bn-a-text-sm);
+	font-weight: var(--bn-a-fw-medium);
+	color: var(--bn-a-text-1);
+}
+
+.bn-type-form .bn-check-row + .bn-check-row {
+	margin-top: var(--bn-a-s2);
+}
+
+.bn-type-form .bn-pf-opts-textarea {
+	width: 100%;
+	max-width: 580px;
+	resize: vertical;
+	font-family: var(--bn-font-mono);
+	font-size: var(--bn-a-text-xs);
+}
+
+/* .bn-color-row / swatch / hex now live in bn-admin.css (shared across every
+   admin screen). Kept out of here to avoid a duplicate definition. */
+
+.bn-type-actions {
+	display: flex;
+	gap: var(--bn-a-s2);
+	align-items: center;
+	margin-top: var(--bn-a-s4);
+}
+
+.bn-type-list-count {
+	background: var(--bn-a-career-bg);
+	color: var(--bn-a-brand);
+}
+
+.bn-type-th-strong {
+	font-size: var(--bn-a-text-md);
+	color: var(--bn-a-text-1);
+}
+
+.bn-type-slug-code {
+	font-size: var(--bn-a-text-xs);
+	color: var(--bn-a-text-3);
+	font-family: var(--bn-font-mono);
+	/* A slug is a single token and must never break mid-word. Without this it
+	   inherits the wrapping used for long free text and renders as
+	   "con / trib / uto / r" once the column is squeezed on a tablet. */
+	white-space: nowrap;
+}
+
+/* Notice — inline success/error messages: the .bn-notice* component now lives
+   in bn-admin.css (loaded site-wide on BN admin, and the home of the --bn-a-*
+   tokens), so every admin screen styles it identically. It used to live here,
+   which meant only the Members page — the sole loader of this file — rendered
+   it styled. */
+
+@media (max-width: 782px) {
+	.bn-type-grid,
+	.bn-type-grid-3 {
+		grid-template-columns: 1fr;
+	}
+}
+
+/* ==========================================================================
+   8. PROFILE FIELDS MANAGER
+   ========================================================================== */
+
+.bn-pf-wrap {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-a-s5);
+	margin-top: var(--bn-a-s5);
+}
+
+.bn-pf-card {
+	background: var(--bn-a-bg);
+	border: 1px solid var(--bn-a-border);
+	border-radius: var(--bn-a-r-lg);
+	overflow: hidden;
+}
+
+.bn-pf-card-head {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-a-s3);
+	padding: var(--bn-a-s4) var(--bn-a-s5);
+	background: var(--bn-a-bg-subtle);
+	border-bottom: 1px solid var(--bn-a-border);
+	flex-wrap: wrap;
+}
+
+.bn-pf-group-name {
+	font-family: var(--bn-a-font-display);
+	font-size: var(--bn-a-text-md);
+	font-weight: var(--bn-a-fw-bold);
+	color: var(--bn-a-text-1);
+	white-space: nowrap;
+}
+
+/* Left identity cluster: title + badges, vertically centered as one unit. */
+.bn-pf-head-id {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-a-s2);
+	flex-wrap: wrap;
+	min-width: 0;
+}
+
+.bn-pf-badge {
+	display: inline-flex;
+	align-items: center;
+	padding: 3px var(--bn-a-s2);
+	border-radius: var(--bn-a-r-full);
+	font-size: var(--bn-a-text-2xs);
+	font-weight: var(--bn-a-fw-semibold);
+	white-space: nowrap;
+}
+
+.bn-pf-b-system {
+	background: var(--bn-a-amber-bg);
+	color: var(--bn-a-amber);
+}
+
+.bn-pf-b-flat {
+	background: var(--bn-a-career-bg);
+	color: var(--bn-a-career);
+}
+
+.bn-pf-b-repeater {
+	background: var(--bn-a-jetonomy-bg);
+	color: var(--bn-a-jetonomy);
+}
+
+.bn-pf-b-public {
+	background: var(--bn-a-green-bg);
+	color: var(--bn-a-green);
+}
+
+.bn-pf-b-followers {
+	background: var(--bn-a-amber-bg);
+	color: var(--bn-a-amber);
+}
+
+.bn-pf-b-private {
+	background: var(--bn-a-red-bg);
+	color: var(--bn-a-red);
+}
+
+.bn-pf-b-count {
+	background: var(--bn-a-bg);
+	border: 1px solid var(--bn-a-border);
+	color: var(--bn-a-text-3);
+	font-weight: var(--bn-a-fw-semibold);
+}
+
+/* One compact inline control row on the right of the group header:
+   visibility select, member-type select, reorder arrows, + Add Field,
+   Delete Group. All controls share the same 28px visual height. */
+.bn-pf-head-actions {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-a-s2);
+	flex-wrap: wrap;
+	justify-content: flex-end;
+	margin-inline-start: auto;
+}
+
+/* Compact header selects — beat the .bn-admin-hub select input baseline
+   (full form-input padding) with a control sized for a header row. */
+.bn-admin-hub select.bn-pf-head-select {
+	padding: 3px var(--bn-a-s2);
+	padding-inline-end: var(--bn-a-s5);
+	font-size: var(--bn-a-text-xs);
+	line-height: 1.4;
+	/* wp-core forms.css forces select { min-height: 40px } — far too tall for
+	   a header control row; let the compact padding define the height. */
+	min-height: 0;
+	color: var(--bn-a-text-2);
+	max-width: 180px;
+	min-width: 0;
+	text-overflow: ellipsis;
+	border: 1px solid var(--bn-a-border);
+	border-radius: var(--bn-a-r-sm);
+	background-color: var(--bn-a-bg);
+	cursor: pointer;
+}
+
+.bn-admin-hub select.bn-pf-head-select:hover {
+	border-color: var(--bn-a-border-strong, var(--bn-a-border));
+	color: var(--bn-a-text-1);
+}
+
+.bn-admin-hub select.bn-pf-head-select:focus {
+	border-color: var(--bn-a-brand);
+	color: var(--bn-a-text-1);
+}
+
+.bn-pf-icon-btn {
+	background: var(--bn-a-bg);
+	border: 1px solid var(--bn-a-border);
+	border-radius: var(--bn-a-r-sm);
+	padding: 5px var(--bn-a-s2);
+	font-size: var(--bn-a-text-sm);
+	color: var(--bn-a-text-3);
+	cursor: pointer;
+	line-height: 1.2;
+	transition: background var(--bn-a-transition), color var(--bn-a-transition);
+}
+
+.bn-pf-icon-btn:hover {
+	background: var(--bn-a-bg-subtle);
+	color: var(--bn-a-text-1);
+}
+
+.bn-pf-icon-btn:focus-visible {
+	outline: 2px solid var(--bn-a-brand);
+	outline-offset: var(--bn-a-outline-offset);
+}
+
+.bn-pf-add-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-a-s1);
+	padding: var(--bn-a-s1) var(--bn-a-s3);
+	background: var(--bn-a-bg);
+	border: 1px solid var(--bn-a-brand);
+	color: var(--bn-a-brand);
+	border-radius: var(--bn-a-r-sm);
+	font-size: var(--bn-a-text-xs);
+	font-weight: var(--bn-a-fw-semibold);
+	cursor: pointer;
+	text-decoration: none;
+}
+
+.bn-pf-add-btn:hover {
+	background: var(--bn-a-career-bg);
+}
+
+.bn-pf-add-btn:focus-visible {
+	outline: 2px solid var(--bn-a-brand);
+	outline-offset: var(--bn-a-outline-offset);
+}
+
+/* Quiet danger text button — deliberately the lowest-weight control in the
+   header row; the destructive styling only asserts itself on hover/focus. */
+.bn-pf-del-group-btn {
+	padding: 3px var(--bn-a-s2);
+	background: none;
+	border: none;
+	color: var(--bn-a-text-3);
+	border-radius: var(--bn-a-r-sm);
+	font-size: var(--bn-a-text-xs);
+	font-weight: var(--bn-a-fw-semibold);
+	cursor: pointer;
+	transition: background var(--bn-a-transition), color var(--bn-a-transition);
+}
+
+.bn-pf-del-group-btn:hover {
+	color: var(--bn-a-red);
+	background: var(--bn-a-red-bg);
+}
+
+.bn-pf-del-group-btn:focus-visible {
+	outline: 2px solid var(--bn-a-red);
+	outline-offset: var(--bn-a-outline-offset);
+}
+
+/* Enforce the single 28px control height the header row promises above.
+   Without this, each control derived its own height from its own padding
+   (select 25 / icon 29 / add 28 / delete 20px) and never lined up on the
+   flex baseline. One shared box height makes align-items:center exact. */
+.bn-admin-hub .bn-pf-head-actions .bn-pf-head-select,
+.bn-admin-hub .bn-pf-head-actions .bn-pf-icon-btn,
+.bn-admin-hub .bn-pf-head-actions .bn-pf-add-btn,
+.bn-admin-hub .bn-pf-head-actions .bn-pf-del-group-btn {
+	height: 28px;
+	min-height: 28px;
+	box-sizing: border-box;
+}
+
+/* Each control is wrapped in an inline <form>; those forms are the row's flex
+   items. Center every item on the cross axis so the reorder/delete buttons
+   line up with the selects. (The block margin that used to push them 3px high
+   is removed at its source — the button-form rule in bn-admin-hub.css now
+   excludes .bn-pf-head-actions form.) */
+.bn-admin-hub .bn-pf-head-actions > * {
+	align-self: center;
+}
+
+.bn-admin-hub .bn-pf-head-actions .bn-pf-inline-form {
+	display: inline-flex;
+	align-items: center;
+}
+
+.bn-admin-hub .bn-pf-head-actions .bn-pf-icon-btn,
+.bn-admin-hub .bn-pf-head-actions .bn-pf-del-group-btn {
+	display: inline-flex;
+	align-items: center;
+}
+
+.bn-pf-table {
+	width: 100%;
+	border-collapse: collapse;
+	font-family: var(--bn-a-font-body);
+}
+
+.bn-pf-table th {
+	padding: var(--bn-a-s2) var(--bn-a-s4);
+	font-size: var(--bn-a-text-2xs);
+	font-weight: var(--bn-a-fw-bold);
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	color: var(--bn-a-text-3);
+	text-align: start;
+	background: var(--bn-a-bg-subtle);
+	border-bottom: 1px solid var(--bn-a-border-soft);
+}
+
+.bn-pf-table td {
+	padding: var(--bn-a-s3) var(--bn-a-s4);
+	font-size: var(--bn-a-text-sm);
+	color: var(--bn-a-text-1);
+	border-bottom: 1px solid var(--bn-a-border-soft);
+	vertical-align: middle;
+}
+
+.bn-pf-table tbody tr:last-child td {
+	border-bottom: none;
+}
+
+.bn-pf-table tbody tr:hover td {
+	background: var(--bn-a-bg-subtle);
+}
+
+.bn-pf-th-order,
+.bn-pf-th-actions {
+	width: 64px;
+}
+
+.bn-pf-field-name {
+	font-weight: var(--bn-a-fw-semibold);
+	color: var(--bn-a-text-1);
+}
+
+
+/* Inline single-control forms in the field table (Required toggle, Visible-to
+   select, delete). Zero margin so they sit flush inside the table cell. */
+.bn-pf-inline-form {
+	margin: 0;
+}
+
+/* Delete forms hold trigger + impact panel + confirm/cancel: keep the pieces
+   on one centered row (wrapping as a unit when the impact panel reveals). */
+.bn-pf-inline-form.bn-del-form {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-a-s2);
+	flex-wrap: wrap;
+	justify-content: flex-end;
+}
+
+/* Confirming state: the impact box + Yes/Cancel would otherwise crowd and
+   overlap the toolbar controls (visibility / member-type / reorder / Add Field)
+   inside the wrapping flex row. Breaking the form onto its own full-width line
+   drops the confirmation cleanly below the toolbar, right-aligned to match it. */
+.bn-pf-head-actions .bn-del-form.is-confirming {
+	flex-basis: 100%;
+	align-items: center;
+	justify-content: flex-end;
+	margin-top: var(--bn-a-s2);
+}
+
+.bn-pf-req-wrap {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-a-s1);
+	font-size: var(--bn-a-text-sm);
+	color: var(--bn-a-text-1);
+	cursor: pointer;
+}
+
+.bn-pf-req-check {
+	width: 16px;
+	height: 16px;
+	cursor: pointer;
+	accent-color: var(--bn-a-brand);
+	flex-shrink: 0;
+}
+
+.bn-pf-vis-field {
+	font-size: var(--bn-a-text-xs);
+	border: 1px solid var(--bn-a-border);
+	border-radius: var(--bn-a-r-sm);
+	padding: 5px var(--bn-a-s2);
+	background: var(--bn-a-bg);
+	color: var(--bn-a-text-1);
+	cursor: pointer;
+	min-width: 120px;
+}
+
+.bn-pf-vis-field:focus {
+	outline: 2px solid transparent;
+	outline-offset: 2px;
+	border-color: var(--bn-a-brand);
+}
+
+.bn-pf-order-cell {
+	display: flex;
+	gap: 3px;
+	align-items: center;
+}
+
+.bn-pf-action-cell {
+	display: flex;
+	gap: 3px;
+	align-items: center;
+	justify-content: flex-end;
+}
+
+.bn-pf-edit-btn {
+	background: none;
+	border: none;
+	padding: 5px var(--bn-a-s1);
+	cursor: pointer;
+	color: var(--bn-a-text-3);
+	font-size: var(--bn-a-text-md);
+	line-height: 1;
+	border-radius: var(--bn-a-r-sm);
+}
+
+.bn-pf-edit-btn:hover {
+	color: var(--bn-a-brand);
+	background: var(--bn-a-career-bg);
+}
+
+.bn-pf-edit-btn:focus-visible {
+	outline: 2px solid var(--bn-a-brand);
+	outline-offset: var(--bn-a-outline-offset);
+}
+
+.bn-pf-del-field {
+	background: none;
+	border: none;
+	padding: 5px var(--bn-a-s1);
+	cursor: pointer;
+	color: var(--bn-a-text-3);
+	font-size: var(--bn-a-text-md);
+	line-height: 1;
+	border-radius: var(--bn-a-r-sm);
+}
+
+.bn-pf-del-field:hover {
+	color: var(--bn-a-red);
+	background: var(--bn-a-red-bg);
+}
+
+.bn-pf-del-field:focus-visible {
+	outline: 2px solid var(--bn-a-red);
+	outline-offset: var(--bn-a-outline-offset);
+}
+
+.bn-del-confirm {
+	background: var(--bn-a-red-bg);
+	border: 1px solid var(--bn-a-red);
+	color: var(--bn-a-red);
+	padding: 3px var(--bn-a-s3);
+	border-radius: var(--bn-a-r-sm);
+	cursor: pointer;
+	font-size: var(--bn-a-text-sm);
+	font-weight: var(--bn-a-fw-semibold);
+}
+
+.bn-del-confirm:hover {
+	background: var(--bn-a-red);
+	color: var(--bn-a-bg);
+}
+
+.bn-del-cancel {
+	background: none;
+	border: 1px solid var(--bn-a-border);
+	color: var(--bn-a-text-3);
+	padding: 3px var(--bn-a-s2);
+	border-radius: var(--bn-a-r-sm);
+	cursor: pointer;
+	font-size: var(--bn-a-text-sm);
+	margin-inline-start: 2px;
+}
+
+.bn-del-cancel:hover {
+	background: var(--bn-a-bg-subtle);
+}
+
+.bn-del-confirm:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+	background: var(--bn-a-red-bg);
+	color: var(--bn-a-red);
+}
+
+/* Impact-confirm: revealed with the confirm/cancel step when the delete would
+   destroy stored member values. Type-to-confirm input gates the confirm button. */
+.bn-del-impact {
+	display: inline-flex;
+	flex-direction: column;
+	gap: var(--bn-a-s1);
+	max-width: 320px;
+	padding: var(--bn-a-s2) var(--bn-a-s3);
+	background: var(--bn-a-red-bg);
+	border: 1px solid var(--bn-a-red);
+	border-radius: var(--bn-a-r-sm);
+	text-align: start;
+}
+
+.bn-del-impact[hidden] {
+	display: none;
+}
+
+.bn-del-impact-text {
+	color: var(--bn-a-red);
+	font-size: var(--bn-a-text-sm);
+	font-weight: var(--bn-a-fw-semibold);
+	line-height: 1.4;
+}
+
+.bn-del-confirm-input {
+	width: 100%;
+	padding: 3px var(--bn-a-s2);
+	border: 1px solid var(--bn-a-red);
+	border-radius: var(--bn-a-r-sm);
+	background: var(--bn-a-bg);
+	color: var(--bn-a-text-1);
+	font-size: var(--bn-a-text-sm);
+}
+
+.bn-del-confirm-input:focus-visible {
+	outline: 2px solid var(--bn-a-red);
+	outline-offset: var(--bn-a-outline-offset);
+}
+
+.bn-pf-ef-panel {
+	padding: var(--bn-a-s5);
+	background: var(--bn-a-bg-subtle);
+	border-top: 1px dashed var(--bn-a-border);
+}
+
+.bn-pf-ef-panel tr.bn-pf-ef-row > td {
+	padding: 0;
+}
+
+.bn-pf-opts-wrap {
+	margin-top: var(--bn-a-s3);
+}
+
+.bn-pf-opts-wrap > label {
+	font-size: var(--bn-a-text-2xs);
+	font-weight: var(--bn-a-fw-bold);
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	color: var(--bn-a-text-3);
+	display: block;
+	margin-bottom: 5px;
+}
+
+.bn-pf-opts-textarea {
+	width: 100%;
+	border: 1px solid var(--bn-a-input-border);
+	border-radius: var(--bn-a-input-radius);
+	padding: var(--bn-a-input-pad-y) var(--bn-a-input-pad-x);
+	font-size: var(--bn-a-text-sm);
+	font-family: var(--bn-a-font-body);
+	resize: vertical;
+	min-height: 100px;
+	background: var(--bn-a-bg);
+	color: var(--bn-a-text-1);
+	box-sizing: border-box;
+}
+
+.bn-pf-opts-textarea:focus {
+	outline: 2px solid transparent;
+	outline-offset: 2px;
+	border-color: var(--bn-a-brand);
+	box-shadow: var(--bn-a-focus-ring);
+}
+
+.bn-pf-opts-hint {
+	font-size: var(--bn-a-text-2xs);
+	color: var(--bn-a-text-3);
+	margin: 5px 0 0;
+}
+
+.bn-pf-af-panel {
+	padding: var(--bn-a-s5);
+	background: var(--bn-a-bg-subtle);
+	border-top: 1px dashed var(--bn-a-border);
+	display: none;
+}
+
+.bn-pf-af-panel.bn-open {
+	display: block;
+}
+
+/* Group rename panel: same reveal chrome as the add-field panel, with the input + save button on one compact row. */
+.bn-pf-rename-panel .bn-pf-inline-form {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-a-s2);
+}
+
+
+.bn-pf-af-title {
+	font-size: var(--bn-a-text-sm);
+	font-weight: var(--bn-a-fw-bold);
+	color: var(--bn-a-text-1);
+	margin: 0 0 var(--bn-a-s3);
+}
+
+.bn-pf-af-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--bn-a-s3);
+	align-items: flex-end;
+}
+
+.bn-pf-af-row .bn-pf-af-field {
+	flex: 1;
+	min-width: 150px;
+}
+
+.bn-pf-af-field--type {
+	flex: 0 0 180px !important;
+}
+
+.bn-pf-af-field--vis {
+	flex: 0 0 160px !important;
+}
+
+.bn-pf-af-row .bn-pf-af-field label {
+	font-size: var(--bn-a-text-2xs);
+	font-weight: var(--bn-a-fw-bold);
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	color: var(--bn-a-text-3);
+	display: block;
+	margin-bottom: 5px;
+}
+
+.bn-pf-af-row .bn-pf-af-field input[type="text"],
+.bn-pf-af-row .bn-pf-af-field select {
+	font-size: var(--bn-a-text-sm);
+	width: 100%;
+	border: 1px solid var(--bn-a-input-border);
+	border-radius: var(--bn-a-input-radius);
+	padding: var(--bn-a-input-pad-y) var(--bn-a-input-pad-x);
+	background: var(--bn-a-bg);
+	color: var(--bn-a-text-1);
+	box-sizing: border-box;
+}
+
+.bn-pf-af-row .bn-pf-af-field input:focus,
+.bn-pf-af-row .bn-pf-af-field select:focus {
+	outline: 2px solid transparent;
+	outline-offset: 2px;
+	border-color: var(--bn-a-brand);
+	box-shadow: var(--bn-a-focus-ring);
+}
+
+.bn-pf-af-req-row {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-a-s2);
+	font-size: var(--bn-a-text-sm);
+	color: var(--bn-a-text-1);
+	margin-top: var(--bn-a-s3);
+}
+
+.bn-pf-af-req-row input[type="checkbox"] {
+	width: 16px;
+	height: 16px;
+	accent-color: var(--bn-a-brand);
+}
+
+.bn-pf-af-actions {
+	display: flex;
+	gap: var(--bn-a-s2);
+	margin-top: var(--bn-a-s3);
+}
+
+.bn-pf-add-group-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-a-s2);
+	padding: var(--bn-a-s2) var(--bn-a-s4);
+	border: 1px solid var(--bn-a-brand);
+	border-radius: var(--bn-a-r-sm);
+	color: var(--bn-a-brand);
+	background: var(--bn-a-bg);
+	font-size: var(--bn-a-text-sm);
+	font-weight: var(--bn-a-fw-semibold);
+	cursor: pointer;
+	text-decoration: none;
+}
+
+.bn-pf-add-group-btn:hover {
+	background: var(--bn-a-career-bg);
+}
+
+.bn-pf-add-group-btn:focus-visible {
+	outline: 2px solid var(--bn-a-brand);
+	outline-offset: var(--bn-a-outline-offset);
+}
+
+/* The Add Group control is a <summary>: a native disclosure, so revealing the
+   form costs no page load and never moves the admin's scroll position. Strip
+   the default marker in both engines so it reads as the button it already was,
+   and hide it once open — the form itself is the affordance at that point. */
+.bn-pf-add-group > summary.bn-pf-add-group-btn {
+	list-style: none;
+}
+
+.bn-pf-add-group > summary.bn-pf-add-group-btn::-webkit-details-marker {
+	display: none;
+}
+
+.bn-pf-add-group[open] > summary.bn-pf-add-group-btn {
+	margin-bottom: var(--bn-a-s4);
+}
+
+.bn-pf-ag-card {
+	background: var(--bn-a-bg);
+	border: 1px solid var(--bn-a-border);
+	border-radius: var(--bn-a-r-lg);
+	padding: var(--bn-a-s5);
+}
+
+.bn-pf-ag-card h3 {
+	font-family: var(--bn-a-font-display);
+	font-size: var(--bn-a-text-md);
+	font-weight: var(--bn-a-fw-bold);
+	color: var(--bn-a-text-1);
+	margin: 0 0 var(--bn-a-s4);
+}
+
+.bn-pf-ag-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--bn-a-s3);
+	align-items: flex-end;
+}
+
+.bn-pf-ag-row .bn-pf-ag-field {
+	flex: 1;
+	min-width: 150px;
+}
+
+.bn-pf-ag-field--type {
+	flex: 0 0 220px !important;
+}
+
+.bn-pf-ag-field--vis {
+	flex: 0 0 180px !important;
+}
+
+.bn-pf-ag-row .bn-pf-ag-field label {
+	font-size: var(--bn-a-text-2xs);
+	font-weight: var(--bn-a-fw-bold);
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	color: var(--bn-a-text-3);
+	display: block;
+	margin-bottom: 5px;
+}
+
+.bn-pf-ag-row .bn-pf-ag-field input[type="text"],
+.bn-pf-ag-row .bn-pf-ag-field select {
+	font-size: var(--bn-a-text-sm);
+	width: 100%;
+	border: 1px solid var(--bn-a-border);
+	border-radius: var(--bn-a-r-sm);
+	padding: var(--bn-a-s2) var(--bn-a-s3);
+	background: var(--bn-a-bg);
+	color: var(--bn-a-text-1);
+	box-sizing: border-box;
+}
+
+.bn-pf-ag-row .bn-pf-ag-field input:focus,
+.bn-pf-ag-row .bn-pf-ag-field select:focus {
+	outline: 2px solid transparent;
+	outline-offset: 2px;
+	border-color: var(--bn-a-brand);
+	box-shadow: 0 0 0 2px var(--bn-a-career-bg);
+}
+
+.bn-pf-ag-note {
+	font-size: var(--bn-a-text-xs);
+	color: var(--bn-a-text-3);
+	margin-top: var(--bn-a-s3);
+}
+
+.bn-pf-ag-actions {
+	display: flex;
+	gap: var(--bn-a-s2);
+	margin-top: var(--bn-a-s4);
+}
+
+@media (max-width: 1024px) {
+	.bn-pf-head-actions {
+		gap: var(--bn-a-s1);
+	}
+}
+
+@media (max-width: 782px) {
+	/* Horizontal scroll on the data table to keep all columns reachable. */
+	.bn-members-table-wrap .bn-table-wrap__scroll {
+		overflow-x: auto;
+	}
+
+	.bn-pf-card-head {
+		gap: var(--bn-a-s2);
+	}
+
+	.bn-pf-table th:nth-child(5),
+	.bn-pf-table td:nth-child(5) {
+		display: none;
+	}
+
+	.bn-pf-af-row,
+	.bn-pf-ag-row {
+		flex-direction: column;
+	}
+}
+
+@media (max-width: 640px) {
+	.bn-pf-table th:nth-child(3),
+	.bn-pf-table td:nth-child(3),
+	.bn-pf-table th:nth-child(4),
+	.bn-pf-table td:nth-child(4) {
+		display: none;
+	}
+}
+
+/* ==========================================================================
+   9. AVATAR SETTINGS
+   ========================================================================== */
+
+.bn-av-style-grid {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: var(--bn-a-s3);
+	margin-bottom: var(--bn-a-s1);
+}
+
+.bn-av-style-card {
+	position: relative;
+	border: 2px solid var(--bn-a-border);
+	border-radius: var(--bn-a-r-md);
+	padding: var(--bn-a-s4) var(--bn-a-s3);
+	cursor: pointer;
+	text-align: center;
+	transition: border-color var(--bn-a-transition), background var(--bn-a-transition);
+	background: var(--bn-a-bg);
+}
+
+.bn-av-style-card:hover {
+	border-color: var(--bn-a-text-3);
+}
+
+.bn-av-style-card:has(input:checked) {
+	border-color: var(--bn-a-brand);
+	background: var(--bn-a-career-bg);
+}
+
+.bn-av-style-card:focus-within {
+	outline: 2px solid var(--bn-a-brand);
+	outline-offset: var(--bn-a-outline-offset);
+}
+
+.bn-av-style-card input {
+	position: absolute;
+	opacity: 0;
+	pointer-events: none;
+}
+
+.bn-av-style-icon {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	margin-bottom: var(--bn-a-s2);
+}
+
+.bn-av-style-icon svg {
+	/* Icons ship without width/height (house rule) so the consumer decides the
+	   size. These previously carried width="36" inline; the dimension moved here
+	   when they became buddynext_icon() calls. Without it an SVG with only a
+	   viewBox falls back to the replaced-element default and blows up the card. */
+	width: 36px;
+	height: 36px;
+	color: var(--bn-a-text-3);
+}
+
+.bn-av-style-card:has(input:checked) .bn-av-style-icon svg {
+	color: var(--bn-a-brand);
+}
+
+.bn-av-style-label {
+	font-size: var(--bn-a-text-sm);
+	font-weight: var(--bn-a-fw-semibold);
+	color: var(--bn-a-text-1);
+}
+
+.bn-av-style-desc {
+	font-size: var(--bn-a-text-2xs);
+	color: var(--bn-a-text-3);
+	margin-top: 2px;
+}
+
+/* .bn-av-section-desc moved to bn-admin.css (always-loaded) so every admin
+   tab shares the same spacing — see note there. */
+
+/* Dependent section (Default Avatar Image) — dimmed + reduced opacity while
+   the avatar style is not "Default Image", with an explanatory note. */
+.bn-av-dependent.is-inactive {
+	opacity: 0.55;
+}
+
+.bn-av-dependent-note {
+	display: none;
+	font-size: var(--bn-a-text-xs);
+	color: var(--bn-a-warn, var(--bn-a-text-2));
+	background: var(--bn-a-warn-bg, var(--bn-a-bg-subtle));
+	border-radius: var(--bn-a-r-sm);
+	padding: var(--bn-a-s2) var(--bn-a-s3);
+	margin: 0 0 var(--bn-a-s3);
+}
+
+.bn-av-dependent.is-inactive .bn-av-dependent-note {
+	display: block;
+}
+
+.bn-image-picker {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-a-s3);
+	flex-wrap: wrap;
+}
+
+.bn-image-picker-preview {
+	width: 72px;
+	height: 72px;
+	object-fit: cover;
+	border-radius: var(--bn-a-r-md);
+	border: 1px solid var(--bn-a-border);
+	background: var(--bn-a-bg-subtle);
+	flex-shrink: 0;
+}
+
+.bn-image-picker-preview.bn-cover-preview {
+	width: 140px;
+	height: 72px;
+	border-radius: var(--bn-a-r-sm);
+}
+
+.bn-image-picker-empty {
+	width: 140px;
+	height: 72px;
+	border: 1px solid var(--bn-a-border);
+	border-radius: var(--bn-a-r-sm);
+	background: var(--bn-a-bg-subtle);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+}
+
+.bn-image-picker-empty-label {
+	font-size: var(--bn-a-text-2xs);
+	color: var(--bn-a-text-3);
+}
+
+.bn-image-picker-controls {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-a-s2);
+}
+
+.bn-image-picker-controls input[type="text"] {
+	border: 1px solid var(--bn-a-border);
+	border-radius: var(--bn-a-r-sm);
+	padding: 7px var(--bn-a-s3);
+	font-size: var(--bn-a-text-sm);
+	width: 280px;
+	max-width: 100%;
+	background: var(--bn-a-bg);
+	color: var(--bn-a-text-1);
+}
+
+.bn-image-picker-controls input[type="text"]:focus {
+	outline: 2px solid transparent;
+	outline-offset: 2px;
+	border-color: var(--bn-a-brand);
+	box-shadow: 0 0 0 2px var(--bn-a-career-bg);
+}
+
+.bn-image-picker-actions {
+	display: flex;
+	gap: var(--bn-a-s2);
+	align-items: center;
+	flex-wrap: wrap;
+}
+
+@media (max-width: 782px) {
+	.bn-av-style-grid {
+		grid-template-columns: 1fr;
+	}
+}
+
+/* ==========================================================================
+   10. MEMBER TYPE FIELD (Edit-Member view)
+   ========================================================================== */
+
+.bn-member-type-field {
+	margin-bottom: var(--bn-a-s4);
+}
+
+/*
+ * Sections that render after the main edit-member form (Member Type from Free,
+ * Member Labels from Pro) hook buddynext_after_edit_member_form and were butting
+ * straight against the form with no gap. This shared separator gives every such
+ * section a uniform top gap + rule so they read as distinct blocks, whichever
+ * plugins add them.
+ */
+.bn-field-row.bn-edit-member-extra {
+	margin-block-start: var(--bn-a-s6);
+}
+
+.bn-member-type-form {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-a-s2);
+	flex-wrap: wrap;
+}
+
+.bn-member-type-select {
+	min-width: 200px;
+}
+
+
+/* Add/Edit Member Type form — cap to a readable width so the 2-col fields
+   don't sprawl across the full-width card. Fields fill their columns via the
+   global .bn-field rule (bn-admin.css). */
+.bn-type-create-form {
+	max-width: 940px;
+}
+
+/* ── Inline setting alert ──────────────────────────────────────────────────
+ * A warning that sits INSIDE a settings panel, beside the control it concerns.
+ *
+ * Deliberately not the plain .bn-notice treatment, which paints every word red:
+ * three lines of solid red prose reads as documentation, not as a thing to act
+ * on. Here the tinted panel and the icon carry the severity, the title is the
+ * only emphasised text, and the body sits in normal admin ink so it can be READ.
+ * The action is a real button on the right, where the eye lands last.
+ */
+.bn-alert {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--bn-a-s3);
+	padding: var(--bn-a-s4);
+	margin-bottom: var(--bn-a-s5);
+	border-radius: var(--bn-a-r-md);
+	background: var(--bn-a-red-bg);
+	border: 1px solid transparent;
+	border-inline-start: 3px solid var(--bn-a-red);
+}
+
+.bn-alert__icon {
+	flex-shrink: 0;
+	display: flex;
+	color: var(--bn-a-red);
+	margin-block-start: 1px;
+}
+
+.bn-alert__icon svg {
+	width: 18px;
+	height: 18px;
+	stroke: currentColor;
+	fill: none;
+}
+
+.bn-alert__body {
+	flex: 1;
+	min-width: 0;
+}
+
+.bn-alert__title {
+	margin: 0;
+	font-size: var(--bn-a-text-sm);
+	font-weight: var(--bn-a-fw-semibold);
+	color: var(--bn-a-text-1);
+	line-height: 1.4;
+}
+
+.bn-alert__text {
+	margin: var(--bn-a-s1) 0 0;
+	font-size: var(--bn-a-text-sm);
+	font-weight: var(--bn-a-fw-normal);
+	color: var(--bn-a-text-2);
+	line-height: 1.5;
+}
+
+/* The diagnostic pair. Useful when it is needed, invisible when it is not —
+   so it must never compete with the sentence above it. */
+.bn-alert__meta {
+	margin: var(--bn-a-s2) 0 0;
+	font-size: var(--bn-a-text-xs);
+	font-weight: var(--bn-a-fw-normal);
+	color: var(--bn-a-text-3);
+}
+
+.bn-alert__meta code {
+	padding: 1px 5px;
+	border-radius: var(--bn-a-r-sm);
+	/* Subtle, not the dark code-block treatment: these are two values being
+	   reported, and at full code contrast they out-shout the sentence above. */
+	background: var(--bn-a-bg-subtle);
+	border: 1px solid var(--bn-a-border-soft);
+	color: var(--bn-a-text-2);
+	font-size: var(--bn-a-text-xs);
+}
+
+.bn-alert__action {
+	flex-shrink: 0;
+	align-self: center;
+}
+
+@media (max-width: 782px) {
+	/* Stack so neither the sentence nor the button gets squeezed into a column
+	   too narrow to read or tap. */
+	.bn-alert {
+		flex-wrap: wrap;
+	}
+
+	.bn-alert__action {
+		flex-basis: 100%;
+		align-self: stretch;
+		margin-block-start: var(--bn-a-s3);
+	}
+
+	.bn-alert__action .button {
+		width: 100%;
+		text-align: center;
+	}
+}
+
+/* --------------------------------------------------------------------------
+   Member Types table — tablet legibility
+   Six columns (Type / Slug / Members / Directory / Self-Select / Actions) do
+   not fit an iPad-portrait content column once the admin rail is accounted
+   for. Rather than let the browser crush each column to the width of its
+   longest unbreakable word, keep each cell on one line and let the wrapper
+   scroll. Scoped to this table — the Members directory wants its long email
+   and display-name cells to wrap.
+   -------------------------------------------------------------------------- */
+.bn-table--types th,
+.bn-table--types td {
+	white-space: nowrap;
+}

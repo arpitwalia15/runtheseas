@@ -1,0 +1,745 @@
+<?php
+/**
+ * WB Gamification Engine
+ *
+ * Single entry point for all gamification events.
+ * All award paths flow through Engine::process() — never directly
+ * to PointsEngine::award().
+ *
+ * Pipeline:
+ *   1. Validate event
+ *   2. Action-enabled + rate-limit checks  (registered actions only)
+ *   3. Enrich metadata via filter
+ *   4. Before-evaluate gate (can abort)
+ *   5. Persist to wb_gam_events  (immutable source of truth)
+ *   6. Calculate points  (option + RuleEngine multipliers)
+ *   7. Write to wb_gam_points  (with event_id FK)
+ *   8. Fire hooks + dispatch webhooks
+ *   9. Level-up + streak updates
+ *
+ * @package WB_Gamification
+ * @since   0.1.0
+ */
+
+namespace WBGam\Engine;
+
+defined( 'ABSPATH' ) || exit;
+// Silencing convention-driven false positives so Plugin Check signal stays clean:
+// - PrefixAllGlobals.NonPrefixedHooknameFound — plugin uses `wb_gam_*` as its
+// established hook prefix (documented in CLAUDE.md, declared in .phpcs.xml).
+// Plugin Check auto-detects `wb_gamification` from the text-domain header
+// and doesn't share the .phpcs.xml prefix list; hooks like
+// `wb_gam_points_redeemed` are part of the public 1.0 API and can't rename.
+// - PrefixAllGlobals.NonPrefixedFunctionFound — same convention. Helper
+// functions exported under `wb_gam_*` are documented in `src/Extensions/`.
+// - PluginCheck.Security.DirectDB.UnescapedDBParameter +
+// WordPress.DB.PreparedSQL.InterpolatedNotPrepared — this file does custom-
+// table work. Table names are interpolated from `{$wpdb->prefix}` plus
+// literal constants (no user input); user-supplied values pass through
+// `$wpdb->prepare()`. MySQL doesn't allow placeholder table names, so the
+// interpolation is unavoidable.
+// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound
+
+/**
+ * Single entry point for all gamification events through the full rule pipeline.
+ *
+ * @package WB_Gamification
+ */
+final class Engine {
+
+	/**
+	 * Guards against double-initialisation on the same request.
+	 *
+	 * @var bool
+	 */
+	private static bool $initialized = false;
+
+	/**
+	 * Static cache for action-enabled option checks.
+	 *
+	 * These options are NOT autoloaded, so each `get_option()` call is a DB
+	 * query the first time. Caching per-request avoids repeated lookups when
+	 * the same action fires multiple times (e.g. bulk imports).
+	 *
+	 * @var array<string, bool>
+	 */
+	private static array $enabled_cache = [];
+
+	/**
+	 * Boot the engine — registers async event processing callback.
+	 */
+	public static function init(): void {
+		if ( self::$initialized ) {
+			return;
+		}
+		self::$initialized = true;
+
+		WebhookDispatcher::init();
+		SideEffectDispatcher::boot();
+		self::register_default_side_effects();
+
+		// Action Scheduler handler for async event processing.
+		add_action( 'wb_gam_process_event_async', array( __CLASS__, 'handle_async' ) );
+
+		// Invalidate the per-request action-enabled cache whenever an
+		// admin toggles a `wb_gam_enabled_<action>` option. Without this,
+		// long-running contexts (WP-CLI bulk imports, Action Scheduler
+		// workers, cron) keep awarding for an action the admin just
+		// disabled — the same request never re-reads the option.
+		// See audit/DATA-FLOW-AWARD-2026-05-27.md §G15. `updated_option`
+		// fires once per real change so the work is bounded.
+		add_action( 'updated_option', array( __CLASS__, 'maybe_flush_enabled_cache' ), 10, 1 );
+		add_action( 'added_option', array( __CLASS__, 'maybe_flush_enabled_cache' ), 10, 1 );
+		add_action( 'deleted_option', array( __CLASS__, 'maybe_flush_enabled_cache' ), 10, 1 );
+	}
+
+	/**
+	 * Register the engine's default side-effect handlers with
+	 * SideEffectDispatcher.
+	 *
+	 * Each handler must be idempotent. The reconciler cron re-fires
+	 * failed handlers from the original Event payload up to MAX_RETRIES
+	 * times; a non-idempotent handler would double-apply on retry.
+	 *
+	 *   level_up — LevelEngine::maybe_level_up is idempotent because it
+	 *              re-derives the current level from wb_gam_user_totals
+	 *              and only writes when level_id differs from the cached
+	 *              value in user_meta. Re-firing with the same state is
+	 *              a no-op.
+	 *
+	 *   streak   — StreakEngine::record_activity is idempotent because
+	 *              it dedupes on (user_id, YYYY-MM-DD). Re-firing on the
+	 *              same day is a no-op.
+	 *
+	 *   webhook  — WebhookDispatcher::dispatch enqueues one AS job per
+	 *              webhook subscription per event. If a job is enqueued
+	 *              twice for the same (subscription, event_id), the
+	 *              second job's deliver() call hits the same URL with
+	 *              the same payload — at-least-once delivery semantics
+	 *              are documented on the public webhook contract.
+	 */
+	private static function register_default_side_effects(): void {
+		SideEffectDispatcher::register(
+			'level_up',
+			static function ( Event $event, int $points ): void {
+				LevelEngine::maybe_level_up( $event->user_id );
+			}
+		);
+		SideEffectDispatcher::register(
+			'streak',
+			static function ( Event $event, int $points ): void {
+				StreakEngine::record_activity( $event->user_id );
+			}
+		);
+		SideEffectDispatcher::register(
+			'webhook',
+			static function ( Event $event, int $points ): void {
+				WebhookDispatcher::dispatch( 'points_awarded', $event->user_id, $event, $points, array() );
+			}
+		);
+	}
+
+	/**
+	 * Engine-internal action_ids that bypass the Registry by design.
+	 *
+	 * These are emitted directly by engine code (admin manual awards,
+	 * redemption debits, generic ledger writes) and have no manifest
+	 * entry — they must NOT trigger the `wb_gam_unknown_action` warning.
+	 *
+	 * @var string[]
+	 */
+	private const INTERNAL_ACTION_IDS = array(
+		'manual',
+		'manual_award',
+		'manual_debit',
+		'debit',
+		'redemption',
+		'kudos_received',
+		'kudos_given',
+	);
+
+	/**
+	 * Whether an action_id is engine-internal (not a manifest action).
+	 *
+	 * @param string $action_id Action identifier.
+	 * @return bool True if engine-internal.
+	 */
+	private static function is_engine_internal_action( string $action_id ): bool {
+		return in_array( $action_id, self::INTERNAL_ACTION_IDS, true );
+	}
+
+	/**
+	 * Emit a developer-facing warning for an unknown action_id.
+	 *
+	 * Fired from {@see process()} when the action_id is not in the Registry,
+	 * is not engine-internal, and carries no manual points payload. Three
+	 * surfaces light up:
+	 *   1. `Log::warning()` → debug log + Query Monitor;
+	 *   2. `do_action( 'wb_gam_unknown_action', ... )` → custom listeners
+	 *      (admin notices, Slack, Sentry).
+	 *   3. A per-action_id rate limit so a hot loop calling the wrong ID
+	 *      doesn't flood the log — one warning per action_id per request.
+	 *
+	 * @param Event $event The unprocessable event.
+	 */
+	private static function warn_unknown_action( Event $event ): void {
+		static $warned = array();
+
+		$action_id = $event->action_id;
+		if ( isset( $warned[ $action_id ] ) ) {
+			return;
+		}
+		$warned[ $action_id ] = true;
+
+		$suggestions = Registry::suggest_similar( $action_id, 3 );
+
+		$msg = sprintf(
+			/* translators: %s: unrecognised action_id */
+			__( 'Engine: action_id "%s" is not in the Registry. Manifest missing, plugin inactive, or typo.', 'wb-gamification' ),
+			$action_id
+		);
+		if ( ! empty( $suggestions ) ) {
+			$msg .= ' ' . sprintf(
+				/* translators: %s: comma-separated list of suggested action_ids */
+				__( 'Did you mean: %s?', 'wb-gamification' ),
+				implode( ', ', $suggestions )
+			);
+		}
+
+		Log::warning(
+			$msg,
+			array(
+				'action_id'   => $action_id,
+				'user_id'     => $event->user_id,
+				'suggestions' => $suggestions,
+			)
+		);
+
+		// Record the miss for the admin observability surface. Without this
+		// the warning only lands in debug.log — production site owners don't
+		// see it. The transient feeds an analytics-dashboard panel so the
+		// person actually running the site can spot integration drift
+		// (typo'd action_id, deactivated plugin, missing manifest).
+		self::record_unknown_action( $action_id, $event->user_id, $suggestions );
+
+		/**
+		 * Fires when Engine::process() is handed an action_id that isn't in
+		 * the Registry and carries no manual points payload.
+		 *
+		 * Use this to route the miss to your monitoring of choice. Default
+		 * behaviour (log + return false from process()) is unchanged — this
+		 * is purely observational. Listener runs OUTSIDE any award
+		 * transaction (no DB writes that need to roll back).
+		 *
+		 * @since 1.5.0
+		 *
+		 * @param string   $action_id   The unrecognised action_id.
+		 * @param Event    $event       The event that triggered the miss.
+		 * @param string[] $suggestions Up to 3 close-match action_ids from
+		 *                              the Registry (may be empty).
+		 */
+		do_action( 'wb_gam_unknown_action', $action_id, $event, $suggestions );
+	}
+
+	/**
+	 * Transient key for the unknown-action observability buffer.
+	 *
+	 * One key holds a small associative array keyed by action_id; admin
+	 * dashboard reads + renders. Kept off-DB-as-row to avoid a schema
+	 * migration for what is fundamentally a 24h diagnostic.
+	 */
+	private const UNKNOWN_ACTIONS_TRANSIENT = 'wb_gam_unknown_actions_recent';
+
+	/**
+	 * How long a row in the buffer survives before auto-expiry.
+	 */
+	private const UNKNOWN_ACTIONS_TTL = DAY_IN_SECONDS;
+
+	/**
+	 * How many distinct action_ids the buffer holds before dropping the
+	 * least-recently-seen entry. Keeps the option payload bounded.
+	 */
+	private const UNKNOWN_ACTIONS_MAX = 50;
+
+	/**
+	 * Record an unknown action_id miss for the admin dashboard.
+	 *
+	 * Aggregates by action_id so a hot loop firing the wrong id 10,000
+	 * times shows up as one row with count=10000, not 10,000 rows. Reads
+	 * → mutates → writes through `set_transient()`, which is atomic enough
+	 * for an observability counter (we accept a small race window losing
+	 * a count or two under contention; this is a diagnostic, not billing).
+	 *
+	 * @param string   $action_id   The unknown id.
+	 * @param int      $user_id     User the event was for.
+	 * @param string[] $suggestions Latest suggestion set from the matcher.
+	 */
+	private static function record_unknown_action( string $action_id, int $user_id, array $suggestions ): void {
+		$buffer = get_transient( self::UNKNOWN_ACTIONS_TRANSIENT );
+		if ( ! is_array( $buffer ) ) {
+			$buffer = array();
+		}
+
+		$now = time();
+
+		if ( isset( $buffer[ $action_id ] ) && is_array( $buffer[ $action_id ] ) ) {
+			$buffer[ $action_id ]['count']        = (int) ( $buffer[ $action_id ]['count'] ?? 0 ) + 1;
+			$buffer[ $action_id ]['last_seen']    = $now;
+			$buffer[ $action_id ]['last_user_id'] = $user_id;
+			$buffer[ $action_id ]['suggestions']  = $suggestions;
+		} else {
+			$buffer[ $action_id ] = array(
+				'count'        => 1,
+				'first_seen'   => $now,
+				'last_seen'    => $now,
+				'last_user_id' => $user_id,
+				'suggestions'  => $suggestions,
+			);
+		}
+
+		// Bound the buffer by evicting the least-recently-seen entries when
+		// the cardinality cap is hit. A site emitting 100+ distinct wrong
+		// action_ids in a day is almost certainly a bug; we don't need to
+		// catalogue all of them, just enough for the admin to triage.
+		if ( count( $buffer ) > self::UNKNOWN_ACTIONS_MAX ) {
+			uasort( $buffer, static fn( $a, $b ) => ( $b['last_seen'] ?? 0 ) <=> ( $a['last_seen'] ?? 0 ) );
+			$buffer = array_slice( $buffer, 0, self::UNKNOWN_ACTIONS_MAX, true );
+		}
+
+		set_transient( self::UNKNOWN_ACTIONS_TRANSIENT, $buffer, self::UNKNOWN_ACTIONS_TTL );
+	}
+
+	/**
+	 * Read the unknown-action observability buffer for the admin dashboard.
+	 *
+	 * Caller is responsible for capability checking; this is a pure read.
+	 * Rows are returned sorted by last_seen DESC so the most-recent miss
+	 * surfaces at the top.
+	 *
+	 * @return array<string, array{count:int, first_seen:int, last_seen:int, last_user_id:int, suggestions:string[]}>
+	 */
+	public static function get_unknown_actions_recent(): array {
+		$buffer = get_transient( self::UNKNOWN_ACTIONS_TRANSIENT );
+		if ( ! is_array( $buffer ) ) {
+			return array();
+		}
+		uasort( $buffer, static fn( $a, $b ) => ( $b['last_seen'] ?? 0 ) <=> ( $a['last_seen'] ?? 0 ) );
+		return $buffer;
+	}
+
+	/**
+	 * Check whether a specific action is enabled, with per-request static cache.
+	 *
+	 * @param string $action_id Action identifier to check.
+	 * @return bool True if the action is enabled (default: true).
+	 */
+	private static function is_action_enabled( string $action_id ): bool {
+		if ( ! isset( self::$enabled_cache[ $action_id ] ) ) {
+			self::$enabled_cache[ $action_id ] = (bool) get_option( 'wb_gam_enabled_' . $action_id, true );
+		}
+		return self::$enabled_cache[ $action_id ];
+	}
+
+	/**
+	 * Drop the per-request cache when a `wb_gam_enabled_<action>` option
+	 * gets written. Bound from {@see init()}; takes the option name from
+	 * the `updated_option` / `added_option` / `deleted_option` callbacks.
+	 *
+	 * @param string $option_name Option that was just written.
+	 * @return void
+	 */
+	public static function maybe_flush_enabled_cache( string $option_name ): void {
+		if ( str_starts_with( $option_name, 'wb_gam_enabled_' ) ) {
+			self::$enabled_cache = array();
+		}
+	}
+
+	/**
+	 * Explicitly drop the per-request action-enabled cache.
+	 *
+	 * Useful for WP-CLI flows that update many `wb_gam_enabled_*` options
+	 * in a tight loop and want to force a re-read before the next batch.
+	 *
+	 * @return void
+	 */
+	public static function flush_enabled_cache(): void {
+		self::$enabled_cache = array();
+	}
+
+	/**
+	 * Queue event processing asynchronously via Action Scheduler.
+	 *
+	 * Use for high-volume repeatable actions where synchronous processing would
+	 * add latency on the request path. Rate limits are checked synchronously
+	 * before queueing so obviously-blocked actions are rejected immediately.
+	 *
+	 * Falls back to synchronous processing if Action Scheduler is unavailable.
+	 *
+	 * Note: There is a narrow race window between the sync rate-limit check and
+	 * the actual DB write (which happens when AS processes the job). In practice
+	 * this is harmless for cooldown-based limits because the AS queue is ordered
+	 * per group and jobs run sequentially.
+	 *
+	 * @param Event $event The event to queue.
+	 * @as-fire-once One enqueue per inbound Event. PointsEngine::award is the
+	 *               caller; each award produces one event, each event one job.
+	 *               The async handler does not re-enter process_async — it
+	 *               calls PointsEngine::award_batch directly.
+	 * @return bool True if queued (or synchronously processed as fallback).
+	 */
+	public static function process_async( Event $event ): bool {
+		if ( $event->user_id <= 0 || '' === $event->action_id ) {
+			return false;
+		}
+
+		// Sync gate: validate + rate-limit checks (fast, no writes).
+		$action = Registry::get_action( $event->action_id );
+		if ( null !== $action ) {
+			if ( ! self::is_action_enabled( $event->action_id ) ) {
+				return false;
+			}
+			if ( ! PointsEngine::passes_rate_limits( $event->user_id, $event->action_id, $action ) ) {
+				return false;
+			}
+		}
+
+		// Fallback: synchronous if AS not available (e.g. unit tests, early boot).
+		if ( ! function_exists( 'as_enqueue_async_action' ) ) {
+			return self::process( $event );
+		}
+
+		as_enqueue_async_action(
+			'wb_gam_process_event_async',
+			array(
+				array(
+					'action_id'  => $event->action_id,
+					'user_id'    => $event->user_id,
+					'object_id'  => $event->object_id,
+					'metadata'   => $event->metadata,
+					'event_id'   => $event->event_id,
+					'created_at' => $event->created_at,
+				),
+			),
+			'wb-gamification'
+		);
+
+		return true;
+	}
+
+	/**
+	 * Action Scheduler callback — reconstructs Event and runs full pipeline.
+	 *
+	 * @param array $event_data Serialised event data passed by process_async().
+	 */
+	public static function handle_async( array $event_data ): void {
+		if ( empty( $event_data['action_id'] ) || empty( $event_data['user_id'] ) ) {
+			return;
+		}
+
+		self::process( new Event( $event_data ) );
+	}
+
+	/**
+	 * Process a gamification event through the full rule pipeline.
+	 *
+	 * @param Event $event The normalised event to process.
+	 * @return bool        True if points were awarded.
+	 */
+	public static function process( Event $event ): bool {
+		if ( $event->user_id <= 0 || '' === $event->action_id ) {
+			return false;
+		}
+
+		$action = Registry::get_action( $event->action_id );
+
+		// Unknown action_id + no manual points → typo or missing manifest.
+		// The silent path here was the #1 confusion during integration testing:
+		// a wrong action_id resolved to $action = null, $points fell through
+		// to metadata['points'] (also 0), the engine returned false, and
+		// nothing surfaced to the caller, debug log, or admin. Now we log
+		// once with "did you mean …" suggestions and fire wb_gam_unknown_action
+		// so admin tooling (or a custom listener) can route the miss to a
+		// notice / Slack / monitoring channel.
+		if ( null === $action && empty( $event->metadata['points'] ) && ! self::is_engine_internal_action( $event->action_id ) ) {
+			self::warn_unknown_action( $event );
+			// Continue execution — the existing $points <= 0 gate at line ~380
+			// still rejects the event. The warning is observational, not a
+			// behaviour change.
+		}
+
+		// Resolve the currency ONCE — before any filter runs, before rate-limit
+		// check, before persist. Both passes_rate_limits and insert_point_row
+		// must agree on which ledger this award lands in; otherwise a filter
+		// that mutates `point_type` in metadata can drop the award into a
+		// different currency than the cap is counting (and vice versa).
+		// Manual / unregistered awards fall back to metadata for $type because
+		// they have no Registry entry to resolve from.
+		$resolved_type = null !== $action
+			? PointsEngine::resolve_type( Registry::resolve_action_point_type( $action ) ?: null )
+			: PointsEngine::resolve_type( $event->metadata['point_type'] ?? null );
+
+		// Stamp the resolved type onto the Event so downstream listeners
+		// (BadgeEngine, NotificationBridge, LevelEngine) read the canonical
+		// currency directly instead of digging back through metadata or
+		// re-resolving via Registry — both fall back to the primary type
+		// for internal-callsite events (challenge bonus, streak milestone,
+		// manual award, redemption) and silently produced wrong-currency
+		// reads. Closes audit/DATA-FLOW-AWARD-2026-05-27.md §G5/G6/G14.
+		$event = $event->with_point_type( $resolved_type );
+
+		// Registered-action checks: enabled + rate limits.
+		if ( null !== $action ) {
+			if ( ! self::is_action_enabled( $event->action_id ) ) {
+				return false;
+			}
+			if ( ! PointsEngine::passes_rate_limits( $event->user_id, $event->action_id, $action ) ) {
+				return false;
+			}
+		}
+
+		/**
+		 * Enrich event metadata before rule evaluation.
+		 *
+		 * Listeners may add fields like quality signals, word counts, AI
+		 * scores, or remote-site context. Mutating any field is allowed,
+		 * but be aware of two contracts the engine enforces:
+		 *
+		 *   - `point_type` is resolved BEFORE this filter runs (from the
+		 *     Registry action definition, not from metadata). Mutating
+		 *     metadata['point_type'] here has NO effect on which currency
+		 *     the resulting award lands in. To change the awarded currency
+		 *     for an action, override via the Registry layer or
+		 *     `wb_gam_resolve_action_point_type` filter (if exposed).
+		 *
+		 *   - The filter fires OUTSIDE the award transaction. Listeners
+		 *     should perform read-only enrichment only — no DB writes,
+		 *     no `PointsEngine::award` calls, no side effects that need
+		 *     to roll back if the award itself rolls back.
+		 *
+		 * @param array<string, mixed> $metadata Current metadata.
+		 * @param Event                $event    The event being processed.
+		 */
+		$enriched = (array) apply_filters( 'wb_gam_event_metadata', $event->metadata, $event );
+
+		if ( $enriched !== $event->metadata ) {
+			$event = new Event(
+				array(
+					'action_id'  => $event->action_id,
+					'user_id'    => $event->user_id,
+					'object_id'  => $event->object_id,
+					'metadata'   => $enriched,
+					'created_at' => $event->created_at,
+					'event_id'   => $event->event_id,
+				)
+			);
+		}
+
+		/**
+		 * Gate to block event processing.
+		 *
+		 * Return false to abort without recording anything. Use to short-
+		 * circuit awards based on user role, time of day, A/B-test bucket,
+		 * fraud signals, etc.
+		 *
+		 * IMPORTANT — listeners run OUTSIDE the award transaction:
+		 *   - Don't perform DB writes from a listener; if the award itself
+		 *     rolls back later, your write isn't covered.
+		 *   - Don't call PointsEngine::award / debit / award_batch from
+		 *     a listener — recursion + non-atomic mutations.
+		 *   - Read-only checks (cap evaluation, role checks) are safe.
+		 *
+		 * @param bool  $proceed Whether to proceed.
+		 * @param Event $event   The event.
+		 */
+		if ( ! (bool) apply_filters( 'wb_gam_before_evaluate', true, $event ) ) {
+			return false;
+		}
+
+		// Determine base points BEFORE the transaction so the early return
+		// for $points <= 0 doesn't leave the transaction open.
+		if ( null !== $action ) {
+			// Dynamic points (computed by the manifest's points_callback from
+			// the hook args at fire time) override the per-action admin option
+			// and the default. This is how rank-based winners + streak-day
+			// scaling pass varying point totals through the engine — the
+			// callback runs in Registry::register_action()'s listener BEFORE
+			// the event is queued, so the value survives the Action Scheduler
+			// round-trip via metadata. The admin's per-action option
+			// (wb_gam_points_<id>) is intentionally bypassed when a dynamic
+			// value is set; site owners controlling rank-scaling override the
+			// callback at the manifest layer, not the option.
+			if ( isset( $event->metadata['_dynamic_points'] ) ) {
+				$points = (int) $event->metadata['_dynamic_points'];
+			} else {
+				$points = (int) get_option( 'wb_gam_points_' . $event->action_id, $action['default_points'] );
+			}
+		} else {
+			// Manual / unregistered awards carry the points value in metadata.
+			$points = (int) ( $event->metadata['points'] ?? 0 );
+		}
+
+		/**
+		 * Filter points before rule multipliers are applied.
+		 *
+		 * Quality signals (word_count, activity_type, etc.) are available in
+		 * $event->metadata when the action registered a metadata_callback.
+		 *
+		 * @param int    $points    Base points (from admin option or action default).
+		 * @param string $action_id Action ID.
+		 * @param int    $user_id   User ID.
+		 * @param Event  $event     Full event object (metadata available).
+		 */
+		$points = (int) apply_filters( 'wb_gam_points_for_action', $points, $event->action_id, $event->user_id, $event );
+
+		// Apply any stored rule multipliers (day-of-week, order-total, etc.).
+		$points = RuleEngine::apply_multipliers( $points, $event );
+
+		if ( $points <= 0 ) {
+			return false;
+		}
+
+		/**
+		 * Fires before points are written to the ledger.
+		 *
+		 * All checks have passed (enabled, rate limits, gate filter, multipliers).
+		 * This is the last chance to inspect the award before it becomes permanent.
+		 *
+		 * @since 1.0.0
+		 * @param int   $user_id User who will receive the points.
+		 * @param Event $event   Full event object.
+		 * @param int   $points  Final points (after multipliers).
+		 */
+		do_action( 'wb_gam_before_points_awarded', $event->user_id, $event, $points );
+
+		// Atomic: events row + points row + user_totals UPSERT all in one
+		// transaction. Without this, a partial failure between events insert
+		// and points insert leaves an orphan event with no ledger entry; or
+		// a points insert without a user_totals bump leaves drift.
+		global $wpdb;
+		$wpdb->query( 'START TRANSACTION' );
+
+		// Rate-limit re-check INSIDE the transaction. The earlier check
+		// happens before metadata filters fire and before the transaction
+		// opens — under concurrent bursts (rapid clicks, retried API
+		// calls), two requests can both pass the early check and both
+		// reach this point. Re-checking inside the transaction tightens
+		// the TOCTOU window dramatically; the residual race is the small
+		// window between this check and the insert. For absolute caps
+		// (e.g. anti-fraud) callers should add a UNIQUE constraint on
+		// the relevant key shape — see plan/v1.1-rate-limit-hardening.
+		if ( null !== $action && ! PointsEngine::passes_rate_limits( $event->user_id, $event->action_id, $action ) ) {
+			$wpdb->query( 'ROLLBACK' );
+			return false;
+		}
+
+		// Replay protection — persist_event returns false when the event_id
+		// already exists (PK collision on wb_gam_events.id). Without this
+		// check the points insert proceeds against the FIRST events row's
+		// id and the caller has effectively double-awarded.
+		if ( ! self::persist_event( $event ) ) {
+			$wpdb->query( 'ROLLBACK' );
+			Log::error(
+				'Engine::process — duplicate event_id rejected; possible replay or retry storm.',
+				array(
+					'event_id'  => $event->event_id,
+					'user_id'   => $event->user_id,
+					'action_id' => $event->action_id,
+				)
+			);
+			return false;
+		}
+
+		if ( ! PointsEngine::insert_point_row( $event, $points, $resolved_type ) ) {
+			$wpdb->query( 'ROLLBACK' );
+			return false;
+		}
+
+		$wpdb->query( 'COMMIT' );
+
+		/**
+		 * Fires after points are awarded.
+		 *
+		 * ⚠ BREAKING CHANGE (Phase 0):
+		 *   Old: ( int $user_id, string $action_id, int $points )
+		 *   New: ( int $user_id, Event  $event,     int $points )
+		 *   Use $event->action_id for the action ID; full metadata available via $event->metadata.
+		 *
+		 * @param int   $user_id User who earned the points.
+		 * @param Event $event   Full event object.
+		 * @param int   $points  Points awarded.
+		 */
+		do_action( 'wb_gam_points_awarded', $event->user_id, $event, $points );
+
+		// NOTE: `wb_gam_after_points_award` (a 4-arg duplicate of the above
+		// hook) was removed on 2026-05-27 — no listener in the codebase
+		// subscribed to it, and listeners that need the same payload can
+		// use `wb_gam_points_awarded` instead. See audit/DATA-FLOW-AWARD-
+		// 2026-05-27.md §G8. If your code listened to the removed hook,
+		// switch to `wb_gam_points_awarded` and read fields off the Event
+		// object: $event->action_id, $event->object_id, $event->metadata.
+
+		// Side-effects — routed through SideEffectDispatcher so failures
+		// land in wb_gam_side_effect_failures for reconciliation rather
+		// than disappearing silently. See v2.1 in
+		// plan/STABILITY-AND-ARCHITECTURE-V2.md (Finding B + #2).
+		//
+		// Each handler is registered once at boot (see register_default_side_effects()
+		// below). dispatch() wraps every registered handler in try/catch;
+		// one failure doesn't stop the others, and every failure becomes
+		// a retry candidate for the hourly reconciler cron.
+		SideEffectDispatcher::dispatch( $event, $points );
+
+		/**
+		 * Fires after a gamification event is fully processed.
+		 *
+		 * @since 1.0.0
+		 *
+		 * @param array $event Event data array.
+		 * @param int   $user_id User ID.
+		 */
+		do_action( 'wb_gam_event_processed', (array) $event->metadata, $event->user_id );
+
+		return true;
+	}
+
+	/**
+	 * Persist a raw event to the immutable event log.
+	 *
+	 * The event log is the source of truth for all derived state.
+	 * Points, badges, and levels can all be replayed from this table.
+	 *
+	 * @param Event $event The event to persist.
+	 */
+	public static function persist_event( Event $event ): bool {
+		global $wpdb;
+
+		// Resolve point_type for the event log so analytics queries can scope by currency
+		// without re-parsing the JSON metadata blob.
+		$point_type = ( new \WBGam\Services\PointTypeService() )->resolve(
+			isset( $event->metadata['point_type'] ) ? (string) $event->metadata['point_type'] : null
+		);
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- ledger insert; not cacheable.
+		$inserted = $wpdb->insert(
+			$wpdb->prefix . 'wb_gam_events',
+			array(
+				'id'         => $event->event_id,
+				'user_id'    => $event->user_id,
+				'action_id'  => $event->action_id,
+				'object_id'  => $event->object_id ?: null,
+				'metadata'   => ! empty( $event->metadata ) ? wp_json_encode( $event->metadata ) : null,
+				'point_type' => $point_type,
+				'site_id'    => $event->metadata['_site_id'] ?? '',
+				'created_at' => gmdate( 'Y-m-d H:i:s' ),
+			),
+			array( '%s', '%d', '%s', '%d', '%s', '%s', '%s', '%s' )
+		);
+
+		// Replay protection — if the same event_id is submitted twice (network
+		// retry, double-tap, malicious replay), the PRIMARY KEY constraint on
+		// wb_gam_events.id rejects the second insert. Caller must abort the
+		// transaction to prevent an orphan points row from being committed
+		// against the FIRST events row's id.
+		return false !== $inserted;
+	}
+}

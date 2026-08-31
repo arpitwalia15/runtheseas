@@ -1,0 +1,11 @@
+/* Keep the Elementor background visible outside the framed survey while the
+ * survey shell itself remains a readable navy panel. */
+.rts-luxury-survey {
+	background-color: rgba(1, 11, 20, .9) !important;
+	background-image:
+		linear-gradient(rgba(2, 12, 22, .78), rgba(2, 12, 22, .9)),
+		var(--rts-survey-background, none) !important;
+	background-position: center !important;
+	background-repeat: no-repeat !important;
+	background-size: cover !important;
+}

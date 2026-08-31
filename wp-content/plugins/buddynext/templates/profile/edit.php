@@ -1,0 +1,834 @@
+<?php
+/**
+ * BuddyNext — Edit Profile template (v2 design system).
+ *
+ * Composer template. Resolves the editing user, loads profile/social
+ * data, prepares stats for the sidebar, then delegates rendering to the
+ * `templates/parts/profile-edit-*` parts.
+ *
+ * Context variables expected:
+ *   $user_id  int  The ID of the profile being edited (always current user or admin).
+ *
+ * Composed from v2 primitives in bn-base.css. Mirrors the hero visual
+ * language of `templates/profile/view.php` so view + edit feel like the
+ * same surface. Saves via REST POST `buddynext/v1/profile/me` (JSON,
+ * nonce in X-WP-Nonce header). Cover/avatar upload via REST POST
+ * `buddynext/v1/profile/avatar`.
+ *
+ * @package BuddyNext
+ * @since   1.0.0
+ */
+
+declare(strict_types=1);
+
+defined( 'ABSPATH' ) || exit;
+
+// Must be logged in and editing own profile (or admin).
+$current_user_id = get_current_user_id();
+if ( ! $current_user_id ) {
+	$bn_auth = \BuddyNext\Core\PageRouter::auth_url();
+	wp_safe_redirect( '' !== $bn_auth ? add_query_arg( 'redirect_to', get_permalink(), $bn_auth ) : wp_login_url( get_permalink() ) );
+	exit;
+}
+
+if ( empty( $user_id ) || ! is_int( $user_id ) ) {
+	$user_id = $current_user_id;
+}
+
+// Only own profile, or a user granted "Edit anyone's profile" (role map —
+// buddynext-profile/edit-any; site admins always pass). Replaces the hard-coded
+// edit_users cap so the Roles & Capabilities toggle actually governs this.
+if ( $user_id !== $current_user_id && ! buddynext_can( $current_user_id, 'buddynext-profile/edit-any' ) ) {
+	wp_die( esc_html__( 'You do not have permission to edit this profile.', 'buddynext' ), 403 );
+}
+
+$profile_user = get_userdata( $user_id );
+if ( ! $profile_user ) {
+	wp_die( esc_html__( 'Profile not found.', 'buddynext' ) );
+}
+
+$display_name      = $profile_user->display_name;
+$profile_email_raw = $profile_user->user_email;
+// The @handle badge shows the member's PUBLIC handle (bn_profile_slug ?: user_nicename) -
+// the same mention others resolve them by - never user_login (a credential).
+$user_login_str = \BuddyNext\Core\PageRouter::member_handle( (int) $profile_user->ID );
+
+// Avatar initials.
+$name_parts = explode( ' ', $display_name );
+$initials   = '';
+foreach ( array_slice( $name_parts, 0, 2 ) as $part ) {
+	$initials .= mb_strtoupper( mb_substr( $part, 0, 1 ) );
+}
+if ( ! $initials ) {
+	$initials = mb_strtoupper( mb_substr( $user_login_str, 0, 2 ) );
+}
+
+$avatar_url = get_avatar_url( $user_id, array( 'size' => 192 ) );
+// Resolve through the shared helper (uploaded cover -> site default -> '') so the
+// edit screen matches what the profile view + directory show; reading the raw
+// usermeta here left a user with no upload looking at the bare gradient even when
+// a site-wide default cover is configured.
+$cover_url = (string) buddynext_user_cover_url( $user_id );
+
+// Whether the user has a *custom* uploaded avatar (vs the generated initials /
+// Gravatar fallback). Drives the "Remove photo" control — there is nothing to
+// remove when the avatar is the auto fallback.
+$has_custom_avatar = '' !== (string) get_user_meta( $user_id, 'bn_avatar', true );
+
+// Load profile through service — reads from bn_profile_values.
+// As owner ($user_id === $user_id) ProfileService returns EVERY group/field
+// (no visibility gating) so the edit form can render the full field set.
+$service   = buddynext_service( 'profiles' );
+$profile   = $service->get_profile( $user_id, $user_id );
+$bn_groups = isset( $profile['groups'] ) && is_array( $profile['groups'] ) ? $profile['groups'] : array();
+
+// Build flat key=>value map for the lightweight sidebar/preview vars only.
+$fv = array();
+foreach ( $bn_groups as $grp ) {
+	if ( 'flat' === ( $grp['type'] ?? '' ) && ! empty( $grp['fields'] ) ) {
+		foreach ( $grp['fields'] as $f ) {
+			// value_raw: the owner's real stored value. `value` is display-reduced for
+			// date fields (age/year/month_year), and an edit input must prefill with the
+			// actual date, not '36 years old'.
+			$fv[ $f['field_key'] ] = $f['value_raw'] ?? ( $f['value'] ?? '' );
+		}
+	}
+}
+
+// Repeater entries kept in the Interactivity context so the existing JS
+// store (assets/js/profile/*) can add/remove rows client-side. We seed the
+// canonical work_experience/education keys it expects.
+$work_entries = array();
+$edu_entries  = array();
+foreach ( $bn_groups as $grp ) {
+	if ( 'repeater' === ( $grp['type'] ?? '' ) ) {
+		if ( 'work_experience' === $grp['group_key'] ) {
+			$work_entries = $grp['entries'] ?? array();
+		} elseif ( 'education' === $grp['group_key'] ) {
+			$edu_entries = $grp['entries'] ?? array();
+		}
+	}
+}
+
+// Convenience vars used by the hero + sidebar preview.
+$headline = $fv['headline'] ?? '';
+$bio      = $fv['bio'] ?? '';
+$location = $fv['location'] ?? '';
+
+/*
+ * The sidebar preview shows the member what OTHERS see, so it needs the same
+ * type-aware rendering the profile hero uses — not the raw value the edit inputs
+ * above prefill with. Those two needs pull in opposite directions for any
+ * structured type: the Location map field must prefill its control with the
+ * stored JSON and preview as "Lucknow, Uttar Pradesh, India". Keeping one
+ * variable for both is what put a JSON blob in the preview where a headline
+ * belongs.
+ */
+$bn_preview_display = static function ( string $field_key ) use ( $bn_groups ): string {
+	foreach ( $bn_groups as $bn_pd_group ) {
+		if ( 'flat' !== ( $bn_pd_group['type'] ?? '' ) || empty( $bn_pd_group['fields'] ) ) {
+			continue;
+		}
+		foreach ( $bn_pd_group['fields'] as $bn_pd_field ) {
+			if ( ( $bn_pd_field['field_key'] ?? '' ) === $field_key ) {
+				return \BuddyNext\Profile\FieldType::display_text(
+					$bn_pd_field,
+					$bn_pd_field['value_raw'] ?? ( $bn_pd_field['value'] ?? '' )
+				);
+			}
+		}
+	}
+	return '';
+};
+
+$headline_display = $bn_preview_display( 'headline' );
+$location_display = $bn_preview_display( 'location' );
+
+// The hero card owns the headline control, so it must render the field's
+// admin-configured label / placeholder / description — the field manager
+// persists edits to bn_profile_fields, but the hero hardcoded its strings and
+// renames never showed anywhere (Zoho #40911).
+$headline_field = array();
+foreach ( $bn_groups as $bn_hf_group ) {
+	foreach ( (array) ( $bn_hf_group['fields'] ?? array() ) as $bn_hf_field ) {
+		if ( 'headline' === (string) ( $bn_hf_field['field_key'] ?? '' ) ) {
+			$headline_field = $bn_hf_field;
+			break 2;
+		}
+	}
+}
+
+/*
+ * ── Field-level privacy helpers ────────────────────────────────────────────
+ *
+ * Restrictiveness ladder (contracts.visibility_resolution):
+ *   public(0) < members(1) < followers(2) < connections(3) < private(4)
+ *
+ * The admin sets each field's DEFAULT visibility; a member may only TIGHTEN
+ * it. So the per-field lock selector offers ONLY options whose rank is
+ * >= the admin default rank, and pre-selects the member's current effective
+ * choice (clamped into range). The server re-clamps on save.
+ */
+$bn_vis_labels = array(
+	'public'      => __( 'Public', 'buddynext' ),
+	'members'     => __( 'Members', 'buddynext' ),
+	'followers'   => __( 'Followers', 'buddynext' ),
+	'connections' => __( 'Connections', 'buddynext' ),
+	'private'     => __( 'Only me', 'buddynext' ),
+);
+$bn_vis_rank   = array(
+	'public'      => 0,
+	'members'     => 1,
+	'followers'   => 2,
+	'connections' => 3,
+	'private'     => 4,
+);
+
+/**
+ * Normalise an arbitrary value to a known visibility slug.
+ *
+ * @param mixed  $value    Candidate slug.
+ * @param string $fallback Slug returned when $value is unknown.
+ * @return string One of public|members|followers|connections|private.
+ */
+$bn_vis_norm = static function ( $value, string $fallback = 'public' ) use ( $bn_vis_rank ): string {
+	$value = is_string( $value ) ? $value : '';
+	return isset( $bn_vis_rank[ $value ] ) ? $value : $fallback;
+};
+
+/**
+ * Build the compact per-field privacy <select> (the "lock" dropdown).
+ *
+ * Only options EQUAL-OR-MORE restrictive than the admin default are offered
+ * (members can tighten, never loosen). Pre-selects the current effective
+ * choice. The control is escaped and emitted as a string.
+ *
+ * @param string $name           Input name attribute (e.g. headline__visibility).
+ * @param string $admin_default  Admin-set default visibility for the field.
+ * @param string $current        Member's current effective visibility.
+ * @param string $select_id      DOM id for the <select>.
+ * @return string Rendered HTML.
+ */
+$bn_privacy_select = static function ( string $name, string $admin_default, string $current, string $select_id ) use ( $bn_vis_labels, $bn_vis_rank, $bn_vis_norm ): string {
+	$admin_default = $bn_vis_norm( $admin_default, 'public' );
+	$current       = $bn_vis_norm( $current, $admin_default );
+	$min_rank      = $bn_vis_rank[ $admin_default ];
+
+	// Member choice can never be looser than the admin default — clamp the
+	// pre-selected value up to the default if a stale looser value slipped in.
+	if ( $bn_vis_rank[ $current ] < $min_rank ) {
+		$current = $admin_default;
+	}
+
+	$options_html = '';
+	foreach ( $bn_vis_labels as $slug => $label ) {
+		if ( $bn_vis_rank[ $slug ] < $min_rank ) {
+			continue;
+		}
+		$options_html .= sprintf(
+			'<option value="%1$s"%2$s>%3$s</option>',
+			esc_attr( $slug ),
+			selected( $current, $slug, false ),
+			esc_html( $label )
+		);
+	}
+
+	$lock_icon = \BuddyNext\Core\IconService::render( 'lock', 'bn-ep-vis-lock' );
+
+	return sprintf(
+		'<span class="bn-ep-field-vis" data-bn-vis>' .
+			'<label class="bn-ep-field-vis__label" for="%1$s">%2$s<span class="screen-reader-text">%3$s</span></label>' .
+			'<select class="bn-input bn-ep-field-vis__select" id="%1$s" name="%4$s" data-wp-on--change="actions.markDirty">%5$s</select>' .
+		'</span>',
+		esc_attr( $select_id ),
+		$lock_icon, // Already escaped by IconService (wp_kses'd).
+		esc_html__( 'Who can see this field', 'buddynext' ),
+		esc_attr( $name ),
+		$options_html // Built from escaped pieces above.
+	);
+};
+
+$profile_url = \BuddyNext\Core\PageRouter::profile_url( $user_id );
+
+// Stats for preview widget — read through the services (no SQL here). The
+// follow counts come from FollowService, which filters status = 'approved';
+// the old inline queries omitted that, so private accounts counted pending
+// follow requests as followers.
+$post_count      = ( new \BuddyNext\Feed\PostService() )->user_post_count( $user_id );
+$follower_count  = buddynext_service( 'follows' )->follower_count( $user_id );
+$following_count = buddynext_service( 'follows' )->following_count( $user_id );
+
+$format_count = static function ( int $n ): string {
+	if ( $n >= 1000 ) {
+		return round( $n / 1000, 1 ) . 'k';
+	}
+	return (string) $n;
+};
+
+$rest_nonce = wp_create_nonce( 'wp_rest' );
+
+/**
+ * Fires before the profile edit inner content.
+ *
+ * @param int $user_id Profile being edited.
+ */
+do_action( 'buddynext_profile_edit_before', isset( $user_id ) ? (int) $user_id : 0 );
+?>
+<div class="bn-ep-wrap"
+	data-wp-interactive="buddynext/profile"
+	<?php // When editing someone else's profile (edit-any), the store saves to that user's REST route instead of /me/profile. Absent/0 = editing own. ?>
+	<?php if ( $user_id !== $current_user_id ) : ?>
+		data-bn-profile-user="<?php echo absint( $user_id ); ?>"
+	<?php endif; ?>
+	data-wp-init="callbacks.initEditGuard"
+	<?php // Complete profile editor: submits every field, so the store signals a full write and the server enforces required fields across absent keys. Partial surfaces (privacy tab) omit this marker. ?>
+	data-bn-full-write="1"
+	<?php
+	// phpcs:disable WordPress.Security.EscapeOutput.OutputNotEscaped
+	echo wp_interactivity_data_wp_context(
+		array(
+			// Profile-only context: account / slug / privacy / 2FA state moved to
+			// the Settings hub. saveProfile reads the work/edu repeaters (guarded
+			// in store.js) and the flat field inputs that are on the page (every
+			// dynamic profile field, including Skills / Interests, is a flat input).
+			'userId'          => $user_id,
+			'restNonce'       => $rest_nonce,
+			'saved'           => false,
+			'saving'          => false,
+			// Per-media upload flags: drive the spinner overlays on the avatar/cover
+			// while their deferred uploads run on Save (flushStagedMedia).
+			'avatarUploading' => false,
+			'coverUploading'  => false,
+			'isDirty'         => false,
+			'errors'          => (object) array(),
+			'profileUrl'      => $profile_url,
+			'workEntries'     => array_values( $work_entries ),
+			'eduEntries'      => array_values( $edu_entries ),
+		)
+	);
+	// phpcs:enable WordPress.Security.EscapeOutput.OutputNotEscaped
+	?>
+>
+
+	<form class="bn-ep-form-shell"
+		data-wp-on--submit="actions.saveProfile"
+		data-wp-on--input="actions.markDirty"
+		data-wp-on--change="actions.markDirty"
+		novalidate>
+
+	<div class="bn-ep-shell">
+
+		<!-- Page title -->
+		<header class="bn-ep-title-row">
+			<h1 class="bn-ep-title">
+				<?php
+				echo esc_html(
+					sprintf(
+						/* translators: %s: member display name. */
+						__( 'Edit Profile · %s', 'buddynext' ),
+						$display_name
+					)
+				);
+				?>
+			</h1>
+			<p class="bn-ep-subtitle"><?php esc_html_e( 'How others see you across the community.', 'buddynext' ); ?></p>
+			<a class="bn-btn bn-ep-settings-link" data-variant="ghost" data-size="sm" href="<?php echo esc_url( \BuddyNext\Core\PageRouter::settings_url() ); ?>">
+				<?php esc_html_e( 'Account & settings', 'buddynext' ); ?>
+				<?php buddynext_icon( 'chevron-right' ); ?>
+			</a>
+		</header>
+
+		<!-- Main form column -->
+		<main class="bn-ep-form">
+
+			<?php
+			// Hero card.
+			buddynext_get_template(
+				'parts/profile-edit-hero.php',
+				array(
+					'profile_user_id'      => $user_id,
+					'display_name'         => $display_name,
+					'headline'             => $headline,
+					'headline_label'       => (string) ( $headline_field['label'] ?? '' ),
+					'headline_placeholder' => (string) ( $headline_field['placeholder'] ?? '' ),
+					'headline_hint'        => (string) ( $headline_field['description'] ?? '' ),
+					'username'             => $user_login_str,
+					'avatar_url'           => $avatar_url,
+					'cover_url'            => $cover_url,
+					'initials'             => $initials,
+					'has_custom_avatar'    => $has_custom_avatar,
+				)
+			);
+
+			// ── Dynamic profile fields ──────────────────────────────────
+			// Every admin-defined group/field is rendered here through the
+			// single field-type engine (contracts.field_type_engine), so any
+			// field type works edit→display→search without per-type template
+			// code. Each field carries a compact lock privacy selector; the
+			// member can only TIGHTEN a field below its admin default.
+			foreach ( $bn_groups as $bn_group ) {
+				$bn_gkey   = isset( $bn_group['group_key'] ) ? (string) $bn_group['group_key'] : '';
+				$bn_gtype  = isset( $bn_group['type'] ) ? (string) $bn_group['type'] : 'flat';
+				$bn_glabel = isset( $bn_group['label'] ) && '' !== (string) $bn_group['label']
+					? (string) $bn_group['label']
+					: ucwords( str_replace( '_', ' ', $bn_gkey ) );
+
+				if ( '' === $bn_gkey ) {
+					continue;
+				}
+
+				/*
+				 * A group the member's plan does not include.
+				 *
+				 * Shown, not hidden. A member cannot choose to upgrade for a
+				 * section they never learn exists, so this is the one surface
+				 * where a locked group stays visible -- ProfileService drops it
+				 * outright for every other viewer, so nobody else can tell which
+				 * plan this member is on.
+				 *
+				 * Rendered as a static section with no inputs, so nothing is
+				 * posted for it and the save path never has to special-case it.
+				 */
+				if ( ! empty( $bn_group['locked'] ) ) {
+					$bn_upgrade_url = (string) apply_filters( 'buddynext_profile_group_upgrade_url', '', $bn_gkey, $user_id );
+					?>
+					<section class="bn-ep-group bn-ep-group--locked" aria-labelledby="bn-ep-locked-<?php echo esc_attr( $bn_gkey ); ?>">
+						<h3 class="bn-ep-group__title" id="bn-ep-locked-<?php echo esc_attr( $bn_gkey ); ?>">
+							<?php echo esc_html( $bn_glabel ); ?>
+							<span class="bn-ep-locked-badge"><?php esc_html_e( 'Upgrade', 'buddynext' ); ?></span>
+						</h3>
+						<p class="bn-ep-locked-note">
+							<?php esc_html_e( 'This section is not part of your current plan.', 'buddynext' ); ?>
+						</p>
+						<?php
+						/*
+						 * No destination, no button. A prompt that links nowhere is
+						 * worse than no prompt -- same rule the membership pages
+						 * apply when no default plan is configured.
+						 */
+						if ( '' !== $bn_upgrade_url ) :
+							?>
+							<a class="bn-btn" data-variant="primary" data-size="sm" href="<?php echo esc_url( $bn_upgrade_url ); ?>">
+								<?php esc_html_e( 'See plans', 'buddynext' ); ?>
+							</a>
+						<?php endif; ?>
+					</section>
+					<?php
+					continue;
+				}
+
+				if ( 'repeater' === $bn_gtype ) {
+					// Repeater group: render each saved entry's sub-fields via
+					// the engine, plus ONE per-entry privacy lock that reuses
+					// the existing `group_key[n][_visibility]` save contract.
+					$bn_entries  = isset( $bn_group['entries'] ) && is_array( $bn_group['entries'] ) ? $bn_group['entries'] : array();
+					$bn_gdefault = $bn_vis_norm( $bn_group['visibility'] ?? 'public', 'public' );
+
+					/*
+					 * A repeater entry carries ONE audience for the whole entry, but the
+					 * fields inside it each ship their own default. Start the entry at the
+					 * most restrictive of them, so a Work Experience row does not default
+					 * to Public while every flat field on the same screen defaults to
+					 * Members - same screen, same rule.
+					 *
+					 * The group remains the FLOOR (what the member may loosen to); this is
+					 * only the starting value.
+					 */
+					$bn_rep_default = $bn_gdefault;
+					foreach ( $bn_entries as $bn_schema_entry ) {
+						if ( ! is_array( $bn_schema_entry ) ) {
+							continue;
+						}
+						foreach ( $bn_schema_entry as $bn_schema_field ) {
+							if ( ! is_array( $bn_schema_field ) ) {
+								continue;
+							}
+							$bn_sub_vis = $bn_vis_norm(
+								$bn_schema_field['field_visibility'] ?? ( $bn_schema_field['visibility'] ?? $bn_gdefault ),
+								$bn_gdefault
+							);
+							if ( $bn_vis_rank[ $bn_sub_vis ] > $bn_vis_rank[ $bn_rep_default ] ) {
+								$bn_rep_default = $bn_sub_vis;
+							}
+						}
+					}
+
+					// Required sub-field keys for this group, so a JS-added row
+					// (buildEntryNode) can mirror the same asterisk the server
+					// renders — data-driven from is_required, never hardcoded.
+					$bn_req_keys = array();
+					foreach ( $bn_entries as $bn_schema_entry ) {
+						if ( ! is_array( $bn_schema_entry ) ) {
+							continue;
+						}
+						foreach ( $bn_schema_entry as $bn_schema_field ) {
+							if ( is_array( $bn_schema_field ) && ! empty( $bn_schema_field['is_required'] ) && ! empty( $bn_schema_field['field_key'] ) ) {
+								$bn_req_keys[ (string) $bn_schema_field['field_key'] ] = true;
+							}
+						}
+					}
+
+					$bn_rep_html = '<div class="bn-ep-card-body" id="' . esc_attr( 'bn-ep-' . str_replace( '_', '-', $bn_gkey ) . '-entries' ) . '" data-bn-repeater-group="' . esc_attr( $bn_gkey ) . '" data-bn-required-fields="' . esc_attr( implode( ',', array_keys( $bn_req_keys ) ) ) . '">';
+
+					foreach ( $bn_entries as $bn_idx => $bn_entry ) {
+						$bn_idx_int = (int) $bn_idx;
+						$bn_fields  = is_array( $bn_entry ) ? $bn_entry : array();
+
+						$bn_rep_html .= '<div class="bn-ep-repeater-entry" data-entry-index="' . esc_attr( (string) $bn_idx_int ) . '">';
+						$bn_rep_html .= '<header class="bn-ep-repeater-header"><span class="bn-ep-repeater-num">' . absint( $bn_idx_int + 1 ) . '</span>';
+						$bn_rep_html .= '<button class="bn-btn bn-ep-repeater-remove" type="button" data-variant="ghost" data-size="sm" data-group="' . esc_attr( $bn_gkey ) . '" data-entry-index="' . esc_attr( (string) $bn_idx_int ) . '" data-wp-on--click="actions.removeEntry" aria-label="' . esc_attr__( 'Remove this entry', 'buddynext' ) . '">' . \BuddyNext\Core\IconService::render( 'x' ) . '</button>';
+						$bn_rep_html .= '</header>';
+
+						$bn_rep_html .= '<div class="bn-ep-grid">';
+						foreach ( $bn_fields as $bn_field ) {
+							if ( ! is_array( $bn_field ) || empty( $bn_field['field_key'] ) ) {
+								continue;
+							}
+							$bn_fkey  = (string) $bn_field['field_key'];
+							$bn_ftype = isset( $bn_field['type'] ) ? (string) $bn_field['type'] : 'text';
+							$bn_name  = $bn_gkey . '[' . $bn_idx_int . '][' . $bn_fkey . ']';
+							$bn_label = isset( $bn_field['label'] ) ? (string) $bn_field['label'] : ucwords( str_replace( '_', ' ', $bn_fkey ) );
+							// Same render-gate as the flat branch: a plan-gated sub-field
+							// renders the locked explanation, not an input the API refuses.
+							$bn_ctrl = \BuddyNext\Profile\FieldType::render_profile_input( $bn_field, $bn_field['value_raw'] ?? ( $bn_field['value'] ?? '' ), $bn_name, $user_id );
+
+							// Visible required marker, mirroring the flat-field branch so
+							// repeater sub-fields show the same asterisk (the control already
+							// carries the HTML `required` attribute via FieldType).
+							$bn_sf_required = ! empty( $bn_field['is_required'] )
+								? ' <span class="bn-ep-required" aria-hidden="true">*</span>'
+								: '';
+
+							// G1: owner-authored help text renders under the label; an
+							// empty description renders nothing (no empty shells).
+							$bn_sf_hint = '';
+							if ( ! empty( $bn_field['description'] ) ) {
+								$bn_sf_hint = '<p class="bn-ep-hint bn-ep-field-hint">' . esc_html( (string) $bn_field['description'] ) . '</p>';
+							}
+
+							// A boolean's control is already self-labelling (the checkbox
+							// carries its own label), so it gets a full-width row with no
+							// redundant outer label.
+							if ( 'boolean' === $bn_ftype ) {
+								$bn_rep_html .= '<div class="bn-ep-field bn-ep-field--full">' . $bn_ctrl . $bn_sf_hint . '</div>';
+							} else {
+								// `for` must be the id render_input() actually gave the
+								// control — ask FieldType rather than re-deriving it, and
+								// omit it entirely for the group types, which render a
+								// <fieldset> with no element carrying that id.
+								$bn_sf_for = \BuddyNext\Profile\FieldType::has_labelable_control( $bn_ftype )
+									? ' for="' . esc_attr( \BuddyNext\Profile\FieldType::input_id( $bn_name ) ) . '"'
+									: '';
+
+								$bn_rep_html .= '<div class="bn-ep-field"><label class="bn-ep-label"' . $bn_sf_for . '>' . esc_html( $bn_label ) . $bn_sf_required . '</label>' . $bn_sf_hint . $bn_ctrl . '</div>';
+							}
+						}
+						$bn_rep_html .= '</div>';
+
+						// Per-entry privacy lock (reuses the _visibility control).
+						// The saved choice arrives in the group's index-aligned
+						// entry_visibility array — never inside the entry itself,
+						// which must stay a packed list for JSON consumers.
+						$bn_entry_vis = $bn_vis_norm(
+							$bn_group['entry_visibility'][ $bn_idx_int ] ?? $bn_rep_default,
+							$bn_rep_default
+						);
+						$bn_rep_html .= '<div class="bn-ep-field bn-ep-field--full bn-ep-repeater-vis">';
+						$bn_rep_html .= $bn_privacy_select(
+							$bn_gkey . '[' . $bn_idx_int . '][_visibility]',
+							$bn_gdefault,
+							$bn_entry_vis,
+							'bn-ep-' . str_replace( '_', '-', $bn_gkey ) . '-vis-' . $bn_idx_int
+						);
+						$bn_rep_html .= '</div>';
+
+						$bn_rep_html .= '</div>';
+					}
+
+					$bn_rep_html .= '</div>';
+					$bn_rep_html .= '<footer class="bn-ep-card-footer"><button class="bn-btn bn-ep-add-entry" type="button" data-variant="ghost" data-size="sm" data-group="' . esc_attr( $bn_gkey ) . '" data-wp-on--click="actions.addEntry">' . \BuddyNext\Core\IconService::render( 'plus' ) . '<span>' . esc_html__( 'Add entry', 'buddynext' ) . '</span></button></footer>';
+
+					echo '<section class="bn-card bn-ep-card"><header class="bn-ep-card-header"><h2 class="bn-ep-card-title">' . esc_html( $bn_glabel ) . '</h2></header>';
+					// Repeater body markup is assembled from individually escaped
+					// pieces above (FieldType output is escaped per its contract).
+					echo $bn_rep_html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+					echo '</section>';
+					continue;
+				}
+
+				// Flat group: render each field's input via the engine + lock.
+				$bn_fields = isset( $bn_group['fields'] ) && is_array( $bn_group['fields'] ) ? $bn_group['fields'] : array();
+				if ( empty( $bn_fields ) ) {
+					continue;
+				}
+
+				$bn_gvis_default = $bn_vis_norm( $bn_group['visibility'] ?? 'public', 'public' );
+				$bn_body_html    = '<div class="bn-ep-grid">';
+
+				foreach ( $bn_fields as $bn_field ) {
+					if ( ! is_array( $bn_field ) || empty( $bn_field['field_key'] ) ) {
+						continue;
+					}
+					$bn_fkey = (string) $bn_field['field_key'];
+					// `headline` is edited inline in the hero card (parts/profile-edit-hero.php),
+					// which already renders an <input name="headline">. Rendering it again here
+					// puts a second same-named input on the page; the save collector
+					// (querySelectorAll('input[name]') in profile/store.js) then reads the empty
+					// duplicate and blanks the headline on save. Skip it — the hero owns headline.
+					if ( 'headline' === $bn_fkey ) {
+						continue;
+					}
+					$bn_ftype  = isset( $bn_field['type'] ) ? (string) $bn_field['type'] : 'text';
+					$bn_label  = isset( $bn_field['label'] ) ? (string) $bn_field['label'] : ucwords( str_replace( '_', ' ', $bn_fkey ) );
+					$bn_inp_id = 'bn-ep-' . str_replace( '_', '-', $bn_fkey );
+
+					// Wide controls (textarea) take the full row.
+					$bn_field_cls = 'bn-ep-field';
+					if ( in_array( $bn_ftype, array( 'textarea', 'multiselect', 'radio' ), true ) ) {
+						$bn_field_cls .= ' bn-ep-field--full';
+					}
+
+					// Is this field actually this member's to fill?
+					//
+					// The same predicate the two validation entry points ask, so the
+					// form and the API cannot disagree about a field. A field can be
+					// inactive because its group is locked to a member type this member
+					// does not hold, because a conditional branch is closed, or - what
+					// this was added for - because the member's plan does not include
+					// it.
+					//
+					// Rendering an editable control for a field the API will refuse is a
+					// trap: the member fills it in, saves, and is told the field is not
+					// included in their plan. Worse, the field is marked required in the
+					// schema, so before this they could not satisfy it OR omit it, and
+					// the whole profile became unsaveable.
+					$bn_field_active = \BuddyNext\Profile\FieldType::is_profile_field_active( $bn_field, $user_id );
+
+					// Field value control via the engine. An inactive field renders a
+					// short, plain explanation instead - no input, so nothing is posted
+					// for it and an omitted key stays a legal partial update.
+					$bn_control = $bn_field_active
+						? \BuddyNext\Profile\FieldType::render_input( $bn_field, $bn_field['value_raw'] ?? ( $bn_field['value'] ?? '' ), $bn_fkey )
+						: '<p class="bn-ep-field-locked">' . esc_html__( 'Not available on your current plan.', 'buddynext' ) . '</p>';
+
+					// Two different things, and conflating them is what made the
+					// control a one-way ratchet:
+					//
+					// FLOOR   = the GROUP's visibility. The loosest the member is
+					// allowed to go, so it decides which options exist.
+					// CURRENT = the member's own choice if they made one, else the
+					// FIELD's visibility, which is only a starting point.
+					//
+					// The floor used to be the field, so a members-only field default
+					// removed "Public" from the list and the member could never opt in.
+					$bn_vis_floor = $bn_vis_norm( $bn_gvis_default, 'public' );
+					$bn_field_def = $bn_vis_norm(
+						$bn_field['field_visibility'] ?? ( $bn_field['visibility'] ?? $bn_vis_floor ),
+						$bn_vis_floor
+					);
+					$bn_current   = $bn_vis_norm(
+						$bn_field['entry_visibility'] ?? $bn_field_def,
+						$bn_field_def
+					);
+
+					// No privacy control for a field the member cannot fill in.
+					//
+					// Same reasoning as the required marker below, which was already
+					// gated on $bn_field_active: an inactive field renders "Not
+					// available on your current plan" instead of an input, so a
+					// "Who can see this field" selector beside it asks the member to
+					// choose an audience for a value they have no way to set. It also
+					// posted `<key>__visibility` on every save, writing a preference
+					// for a field that can hold nothing.
+					$bn_privacy_html = $bn_field_active
+						? $bn_privacy_select(
+							$bn_fkey . '__visibility',
+							$bn_vis_floor,
+							$bn_current,
+							$bn_inp_id . '-vis'
+						)
+						: '';
+
+					// Required marker on the label (mirrors the hero's display-name field).
+					// A field the member cannot fill is never marked required of them -
+					// the marker would be asking for something they have no way to give.
+					$bn_is_required = $bn_field_active && ! empty( $bn_field['is_required'] );
+					$bn_req_mark    = $bn_is_required
+						? ' <span class="bn-ep-required" aria-hidden="true">*</span>'
+						: '';
+
+					// Per-field inline error slot — reactively shown by the
+					// buddynext/profile Interactivity store, which writes
+					// context.errors[ field_key ] both on client-side required
+					// validation (store.js saveProfile) and on a 422 from the
+					// server. Keyed by the field_key so JS and PHP agree.
+					$bn_err_id   = 'bn-ep-error-' . esc_attr( $bn_fkey );
+					$bn_err_html = '<span class="bn-ep-field-error" id="' . $bn_err_id . '" role="alert"'
+						. ' data-wp-text="context.errors.' . esc_attr( $bn_fkey ) . '"'
+						. ' data-wp-bind--hidden="!context.errors.' . esc_attr( $bn_fkey ) . '"></span>';
+
+					// G1: owner-authored help text renders under the label; an empty
+					// description renders nothing (no empty shells).
+					$bn_field_hint = '';
+					if ( ! empty( $bn_field['description'] ) ) {
+						$bn_field_hint = '<p class="bn-ep-hint bn-ep-field-hint">' . esc_html( (string) $bn_field['description'] ) . '</p>';
+					}
+
+					$bn_body_html .= '<div class="' . esc_attr( $bn_field_cls ) . '"'
+						. ' data-wp-class--bn-ep-field--error="context.errors.' . esc_attr( $bn_fkey ) . '">';
+					// `for` must be the id render_input() actually gave the control (see
+					// FieldType::input_id), and is omitted for the group types, which
+					// render a <fieldset> with no element carrying that id.
+					//
+					// Also omitted when the field is INACTIVE: that path renders a
+					// paragraph instead of an input, so there is no element carrying the
+					// id and the label pointed at nothing. Measured on the edit form of a
+					// member whose plan excludes advanced fields, the gated field was the
+					// only dangling label on the page - so this is the locked state's
+					// doing, not a general template problem.
+					$bn_lbl_for    = ( $bn_field_active && \BuddyNext\Profile\FieldType::has_labelable_control( $bn_ftype ) )
+						? ' for="' . esc_attr( \BuddyNext\Profile\FieldType::input_id( $bn_fkey ) ) . '"'
+						: '';
+					$bn_body_html .= '<div class="bn-ep-field-head"><label class="bn-ep-label"' . $bn_lbl_for . '>' . esc_html( $bn_label ) . $bn_req_mark . '</label>' . $bn_privacy_html . '</div>';
+					$bn_body_html .= $bn_field_hint;
+					$bn_body_html .= $bn_control;
+					$bn_body_html .= $bn_err_html;
+					$bn_body_html .= '</div>';
+				}
+
+				$bn_body_html .= '</div>';
+
+				buddynext_get_template(
+					'parts/profile-edit-section.php',
+					array(
+						'title'     => $bn_glabel,
+						'body_html' => $bn_body_html,
+					)
+				);
+			}
+
+			// Member-type self-select — only when self-select types exist (own
+			// profile only; this template renders for the owner). Wired to the
+			// buddynext/profile store's setMemberType action, which PUTs to
+			// /users/{id}/member-type; the endpoint enforces the self_select gate.
+			$bn_mt_service = function_exists( 'buddynext_service' ) ? buddynext_service( 'member_types' ) : null;
+			if ( $bn_mt_service && method_exists( $bn_mt_service, 'get_all' ) ) {
+				$bn_self_types = array_values(
+					array_filter(
+						(array) $bn_mt_service->get_all(),
+						static function ( $t ) {
+							return ! empty( $t['self_select'] );
+						}
+					)
+				);
+
+				$bn_current_type = method_exists( $bn_mt_service, 'get_user_type' ) ? $bn_mt_service->get_user_type( $user_id ) : null;
+				$bn_current_slug = ( is_array( $bn_current_type ) && isset( $bn_current_type['slug'] ) ) ? (string) $bn_current_type['slug'] : '';
+
+				// A type the owner assigned is theirs to change, not the member's.
+				//
+				// This block only ever listed self-selectable types, so a member
+				// carrying an admin-assigned one saw "— None —" selected and their
+				// real type missing from the list entirely: the page reported them as
+				// unclassified and invited them to pick something. The endpoint now
+				// refuses that change, so offering it would be a control that fails.
+				$bn_mt_locked = '' !== $bn_current_slug && empty( $bn_current_type['self_select'] );
+
+				if ( $bn_mt_locked ) {
+					// Same wording as the profile-field renderer, because it is the
+					// same state — a member reading both must not be told two things.
+					$bn_mt_html = sprintf(
+						'<div class="bn-field-membertype is-set"><span class="bn-membertype-badge">%1$s</span> <span class="bn-field-hint">%2$s</span></div>',
+						esc_html( (string) ( $bn_current_type['name'] ?? $bn_current_slug ) ),
+						esc_html__( 'Set by the community — contact an admin to change it.', 'buddynext' )
+					);
+
+					buddynext_get_template(
+						'parts/profile-edit-section.php',
+						array(
+							'title'     => __( 'Member type', 'buddynext' ),
+							'title_id'  => 'bn-ep-member-type-title',
+							'body_html' => $bn_mt_html,
+						)
+					);
+				} elseif ( ! empty( $bn_self_types ) ) {
+					$bn_mt_html  = '<label class="bn-ep-label bn-sr-only" for="bn-ep-member-type">' . esc_html__( 'Member type', 'buddynext' ) . '</label>';
+					$bn_mt_html .= '<select class="bn-input" id="bn-ep-member-type" data-user-id="' . esc_attr( (string) $user_id ) . '" data-wp-on--change="actions.setMemberType">';
+					$bn_mt_html .= '<option value="">' . esc_html__( '— None —', 'buddynext' ) . '</option>';
+					foreach ( $bn_self_types as $bn_t ) {
+						$bn_mt_html .= sprintf(
+							'<option value="%s"%s>%s</option>',
+							esc_attr( (string) ( $bn_t['slug'] ?? '' ) ),
+							selected( $bn_current_slug, (string) ( $bn_t['slug'] ?? '' ), false ),
+							esc_html( (string) ( $bn_t['name'] ?? $bn_t['slug'] ?? '' ) )
+						);
+					}
+					$bn_mt_html .= '</select>';
+
+					// Surface the selected type's description so the member knows
+					// what it means (the data is already plumbed, just not shown).
+					$bn_mt_desc = '';
+					foreach ( $bn_self_types as $bn_t ) {
+						if ( (string) ( $bn_t['slug'] ?? '' ) === $bn_current_slug ) {
+							$bn_mt_desc = (string) ( $bn_t['description'] ?? '' );
+							break;
+						}
+					}
+					if ( '' !== $bn_mt_desc ) {
+						$bn_mt_html .= '<p class="bn-field-hint bn-ep-member-type-desc">' . esc_html( $bn_mt_desc ) . '</p>';
+					}
+
+					buddynext_get_template(
+						'parts/profile-edit-section.php',
+						array(
+							'title'     => __( 'Member type', 'buddynext' ),
+							'subtitle'  => __( 'Pick the type that best describes you. Saved instantly.', 'buddynext' ),
+							'title_id'  => 'bn-ep-member-type-title',
+							'body_html' => $bn_mt_html,
+						)
+					);
+				}
+			}
+
+			?>
+		</main><!-- /form area -->
+
+		<?php
+		// Sidebar.
+		buddynext_get_template(
+			'parts/profile-edit-sidebar.php',
+			array(
+				'profile' => array(
+					'user_id'      => $user_id,
+					'display_name' => $display_name,
+					// Display-rendered, not raw: this block is a preview of the public
+					// profile, so it must read exactly as the hero does.
+					'headline'     => $headline_display,
+					'location'     => $location_display,
+					'avatar_url'   => $avatar_url,
+					'initials'     => $initials,
+					'stats'        => array(
+						'posts'     => $format_count( $post_count ),
+						'followers' => $format_count( $follower_count ),
+						'following' => $format_count( $following_count ),
+					),
+				),
+			)
+		);
+		?>
+
+	</div><!-- /bn-ep-shell -->
+
+	<?php
+	// Sticky save bar.
+	buddynext_get_template(
+		'parts/profile-edit-save-bar.php',
+		array(
+			'cancel_url' => \BuddyNext\Core\PageRouter::profile_url( $user_id ),
+		)
+	);
+	?>
+
+	</form><!-- /.bn-ep-form-shell -->
+
+</div><!-- /bn-ep-wrap -->

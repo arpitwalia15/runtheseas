@@ -1,0 +1,555 @@
+/**
+ * Notification preferences - v2 chrome.
+ *
+ * Loaded only on /settings/notifications/ + /notifications/preferences/.
+ * All tokens come from --bn-* in bn-base.css. No new tokens. The sticky save
+ * bar reuses the .bn-ep-save-bar primitives defined in bn-profile.css so the
+ * pattern stays identical to the Profile edit save bar.
+ */
+
+.bn-notif-prefs {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s5);
+	padding-block-end: var(--bn-s12);
+}
+
+/* ── Card primitive ───────────────────────────────────────────────────── */
+.bn-prefs-card {
+	padding: var(--bn-s5);
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s4);
+}
+
+.bn-prefs-card__head {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s1);
+}
+
+.bn-prefs-card__title {
+	margin: 0;
+	font-size: var(--bn-text-md);
+	font-weight: var(--bn-fw-semibold);
+	color: var(--bn-ink);
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2);
+}
+
+.bn-prefs-card__sub {
+	margin: 0;
+	color: var(--bn-ink-3);
+	font-size: var(--bn-text-sm);
+	line-height: var(--bn-lh-normal);
+}
+
+/* ── Section 1: Channels ──────────────────────────────────────────────── */
+/* Five channels in a grid whose tracks were 240px wide fit FOUR across, which left the
+ * fifth card alone on a second row with three dead columns beside it. A narrower minimum
+ * lets all five sit on one row on a desktop and still reflow cleanly to two, then one. */
+.bn-prefs-channels {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(185px, 1fr));
+	gap: var(--bn-s3);
+	align-items: stretch;
+}
+
+.bn-prefs-channel {
+	display: grid;
+	/* Selectable-card layout: icon top-left, checkbox top-right, label + sub
+	   spanning the row below — a clearer hierarchy than the old single inline row. */
+	grid-template-columns: 1fr auto;
+	grid-template-areas:
+		"icon  check"
+		"body  body";
+	align-items: start;
+	/* The cards stretch to the tallest sibling (the Newsletters copy is long), and auto grid
+	 * rows stretch with them — which floated the title and description into the middle of
+	 * the card, away from the icon they belong to. Pin the rows to their natural height and
+	 * let the slack collect at the BOTTOM, so every card reads top-down: icon, switch, name,
+	 * explanation. */
+	align-content: start;
+	gap: var(--bn-s3);
+	padding: var(--bn-s4);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-md);
+	background: var(--bn-surface);
+	cursor: pointer;
+	transition: border-color 120ms ease, background-color 120ms ease;
+}
+
+/* Hover + selected share one treatment: accent border with a faint accent wash,
+   applied smoothly. The whole <label> is the click target (native), so the box
+   toggles from anywhere. :has() lifts the selected card without extra markup. */
+.bn-prefs-channel:hover { border-color: var(--bn-accent-200); background: var(--bn-sunken); }
+.bn-prefs-channel:has( input:checked ) {
+	border-color: var(--bn-accent);
+	background: var(--bn-accent-50, var(--bn-surface));
+}
+
+/* THE CONTROL IS A SWITCH, NOT A CHECKBOX.
+ *
+ * This was a raw OS checkbox — `appearance: auto` with an accent-color, which is the only
+ * native widget left on the page. Next to a product built entirely from its own components
+ * it reads as something a different person built, and it is the first thing the eye lands
+ * on because the browser draws it in its own idiom, not ours.
+ *
+ * It is also the wrong control. The section calls these "Master switches" and the copy says
+ * "Turning a channel off mutes every type" — an immediate, self-applying on/off. That is a
+ * switch. A checkbox says "this will be true when you submit"; a switch says "this is true
+ * now". There is no submit here.
+ *
+ * Styled to match .bn-toggle exactly (40x22 track, same tokens, same motion) rather than
+ * swapping the element for one: the input stays an input, so the Interactivity binding
+ * (actions.setChannel), the label-click target, and keyboard/space activation all keep
+ * working untouched. The design changes; the machinery does not. */
+.bn-prefs-channel input[type="checkbox"],
+.bn-prefs-toggle input[type="checkbox"] {
+	appearance: none;
+	-webkit-appearance: none;
+	position: relative;
+	flex-shrink: 0;
+	inline-size: 40px;
+	block-size: 22px;
+	margin: 0;
+	border: none;
+	border-radius: var(--bn-r-full);
+	background: var(--bn-line-strong);
+	cursor: pointer;
+	transition: background var(--bn-dur) var(--bn-ease);
+}
+
+/* The knob. */
+.bn-prefs-channel input[type="checkbox"]::before,
+.bn-prefs-toggle input[type="checkbox"]::before {
+	content: "";
+	position: absolute;
+	inset-block-start: 2px;
+	inset-inline-start: 2px;
+	inline-size: 18px;
+	block-size: 18px;
+	border-radius: 50%;
+	background: var(--bn-surface);
+	box-shadow: var(--bn-shadow-sm, 0 1px 2px rgb(0 0 0 / 0.2));
+	transition: translate var(--bn-dur) var(--bn-ease);
+}
+
+.bn-prefs-channel input[type="checkbox"]:checked,
+.bn-prefs-toggle input[type="checkbox"]:checked {
+	background: var(--bn-accent);
+}
+
+.bn-prefs-channel input[type="checkbox"]:checked::before,
+.bn-prefs-toggle input[type="checkbox"]:checked::before {
+	translate: 18px 0;
+}
+
+.bn-prefs-channel input[type="checkbox"]:focus-visible,
+.bn-prefs-toggle input[type="checkbox"]:focus-visible {
+	outline: 2px solid var(--bn-accent);
+	outline-offset: 2px;
+}
+
+/* The channel card places its switch in the top-right cell. */
+.bn-prefs-channel input[type="checkbox"] {
+	grid-area: check;
+}
+
+.bn-prefs-channel__icon {
+	grid-area: icon;
+	color: var(--bn-accent);
+	inline-size: 36px;
+	block-size: 36px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.bn-prefs-channel__icon svg {
+	inline-size: 18px;
+	block-size: 18px;
+}
+
+.bn-prefs-channel__body {
+	grid-area: body;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.bn-prefs-channel__label {
+	font-weight: var(--bn-fw-semibold);
+	color: var(--bn-ink);
+	font-size: var(--bn-text-sm);
+}
+
+.bn-prefs-channel__sub {
+	color: var(--bn-ink-3);
+	font-size: var(--bn-text-xs);
+}
+
+/* ── Section 2: Activity types ────────────────────────────────────────── */
+.bn-prefs-groups {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s3);
+}
+
+.bn-prefs-group {
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-md);
+	background: var(--bn-surface);
+	overflow: hidden;
+}
+
+.bn-prefs-group__head {
+	padding: var(--bn-s3) var(--bn-s4);
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--bn-s3);
+	cursor: pointer;
+	background: var(--bn-sunken);
+	border-block-end: 1px solid var(--bn-line);
+	list-style: none;
+	-webkit-appearance: none;
+	appearance: none;
+}
+
+.bn-prefs-group__head::-webkit-details-marker { display: none; }
+.bn-prefs-group__head::marker { display: none; }
+
+.bn-prefs-group:not([open]) .bn-prefs-group__head {
+	border-block-end: none;
+}
+
+.bn-prefs-group__title {
+	font-weight: var(--bn-fw-semibold);
+	color: var(--bn-ink);
+	font-size: var(--bn-text-sm);
+}
+
+.bn-prefs-group__count {
+	color: var(--bn-ink-3);
+	font-size: var(--bn-text-xs);
+}
+
+.bn-prefs-group__body {
+	display: flex;
+	flex-direction: column;
+}
+
+.bn-prefs-row {
+	display: grid;
+	grid-template-columns: 1fr auto;
+	gap: var(--bn-s4);
+	padding: var(--bn-s4);
+	border-block-end: 1px solid var(--bn-line-faint);
+}
+
+.bn-prefs-group__body .bn-prefs-row:last-child {
+	border-block-end: none;
+}
+
+.bn-prefs-row__copy {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-inline-size: 0;
+}
+
+.bn-prefs-row__label {
+	font-weight: var(--bn-fw-semibold);
+	color: var(--bn-ink);
+	font-size: var(--bn-text-sm);
+}
+
+.bn-prefs-row__desc {
+	margin: 0;
+	color: var(--bn-ink-3);
+	font-size: var(--bn-text-xs);
+	line-height: var(--bn-lh-normal);
+}
+
+.bn-prefs-row__controls {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s3);
+	flex-wrap: wrap;
+	justify-content: flex-end;
+}
+
+.bn-prefs-row__no-email {
+	color: var(--bn-ink-3);
+	font-size: var(--bn-text-xs);
+}
+
+.bn-prefs-toggle {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	cursor: pointer;
+}
+
+/* The old 18px native checkbox rule lived here and, being LATER in the file at the same
+ * specificity, quietly beat the switch styling above — the control lost its square look but
+ * kept a checkbox's dimensions. Deleted rather than overridden: two rules fighting over one
+ * control is how it drifts back. */
+
+.bn-prefs-toggle__label {
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-2);
+}
+
+/* ── Chip groups (email frequency + per-space pref) ───────────────────── */
+.bn-prefs-freq,
+.bn-prefs-space__controls {
+	display: inline-flex;
+	gap: 2px;
+	padding: 2px;
+	border-radius: var(--bn-r-md);
+	background: var(--bn-sunken);
+	border: 1px solid var(--bn-line);
+	/* A segmented control must never be wider than the row holding it. Without this
+	   clamp the group kept its intrinsic width (257px inside a 221px row at 390px) and
+	   the card clipped the last segment: "Off" rendered as "Of". The clamp is the
+	   structural guard — it holds for any label set, including translations — while the
+	   mobile block below buys back the room so the segments never have to be squeezed. */
+	max-inline-size: 100%;
+}
+
+.bn-prefs-chip {
+	-webkit-appearance: none;
+	appearance: none;
+	background: transparent;
+	/* A transparent 1px border (not `none`) reserves the box so the segment
+	   never shifts, and — paired with the scoped overrides below — neutralises
+	   the host theme's button:hover border that otherwise flashed a stray blue
+	   outline on hover/active. */
+	border: 1px solid transparent;
+	color: var(--bn-ink-2);
+	padding: var(--bn-s1) var(--bn-s3);
+	border-radius: var(--bn-r-sm);
+	font-size: var(--bn-text-xs);
+	font-weight: var(--bn-fw-medium);
+	cursor: pointer;
+	transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+
+.bn-prefs-chip:hover {
+	background: var(--bn-surface);
+	color: var(--bn-ink);
+}
+
+/* Scoped (0,2,x) so they outrank the theme's `button:hover`/`:focus` border —
+   the segment keeps its own flat/raised look in every state, no theme outline. */
+.bn-prefs-freq .bn-prefs-chip:hover,
+.bn-prefs-freq .bn-prefs-chip:focus,
+.bn-prefs-freq .bn-prefs-chip:active,
+.bn-prefs-freq .bn-prefs-chip[aria-pressed="true"] {
+	border-color: transparent;
+}
+
+.bn-prefs-chip:focus-visible {
+	outline: 2px solid var(--bn-accent);
+	outline-offset: 2px;
+}
+
+/* Selected segment: a raised "pill" on the sunken track — matches the
+   Appearance text-size control (.bn-ep-segmented) so both Settings tabs read
+   the same. Avoids the flat accent fill + the undefined --bn-accent-contrast
+   that left the active label low-contrast. */
+.bn-prefs-chip[aria-pressed="true"] {
+	background: var(--bn-surface);
+	color: var(--bn-ink);
+	font-weight: var(--bn-fw-semibold);
+	box-shadow: var(--bn-shadow-sm);
+}
+
+/* ── Section 3: Spaces ────────────────────────────────────────────────── */
+.bn-prefs-spaces {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s2);
+}
+
+.bn-prefs-space {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--bn-s3);
+	padding: var(--bn-s3);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-md);
+	background: var(--bn-surface);
+}
+
+.bn-prefs-space__head {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-s3);
+	color: var(--bn-ink);
+	text-decoration: none;
+	min-inline-size: 0;
+}
+
+.bn-prefs-space__head:hover .bn-prefs-space__name { color: var(--bn-accent); }
+
+.bn-prefs-space__avatar {
+	inline-size: 40px;
+	block-size: 40px;
+	border-radius: var(--bn-r-md);
+	background: var(--bn-sunken);
+	object-fit: cover;
+}
+
+.bn-prefs-space__avatar--initial {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	font-weight: var(--bn-fw-semibold);
+	color: var(--bn-ink-2);
+	font-size: var(--bn-text-sm);
+}
+
+.bn-prefs-space__name {
+	font-weight: var(--bn-fw-semibold);
+	font-size: var(--bn-text-sm);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* ── Empty state ──────────────────────────────────────────────────────── */
+.bn-prefs-empty {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: var(--bn-s2);
+	padding: var(--bn-s6) var(--bn-s4);
+	color: var(--bn-ink-3);
+	text-align: center;
+}
+
+.bn-prefs-empty__emblem {
+	inline-size: 48px;
+	block-size: 48px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 50%;
+	background: var(--bn-sunken);
+	color: var(--bn-accent);
+}
+
+.bn-prefs-empty__title {
+	margin: 0;
+	font-weight: var(--bn-fw-semibold);
+	color: var(--bn-ink-2);
+}
+
+/* ── Reset action ─────────────────────────────────────────────────────── */
+.bn-prefs-reset {
+	display: flex;
+	justify-content: flex-end;
+}
+
+/* ── Save bar overrides ───────────────────────────────────────────────── */
+.bn-prefs-save-bar[hidden] { display: none !important; }
+
+/* ── Settings link on /notifications/ ─────────────────────────────────── */
+.bn-notifs-main .bn-section-head__actions .bn-btn--prefs-link svg {
+	inline-size: 16px;
+	block-size: 16px;
+}
+
+/* ── Digests-disabled state ───────────────────────────────────────────────
+   Shown when the owner sets Settings -> Notifications -> Digest frequency to
+   "Disabled": the Daily/Weekly chips cannot deliver anything, so they are
+   disabled and the member is told why instead of picking a dead option. */
+.bn-prefs-notice {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--bn-s3);
+	margin-block-end: var(--bn-s4);
+	padding: var(--bn-s3) var(--bn-s4);
+	border: 1px solid var(--bn-line);
+	border-inline-start: 3px solid var(--bn-info);
+	border-radius: var(--bn-r-md);
+	background: var(--bn-info-bg);
+}
+
+.bn-prefs-notice__icon {
+	display: inline-flex;
+	flex: 0 0 auto;
+	color: var(--bn-info);
+}
+
+.bn-prefs-notice__icon svg {
+	inline-size: 18px;
+	block-size: 18px;
+}
+
+.bn-prefs-notice__body {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s1);
+	min-inline-size: 0;
+}
+
+.bn-prefs-notice__title {
+	margin: 0;
+	font-size: var(--bn-text-sm);
+	font-weight: var(--bn-fw-semibold);
+	color: var(--bn-ink);
+}
+
+.bn-prefs-notice__text {
+	margin: 0;
+	font-size: var(--bn-text-xs);
+	line-height: var(--bn-lh-normal);
+	color: var(--bn-ink-2);
+}
+
+.bn-prefs-chip:disabled,
+.bn-prefs-chip[aria-disabled="true"] {
+	opacity: 0.45;
+	cursor: not-allowed;
+}
+
+.bn-prefs-row__warn {
+	margin: var(--bn-s1) 0 0;
+	inline-size: 100%;
+	text-align: end;
+	font-size: var(--bn-text-xs);
+	line-height: var(--bn-lh-normal);
+	color: var(--bn-warn);
+}
+
+@media (max-width: 640px) {
+	.bn-prefs-row { grid-template-columns: 1fr; }
+	.bn-prefs-row__controls { justify-content: flex-start; }
+	.bn-prefs-row__warn { text-align: start; }
+	.bn-prefs-space { flex-wrap: wrap; }
+
+	/* Both segmented controls span the row and share it out proportionally. The
+	   frequency group was missing from this rule, so it kept its intrinsic width and
+	   overflowed. Full width alone is not enough either: the four labels need only
+	   143px of text but carried 106px of chrome against a 221px row, so the fix is to
+	   spend the row's slack on the segments instead of on fixed padding. `1 1 auto`
+	   (not `1 1 0`) keeps each segment sized to its own label first, so "Immediate"
+	   is never truncated to make room for "Off". */
+	.bn-prefs-freq,
+	.bn-prefs-space__controls { inline-size: 100%; justify-content: flex-start; }
+
+	.bn-prefs-freq .bn-prefs-chip,
+	.bn-prefs-space__controls .bn-prefs-chip {
+		flex: 1 1 auto;
+		min-inline-size: 0;
+		padding-inline: var(--bn-s2);
+		text-align: center;
+	}
+}
+

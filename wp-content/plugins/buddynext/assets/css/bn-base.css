@@ -1,0 +1,4515 @@
+/*
+ * BuddyNext — Base CSS
+ *
+ * Defines all design system tokens (CSS custom properties) consumed by every
+ * BuddyNext component. Must be loaded before any other bn-*.css handle.
+ * Tokens match CLAUDE.md `:root` block verbatim.
+ */
+
+/* ── Stable scrollbar gutter (BuddyNext hub pages) ───────────────────────────
+ * Hub pages scroll on the document. With no reserved gutter, switching between
+ * tabs whose content differs in height (e.g. a long Feed vs a short About) makes
+ * the viewport scrollbar appear/disappear on classic-scrollbar systems, shifting
+ * the centred header + left rail by the scrollbar width on every tab change.
+ * Reserving the gutter keeps the layout fixed across tab navigations. Scoped via
+ * :has() to pages that render a BuddyNext hub so pure host-theme pages are left
+ * untouched. */
+html:has( .bn-app__main ) { scrollbar-gutter: stable; }
+
+/* ── Design tokens ──────────────────────────────────────────────────────── */
+
+/* ────────────────────────────────────────────────────────────────────────
+ * v2 token system (canonical) — mirrors docs/v2 Plans/tokens.css.
+ * Single `--bn-*` namespace, OKLCH-derived from one rotatable hue so
+ * whitelabel rebrand only flips --bn-hue. Theme-agnostic: nothing leaks
+ * into the host theme's global `--text-*` / `--bg` / `--brand` names —
+ * legacy aliases at the bottom map old names onto the v2 source so any
+ * pre-v2 CSS keeps rendering against the new palette.
+ * ──────────────────────────────────────────────────────────────────────── */
+
+:root,
+[data-bn-theme="light"] {
+	/* Brand hue — rotate per whitelabel; everything else derives from it. */
+	--bn-hue:           var(--bn-accent-hue, 252);   /* 252 = indigo. 200 blue, 160 teal, 25 orange. */
+	--bn-hue-jetonomy:  285;
+	--bn-hue-media:     175;
+	--bn-hue-events:    45;
+	--bn-hue-paid:      145;
+
+	/* Chroma (saturation depth). Lower = more neutral, higher = more vivid. */
+	--bn-chroma: 0.16;
+
+	/* Accent ramp */
+	--bn-accent-50:  oklch(97% 0.02 var(--bn-hue));
+	--bn-accent-100: oklch(94% 0.04 var(--bn-hue));
+	--bn-accent-200: oklch(88% 0.07 var(--bn-hue));
+	--bn-accent-300: oklch(80% 0.10 var(--bn-hue));
+	--bn-accent-400: oklch(70% 0.13 var(--bn-hue));
+	--bn-accent-500: oklch(58% var(--bn-chroma) var(--bn-hue));
+	--bn-accent-600: oklch(50% var(--bn-chroma) var(--bn-hue));
+	--bn-accent-700: oklch(42% calc(var(--bn-chroma) * 0.9) var(--bn-hue));
+	--bn-accent-800: oklch(34% calc(var(--bn-chroma) * 0.85) var(--bn-hue));
+	--bn-accent-900: oklch(26% calc(var(--bn-chroma) * 0.8) var(--bn-hue));
+	--bn-accent:     var(--bn-accent-500);
+	--bn-accent-fg:  oklch(99% 0 0);
+
+	/* Surfaces (three-layer system) */
+	--bn-canvas:   oklch(99% 0.002 var(--bn-hue));
+	--bn-surface:  oklch(100% 0 0);
+	--bn-raised:   oklch(99% 0.003 var(--bn-hue));
+	--bn-sunken:   oklch(97% 0.004 var(--bn-hue));
+
+	/* Borders */
+	--bn-line:        oklch(92% 0.005 var(--bn-hue));
+	--bn-line-strong: oklch(86% 0.008 var(--bn-hue));
+	--bn-line-faint:  oklch(95% 0.003 var(--bn-hue));
+
+	/* Text (AAA contrast) */
+	--bn-ink:    oklch(20% 0.01 var(--bn-hue));
+	--bn-ink-2:  oklch(40% 0.01 var(--bn-hue));
+	--bn-ink-3:  oklch(58% 0.008 var(--bn-hue));
+	--bn-ink-4:  oklch(72% 0.005 var(--bn-hue));
+
+	/* Semantic */
+	--bn-success:    oklch(55% 0.15 145);
+	--bn-success-bg: oklch(96% 0.04 145);
+	--bn-warn:       oklch(65% 0.16 75);
+	--bn-warn-bg:    oklch(96% 0.05 75);
+	--bn-danger:     oklch(58% 0.20 25);
+	--bn-danger-bg:  oklch(96% 0.04 25);
+	--bn-info:       oklch(58% 0.14 230);
+	--bn-info-bg:    oklch(96% 0.04 230);
+
+	/* Sibling-product accents (derived) */
+	--bn-jetonomy:    oklch(58% var(--bn-chroma) var(--bn-hue-jetonomy));
+	--bn-jetonomy-bg: oklch(96% 0.03 var(--bn-hue-jetonomy));
+	--bn-media:       oklch(58% var(--bn-chroma) var(--bn-hue-media));
+	--bn-media-bg:    oklch(96% 0.03 var(--bn-hue-media));
+	--bn-events:      oklch(60% var(--bn-chroma) var(--bn-hue-events));
+	--bn-events-bg:   oklch(96% 0.04 var(--bn-hue-events));
+	--bn-paid:        oklch(55% var(--bn-chroma) var(--bn-hue-paid));
+	--bn-paid-bg:     oklch(96% 0.03 var(--bn-hue-paid));
+
+	/* Family EDGE, one step down in lightness from the 96% surface above.
+	   A border must never be the same value as the fill it sits on: the
+	   partner tokens below used to alias *-bg, so any control that took its
+	   background from *-bg AND its border from *-border rendered with no
+	   visible edge at all - a <select> and an autocomplete dropdown among
+	   them. Same hue keeps the product identity; the lightness step is what
+	   makes it a border. */
+	--bn-jetonomy-border: oklch(88% 0.05 var(--bn-hue-jetonomy));
+	--bn-media-border:    oklch(88% 0.05 var(--bn-hue-media));
+	--bn-events-border:   oklch(88% 0.06 var(--bn-hue-events));
+	--bn-paid-border:     oklch(88% 0.05 var(--bn-hue-paid));
+
+	/* Type families — adopt the host theme's font-family, fall back to BN's stack.
+	 * font-scale.js publishes the active theme's resolved body/heading font as
+	 * --bn-theme-font / --bn-theme-heading-font (the theme sets font-family with no
+	 * CSS var, so we capture it in JS). BN keeps all its OWN sizing/weights/spacing
+	 * — only the family is borrowed. When no theme/JS value exists, the Inter stack
+	 * applies. The dyslexia block below re-sets --bn-font-ui/display directly, so
+	 * Atkinson still overrides the theme font for accessibility. */
+	--bn-font-ui:      var(--bn-theme-font, 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif);
+	--bn-font-display: var(--bn-theme-heading-font, var(--bn-theme-font, 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif));
+	--bn-font-mono:    ui-monospace, SFMono-Regular, Menlo, 'Geist Mono', monospace;
+
+	/* Type scale */
+	--bn-text-scale: 1;
+	--bn-text-2xs:  calc(11px * var(--bn-text-scale));
+	--bn-text-xs:   calc(12px * var(--bn-text-scale));
+	--bn-text-sm:   calc(13px * var(--bn-text-scale));
+	--bn-text-base: calc(15px * var(--bn-text-scale));
+	--bn-text-md:   calc(16px * var(--bn-text-scale));
+	--bn-text-lg:   calc(18px * var(--bn-text-scale));
+	--bn-text-xl:   calc(22px * var(--bn-text-scale));
+	--bn-text-2xl:  calc(28px * var(--bn-text-scale));
+	--bn-text-3xl:  calc(36px * var(--bn-text-scale));
+	--bn-text-4xl:  calc(48px * var(--bn-text-scale));
+
+	/* Spacing — 4px grid */
+	--bn-density: 1;
+	--bn-s1:  calc(4px  * var(--bn-density));
+	--bn-s2:  calc(8px  * var(--bn-density));
+	--bn-s3:  calc(12px * var(--bn-density));
+	--bn-s4:  calc(16px * var(--bn-density));
+	--bn-s5:  calc(20px * var(--bn-density));
+	--bn-s6:  calc(24px * var(--bn-density));
+	--bn-s8:  calc(32px * var(--bn-density));
+	--bn-s10: calc(40px * var(--bn-density));
+	--bn-s12: calc(48px * var(--bn-density));
+	--bn-s16: calc(64px * var(--bn-density));
+
+	/* Minimum touch-target edge for member-facing interactive controls.
+	 * Nine rules across bn-feed.css / bn-spaces.css already read this token as
+	 * `var(--bn-tap, 40px)` but it was never declared, so every one of them was
+	 * silently living on its fallback. Declaring it here makes the floor real
+	 * and gives one knob for the whole UI. Touch viewports raise it to 44px in
+	 * the tap-target block near the end of this file. */
+	--bn-tap: 40px;
+
+	/* Radius — single source. Adopt the host theme's global corner radius
+	   (BuddyX/BuddyX Pro/Reign expose --global-border-radius via the Customizer)
+	   so BN cards/buttons match the site's chosen roundness; fall back to 10px
+	   when the theme sets nothing. --bn-radius-scale still scales the whole set. */
+	--bn-radius-base: calc(var(--global-border-radius, 10px) * var(--bn-radius-scale, 1));
+	--bn-r-sm:   calc(var(--bn-radius-base) * 0.5);
+	--bn-r-md:   var(--bn-radius-base);
+	--bn-r-lg:   calc(var(--bn-radius-base) * 1.4);
+	--bn-r-xl:   calc(var(--bn-radius-base) * 2);
+	--bn-r-full: 9999px;
+
+	/* Shadows */
+	--bn-shadow-xs: 0 1px 2px oklch(0% 0 0 / 0.04);
+	--bn-shadow-sm: 0 1px 2px oklch(0% 0 0 / 0.04), 0 2px 4px oklch(0% 0 0 / 0.04);
+	--bn-shadow-md: 0 2px 4px oklch(0% 0 0 / 0.04), 0 8px 16px oklch(0% 0 0 / 0.06);
+	--bn-shadow-lg: 0 8px 16px oklch(0% 0 0 / 0.06), 0 24px 48px oklch(0% 0 0 / 0.08);
+	--bn-ring:      0 0 0 3px oklch(58% var(--bn-chroma) var(--bn-hue) / 0.18);
+
+	/* Scrim/backdrop behind modals and overlays. Mode-aware: a plain dark
+		rgba scrim is nearly invisible over an already-dark page, so the dark
+		block below raises the opacity. */
+	--bn-overlay: oklch(0% 0 0 / 0.45);
+
+	/* Motion */
+	--bn-ease:     cubic-bezier(0.2, 0.8, 0.2, 1);
+	--bn-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+	--bn-dur-fast: 120ms;
+	--bn-dur:      200ms;
+	--bn-dur-slow: 400ms;
+
+	/* Layout */
+	/* --bn-topbar-h is 0 because the BN-owned topbar was removed; the active
+	 * theme's get_header() is now the only top navigation. The token remains
+	 * so existing calc() expressions in feature stylesheets keep working. */
+	--bn-topbar-h:     0px;
+	--bn-railw:        260px;
+	--bn-content-max:  720px;
+	--bn-content-wide: 1080px;
+
+	/* Avatar presence-dot border — defaults to surface so dots read on cards,
+	 * locally overridable on sunken / raised containers. */
+	--bn-avatar-presence-border: var(--bn-surface);
+
+	/* Font weight */
+	--bn-fw-normal:          400;
+	--bn-fw-medium:          500;
+	--bn-fw-medium-semibold: 550; /* Inter variable-font weight between medium and semibold. */
+	--bn-fw-semibold:        600;
+	--bn-fw-bold:            700;
+	--bn-fw-extrabold:       800;
+
+	/* Letter spacing */
+	--bn-ls-tight:  -0.02em;
+	--bn-ls-normal: 0em;
+	--bn-ls-wide:   0.03em;
+	--bn-ls-wider:  0.06em;
+
+	/* Leading */
+	--bn-leading-tight:  1.25;
+	--bn-leading-snug:   1.35;
+	--bn-leading-normal: 1.5;
+	--bn-leading-body:   1.7;
+
+	/* ── Legacy aliases — pre-v2 names that already ship in 16 CSS files.
+	 *    Mapped onto the v2 source so old class rules keep rendering
+	 *    against the new palette. Do NOT add new consumers of these names;
+	 *    new code uses --bn-* directly.
+	 * ──────────────────────────────────────────────────────────────────── */
+
+	/* Typography */
+	--font-body:    var(--bn-font-ui);
+	--font-display: var(--bn-font-display);
+	--text-xs:      var(--bn-text-xs);
+	--text-sm:      var(--bn-text-sm);
+	--text-base:    var(--bn-text-base);
+	--text-lg:      var(--bn-text-lg);
+	--text-xl:      var(--bn-text-xl);
+	--text-2xl:     var(--bn-text-2xl);
+	--text-3xl:     var(--bn-text-3xl);
+	--text-4xl:     var(--bn-text-4xl);
+	--leading-tight:  var(--bn-leading-tight);
+	--leading-snug:   var(--bn-leading-snug);
+	--leading-normal: var(--bn-leading-normal);
+	--leading-body:   var(--bn-leading-body);
+
+	/* Font weight */
+	--fw-normal:    var(--bn-fw-normal);
+	--fw-medium:    var(--bn-fw-medium);
+	--fw-semibold:  var(--bn-fw-semibold);
+	--fw-bold:      var(--bn-fw-bold);
+	--fw-extrabold: var(--bn-fw-extrabold);
+
+	/* Letter spacing */
+	--ls-tight:  var(--bn-ls-tight);
+	--ls-normal: var(--bn-ls-normal);
+	--ls-wide:   var(--bn-ls-wide);
+	--ls-wider:  var(--bn-ls-wider);
+
+	/* Surfaces */
+	--bg:          var(--bn-canvas);
+	--bg-subtle:   var(--bn-sunken);
+	--bg-hover:    var(--bn-sunken);
+	--surface:     var(--bn-surface);
+	--border:      var(--bn-line);
+	--border-soft: var(--bn-line-faint);
+	--text-1:      var(--bn-ink);
+	--text-2:      var(--bn-ink-2);
+	--text-3:      var(--bn-ink-3);
+
+	/* Brand */
+	--brand:       var(--bn-accent);
+	--brand-light: var(--bn-accent-100);
+	--brand-hover: var(--bn-accent-700);
+
+	/* Integration accents */
+	--jetonomy:        var(--bn-jetonomy);
+	--jetonomy-bg:     var(--bn-surface);
+	--jetonomy-border: var(--bn-jetonomy-border);
+	--mvs:             var(--bn-media);
+	/* Neutral SURFACE, not the family tint. MediaVerse uses --mvs-bg for its
+	   cards, bars and panels - standalone it resolves to white - so pointing it
+	   at the 96% media tint repainted every grid item, every card footer and the
+	   search bar the same mint. The hue belongs on ACCENTS (--mvs, badges) and on
+	   the edge (--mvs-border), not on the surface. */
+	--mvs-bg:          var(--bn-surface);
+	--mvs-border:      var(--bn-media-border);
+
+	/* Neutral */
+	--white:          oklch(100% 0 0);
+	--text-on-brand:  var(--bn-accent-fg);
+
+	/* Semantic */
+	--green:       var(--bn-success);
+	--green-bg:    var(--bn-success-bg);
+	--amber:       var(--bn-warn);
+	--amber-bg:    var(--bn-warn-bg);
+	--red:         var(--bn-danger);
+	--red-bg:      var(--bn-danger-bg);
+	--pink:        oklch(60% 0.20 350);
+
+	/* Auth-page gradient stops */
+	--auth-grad-from: var(--bn-accent);
+	--auth-grad-via:  oklch(50% 0.20 270);
+	--auth-grad-to:   oklch(52% 0.22 295);
+
+	/* Spacing */
+	--s1:  var(--bn-s1);
+	--s2:  var(--bn-s2);
+	--s3:  var(--bn-s3);
+	--s4:  var(--bn-s4);
+	--s5:  var(--bn-s5);
+	--s6:  var(--bn-s6);
+	--s8:  var(--bn-s8);
+	--s10: var(--bn-s10);
+	--s12: var(--bn-s12);
+
+	/* Radius */
+	--r-sm:   var(--bn-r-sm);
+	--r-md:   var(--bn-r-md);
+	--r-lg:   var(--bn-r-lg);
+	--r-xl:   var(--bn-r-xl);
+	--r-full: var(--bn-r-full);
+
+	/* Shadows */
+	--shadow-sm: var(--bn-shadow-sm);
+	--shadow-md: var(--bn-shadow-md);
+
+	/* Transition */
+	--transition: var(--bn-dur) var(--bn-ease);
+
+	/* Legacy --bn-* names not yet covered above (a few CSS files use these). */
+	--bn-bg:           var(--bn-canvas);
+	--bn-bg-subtle:    var(--bn-sunken);
+	--bn-bg-hover:     var(--bn-sunken);
+	--bn-border:       var(--bn-line);
+	--bn-border-soft:  var(--bn-line-faint);
+	--bn-text-1:       var(--bn-ink);
+	--bn-text-2:       var(--bn-ink-2);
+	--bn-text-3:       var(--bn-ink-3);
+	--bn-font-body:    var(--bn-font-ui);
+	--bn-brand:        var(--bn-accent);
+	--bn-brand-light:  var(--bn-accent-100);
+	--bn-brand-hover:  var(--bn-accent-700);
+	--bn-red:          var(--bn-danger);
+	--bn-red-bg:       var(--bn-danger-bg);
+	--bn-amber:        var(--bn-warn);
+	--bn-amber-bg:     var(--bn-warn-bg);
+	--bn-transition:   var(--bn-dur) var(--bn-ease);
+}
+
+/* ── Density modes ────────────────────────────────────────────────────── */
+[data-bn-density="compact"] {
+	--bn-density: 0.8;
+	--bn-text-scale: 0.93;
+	--bn-radius-scale: 0.8;   /* multiplicative — keeps the calc() invariant */
+}
+
+/* ── Large-text accessibility ─────────────────────────────────────────── */
+[data-bn-text="large"]  { --bn-text-scale: 1.15; }
+[data-bn-text="xlarge"] { --bn-text-scale: 1.3; }
+
+/* ── Dyslexia-friendly font swap (opt-in).
+ * Falls through to Inter until Atkinson Hyperlegible is self-hosted. */
+[data-bn-dyslexia="on"] {
+	--bn-font-ui:      'Atkinson Hyperlegible', 'Inter', system-ui, sans-serif;
+	--bn-font-display: 'Atkinson Hyperlegible', 'Inter', system-ui, sans-serif;
+}
+
+/* ── Dark mode ──
+ * Triggered by [data-bn-theme="dark"] (v2 canonical), the legacy
+ * [data-theme="dark"] (existing templates), or [data-bx-mode="dark"] — the
+ * attribute the Wbcom sibling themes (BuddyX, BuddyX Pro, Reign) set on <html>
+ * via their color-mode toggle. Mapping the theme toggle into BN's token system
+ * keeps every BN surface (blocks, header chrome, dropdowns) dark when the host
+ * theme is dark, so the suite stays visually consistent.
+ * ──────────────────────────────────────────────────────────────────── */
+[data-bn-theme="dark"],
+[data-theme="dark"],
+[data-bx-mode="dark"] {
+	/* Tell the UA to render native controls (date/time picker popups, <select>
+	   dropdowns, scrollbars, spinners) in their dark variant. Without this a
+	   native <input type="date"> calendar opens light-on-light over a dark page. */
+	color-scheme: dark;
+	--bn-canvas:   oklch(15% 0.008 var(--bn-hue));
+	--bn-surface:  oklch(19% 0.01  var(--bn-hue));
+	--bn-raised:   oklch(22% 0.012 var(--bn-hue));
+	--bn-sunken:   oklch(13% 0.006 var(--bn-hue));
+
+	--bn-line:        oklch(28% 0.012 var(--bn-hue));
+	--bn-line-strong: oklch(36% 0.014 var(--bn-hue));
+	--bn-line-faint:  oklch(24% 0.01  var(--bn-hue));
+
+	--bn-ink:    oklch(96% 0.005 var(--bn-hue));
+	--bn-ink-2:  oklch(78% 0.008 var(--bn-hue));
+	--bn-ink-3:  oklch(60% 0.008 var(--bn-hue));
+	--bn-ink-4:  oklch(45% 0.008 var(--bn-hue));
+
+	--bn-accent-500: oklch(72% var(--bn-chroma) var(--bn-hue));
+	--bn-accent-600: oklch(78% var(--bn-chroma) var(--bn-hue));
+	--bn-accent-700: oklch(85% calc(var(--bn-chroma) * 0.9) var(--bn-hue));
+	--bn-accent-800: oklch(90% calc(var(--bn-chroma) * 0.85) var(--bn-hue));
+	--bn-accent-900: oklch(95% calc(var(--bn-chroma) * 0.8) var(--bn-hue));
+	--bn-accent-100: oklch(28% 0.05 var(--bn-hue));
+	--bn-accent-200: oklch(35% 0.08 var(--bn-hue));
+	--bn-accent-300: oklch(42% 0.10 var(--bn-hue));
+	--bn-accent-50:  oklch(22% 0.03 var(--bn-hue));
+	--bn-accent:     var(--bn-accent-500);
+	--bn-accent-fg:  oklch(15% 0.008 var(--bn-hue));
+
+	--bn-success-bg: oklch(25% 0.05 145);
+	--bn-warn-bg:    oklch(25% 0.05 75);
+	--bn-danger-bg:  oklch(25% 0.06 25);
+	--bn-info-bg:    oklch(25% 0.05 230);
+
+	--bn-jetonomy-bg: oklch(25% 0.04 var(--bn-hue-jetonomy));
+	--bn-media-bg:    oklch(25% 0.04 var(--bn-hue-media));
+	--bn-events-bg:   oklch(25% 0.04 var(--bn-hue-events));
+	--bn-paid-bg:     oklch(25% 0.04 var(--bn-hue-paid));
+
+	/* Dark: the edge steps UP from the 25% surface, the mirror of light's
+	   step down. Recedes with the rest of the dark palette rather than
+	   glowing, matching how --bn-media-bg drops its own chroma here. */
+	--bn-jetonomy-border: oklch(38% 0.05 var(--bn-hue-jetonomy));
+	--bn-media-border:    oklch(38% 0.05 var(--bn-hue-media));
+	--bn-events-border:   oklch(38% 0.06 var(--bn-hue-events));
+	--bn-paid-border:     oklch(38% 0.05 var(--bn-hue-paid));
+
+	--bn-shadow-xs: 0 1px 2px oklch(0% 0 0 / 0.4);
+	--bn-shadow-sm: 0 1px 2px oklch(0% 0 0 / 0.4), 0 2px 4px oklch(0% 0 0 / 0.3);
+	--bn-shadow-md: 0 2px 4px oklch(0% 0 0 / 0.3), 0 8px 16px oklch(0% 0 0 / 0.4);
+	--bn-shadow-lg: 0 8px 16px oklch(0% 0 0 / 0.4), 0 24px 48px oklch(0% 0 0 / 0.5);
+	--bn-ring:      0 0 0 3px oklch(72% var(--bn-chroma) var(--bn-hue) / 0.3);
+
+	/* Heavier scrim so the modal/backdrop separation stays visible on a dark page. */
+	--bn-overlay: oklch(0% 0 0 / 0.66);
+}
+
+/* Auto from system preference */
+@media (prefers-color-scheme: dark) {
+	[data-bn-theme="auto"] {
+		--bn-canvas:   oklch(15% 0.008 var(--bn-hue));
+		--bn-surface:  oklch(19% 0.01  var(--bn-hue));
+		--bn-raised:   oklch(22% 0.012 var(--bn-hue));
+		--bn-sunken:   oklch(13% 0.006 var(--bn-hue));
+		--bn-line:        oklch(28% 0.012 var(--bn-hue));
+		--bn-line-strong: oklch(36% 0.014 var(--bn-hue));
+		--bn-line-faint:  oklch(24% 0.01  var(--bn-hue));
+		--bn-ink:   oklch(96% 0.005 var(--bn-hue));
+		--bn-ink-2: oklch(78% 0.008 var(--bn-hue));
+		--bn-ink-3: oklch(60% 0.008 var(--bn-hue));
+		--bn-ink-4: oklch(45% 0.008 var(--bn-hue));
+		--bn-accent-500: oklch(72% var(--bn-chroma) var(--bn-hue));
+		--bn-accent-100: oklch(28% 0.05 var(--bn-hue));
+		--bn-accent:     var(--bn-accent-500);
+		--bn-accent-fg:  oklch(15% 0.008 var(--bn-hue));
+	}
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+	:root { --bn-dur-fast: 0ms; --bn-dur: 0ms; --bn-dur-slow: 0ms; }
+}
+
+/* ────────────────────────────────────────────────────────────────────────
+ * Browser-support fallback — OKLCH + color-mix()
+ *
+ * Chrome 111+ / Safari 16.4+ / Firefox 113+ parse oklch() and color-mix().
+ * On older builds the var() values would be invalid and components would
+ * fall back to inherit (often black on white). This block republishes the
+ * top ~20 tokens as hex/rgb so the namespace stays usable when the modern
+ * color syntax isn't supported. v2 indigo hue snapshot only — whitelabel
+ * rebrand requires modern browsers regardless.
+ * ────────────────────────────────────────────────────────────────────── */
+
+@supports not (color: oklch(0% 0 0)) {
+	:root,
+	[data-bn-theme="light"] {
+		--bn-accent-50:  #eef0fc;
+		--bn-accent-100: #dfe3f9;
+		--bn-accent-200: #c4cbf2;
+		--bn-accent-300: #a4adea;
+		--bn-accent-400: #7a86dd;
+		--bn-accent-500: #5b67d0;
+		--bn-accent-600: #4754ad;
+		--bn-accent-700: #36418b;
+		--bn-accent-800: #28316a;
+		--bn-accent-900: #1c234c;
+		--bn-accent:     #5b67d0;
+		--bn-accent-fg:  #ffffff;
+
+		--bn-canvas:  #fbfbfd;
+		--bn-surface: #ffffff;
+		--bn-raised:  #fbfbfd;
+		--bn-sunken:  #f4f4f8;
+
+		--bn-line:        #e6e6ee;
+		--bn-line-strong: #d4d4de;
+		--bn-line-faint:  #efeff5;
+
+		--bn-ink:   #1f2030;
+		--bn-ink-2: #4d4f60;
+		--bn-ink-3: #7a7c8c;
+		--bn-ink-4: #aaabb8;
+
+		--bn-success:    #2fa66f;
+		--bn-success-bg: #e8f7ee;
+		--bn-warn:       #c98a1f;
+		--bn-warn-bg:    #fbf2da;
+		--bn-danger:     #d24a3e;
+		--bn-danger-bg:  #fbe8e5;
+		--bn-info:       #2978c9;
+		--bn-info-bg:    #e3effa;
+
+		--bn-jetonomy:    #a063e0;
+		--bn-jetonomy-bg: #f3e8fb;
+		--bn-media:       #1da18f;
+		--bn-media-bg:    #e0f6f1;
+		--bn-events:      #d08a1f;
+		--bn-events-bg:   #fbf0d6;
+		--bn-paid:        #1f9a5e;
+		--bn-paid-bg:     #e0f3e8;
+
+		--bn-shadow-xs: 0 1px 2px rgba(0,0,0,0.04);
+		--bn-shadow-sm: 0 1px 2px rgba(0,0,0,0.04), 0 2px 4px rgba(0,0,0,0.04);
+		--bn-shadow-md: 0 2px 4px rgba(0,0,0,0.04), 0 8px 16px rgba(0,0,0,0.06);
+		--bn-shadow-lg: 0 8px 16px rgba(0,0,0,0.06), 0 24px 48px rgba(0,0,0,0.08);
+		--bn-ring:      0 0 0 3px rgba(91,103,208,0.18);
+	}
+
+	[data-bn-theme="dark"],
+	[data-theme="dark"],
+	[data-bx-mode="dark"] {
+		--bn-canvas:  #15161f;
+		--bn-surface: #1c1d2a;
+		--bn-raised:  #20212f;
+		--bn-sunken:  #11121a;
+
+		--bn-line:        #2b2c3a;
+		--bn-line-strong: #3a3c4d;
+		--bn-line-faint:  #23242f;
+
+		--bn-ink:   #ebebf2;
+		--bn-ink-2: #c2c2cf;
+		--bn-ink-3: #8c8d9c;
+		--bn-ink-4: #5e6071;
+
+		--bn-accent-500: #8d96e0;
+		--bn-accent-600: #a0a8e7;
+		--bn-accent-700: #b9bfed;
+		--bn-accent-100: #313759;
+		--bn-accent-200: #404670;
+		--bn-accent-50:  #1f243b;
+		--bn-accent:     #8d96e0;
+		--bn-accent-fg:  #15161f;
+
+		--bn-success-bg: #1a3a2a;
+		--bn-warn-bg:    #3a2e1a;
+		--bn-danger-bg:  #3a1f1a;
+		--bn-info-bg:    #1a2a3a;
+
+		--bn-jetonomy-bg: #2e1f3a;
+		--bn-media-bg:    #1a3a35;
+		--bn-events-bg:   #3a2a1a;
+		--bn-paid-bg:     #1a3a2a;
+
+		--bn-ring: 0 0 0 3px rgba(141,150,224,0.32);
+	}
+
+	/* Buttons + badges using color-mix gradients fall back to flat colour. */
+	.bn-btn[data-variant="ai"] {
+		background: linear-gradient(135deg, var(--bn-accent), var(--bn-jetonomy));
+	}
+}
+
+/* ────────────────────────────────────────────────────────────────────────
+ * Higher-contrast preference (Windows High Contrast, macOS Increase Contrast)
+ * ────────────────────────────────────────────────────────────────────── */
+@media (prefers-contrast: more) {
+	:root,
+	[data-bn-theme="light"] {
+		--bn-line:        oklch(50% 0 0);
+		--bn-line-strong: oklch(35% 0 0);
+		--bn-line-faint:  oklch(60% 0 0);
+		--bn-ink-3:       oklch(30% 0 0);
+		--bn-ink-4:       oklch(40% 0 0);
+		--bn-ring:        0 0 0 3px oklch(20% 0 0);
+	}
+	[data-bn-theme="dark"],
+	[data-theme="dark"],
+	[data-bx-mode="dark"] {
+		--bn-line:        oklch(70% 0 0);
+		--bn-line-strong: oklch(85% 0 0);
+		--bn-line-faint:  oklch(60% 0 0);
+		--bn-ink-3:       oklch(85% 0 0);
+		--bn-ink-4:       oklch(75% 0 0);
+		--bn-ring:        0 0 0 3px oklch(95% 0 0);
+	}
+}
+
+/* ────────────────────────────────────────────────────────────────────────
+ * Forced colors (Windows High Contrast Mode + reader-mode forced palettes)
+ *
+ * Let the OS palette through on interactive primitives so focus, links, and
+ * danger semantics remain visible. Decorative backgrounds and shadows are
+ * removed by the browser automatically in this mode.
+ * ────────────────────────────────────────────────────────────────────── */
+@media (forced-colors: active) {
+	.bn-btn,
+	.bn-btn[data-variant],
+	.bn-input,
+	.bn-textarea,
+	.bn-select,
+	.bn-badge,
+	.bn-card,
+	.bn-card[data-interactive],
+	.bn-toast,
+	.bn-modal__panel {
+		forced-color-adjust: auto;
+		border-color: CanvasText;
+	}
+	.bn-btn[data-variant="primary"],
+	.bn-btn[data-variant="danger"] {
+		background: ButtonText;
+		color: ButtonFace;
+	}
+	:focus-visible,
+	.bn-btn:focus-visible,
+	.bn-input:focus-visible,
+	.bn-textarea:focus-visible,
+	.bn-select:focus-visible {
+		outline: 2px solid Highlight;
+		outline-offset: 2px;
+	}
+}
+
+/* ── Icon system ────────────────────────────────────────────────────────── */
+/*
+ * .bn-icon is auto-injected by IconService::render() onto every SVG.
+ * SVG files have no width/height attributes so this class provides the
+ * em-based default that scales naturally with surrounding text.
+ */
+
+.bn-icon {
+	display: inline-block;
+	width: 1em;
+	height: 1em;
+	vertical-align: -0.125em; /* align with text cap-height */
+	flex-shrink: 0;
+	overflow: visible;
+	/* Icons are decorative children of buttons/links; never the click target.
+		Letting the SVG receive pointer events makes event.target the inner
+		<path>, which can defeat click delegation (e.g. the WP Interactivity
+		API) on icon-only controls. Pass clicks through to the parent. */
+	pointer-events: none;
+}
+
+/* Explicit fixed sizes — use when not inline with body text */
+/*
+ * RTL: mirror the icons that POINT somewhere.
+ *
+ * The plugin mirrors its layout correctly (extensive use of logical properties),
+ * but directional icons kept pointing the same way — the "Sign in" and "Create
+ * account" arrows moved to the start of their button and still pointed right,
+ * which reads as "backward" to an Arabic or Hebrew reader.
+ *
+ * Every horizontal arrow/chevron flips: submit-button arrows, pagination
+ * prev/next, back links, breadcrumb separators and the navigate-forward chevron
+ * on link tiles. There is no horizontal DISCLOSURE chevron in the plugin — every
+ * real disclosure control uses chevron-down — so nothing here needs excluding.
+ *
+ * Vertical icons are deliberately absent from this list: chevron-down, arrow-up
+ * and arrow-down are not direction-of-reading, and scaleX(-1) on an asymmetric
+ * rising-metric arrow just mangles it.
+ *
+ * This works at all because IconService now emits a per-name class. Doing it at
+ * the call sites instead would have meant touching ~39 templates and getting the
+ * intent right at each one — the original bug report misclassified 3 of the 5
+ * examples it gave.
+ */
+[dir="rtl"] .bn-icon--arrow-right,
+[dir="rtl"] .bn-icon--arrow-left,
+[dir="rtl"] .bn-icon--chevron-right,
+[dir="rtl"] .bn-icon--chevron-left {
+	transform: scaleX(-1);
+}
+
+.bn-icon--xs  { width: 12px; height: 12px; }
+.bn-icon--sm  { width: 14px; height: 14px; }
+.bn-icon--md  { width: 16px; height: 16px; }
+.bn-icon--lg  { width: 20px; height: 20px; }
+.bn-icon--xl  { width: 24px; height: 24px; }
+.bn-icon--2xl { width: 32px; height: 32px; }
+.bn-icon--3xl { width: 48px; height: 48px; }
+
+/* Empty-state icons: fixed 32 px, centred, dimmed */
+.bn-empty__icon {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 48px;
+	height: 48px;
+	margin-bottom: var(--bn-s2);
+	opacity: 0.35;
+}
+
+.bn-empty__icon .bn-icon {
+	width: 48px;
+	height: 48px;
+}
+
+/* ── Hidden attribute — enforce display:none regardless of component rules */
+
+[hidden] { display: none !important; }
+
+/* ── Toast notifications ─────────────────────────────────────────────────── */
+.bn-toast-container {
+	position: fixed;
+	bottom: var(--bn-s6);
+	left: 50%;
+	transform: translateX(-50%);
+	z-index: 9999;
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s2);
+	align-items: center;
+	pointer-events: none;
+}
+
+/*
+ * ── Bottom-anchored surfaces must clear the fixed mobile nav ────────────────
+ *
+ * .bn-mobile-nav is fixed across the bottom on phones, and every surface pinned
+ * near the bottom used to guess its way around it — the toast at 24px, the
+ * cookie bar at 16px, the edit-profile save bar at a hardcoded 52px. The nav
+ * declares no height (it is emergent: 44px tap targets + padding + iOS
+ * safe-area) and actually measures 60px at 390px, so those literals were wrong
+ * and the surfaces rendered ON the primary navigation. Measured before the fix:
+ * toast 755-820 against a nav starting at 785 — "Comment added" covered
+ * Feed / Spaces / Alerts / Profile for its whole lifetime.
+ *
+ * --bn-mobile-nav-h is the nav's measured height, published by
+ * assets/js/shell/extras.js (fitMobileNav) and re-measured on resize and after a
+ * client-side navigation. The literal in each var() is only the pre-hydration
+ * fallback. Scoped with :has(.bn-mobile-nav) so a surface without the bar (an
+ * embedded shortcode page, a hub with the bar disabled) keeps its tighter anchor.
+ *
+ * ADD ANY NEW BOTTOM-PINNED SURFACE TO THIS BLOCK — that is the whole point of
+ * it. The bug class here was five surfaces each solving the same problem
+ * differently, and three of them getting it wrong.
+ */
+@media (max-width: 768px) {
+	body:has(.bn-mobile-nav) .bn-toast-container,
+	body:has(.bn-mobile-nav) .bn-unsub-notice {
+		bottom: calc(var(--bn-mobile-nav-h, 60px) + var(--bn-s4));
+	}
+
+	body:has(.bn-mobile-nav) .bn-cookie-consent {
+		inset-block-end: calc(var(--bn-mobile-nav-h, 60px) + var(--bn-s4));
+	}
+
+	/* wb-gamification's points toast is NOT ours, but it collides with OUR nav on
+		OUR pages, and we are the only side that knows the nav's measured height —
+		--bn-mobile-nav-h is published by our shell JS. Measured at 768px: the toast
+		box (y 831-883, z-index 9999) painted over .bn-mobile-nav (y 841-900,
+		z-index 9500), 42px of overlap from a SINGLE toast, more as they stack.
+		Scoped to :has(.bn-mobile-nav) so it only applies where our bar exists and
+		the plugin's own placement is untouched everywhere else.
+
+		The alternative is the same offset in wb-gamification's own frontend.css
+		(.bn-gam-toasts--bottom-right at :72-76). Doing it here means every BN site
+		is correct without shipping a second plugin; if gamification ever adopts the
+		token itself, this rule becomes a harmless no-op. */
+	body:has(.bn-mobile-nav) .wb-gam-toasts {
+		bottom: calc(var(--bn-mobile-nav-h, 60px) + var(--bn-s4));
+	}
+}
+.bn-toast {
+	background: var(--text-1);
+	color: var(--bg);
+	padding: var(--bn-s2) var(--bn-s5);
+	border-radius: var(--bn-r-full);
+	font-size: var(--text-sm);
+	font-weight: var(--fw-medium);
+	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+	pointer-events: auto;
+	cursor: pointer;
+	animation: bn-toast-in 0.25s ease;
+}
+/* The exit fade is JS-driven: bnToast owns each toast's dwell (longer for errors
+   so a validation message can be read, and click-to-dismiss), then adds this
+   class to fade it out. It must NOT auto-play on a fixed delay — that hid error
+   toasts before they could be read. */
+.bn-toast--leaving { animation: bn-toast-out 0.25s ease forwards; }
+/* Action link on a toast. Used when a refusal is not retryable and the member
+   needs somewhere to go instead - a suspension being the case it exists for.
+   Underlined and inheriting the toast's colour so it reads as the one thing in
+   the message you can act on, against the inverted toast surface. */
+.bn-toast__action {
+	margin-inline-start: var(--bn-s3);
+	color: inherit;
+	font-weight: var(--bn-fw-semibold);
+	text-decoration: underline;
+	white-space: nowrap;
+}
+.bn-toast__action:hover,
+.bn-toast__action:focus-visible {
+	color: inherit;
+	text-decoration: none;
+}
+
+/* Repeat counter. An action the server keeps refusing used to emit one toast PER
+   attempt and they piled up until they filled the screen (and a screen reader read
+   the same sentence out once per copy — every toast is an assertive alert). The
+   repeat is now collapsed onto the existing toast and counted here. */
+.bn-toast__count {
+	margin-inline-start: var(--bn-s2);
+	opacity: 0.7;
+	font-variant-numeric: tabular-nums;
+}
+.bn-toast--success { background: var(--green); color: var(--text-on-brand); }
+.bn-toast--error   { background: var(--red); color: var(--text-on-brand); }
+@keyframes bn-toast-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes bn-toast-out { from { opacity: 1; } to { opacity: 0; transform: translateY(-10px); } }
+
+/* ── Empty states (global) ─────────────────────────────────────────────── */
+/* Inline variant + body text. The base .bn-empty-state and __title were here;
+   these two were emitted by the showcase blocks and defined nowhere, so the
+   empty state rendered as unstyled paragraphs (Basecamp 10182506250). */
+.bn-empty-state--inline {
+	padding-block: var(--bn-s6);
+	text-align: center;
+}
+
+.bn-empty-state__text {
+	margin: 0 0 var(--bn-s3);
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink-3);
+	line-height: var(--bn-leading-snug);
+}
+
+.bn-empty-state {
+	text-align: center;
+	padding: var(--bn-s12) var(--bn-s6);
+	color: var(--text-3);
+}
+/* Only the empty-state's own illustrative icon (a direct child) is the big,
+   faded 56px glyph. A nested icon — e.g. inside the CTA button — must NOT inherit
+   this; it keeps the button's normal icon sizing. */
+.bn-empty-state > svg {
+	width: 56px;
+	height: 56px;
+	margin: 0 auto var(--bn-s4);
+	opacity: 0.3;
+	display: block;
+}
+.bn-empty-state__title {
+	font-size: var(--text-lg);
+	font-weight: var(--fw-semibold);
+	color: var(--text-2);
+	margin: 0 0 var(--bn-s2);
+}
+.bn-empty-state p {
+	font-size: var(--text-sm);
+	color: var(--text-3);
+	margin: 0;
+	max-width: 320px;
+	margin-inline: auto;
+	line-height: var(--leading-normal);
+}
+
+/* ── Shared member card + pagination (cross-screen component) ─────────────────
+	Used by the member directory, profile followers/following/connections panels,
+	the connections/followers/following shortcodes, and search member results.
+	Lives in bn-base (loaded on every BN page as the feature-style dependency) so
+	it is styled everywhere it renders, regardless of which feature stylesheet a
+	screen enqueues — consolidated here from bn-members/bn-spaces/bn-profile/blocks. */
+.bn-member-card {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	text-align: center;
+	padding-block: var(--bn-s5) var(--bn-s4);
+	padding-inline: var(--bn-s4);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-lg);
+	background: var(--bn-surface);
+	transition: border-color var(--bn-dur) var(--bn-ease);
+}
+
+.bn-member-card:hover {
+	border-color: var(--bn-line-strong);
+}
+
+.bn-member-name {
+	font-family: var(--bn-font-display);
+	font-size: var(--bn-text-base);
+	font-weight: var(--bn-fw-semibold);
+	color: var(--bn-ink);
+	margin: 0 0 var(--bn-s1);
+	line-height: var(--bn-leading-tight);
+}
+
+.bn-member-name a {
+	color: inherit;
+	text-decoration: none;
+}
+
+.bn-member-name a:hover {
+	color: var(--bn-accent);
+}
+
+.bn-member-handle {
+	font-family: var(--bn-font-mono);
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+	margin: 0 0 var(--bn-s2);
+}
+
+.bn-card-actions {
+	display: flex;
+	gap: var(--bn-s2);
+	margin-block-start: auto;
+	inline-size: 100%;
+	justify-content: center;
+	flex-wrap: wrap;
+}
+
+.bn-btn-message {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-inline-size: 36px;
+	min-block-size: 36px;
+	padding-inline: var(--bn-s3);
+	border: 1px solid var(--bn-line-strong);
+	border-radius: var(--bn-r-md);
+	background: var(--bn-surface);
+	color: var(--bn-ink-2);
+	text-decoration: none;
+	transition: border-color var(--bn-dur) var(--bn-ease), color var(--bn-dur) var(--bn-ease);
+}
+
+.bn-btn-message:hover,
+.bn-btn-message:focus-visible {
+	border-color: var(--bn-accent);
+	color: var(--bn-accent);
+}
+
+.bn-btn-message:focus-visible {
+	outline: 2px solid transparent;
+	outline-offset: 2px;
+	box-shadow: var(--bn-ring);
+}
+
+.bn-pagination {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	gap: var(--bn-s2);
+	margin-block-start: var(--bn-s6);
+	padding-block: var(--bn-s4);
+	flex-wrap: wrap;
+}
+
+.bn-page-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	/* 40px both ways: a pager is a target, and a 36px one missed the floor. */
+	min-inline-size: 40px;
+	min-block-size: 40px;
+	padding-inline: var(--bn-s2);
+	border: 1px solid var(--bn-line-strong);
+	border-radius: var(--bn-r-md);
+	background: var(--bn-surface);
+	color: var(--bn-ink-2);
+	font-family: var(--bn-font-mono);
+	font-size: var(--bn-text-sm);
+	text-decoration: none;
+	transition: border-color var(--bn-dur) var(--bn-ease), color var(--bn-dur) var(--bn-ease);
+}
+
+.bn-page-btn:hover,
+.bn-page-btn:focus-visible {
+	border-color: var(--bn-accent);
+	color: var(--bn-accent);
+}
+
+.bn-page-btn:focus-visible {
+	outline: 2px solid transparent;
+	outline-offset: 2px;
+	box-shadow: var(--bn-ring);
+}
+
+.bn-page-btn.current,
+.bn-page-btn[aria-current="page"] {
+	background: var(--bn-accent);
+	border-color: var(--bn-accent);
+	color: var(--bn-accent-fg);
+}
+
+/* ── Shared activity cards (cross-screen component) ───────────────────────────
+	Reply / like / discussion rows. Used by the profile Posts/Replies/Likes/
+	Discussions panels AND the in-hub space Discussions panel. Lives in bn-base
+	(loaded on every BN page as the feature-style dependency) so it renders styled
+	regardless of which feature stylesheet a screen enqueues — consolidated here
+	from bn-profile. */
+.bn-reply-card,
+.bn-like-card {
+	background: var(--bn-surface);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-lg);
+	padding: var(--bn-s4) var(--bn-s5);
+	margin-block-end: var(--bn-s3);
+}
+.bn-reply-card--link {
+	display: block;
+	text-decoration: none;
+	color: inherit;
+	transition: border-color var(--bn-dur-fast) var(--bn-ease);
+}
+.bn-reply-card--link:hover,
+.bn-reply-card--link:focus-visible {
+	border-color: var(--bn-line-strong);
+	color: inherit;
+}
+.bn-reply-card__meta,
+.bn-like-card__meta {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+	margin-block-end: var(--bn-s1);
+}
+.bn-reply-card__meta svg,
+.bn-like-card__meta svg {
+	width: 13px;
+	height: 13px;
+	stroke: currentColor;
+	fill: none;
+}
+.bn-reply-card__time,
+.bn-like-card__time {
+	margin-inline-start: auto;
+	font-family: var(--bn-font-mono);
+}
+.bn-reply-card__content,
+.bn-like-card__content {
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink);
+	line-height: var(--bn-leading-body);
+}
+.bn-reply-card__content--strong {
+	font-weight: 600;
+}
+.bn-reply-card__context {
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+	margin-block-start: var(--bn-s1);
+}
+
+/* Avatar-anchored variant: a leading author/owner avatar turns the stacked card
+   into a media row, so a list of discussions reads with the same left-anchored
+   rhythm as the Portfolio rows. The avatar column spans all three text rows; the
+   existing meta/content/context map into the second column unchanged. Opt-in, so
+   every other .bn-reply-card usage is untouched. */
+.bn-reply-card--avatar {
+	display: grid;
+	grid-template-columns: auto 1fr;
+	grid-template-areas:
+		"avatar meta"
+		"avatar content"
+		"avatar context";
+	column-gap: var(--bn-s3);
+}
+.bn-reply-card--avatar .bn-reply-card__meta { grid-area: meta; }
+.bn-reply-card--avatar .bn-reply-card__content { grid-area: content; }
+.bn-reply-card--avatar .bn-reply-card__context { grid-area: context; }
+.bn-reply-card__avatar {
+	grid-area: avatar;
+	align-self: start;
+	width: 40px;
+	height: 40px;
+	border-radius: var(--bn-r-full, 9999px);
+	overflow: hidden;
+	background: var(--bn-sunken, oklch(97% 0.004 0));
+}
+.bn-reply-card__avatar img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+}
+
+/* In-hub space Discussions panel — header action sits above the thread list. */
+.bn-space-discussions__head {
+	display: flex;
+	justify-content: flex-end;
+	margin-block-end: var(--bn-s3);
+}
+
+/* ── Mobile bottom tab bar ────────────────────────────────────────────── */
+.bn-mobile-nav {
+	display: none; /* Hidden on desktop */
+}
+@media (max-width: 768px) {
+	.bn-mobile-nav {
+		display: flex;
+		position: fixed;
+		bottom: 0;
+		inset-inline: 0;
+		z-index: 9500;
+		background: var(--bg);
+		border-top: 1px solid var(--border);
+		padding: var(--bn-s1) 0 calc(var(--bn-s1) + env(safe-area-inset-bottom, 0px));
+		box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.06);
+	}
+	.bn-mobile-nav__item {
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		/* Meet the 44px minimum tap target (icon + 10px label collapsed to ~37px
+		   before). This also lifts the bar to ~52px, the platform-standard height. */
+		min-height: 44px;
+		gap: 2px;
+		padding: var(--bn-s1) 0;
+		font-size: 10px;
+		color: var(--text-3);
+		text-decoration: none;
+		background: none;
+		border: none;
+		cursor: pointer;
+		position: relative;
+		transition: color 0.15s ease;
+	}
+	/*
+	 * Tab icons need an explicit size, exactly as the centre FAB already has.
+	 *
+	 * .bn-icon (the class IconService::render() puts on every SVG) is sized
+	 * `width/height: 1em`, so an icon inherits whatever font-size its container
+	 * sets. Here that container sets `font-size: 10px` — which is the LABEL
+	 * size, correct for the caption underneath — so the four tab icons were
+	 * rendering at 10x10px against the FAB's 24x24px. That is a 2.4x mismatch in
+	 * the same bar, and 10px is far below the ~24px platform standard for a
+	 * bottom tab bar (iOS 24-28, Material 24).
+	 *
+	 * The FAB was never affected only because it hard-codes its own 24px below.
+	 * Sizing the icon here rather than raising the item's font-size keeps the
+	 * 10px label intact — the label is correct, the icon simply must not be tied
+	 * to it.
+	 */
+	.bn-mobile-nav__item .bn-icon,
+	.bn-mobile-nav__item > svg {
+		width: 24px;
+		height: 24px;
+		flex-shrink: 0;
+	}
+	.bn-mobile-nav__item[aria-current="page"] { color: var(--brand); }
+	.bn-mobile-nav__item[aria-current="page"] svg { stroke: var(--brand); }
+	/* Centred by arithmetic, not by an offset: a fixed-width slot between two
+	   flex:1 items on each side lands on the viewport centre only while the bar
+	   has exactly 5 slots. See templates/partials/nav.php — do not add a 6th. */
+	.bn-mobile-nav__item--create {
+		background: var(--brand);
+		color: var(--text-on-brand);
+		width: 52px;
+		height: 52px;
+		border-radius: 50%;
+		/* Lift the disc clear of the bar so it reads as the primary action rather
+		   than a sixth tab, without leaving the row (no notch/overlap needed). */
+		margin-top: -16px;
+		box-shadow:
+			0 6px 16px color-mix(in srgb, var(--brand) 36%, transparent),
+			0 2px 4px color-mix(in srgb, var(--brand) 24%, transparent);
+		padding: 0;
+		flex: 0 0 auto;
+		justify-content: center;
+		transition: transform 0.15s ease, box-shadow 0.15s ease;
+	}
+	.bn-mobile-nav__item--create:active {
+		transform: scale(0.94);
+		box-shadow: 0 2px 8px color-mix(in srgb, var(--brand) 30%, transparent);
+	}
+	.bn-mobile-nav__item--create svg {
+		stroke: var(--text-on-brand);
+		width: 24px;
+		height: 24px;
+	}
+	.bn-mobile-nav__item--create span { display: none; }
+	.bn-mobile-nav__badge {
+		position: absolute;
+		top: 0;
+		inset-inline-end: calc(50% - 16px);
+		background: var(--red);
+		color: var(--text-on-brand);
+		font-size: 9px;
+		font-weight: 700;
+		min-width: 14px;
+		height: 14px;
+		border-radius: 7px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 0 3px;
+		line-height: 1;
+	}
+	/* "More" overflow sheet — opened from the 5th bar slot when admin-created
+		custom tabs exist. Folds the Profile shortcut + custom tabs into a
+		bottom sheet so the fixed 5-slot bar (centre Create) stays intact. */
+	.bn-mobile-more-backdrop {
+		position: fixed;
+		inset: 0;
+		z-index: 9600;
+		background: rgba(0, 0, 0, 0.4);
+		animation: bn-more-fade 0.18s ease;
+	}
+	.bn-mobile-more-backdrop[hidden] { display: none; }
+	.bn-mobile-more {
+		position: fixed;
+		inset-inline: 0;
+		bottom: 0;
+		z-index: 9700;
+		background: var(--surface);
+		border-top-left-radius: var(--bn-r-lg);
+		border-top-right-radius: var(--bn-r-lg);
+		box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.18);
+		padding: var(--bn-s2) var(--bn-s4) calc(var(--bn-s4) + env(safe-area-inset-bottom, 0px));
+		animation: bn-more-slide-up 0.22s ease;
+	}
+	.bn-mobile-more[hidden] { display: none; }
+	.bn-mobile-more__head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: var(--bn-s2) 0 var(--bn-s3);
+		border-bottom: 1px solid var(--bn-line-faint);
+	}
+	.bn-mobile-more__title {
+		font-family: var(--font-display);
+		font-size: var(--text-base);
+		font-weight: var(--fw-semibold);
+		color: var(--text-1);
+	}
+	.bn-mobile-more__close {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 32px;
+		height: 32px;
+		border: none;
+		border-radius: var(--bn-r-full);
+		background: var(--bg-subtle);
+		color: var(--text-2);
+		cursor: pointer;
+	}
+	.bn-mobile-more__close svg { width: 18px; height: 18px; }
+	.bn-mobile-more__list {
+		list-style: none;
+		margin: 0;
+		padding: var(--bn-s2) 0 0;
+	}
+	.bn-mobile-more__link {
+		display: flex;
+		align-items: center;
+		gap: var(--bn-s3);
+		padding: var(--bn-s3) var(--bn-s1);
+		font-size: var(--text-md);
+		color: var(--text-1);
+		text-decoration: none;
+		border-radius: var(--bn-r-md);
+	}
+	.bn-mobile-more__link:hover,
+	.bn-mobile-more__link:focus { background: var(--bg-hover); }
+	.bn-mobile-more__link svg {
+		width: 20px;
+		height: 20px;
+		stroke: var(--text-2);
+		flex: 0 0 auto;
+	}
+	@keyframes bn-more-fade {
+		from { opacity: 0; }
+		to   { opacity: 1; }
+	}
+	@keyframes bn-more-slide-up {
+		from { transform: translateY(100%); }
+		to   { transform: translateY(0); }
+	}
+	/* Add bottom padding to page content so it doesn't hide behind the nav */
+	.bn-hub-shell,
+	.bn-profile-container { padding-bottom: 72px; }
+}
+
+/* ── Search overlay (cmd+K) ───────────────────────────────────────────── */
+.bn-search-overlay {
+	position: fixed;
+	inset: 0;
+	z-index: 10000;
+	background: var(--bn-overlay);
+	display: flex;
+	align-items: flex-start;
+	justify-content: center;
+	padding-top: 15vh;
+	animation: bn-overlay-in 0.15s ease;
+}
+@keyframes bn-overlay-in { from { opacity: 0; } to { opacity: 1; } }
+.bn-search-overlay__inner {
+	width: 100%;
+	max-width: 580px;
+	background: var(--bg);
+	border-radius: var(--bn-r-xl);
+	box-shadow: 0 16px 64px rgba(0, 0, 0, 0.2);
+	overflow: hidden;
+	animation: bn-dropdown-in 0.2s ease;
+}
+.bn-search-overlay__input-wrap {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s3);
+	padding: var(--bn-s4) var(--bn-s5);
+	border-bottom: 1px solid var(--bn-line-faint);
+}
+.bn-search-overlay__icon {
+	font-size: 20px;
+	color: var(--text-3);
+	flex-shrink: 0;
+}
+.bn-search-overlay__input {
+	flex: 1;
+	border: none;
+	outline: none;
+	font-size: var(--text-lg);
+	font-family: var(--font-body);
+	color: var(--text-1);
+	background: transparent;
+}
+.bn-search-overlay__input::placeholder { color: var(--text-3); }
+.bn-search-overlay__kbd {
+	font-size: 11px;
+	padding: 2px 6px;
+	border: 1px solid var(--border);
+	border-radius: 4px;
+	color: var(--text-3);
+	font-family: var(--font-body);
+}
+.bn-search-overlay__results {
+	max-height: 400px;
+	overflow-y: auto;
+}
+.bn-search-overlay__loading,
+.bn-search-overlay__empty {
+	padding: var(--bn-s6);
+	text-align: center;
+	color: var(--text-3);
+	font-size: var(--text-sm);
+}
+.bn-search-overlay__result {
+	display: block;
+	padding: var(--bn-s3) var(--bn-s5);
+	text-decoration: none;
+	transition: background 0.1s;
+}
+.bn-search-overlay__result:hover { background: var(--bg-hover); }
+.bn-search-overlay__result-title {
+	font-size: var(--text-sm);
+	font-weight: var(--fw-medium);
+	color: var(--text-1);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.bn-search-overlay__result-meta {
+	font-size: var(--text-xs);
+	color: var(--text-3);
+	margin-top: 2px;
+}
+@media (max-width: 640px) {
+	.bn-search-overlay { padding-top: var(--bn-s4); }
+	.bn-search-overlay__inner { max-width: calc(100vw - 16px); border-radius: var(--bn-r-lg); }
+}
+
+/* ── User hover card ──────────────────────────────────────────────────── */
+.bn-hover-card {
+	position: fixed;
+	z-index: 9000;
+	width: 280px;
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: var(--bn-r-lg);
+	box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+	padding: var(--bn-s4);
+	pointer-events: auto;
+	animation: bn-dropdown-in 0.15s ease;
+}
+.bn-hover-card__header { display: flex; gap: var(--bn-s3); align-items: flex-start; margin-bottom: var(--bn-s3); }
+.bn-hover-card__avatar {
+	width: 48px; height: 48px; border-radius: 50%; flex-shrink: 0;
+	background: var(--brand-light); color: var(--brand); font-size: 18px; font-weight: 700;
+	display: flex; align-items: center; justify-content: center; overflow: hidden;
+	text-decoration: none;
+}
+.bn-hover-card__avatar img { width: 100%; height: 100%; object-fit: cover; }
+.bn-hover-card__info { min-width: 0; }
+.bn-hover-card__name {
+	display: block; font-weight: var(--fw-bold); font-size: var(--text-base);
+	color: var(--text-1); text-decoration: none;
+}
+.bn-hover-card__name:hover { text-decoration: underline; }
+.bn-hover-card__handle { display: block; font-size: var(--text-xs); color: var(--text-3); text-decoration: none; }
+.bn-hover-card__handle:hover { color: var(--text-2); }
+.bn-hover-card__bio { font-size: var(--text-sm); color: var(--text-2); margin-bottom: var(--bn-s3); line-height: 1.4; }
+.bn-hover-card__stats { display: flex; gap: var(--bn-s4); font-size: var(--text-xs); color: var(--text-2); text-decoration: none; }
+.bn-hover-card__stat-num { font-weight: var(--fw-bold); color: var(--text-1); }
+.bn-hover-card__follow {
+	margin-top: var(--bn-s3); width: 100%; padding: var(--bn-s2); border: 1px solid var(--brand);
+	border-radius: var(--bn-r-full); background: transparent; color: var(--brand);
+	font-size: var(--text-sm); font-weight: var(--fw-semibold); cursor: pointer;
+	transition: all 0.15s ease;
+}
+.bn-hover-card__follow:hover { background: var(--brand); color: var(--text-on-brand); }
+/* Already-following state mirrors the post-card "Following" affordance: filled,
+	neutral, and reverting to an "Unfollow" cue on hover. */
+.bn-hover-card__follow.is-following { background: var(--brand); color: var(--text-on-brand); }
+.bn-hover-card__follow.is-following:hover { background: var(--red); border-color: var(--red); }
+
+/* ── Box-sizing reset ───────────────────────────────────────────────────── */
+
+.bn-wrap *,
+.bn-wrap *::before,
+.bn-wrap *::after {
+	box-sizing: border-box;
+}
+
+/* ── Base element styles ────────────────────────────────────────────────── */
+
+.bn-wrap {
+	font-family: var(--font-body);
+	font-size: var(--text-base);
+	line-height: var(--leading-body);
+	color: var(--text-1);
+	background: var(--bg);
+}
+
+.bn-wrap a {
+	color: var(--brand);
+	text-decoration: none;
+	transition: color 0.12s;
+}
+
+.bn-wrap a:hover {
+	color: var(--brand-hover);
+}
+
+/* ── Utilities ──────────────────────────────────────────────────────────── */
+
+/* Visually hidden (accessible) */
+.bn-sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
+}
+
+/* ── Spinner ────────────────────────────────────────────────────────────── */
+
+.bn-spinner {
+	display: inline-block;
+	width: 18px;
+	height: 18px;
+	border: 2px solid var(--border);
+	border-top-color: var(--brand);
+	border-radius: var(--bn-r-full);
+	animation: bn-spin 0.6s linear infinite;
+}
+
+@keyframes bn-spin {
+	to { transform: rotate(360deg); }
+}
+
+/* ── Sticky save bar (.bn-ep-*) ──────────────────────────────────────────
+   The pinned "Unsaved changes / Save" bar shared by every long settings form.
+
+   It lived in bn-profile.css and was used from there by notification
+   preferences, whose own stylesheet documented the reuse in its header. But
+   bn-profile.css is not enqueued on that page, so NONE of these rules applied:
+   the bar fell back to position:static and dropped to the natural end of a
+   9,847px document, leaving "Save changes" 7,178px below the fold with the
+   status pill, dirty dot and spinner all unstyled. A member could change a
+   preference and never find the control that saves it.
+
+   A primitive used by more than one surface belongs on the stylesheet every
+   surface loads, so it lives here now and bn-profile.css no longer defines it.
+   The classes keep the .bn-ep- prefix: they are referenced from two templates
+   and renaming them is churn, not a fix. */
+
+.bn-ep-save-bar {
+	position: fixed;
+	inset-block-end: 0;
+	inset-inline: 0;
+	background: var(--bn-surface);
+	border-block-start: 1px solid var(--bn-line);
+	box-shadow: var(--bn-shadow-sm);
+	padding-inline: var(--bn-s5);
+	min-height: 64px;
+	display: flex;
+	align-items: center;
+	z-index: 180;
+}
+
+.bn-ep-save-bar-inner {
+	max-width: 1080px;
+	margin-inline: auto;
+	width: 100%;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--bn-s3);
+}
+
+.bn-ep-save-status {
+	font-size: var(--bn-text-sm);
+	font-weight: 600;
+	color: var(--bn-success);
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-s1);
+}
+
+.bn-ep-save-status svg { width: 14px; height: 14px; }
+
+.bn-ep-save-status[hidden] { display: none !important; }
+
+.bn-ep-save-status--dirty {
+	color: var(--bn-warning, #b45309);
+	font-weight: 600;
+	font-size: var(--bn-text-sm);
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-s1);
+}
+
+.bn-ep-save-status--saving {
+	color: var(--bn-ink-2);
+	font-weight: 500;
+	font-size: var(--bn-text-sm);
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-s1);
+}
+
+.bn-ep-save-actions {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	margin-inline-start: auto;
+}
+
+.bn-ep-dirty-dot {
+	display: inline-block;
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	background: var(--bn-warning, #f59e0b);
+	flex-shrink: 0;
+}
+
+.bn-ep-spinner {
+	display: inline-block;
+	width: 12px;
+	height: 12px;
+	border: 2px solid var(--bn-line);
+	border-top-color: var(--bn-accent);
+	border-radius: 50%;
+	animation: bn-spin 0.8s linear infinite;
+	flex-shrink: 0;
+}
+
+/* The fixed mobile bottom nav (.bn-mobile-nav) is visible <=768px at z-index
+   9500; the save bar sits at bottom:0 z-180, so the nav covered its Save/Cancel
+   buttons and mobile members could not save. Lift the bar to sit flush above the
+   nav across the SAME breakpoint the nav uses. --bn-mobile-nav-h is the nav's
+   MEASURED height, published by assets/js/shell/extras.js; the fallback is
+   pre-hydration only and carries the safe-area inset the measurement already
+   includes. See the shared bottom-clearance block below. */
+@media (max-width: 768px) {
+	.bn-ep-save-bar {
+		padding-inline: var(--bn-s4);
+		inset-block-end: var( --bn-mobile-nav-h, calc( 60px + env( safe-area-inset-bottom, 0px ) ) );
+	}
+
+	/* The status pill stays on mobile. It used to be hidden here for room, but it is
+	   the only thing that tells a member the save WORKED — "Saved just now" is the
+	   confirmation, and without it tapping Save produced no feedback at all beyond the
+	   button greying out. Measured at 390px on the busiest bar (profile edit, which
+	   also carries Cancel): 124px of pill + 204px of buttons inside 343px. */
+	.bn-ep-save-status {
+		/* Yields space to the buttons and ellipsises a long translation rather than
+		   pushing them off the bar. */
+		flex: 0 1 auto;
+		min-inline-size: 0;
+	}
+
+	.bn-ep-save-status span:not(.bn-ep-dirty-dot):not(.bn-ep-spinner) {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	/* The actions take the rest of the row instead of huddling at the right edge.
+	   A 204px cluster against a 343px bar left a third of the width dead, and on the
+	   preferences bar — which carries Save alone — most of the row was empty next to a
+	   small button. Full-width controls are the mobile norm and give bigger targets. */
+	.bn-ep-save-actions {
+		flex: 1 1 auto;
+		margin-inline-start: 0;
+	}
+
+	.bn-ep-save-actions > * {
+		flex: 1 1 auto;
+		justify-content: center;
+		/* Never shrink below a comfortable tap target, whatever the label. */
+		min-inline-size: 5.5rem;
+	}
+}
+
+/* ── Buttons ────────────────────────────────────────────────────────────── */
+
+/* min-height 40px is the design system's `md` rung AND the tap-target floor
+   ("40px minimum tap target on buttons"). The default button had no height at
+   all — it measured whatever padding + line-height produced, which was 36px, so
+   every unsized .bn-btn in the plugin shipped 4px under the floor. */
+.bn-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	min-height: 40px;
+	/* Geometry through tokens, never a literal, so the theme-bleed lock can
+	   re-apply the TOKEN on every interactive state. A lock that re-applied a
+	   literal would be 0,3,0 and out-specify every variant below — a small
+	   button would jump from 0 12px to 8px 16px the moment a pointer touched
+	   it. Every rule that changes a button's padding sets these two custom
+	   properties instead. */
+	--bn-btn-py: var(--bn-s2);
+	--bn-btn-px: var(--bn-s4);
+	padding: var(--bn-btn-py) var(--bn-btn-px);
+	border: 1px solid transparent;
+	border-radius: var(--bn-r-md);
+	font-family: var(--font-body);
+	font-size: var(--text-sm);
+	font-weight: var(--fw-medium);
+	line-height: var(--leading-snug);
+	cursor: pointer;
+	transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+/* Follow button — label cycles "Follow" (~50px) → "Following" (~80px),
+	and both the partial (partials/follow-button.php) and the block
+	(templates/blocks/follow-button.php) render this class. Pinning the
+	worst-case width here keeps the surrounding inline context (sidebar
+	widgets, profile-hero, post bylines, suggestions row) stable across
+	state toggles regardless of which CSS bundle a page loads. */
+.bn-follow-btn,
+.bn-block-follow-button__cta {
+	min-inline-size: 100px;
+	justify-content: center;
+}
+
+.bn-btn-primary {
+	background: var(--brand);
+	color: var(--white);
+}
+
+.bn-btn-primary:hover {
+	background: var(--brand-hover);
+	color: var(--white);
+}
+
+.bn-btn-ghost {
+	background: transparent;
+	color: var(--text-2);
+	border-color: var(--border);
+}
+
+.bn-btn-ghost:hover {
+	background: var(--bg-hover);
+	color: var(--text-1);
+}
+
+.bn-btn-danger {
+	background: transparent;
+	color: var(--red);
+	border-color: var(--red);
+}
+
+.bn-btn-danger:hover {
+	background: var(--bn-danger-bg);
+}
+
+/* ── Avatar ─────────────────────────────────────────────────────────────── */
+
+.bn-avatar {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: var(--bn-r-full);
+	overflow: hidden;
+	flex-shrink: 0;
+	background: var(--brand-light);
+	color: var(--brand);
+	font-weight: var(--fw-semibold);
+}
+
+.bn-avatar img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+/* Shape modifier — people avatars stay circular (default --r-full); space /
+	group avatars opt into a rounded-square via data-shape="rounded" so the shape
+	itself signals person vs space at a glance. Single reusable rule: every
+	space avatar rendered through .bn-avatar uses this, rather than each widget
+	redefining its own radius. The image inherits the container radius so it
+	never reverts to a circle under another sheet's `.bn-avatar img` rule. */
+.bn-avatar[data-shape="rounded"] { border-radius: var(--bn-r-md); }
+.bn-avatar[data-shape="rounded"] img { border-radius: inherit; }
+
+.bn-avatar-xs { width: 24px; height: 24px; font-size: var(--text-xs); }
+.bn-avatar-sm { width: 32px; height: 32px; font-size: var(--text-xs); }
+.bn-avatar-md { width: 40px; height: 40px; font-size: var(--text-sm); }
+.bn-avatar-lg { width: 56px; height: 56px; font-size: var(--text-base); }
+.bn-avatar-xl { width: 80px; height: 80px; font-size: var(--text-xl); }
+
+/* ── Card ───────────────────────────────────────────────────────────────── */
+
+.bn-card {
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: var(--bn-r-lg);
+	padding: var(--bn-s6);
+}
+
+/* ── Divider ────────────────────────────────────────────────────────────── */
+
+.bn-divider {
+	border: none;
+	border-top: 1px solid var(--bn-line-faint);
+	margin: var(--bn-s4) 0;
+}
+
+/* ── Empty state ────────────────────────────────────────────────────────── */
+
+.bn-empty {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	padding: var(--bn-s12) var(--bn-s6);
+	color: var(--text-3);
+	text-align: center;
+	gap: var(--bn-s3);
+}
+
+/* ── Tag / pill ─────────────────────────────────────────────────────────── */
+
+.bn-pill {
+	display: inline-flex;
+	align-items: center;
+	padding: var(--bn-s1) var(--bn-s3);
+	border: 1px solid var(--border);
+	border-radius: var(--bn-r-full);
+	font-size: var(--text-xs);
+	font-weight: var(--fw-medium);
+	color: var(--text-2);
+	background: var(--surface);
+	cursor: pointer;
+	transition: all 0.12s;
+	text-decoration: none;
+}
+
+.bn-pill:hover,
+.bn-pill--active {
+	background: var(--brand-light);
+	border-color: var(--brand);
+	color: var(--brand);
+}
+
+/* ── Mobile ─────────────────────────────────────────────────────────────── */
+
+@media (max-width: 640px) {
+	.bn-card {
+		padding: var(--bn-s4);
+		border-radius: var(--bn-r-md);
+	}
+
+	.bn-btn {
+		--bn-btn-px: var(--bn-s3);
+	}
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+	COMMUNITY CONTAINER WIDTH — single source of truth
+	Every community page — BuddyNext, Jetonomy, WPMediaVerse — uses this width.
+	════════════════════════════════════════════════════════════════════════════ */
+:root {
+	--bn-container: 1100px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+	LEVEL 2 CONTEXT NAV — per-section sub-navigation
+	Only renders when buddynext_context_nav filter returns items.
+	════════════════════════════════════════════════════════════════════════════ */
+.bn-context-nav {
+	border-bottom: 1px solid var(--border);
+	background: var(--bg);
+}
+.bn-context-nav__inner {
+	max-width: var(--bn-container);
+	margin: 0 auto;
+	padding: 0 var(--bn-s8);
+	display: flex;
+	gap: var(--bn-s1);
+	overflow-x: auto;
+}
+.bn-context-nav__item {
+	padding: var(--bn-s2) var(--bn-s4);
+	font-size: var(--text-sm);
+	font-weight: var(--fw-medium);
+	color: var(--text-2);
+	text-decoration: none;
+	white-space: nowrap;
+	border-bottom: 2px solid transparent;
+	transition: color 0.12s, border-color 0.12s;
+}
+.bn-context-nav__item:hover { color: var(--text-1); }
+.bn-context-nav__item--active {
+	color: var(--brand);
+	border-bottom-color: var(--brand);
+}
+@media (max-width: 640px) {
+	.bn-context-nav__inner { padding: 0 var(--bn-s3); }
+	.bn-context-nav__item { padding: var(--bn-s2) var(--bn-s3); font-size: var(--text-xs); }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+	UNIVERSAL HUB SHELL + COMMUNITY SIDEBAR
+	All hub pages use .bn-hub-shell for consistent layout.
+	════════════════════════════════════════════════════════════════════════════ */
+
+/* ── Hub page outer container (Activity / Notifications / Messages) ── */
+.bn-hub-shell {
+	max-width: var(--bn-container);
+	margin: 0 auto;
+	padding: var(--bn-s6) var(--bn-s8);
+	display: grid;
+	grid-template-columns: 1fr 300px;
+	gap: var(--bn-s6);
+	align-items: start;
+}
+
+/* ── Content wrappers (1fr grid children) ── */
+/* Each plugin's content area prevents overflow in the 1fr column. */
+.bn-mvs-content,
+.bn-jt-content,
+.bn-messages-content,
+.bn-space-home,
+.bn-spaces-dir,
+.bn-hub-content,
+.bn-search-shell,
+.bn-hashtag-feed,
+.bn-notifs-shell,
+.bn-lb-shell {
+	min-width: 0;
+}
+
+/* ── Templates inside hub shell — uniform container rules ─────────────
+	Hub shell owns the layout: 1fr content + 300px sidebar.
+	Every direct child (template wrapper) must:
+	1. Fill the 1fr column fully (no internal max-width)
+	2. Have no internal padding that changes the visual alignment
+	3. Flatten any internal two-column grids (community sidebar replaces them)
+	This ensures all pages — feed, members, notifications, spaces, profile,
+	search, hashtags, leaderboard — have identical content width. */
+
+/* The ancestor here was `.bn-hub-shell`, a class renamed to `.bn-app__main` and
+	left in no template — so every rule in this block had been silently dead. The
+	visible symptom was the hashtag page: `.bn-hashtag-shell` kept its own
+	`1fr 300px` and rendered ~324px of white between the content column and the
+	real sidebar, because the rule meant to flatten it never matched.
+
+	Four of the old subjects are dead too and are not carried over:
+	`.bn-notifs-shell` (renamed `.bn-notifs-main`), `.bn-space-home`,
+	`.bn-spaces-dir`, `.bn-hub-content`, plus `.bn-lb-grid` inside the flatten
+	block. */
+
+/* Reset: strip max-width and padding from the template wrappers inside the hub
+	shell, so every hub renders at the same content width. */
+.bn-app__main > .bn-notifs-main,
+.bn-app__main > .bn-lb-shell,
+.bn-app__main > .bn-search-shell,
+.bn-app__main > .bn-hashtag-feed {
+	max-width: none;
+	padding: 0;
+}
+
+/* Flatten internal two-column grids — the hub shell's sidebar IS the right column. */
+.bn-app__main > .bn-hashtag-feed .bn-hashtag-shell {
+	grid-template-columns: 1fr;
+}
+
+/* Deliberately NOT revived: `.bn-search-layout`. Unlike the others its second
+	column is real — `.bn-search-aside` (templates/search/results.php) is the
+	filter panel — so flattening it would collapse the filters into the results
+	column. The old rule never fired, which is the only reason search looks right
+	today. `.bn-notifs-main` needs no flatten either: it is already a
+	single-column flex container (bn-notifications.css:22-26). */
+
+/* Profile uses full-width container (Facebook-style, no community sidebar).
+	Profile has its own contextual widgets — community sidebar is redundant. */
+.bn-profile-container {
+	max-width: var(--bn-container);
+	margin: 0 auto;
+	padding: var(--bn-s6) var(--bn-s8);
+}
+@media (max-width: 640px) {
+	.bn-profile-container { padding: 0 var(--bn-s3) var(--bn-s8); }
+}
+
+/* Space-home keeps internal two-column layout inside hub shell. */
+.bn-hub-shell > .bn-space-home .bn-sh-layout {
+	max-width: none;
+}
+
+/* ── Jetonomy inside BuddyNext ────────────────────────────────────────── */
+/* No hub-shell grid — Jetonomy keeps its own .jt-two-col layout + sidebar.
+	BuddyNext only injects the nav bar above. Add top spacing so content
+	doesn't sit flush against the nav. */
+.bn-jt-content {
+	padding-top: var(--bn-s6, 24px);
+}
+/* Constrain Jetonomy + WPMediaVerse containers to match BuddyNext width. */
+.bn-jt-content .jt-container,
+.bn-jt-content .jt-community-nav-inner {
+	max-width: var(--bn-container);
+}
+
+/* ── WPMediaVerse inside BN shell ────────────────────────────────────── */
+/* MVS pages use BuddyNext community container width. */
+.bn-mvs-content .mvs-explore-page,
+.bn-mvs-content .mvs-single-media,
+.bn-mvs-content .mvs-single-album,
+.bn-mvs-content .mvs-single-collection,
+.bn-mvs-content .mvs-profile-edit {
+	max-width: none;
+	margin: 0;
+	padding: 0;
+}
+
+/* ── Community sidebar (right 300px column) ── */
+.bn-hub-sidebar {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s5);
+}
+
+.bn-sidebar-card {
+	background: var(--surface);
+	border: 1px solid var(--bn-line-faint);
+	border-radius: var(--bn-r-lg);
+	overflow: hidden;
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+	transition: box-shadow 0.2s ease;
+}
+.bn-sidebar-card:hover {
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.bn-sidebar-card__header {
+	padding: var(--bn-s3) var(--bn-s4);
+	border-bottom: 1px solid var(--bn-line-faint);
+	font-size: var(--text-xs);
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: var(--ls-wider);
+	color: var(--text-3);
+}
+
+.bn-sidebar-card__body {
+	padding: var(--bn-s3) var(--bn-s4);
+}
+
+/* ── Canonical member row (parts/sidebar-member-row.php) ─────────────────
+	ONE shared row for every people-listing sidebar widget (People to Follow,
+	People to discover, Online now). Global (bn-base.css) so it renders the
+	same on every surface — the old per-widget classes carried the good look
+	only on one surface each. Avatar + name/@handle column that CLIPS, and a
+	compact, non-shrinking trailing action so a long name never overlaps or
+	pushes out the Follow button. */
+.bn-member-row-list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+.bn-member-row {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	padding: var(--bn-s2) 0;
+	border-bottom: 1px solid var(--bn-line-faint);
+}
+.bn-member-row:last-child { border-bottom: none; }
+.bn-member-row__link {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	flex: 1 1 auto;
+	min-width: 0;
+	text-decoration: none;
+	color: inherit;
+}
+.bn-member-row__text {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+}
+.bn-member-row__name {
+	font-size: var(--text-sm);
+	font-weight: var(--fw-medium, 500);
+	color: var(--text-1);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.bn-member-row__link:hover .bn-member-row__name { color: var(--brand); }
+.bn-member-row__meta {
+	font-family: var(--bn-font-mono, ui-monospace, monospace);
+	font-size: var(--text-xs);
+	color: var(--text-3);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+/* Compact, fixed action so the name column keeps the width. follow-button.php
+   wraps its .bn-btn in .bn-follow-btn-wrap, so pin both. */
+.bn-member-row > .bn-follow-btn-wrap,
+.bn-member-row > .bn-btn { flex: 0 0 auto; }
+.bn-member-row .bn-btn {
+	--bn-btn-py: 4px;
+	--bn-btn-px: var(--bn-s3);
+	font-size: var(--text-xs);
+}
+
+/* ── Reusable sidebar row base ──────────────────────────────────────────
+	Apply .bn-sbar-row to any list item inside bn-sidebar-card__body.
+	Each widget adds its own flex layout on top of this base. */
+.bn-sbar-row {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	padding: var(--bn-s2) 0;
+	border-bottom: 1px solid var(--bn-line-faint);
+}
+.bn-sbar-row:last-child { border-bottom: none; }
+/* Name/meta column takes the free space and CLIPS, so a long name ellipsizes
+   instead of shoving the action button off the row (or overlapping it). */
+.bn-sbar-row__info {
+	flex: 1 1 auto;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+}
+.bn-sbar-row__name {
+	display: block;
+	font-size: var(--text-sm);
+	font-weight: 600;
+	color: var(--text-1);
+	text-decoration: none;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.bn-sbar-row__name:hover { color: var(--brand); }
+/* The action (Follow button — partials/follow-button.php, a .bn-btn) must never
+   shrink or grow; it sits compact at the row end after the name column. */
+.bn-sbar-row > .bn-btn,
+.bn-sbar-row__action { flex: 0 0 auto; }
+.bn-sbar-row > .bn-btn {
+	--bn-btn-py: 4px;
+	--bn-btn-px: var(--bn-s3);
+	font-size: var(--text-xs);
+}
+.bn-sbar-row__meta {
+	display: block;
+	font-size: var(--text-xs);
+	color: var(--text-3);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.bn-sbar-row__avatar {
+	width: 36px;
+	height: 36px;
+	border-radius: var(--bn-r-full);
+	overflow: hidden;
+	flex-shrink: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: var(--text-xs);
+	font-weight: 700;
+	color: var(--text-on-brand);
+	text-decoration: none;
+}
+.bn-sbar-row__avatar img { width: 100%; height: 100%; object-fit: cover; }
+.bn-sbar-row__icon {
+	width: 32px;
+	height: 32px;
+	border-radius: var(--bn-r-md);
+	background: var(--brand-light);
+	color: var(--brand);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: var(--text-xs);
+	font-weight: 700;
+	flex-shrink: 0;
+	overflow: hidden;
+}
+.bn-sbar-row__icon img { width: 100%; height: 100%; object-fit: cover; }
+.bn-sbar-row__action {
+	flex-shrink: 0;
+	padding: 3px 11px;
+	border-radius: var(--bn-r-full);
+	border: 1.5px solid var(--brand);
+	color: var(--brand);
+	font-size: var(--text-xs);
+	font-weight: 600;
+	cursor: pointer;
+	background: var(--bg);
+	white-space: nowrap;
+	font-family: var(--font-body);
+	transition: background 0.14s, color 0.14s;
+}
+.bn-sbar-row__action:hover { background: var(--brand); color: var(--text-on-brand); }
+
+/* See-all link. Scoped under the card + explicit accent so a host theme's own
+   anchor colour (BuddyX renders bare links crimson) can't win the cascade and
+   turn this brand-blue link red. */
+.bn-sidebar-card .bn-sidebar-see-all,
+.bn-sidebar-see-all {
+	display: block;
+	margin-top: var(--bn-s3);
+	font-size: var(--text-sm);
+	font-weight: 600;
+	color: var(--bn-accent);
+	text-decoration: none;
+}
+.bn-sidebar-card .bn-sidebar-see-all:hover,
+.bn-sidebar-see-all:hover {
+	color: var(--bn-accent);
+	text-decoration: underline;
+}
+
+/* Dark mode — canonical trio ([data-bn-theme], [data-theme], [data-bx-mode]). */
+[data-bn-theme="dark"] .bn-sidebar-card,
+[data-theme="dark"] .bn-sidebar-card,
+[data-bx-mode="dark"] .bn-sidebar-card {
+	background: var(--surface);
+	border-color: var(--border);
+}
+[data-bn-theme="dark"] .bn-sbar-row__action,
+[data-theme="dark"] .bn-sbar-row__action,
+[data-bx-mode="dark"] .bn-sbar-row__action {
+	background: transparent;
+}
+[data-bn-theme="dark"] .bn-sbar-row__icon,
+[data-theme="dark"] .bn-sbar-row__icon,
+[data-bx-mode="dark"] .bn-sbar-row__icon {
+	background: var(--brand-light);
+}
+
+/* ── Personalized sidebar widgets (greeting · events · roles · stats) ─────
+	Cross-surface: greeting + events render in the feed sidebar, this-week-
+	stats in the notifications sidebar, by-role in the member-directory
+	sidebar. Each part renders its own internal markup inside the shared
+	.bn-card / .bn-sidebar-card chrome (which supplies the box + padding);
+	only the inner elements need styling. Lives in bn-base.css (loaded on
+	every BN surface) rather than a per-surface sheet so all four are styled
+	wherever they appear. Mirrors docs/v2 Plans/v2/home-feed.html. */
+
+/* Greeting + activity streak (Pattern D-1) */
+.bn-greeting-streak__heading {
+	margin: 0;
+	font-family: var(--bn-font-display);
+	font-size: var(--bn-text-sm);
+	font-weight: 600;
+	line-height: 1.3;
+	color: var(--bn-ink);
+}
+.bn-greeting-streak__body {
+	margin: var(--bn-s2) 0 0;
+	font-size: var(--bn-text-sm);
+	line-height: 1.5;
+	color: var(--bn-ink-2);
+}
+.bn-greeting-streak__body strong {
+	font-weight: 600;
+	color: var(--bn-ink);
+}
+.bn-greeting-streak__strip {
+	display: flex;
+	gap: 6px;
+	margin: var(--bn-s3) 0 0;
+	padding: 0;
+	list-style: none;
+}
+.bn-greeting-streak__cell {
+	flex: 1;
+	aspect-ratio: 1;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: var(--bn-r-sm);
+	background: var(--bn-sunken);
+	font-size: 10px;
+	font-weight: 600;
+	color: var(--bn-ink-3);
+}
+.bn-greeting-streak__cell.is-active {
+	background: var(--bn-accent);
+	color: var(--bn-accent-fg);
+}
+.bn-greeting-streak__cell.is-today {
+	box-shadow: 0 0 0 2px var(--bn-canvas), 0 0 0 4px var(--bn-accent);
+}
+
+/* Upcoming events / "This week" (Pattern D-2) */
+.bn-upcoming-events__head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--bn-s2);
+	margin-bottom: var(--bn-s3);
+}
+.bn-upcoming-events__title {
+	margin: 0;
+	font-family: var(--bn-font-display);
+	font-size: var(--bn-text-sm);
+	font-weight: 600;
+	color: var(--bn-ink);
+}
+.bn-upcoming-events__cta {
+	font-size: var(--bn-text-xs);
+	font-weight: 500;
+	color: var(--bn-accent);
+	text-decoration: none;
+}
+.bn-upcoming-events__cta:hover { text-decoration: underline; }
+.bn-upcoming-events__empty {
+	margin: 0;
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink-3);
+}
+.bn-upcoming-events__list {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+.bn-upcoming-events__item {
+	display: flex;
+	gap: var(--bn-s3);
+	padding: var(--bn-s2) 0;
+	border-bottom: 1px solid var(--bn-line-faint);
+}
+.bn-upcoming-events__item:last-child { border-bottom: none; }
+.bn-upcoming-events__pill {
+	flex-shrink: 0;
+	width: 40px;
+	text-align: center;
+}
+.bn-upcoming-events__pill-month {
+	display: block;
+	font-size: 10px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: var(--bn-events, var(--bn-accent));
+}
+.bn-upcoming-events__pill-day {
+	display: block;
+	font-family: var(--bn-font-display);
+	font-size: var(--bn-text-lg);
+	font-weight: 600;
+	line-height: 1.1;
+	color: var(--bn-ink);
+}
+.bn-upcoming-events__body {
+	flex: 1;
+	min-width: 0;
+}
+.bn-upcoming-events__name {
+	display: block;
+	font-size: var(--bn-text-sm);
+	font-weight: 600;
+	line-height: 1.3;
+	color: var(--bn-ink);
+	text-decoration: none;
+}
+.bn-upcoming-events__name:hover { color: var(--bn-accent); }
+.bn-upcoming-events__meta {
+	display: block;
+	margin-top: 2px;
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+}
+
+/* By-role member summary (Pattern D-4) */
+.bn-by-role__title {
+	margin: 0 0 var(--bn-s3);
+	font-family: var(--bn-font-display);
+	font-size: var(--bn-text-sm);
+	font-weight: 600;
+	color: var(--bn-ink);
+}
+.bn-by-role__list {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+.bn-by-role__row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--bn-s2);
+}
+.bn-by-role__row + .bn-by-role__row {
+	border-top: 1px solid var(--bn-line-faint);
+}
+/* Linked rows: the <a> is the full-width flex child carrying the padding. */
+.bn-by-role__link {
+	flex: 1;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--bn-s2);
+	padding: var(--bn-s2) 0;
+	text-decoration: none;
+}
+/* Unlinked rows: the <li> itself carries the padding (label + count are its
+	direct flex children). */
+.bn-by-role__row:not(:has(.bn-by-role__link)) {
+	padding: var(--bn-s2) 0;
+}
+.bn-by-role__label {
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink-2);
+}
+.bn-by-role__link:hover .bn-by-role__label { color: var(--bn-accent); }
+.bn-by-role__count {
+	font-size: var(--bn-text-sm);
+	font-weight: 600;
+	color: var(--bn-ink);
+	font-variant-numeric: tabular-nums;
+}
+
+/* This-week engagement stats (Pattern D-6) */
+.bn-this-week-stats__title {
+	margin: 0 0 var(--bn-s3);
+	font-family: var(--bn-font-display);
+	font-size: var(--bn-text-sm);
+	font-weight: 600;
+	color: var(--bn-ink);
+}
+.bn-this-week-stats__grid {
+	display: grid;
+	grid-template-columns: repeat(2, 1fr);
+	gap: var(--bn-s2);
+}
+.bn-this-week-stats__grid .bn-stat {
+	min-width: 0;
+	padding: var(--bn-s3);
+	gap: 2px;
+}
+.bn-this-week-stats__grid .bn-stat__value {
+	font-size: var(--bn-text-lg);
+}
+
+/* Mobile — hub shell collapses, sidebar hidden */
+@media ( max-width: 640px ) {
+	.bn-hub-shell {
+		grid-template-columns: 1fr;
+		padding: 0 var(--bn-s3) var(--bn-s8);
+		gap: var(--bn-s4);
+	}
+	.bn-hub-sidebar { display: none; }
+}
+
+/* ==========================================================================
+	Shared Animation System
+	──────────────────────────────────────────────────────────────────────────
+	BuddyNext-level keyframes used uniformly across BuddyNext, Jetonomy, and
+	WPMediaVerse.  All three plugins share the same motion language:
+	- bn-slide-up    : list/card entrance (stagger via animation-delay)
+	- bn-fade-in     : generic fade + subtle translate
+	- bn-fade-title  : heading entrance (scale + fade)
+	- bn-bounce-in   : attention elements (badges, CTAs)
+	- bn-pulse       : loading/skeleton placeholders
+	- bn-count-pop   : stat number pop-in
+	Easing: cubic-bezier(0.22, 1, 0.36, 1) — smooth deceleration.
+	========================================================================== */
+
+@keyframes bn-slide-up {
+	from { opacity: 0; transform: translateY(12px); }
+	to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes bn-fade-in {
+	from { opacity: 0; transform: translateY(8px); }
+	to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes bn-fade-title {
+	from { opacity: 0; transform: translateY(-6px) scale(0.98); }
+	to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes bn-bounce-in {
+	0%   { opacity: 0; transform: scale(0.85); }
+	60%  { opacity: 1; transform: scale(1.04); }
+	100% { transform: scale(1); }
+}
+
+@keyframes bn-pulse {
+	0%, 100% { opacity: 1; }
+	50%      { opacity: 0.5; }
+}
+
+@keyframes bn-count-pop {
+	0%   { opacity: 0; transform: scale(0.5); }
+	70%  { transform: scale(1.1); }
+	100% { opacity: 1; transform: scale(1); }
+}
+
+/* ── Utility classes ───────────────────────────────────────────────────── */
+
+.bn-anim-slide-up  { animation: bn-slide-up 0.35s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.bn-anim-fade-in   { animation: bn-fade-in 0.3s ease both; }
+.bn-anim-fade-title { animation: bn-fade-title 0.5s ease both; }
+.bn-anim-bounce-in { animation: bn-bounce-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.bn-anim-pulse     { animation: bn-pulse 2s ease infinite; }
+.bn-anim-count-pop { animation: bn-count-pop 0.5s ease both; animation-delay: 0.3s; }
+
+/* ── Stagger delays for child items ────────────────────────────────────── */
+
+.bn-stagger > :nth-child(1) { animation-delay: 0s; }
+.bn-stagger > :nth-child(2) { animation-delay: 0.03s; }
+.bn-stagger > :nth-child(3) { animation-delay: 0.05s; }
+.bn-stagger > :nth-child(4) { animation-delay: 0.07s; }
+.bn-stagger > :nth-child(5) { animation-delay: 0.09s; }
+.bn-stagger > :nth-child(n+6) { animation-delay: 0.1s; }
+
+/* ── Respect user preference ───────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+	.bn-anim-slide-up,
+	.bn-anim-fade-in,
+	.bn-anim-fade-title,
+	.bn-anim-bounce-in,
+	.bn-anim-count-pop {
+		animation: none;
+	}
+	.bn-anim-pulse { animation-duration: 10s; }
+}
+
+/* ==========================================================================
+	Font Size Scaling — A / A+ / A++ Accessibility Control
+	──────────────────────────────────────────────────────────────────────────
+	The data-bn-font-scale attribute on <html> scales ALL BuddyNext content
+	uniformly. Because all --text-* tokens use rem, adjusting font-size on
+	the hub shell containers makes everything scale proportionally — text,
+	spacing, icons.
+
+	This applies to BuddyNext pages, Jetonomy pages (inside .bn-jt-content),
+	and WPMediaVerse pages (inside .bn-mvs-content).
+	========================================================================== */
+
+/* Works like browser zoom — sets the root font-size so every rem value
+	in BuddyNext, Jetonomy, and WPMediaVerse scales uniformly. Affects
+	text, spacing, padding, icons — everything measured in rem. */
+
+/* A+ (110%) */
+html[data-bn-font-scale="110"] { font-size: 110%; }
+
+/* A++ (120%) */
+html[data-bn-font-scale="120"] { font-size: 120%; }
+
+/* ════════════════════════════════════════════════════════════════════════
+ * v2 COMPONENT PRIMITIVES
+ *
+ * Attribute-driven API mirrored from docs/v2 Plans/tokens.css. Existing
+ * class-based variants (.bn-btn-primary, .bn-btn-ghost, .bn-btn-danger,
+ * .bn-avatar-sm/md/lg/xl, .bn-card, .bn-pill) keep working unchanged so
+ * any template already using them renders the same. New templates and
+ * sweeps use the attribute form below:
+ *
+ *   <button class="bn-btn" data-variant="primary" data-size="md">…
+ *   <span class="bn-badge" data-tone="success">…
+ *   <span class="bn-avatar" data-size="lg" data-presence="online">…
+ *
+ * The attribute selectors are layered over the legacy rules; when a
+ * data-variant or data-tone or data-size attribute is set, the v2
+ * styling wins on declaration order. The two systems share tokens, so
+ * the only visible drift is the v2 fixed-height button (36px) vs the
+ * legacy padding-based button — opt-in per surface.
+ * ════════════════════════════════════════════════════════════════════════ */
+
+/* ── Focus ring — ONE forced, shape-aware box ring for the whole UI ──────
+ * Every focusable element gets the same soft accent halo (--bn-ring), only
+ * on keyboard/programmatic focus (:focus-visible), never on mouse click.
+ * The transparent outline is the Windows High-Contrast / forced-colors
+ * fallback (where box-shadow is dropped) so focus is never invisible.
+ * Components must NOT roll their own outline — they inherit this. The only
+ * intentional exceptions are surfaces inside an overflow-scroll container
+ * that would clip an outset ring (e.g. .bn-tab), which use an inset ring,
+ * and dark media surfaces that need a high-contrast white ring.
+ *
+ * SCOPE — every BuddyNext root, not just the app shell.
+ * .bn-app covers the routed hub surfaces, but four BuddyNext surfaces render
+ * OUTSIDE it and were therefore inheriting no ring at all:
+ *   .bn-lightbox        — printed in wp_footer, a direct child of <body>
+ *   .bn-search-overlay  — built by shell/extras.js and appended to <body>
+ *   .bn-ob-wrap         — the onboarding wizard, its own full-page root
+ *   wp-block-buddynext-* — the 17 Gutenberg blocks, rendered in theme content
+ * bn-base.css is enqueued globally on the front end (AssetService::
+ * enqueue_global_tokens), so listing them here is enough — no per-file rules. */
+.bn-app :focus-visible,
+.bn-lightbox :focus-visible,
+.bn-search-overlay :focus-visible,
+.bn-ob-wrap :focus-visible,
+[class*="wp-block-buddynext-"] :focus-visible {
+	outline: 2px solid transparent;
+	outline-offset: 2px;
+	box-shadow: var(--bn-ring);
+}
+.bn-btn:focus-visible,
+.bn-input:focus-visible,
+.bn-textarea:focus-visible,
+.bn-select:focus-visible {
+	outline: 2px solid transparent;
+	outline-offset: 2px;
+	box-shadow: var(--bn-ring);
+	border-color: var(--bn-accent);
+}
+
+/* ── Button — v2 attribute API ───────────────────────────────────────── */
+.bn-btn[data-variant] {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: var(--bn-s2);
+	/* min-height, not height, and the label may wrap.
+	 *
+	 * A fixed height plus white-space: nowrap means a label longer than its
+	 * container has nowhere to go: it overflows, and an ancestor with
+	 * overflow:hidden clips it. English hides this — "Log in to join" is 15
+	 * characters — but German renders the same button as "Melde dich an, um
+	 * beizutreten" at ~201px, which overflowed the space-directory card and cut
+	 * the first letter off past its start edge.
+	 *
+	 * Wrapping alone would NOT have fixed it: the label would then overflow the
+	 * fixed 36px/28px box vertically instead. Both parts are required.
+	 *
+	 * Single-line buttons are unaffected — min-height resolves to the same floor,
+	 * so English layouts render at exactly that height. */
+	--bn-btn-py: var(--bn-s2);
+	--bn-btn-px: var(--bn-s4);
+	padding: var(--bn-btn-py) var(--bn-btn-px);
+	/* 40px, the design system's `md` rung and its stated tap-target floor. This
+	   was 36px, and because [data-variant] outranks the plain .bn-btn rule it
+	   was the REAL default height for every button in the plugin — the base
+	   ladder never got a say. Touch raises it again to 44px at the bottom of
+	   this file. */
+	min-height: 40px;
+	border-radius: var(--bn-r-md);
+	font-family: var(--bn-font-ui);
+	font-size: var(--bn-text-sm);
+	font-weight: var(--bn-fw-medium-semibold);
+	letter-spacing: -0.005em;
+	border: 1px solid transparent;
+	transition: background var(--bn-dur) var(--bn-ease),
+				border-color var(--bn-dur) var(--bn-ease),
+				color var(--bn-dur) var(--bn-ease),
+				transform var(--bn-dur-fast) var(--bn-ease);
+	/* Was nowrap. A translated label must be able to wrap rather than escape its
+		card; `balance` keeps two-line labels from breaking after one word. */
+	white-space: normal;
+	text-wrap: balance;
+	cursor: pointer;
+}
+.bn-btn[data-variant]:active { transform: scale(0.98); }
+
+/* `sm` is a DENSITY step, not a smaller hit area: tighter padding, smaller type,
+   tighter radius — and the same 40px floor inherited from .bn-btn above. It used
+   to set min-height 28px, which is where the 32px and 36px controls all over the
+   frontend came from, and `sm` is exactly what card action clusters use (Follow,
+   Connect, Join). The standard allows a 34px floor only for compact ADMIN list
+   rows; none of these are that. */
+.bn-btn[data-size="sm"] {
+	--bn-btn-py: var(--bn-s1);
+	--bn-btn-px: var(--bn-s3);
+	font-size: var(--bn-text-xs);
+	border-radius: var(--bn-r-sm);
+}
+.bn-btn[data-size="lg"] {
+	height: 44px;
+	--bn-btn-py: 0;
+	--bn-btn-px: var(--bn-s5);
+	font-size: var(--bn-text-base);
+}
+
+.bn-btn[data-variant="primary"] {
+	background: var(--bn-accent);
+	color: var(--bn-accent-fg);
+}
+.bn-btn[data-variant="primary"]:hover { background: var(--bn-accent-700); }
+
+.bn-btn[data-variant="secondary"] {
+	background: var(--bn-surface);
+	color: var(--bn-ink);
+	border-color: var(--bn-line-strong);
+}
+.bn-btn[data-variant="secondary"]:hover { background: var(--bn-sunken); }
+
+.bn-btn[data-variant="ghost"] {
+	background: transparent;
+	color: var(--bn-ink-2);
+}
+.bn-btn[data-variant="ghost"]:hover { background: var(--bn-sunken); color: var(--bn-ink); }
+
+.bn-btn[data-variant="danger"] {
+	background: var(--bn-danger);
+	color: oklch(99% 0 0);
+}
+.bn-btn[data-variant="danger"]:hover { filter: brightness(1.05); }
+
+.bn-btn[data-variant="ai"] {
+	background: linear-gradient(135deg, var(--bn-accent), var(--bn-jetonomy));
+	color: var(--bn-accent-fg);
+}
+
+.bn-btn[data-variant][disabled],
+.bn-btn[data-variant][aria-disabled="true"] {
+	opacity: 0.55;
+	cursor: not-allowed;
+	transform: none;
+}
+
+/* ── Input / Textarea / Select — v2 ─────────────────────────────────── */
+/* 40px is the design system's stated default input height ("every input = same
+   40px default"), and it is also the tap-target floor. This shipped at 36px. */
+.bn-input,
+.bn-textarea,
+.bn-select {
+	width: 100%;
+	padding: 0 var(--bn-s3);
+	height: 40px;
+	background: var(--bn-surface);
+	border: 1px solid var(--bn-line-strong);
+	border-radius: var(--bn-r-md);
+	color: var(--bn-ink);
+	font-family: var(--bn-font-ui);
+	font-size: var(--bn-text-sm);
+	transition: border-color var(--bn-dur) var(--bn-ease),
+				box-shadow var(--bn-dur) var(--bn-ease);
+}
+.bn-textarea {
+	padding: var(--bn-s3);
+	height: auto;
+	min-height: 80px;
+	line-height: 1.5;
+	resize: vertical;
+}
+.bn-input::placeholder,
+.bn-textarea::placeholder { color: var(--bn-ink-4); }
+.bn-input:disabled,
+.bn-textarea:disabled,
+.bn-select:disabled {
+	background: var(--bn-sunken);
+	color: var(--bn-ink-3);
+	cursor: not-allowed;
+}
+
+/* iOS Safari auto-zooms the viewport when a focused input/textarea/select has a
+   computed font-size below 16px, and never zooms back out — the member has to
+   pinch out after tapping any field. Raise text controls to a 16px floor on
+   touch / small screens. This is the platform-correct fix; capping
+   maximum-scale in the viewport tag would silence it by disabling zoom, which
+   is an accessibility regression. max() preserves an upscaled text preference.
+   16px is a literal because it is Apple's threshold, not a design token.
+
+   THIS RULE USES !important DELIBERATELY, AND MUST KEEP IT.
+
+   Two earlier attempts lost the cascade, each to a different opponent, and the
+   pattern is the lesson:
+
+     1. `.bn-input` (0,1,0) lost to Reign's `input[type="text"]` (0,1,1).
+     2. `body.bn-page select` (0,1,2) lost to our OWN
+        `.bn-ep-field-vis__select.bn-input` (0,2,0) in bn-profile.css — 15
+        privacy dropdowns on the edit-profile screen still computed 12px, and
+        iOS zooms on a select exactly as it does on an input.
+
+   Raising specificity again would just pick the next fight. Any component in
+   any of a dozen stylesheets may set a font-size on a field, each is free to
+   use two classes, and every new one silently reopens this bug on a surface
+   nobody re-tests. The floor is not a style opinion competing with those rules
+   — it is a platform constraint that must outrank all of them, which is exactly
+   what !important is for.
+
+   Selected by TYPE rather than by our own classes, because most fields never
+   take .bn-input: the composer, the DM bar, the comment box, the auth fields.
+   Scoped to body.bn-page so it stops at our own surfaces and never restyles the
+   host theme's pages. */
+@media (pointer: coarse), (max-width: 768px) {
+	body.bn-page input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]):not([type="range"]):not([type="color"]),
+	body.bn-page textarea,
+	body.bn-page select {
+		font-size: max(16px, var(--bn-text-md)) !important;
+	}
+}
+
+/* Native date/time picker icon: do NOT invert it in dark mode. The dark
+   triggers above set `color-scheme: dark`, which already makes the UA render
+   the calendar glyph light; an invert(1) on top flips it back to dark and the
+   icon disappears into the input background (the Work Experience date fields
+   bug). If the glyph ever reads wrong again, fix the color-scheme declaration,
+   not this pseudo-element. */
+
+/* ── Badge / Chip — v2 attribute tone API ───────────────────────────── */
+.bn-badge {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-s1);
+	/* Fixed height + align-items:center handle vertical centring, so the old
+		off-grid 2px vertical padding was inert — drop it and keep the 8px sides. */
+	padding: 0 var(--bn-s2);
+	height: var(--bn-s5);
+	font-size: var(--bn-text-2xs);
+	font-weight: var(--bn-fw-medium-semibold);
+	border-radius: var(--bn-r-full);
+	background: var(--bn-sunken);
+	color: var(--bn-ink-2);
+	border: 1px solid var(--bn-line);
+}
+.bn-badge[data-tone="neutral"]  { background: var(--bn-sunken); color: var(--bn-ink-2); border-color: var(--bn-line); }
+.bn-badge[data-tone="accent"]   { background: var(--bn-accent-100); color: var(--bn-accent-700); border-color: transparent; }
+.bn-badge[data-tone="success"]  { background: var(--bn-success-bg); color: var(--bn-success); border-color: transparent; }
+.bn-badge[data-tone="warn"]     { background: var(--bn-warn-bg); color: var(--bn-warn); border-color: transparent; }
+.bn-badge[data-tone="danger"]   { background: var(--bn-danger-bg); color: var(--bn-danger); border-color: transparent; }
+.bn-badge[data-tone="info"]     { background: var(--bn-info-bg); color: var(--bn-info); border-color: transparent; }
+.bn-badge[data-tone="jetonomy"] { background: var(--bn-jetonomy-bg); color: var(--bn-jetonomy); border-color: transparent; }
+.bn-badge[data-tone="media"]    { background: var(--bn-media-bg); color: var(--bn-media); border-color: transparent; }
+.bn-badge[data-tone="events"]   { background: var(--bn-events-bg); color: var(--bn-events); border-color: transparent; }
+
+/* Field-value chips — FieldType::render_chips() (multiselect and other
+   set-valued profile fields). The markup shipped with no CSS at all, so
+   selected values ran together as one unstyled string (Value1Value2Value3). */
+.bn-field-chips {
+	display: inline-flex;
+	flex-wrap: wrap;
+	gap: var(--bn-s1);
+}
+.bn-field-chip {
+	display: inline-flex;
+	align-items: center;
+	padding: 0 var(--bn-s2);
+	height: var(--bn-s5);
+	font-size: var(--bn-text-2xs);
+	font-weight: var(--bn-fw-medium-semibold);
+	border-radius: var(--bn-r-full);
+	background: var(--bn-sunken);
+	color: var(--bn-ink-2);
+	border: 1px solid var(--bn-line);
+}
+
+/* Choice-field groups (radio / checkbox / member-type single-select) — a shared
+   primitive, so it lives in bn-base.css (loaded on EVERY frontend page via
+   enqueue_global_tokens) rather than being copied into each feature sheet. This is
+   why a choice field styles identically on the profile-edit form (bn-profile.css)
+   and the registration form (bn-auth.css only) without either sheet re-declaring it. */
+.bn-field-checkbox-group,
+.bn-field-radio-group {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--bn-s2);
+	border: 0;
+	padding: 0;
+	margin: 0;
+	min-width: 0;
+}
+.bn-field-checkbox-group .bn-field-checkbox,
+.bn-field-radio-group .bn-field-radio {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	min-height: var(--bn-s10);
+	padding: var(--bn-s2) var(--bn-s4);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-full);
+	background: var(--bn-surface);
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink-2);
+	cursor: pointer;
+	transition: border-color 0.14s ease, background 0.14s ease;
+}
+.bn-field-checkbox-group .bn-field-checkbox:hover,
+.bn-field-radio-group .bn-field-radio:hover {
+	border-color: var(--bn-line-strong);
+}
+.bn-field-checkbox-group .bn-field-checkbox:has(input:checked),
+.bn-field-radio-group .bn-field-radio:has(input:checked) {
+	border-color: var(--bn-accent);
+	background: var(--bn-accent-50);
+	color: var(--bn-ink);
+}
+.bn-field-checkbox-group .bn-field-checkbox:has(input:focus-visible),
+.bn-field-radio-group .bn-field-radio:has(input:focus-visible) {
+	outline: 2px solid var(--bn-ring);
+	outline-offset: 2px;
+}
+.bn-badge[data-tone="paid"]     { background: var(--bn-paid-bg); color: var(--bn-paid); border-color: transparent; }
+
+/* Member-type badge icon (admin-supplied SVG) — inherits the badge's currentColor
+	and sits inline before the label via the badge's own flex gap. */
+.bn-type-badge__icon { display: inline-flex; align-items: center; }
+.bn-type-badge__icon svg { width: 12px; height: 12px; display: block; }
+
+/* ── Avatar — v2 size + presence attribute API ──────────────────────── */
+.bn-avatar[data-size] {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: var(--bn-r-full);
+	background: var(--bn-accent-200);
+	color: var(--bn-accent-700);
+	font-weight: 600;
+	font-family: var(--bn-font-display);
+	flex-shrink: 0;
+	user-select: none;
+	overflow: hidden;
+}
+.bn-avatar[data-size="xs"]  { width: 20px; height: 20px; font-size: 10px; }
+.bn-avatar[data-size="sm"]  { width: 28px; height: 28px; font-size: 11px; }
+.bn-avatar[data-size="md"]  { width: 36px; height: 36px; font-size: 13px; }
+.bn-avatar[data-size="lg"]  { width: 48px; height: 48px; font-size: 16px; }
+.bn-avatar[data-size="xl"]  { width: 72px; height: 72px; font-size: 22px; }
+.bn-avatar[data-size="2xl"] { width: 96px; height: 96px; font-size: 30px; }
+
+.bn-avatar[data-presence]::after {
+	content: '';
+	position: absolute;
+	bottom: 0;
+	inset-inline-end: 0;
+	width: 28%;
+	height: 28%;
+	min-width: 8px;
+	min-height: 8px;
+	border-radius: 50%;
+	border: 2px solid var(--bn-avatar-presence-border);
+}
+.bn-avatar[data-presence="online"]::after  { background: var(--bn-success); }
+.bn-avatar[data-presence="away"]::after    { background: var(--bn-warn); }
+.bn-avatar[data-presence="dnd"]::after     { background: var(--bn-danger); }
+.bn-avatar[data-presence="offline"]::after { background: var(--bn-ink-4); }
+
+/* The presence dot sits on the avatar's bottom-right edge, so the avatar's
+	circular overflow clip (base .bn-avatar, [data-size], and .bn-md-card__avatar
+	all set overflow:hidden) cut off the dot's inner half. Opt presence avatars
+	out of the clip and round the image itself so it stays circular. This
+	[data-presence] rule outranks .bn-md-card__avatar and, by source order,
+	.bn-avatar[data-size]. */
+.bn-avatar[data-presence] { overflow: visible; }
+.bn-avatar[data-presence] img { border-radius: var(--bn-r-full); }
+
+/* ── Avatar — deterministic monogram tones ──────────────────────────────
+	Initials-only avatars (no image) get a stable colour keyed off the
+	member id so a roster reads as distinct people, not a wall of one hue.
+	Shares the canonical cover-tone palette + hues used by
+	.bn-md-card__cover / .bn-sd-card__cover (sky 240, cyan 200, emerald 160,
+	lime 130, amber 70, coral 35) so the platform speaks one colour language.
+	Solid mid-tone fill + near-white monogram in light; receded (lower L,
+	lower chroma) in dark so the avatar reads as a quiet tinted disc, not a
+	glowing block. Only applies when an actual image is not present. */
+.bn-avatar[data-tone] {
+	--bn-avatar-tone-l: 58%;
+	--bn-avatar-tone-c: 0.14;
+	background: oklch(var(--bn-avatar-tone-l) var(--bn-avatar-tone-c) var(--bn-avatar-tone-h, 240));
+	color: oklch(99% 0 0);
+}
+.bn-avatar[data-tone] img { /* a real photo always wins over the tone fill */
+	background: var(--bn-surface);
+}
+.bn-avatar[data-tone="sky"]     { --bn-avatar-tone-h: 240; }
+.bn-avatar[data-tone="cyan"]    { --bn-avatar-tone-h: 200; --bn-avatar-tone-c: 0.12; }
+.bn-avatar[data-tone="emerald"] { --bn-avatar-tone-h: 160; }
+.bn-avatar[data-tone="lime"]    { --bn-avatar-tone-h: 130; --bn-avatar-tone-c: 0.13; }
+.bn-avatar[data-tone="amber"]   { --bn-avatar-tone-h: 70;  }
+.bn-avatar[data-tone="coral"]   { --bn-avatar-tone-h: 35;  }
+[data-theme="dark"] .bn-avatar[data-tone],
+[data-bn-theme="dark"] .bn-avatar[data-tone],
+[data-bx-mode="dark"] .bn-avatar[data-tone] {
+	--bn-avatar-tone-l: 42%;
+	--bn-avatar-tone-c: 0.08;
+	color: oklch(96% 0.01 var(--bn-avatar-tone-h, 240));
+}
+
+/* ── Card — v2 attribute API ────────────────────────────────────────── */
+.bn-card[data-v2],
+.bn-card[data-interactive] {
+	background: var(--bn-surface);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-lg);
+	transition: border-color var(--bn-dur) var(--bn-ease);
+}
+.bn-card[data-interactive]:hover { border-color: var(--bn-line-strong); }
+
+/* ── Kbd — v2 ────────────────────────────────────────────────────────── */
+.bn-kbd {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 18px;
+	height: 18px;
+	padding: 0 5px;
+	font-family: var(--bn-font-mono);
+	font-size: 11px;
+	background: var(--bn-sunken);
+	color: var(--bn-ink-2);
+	border: 1px solid var(--bn-line);
+	border-bottom-width: 2px;
+	border-radius: 4px;
+}
+
+/* ── Hairline divider — v2 ──────────────────────────────────────────── */
+.bn-hr {
+	height: 1px;
+	background: var(--bn-line);
+	border: none;
+	margin: 0;
+}
+
+/* ── Focus ring helper ──────────────────────────────────────────────── */
+.bn-ring { box-shadow: var(--bn-ring); }
+
+/* ════════════════════════════════════════════════════════════════════════
+ * v2 PRIMITIVES — Phase 1 additions
+ *
+ * Toggle, modal, tab strip, tooltip, stat tile, data table, drag-handle
+ * list row, split-pane editor, stepper. These primitives don't have a
+ * dedicated v2 prototype but are composed from v2 tokens + the existing
+ * primitives. Templates that need a toggle or modal pull from here so the
+ * sweep doesn't invent ad-hoc patterns.
+ * ════════════════════════════════════════════════════════════════════════ */
+
+/* Background-bleed defense. Host themes (BuddyX's `.bx-tokens-applied button`,
+	0,1,1; similar broad bare-`button` rules in others) paint an accent fill onto
+	BuddyNext's ghost/icon controls, which set no background of their own. Pin
+	their DEFAULT background transparent under .bn-app (0,2,0 — out-specifies the
+	theme's selector) so the controls stay flat.
+
+	ORDER MATTERS: this block must sit BEFORE every component's stateful rules in
+	this file. Several stateful fills are also 0,2,0 (.bn-tab[aria-selected],
+	.bn-tab.is-active, .bn-modal__close:hover is 0,2,1 but the principle holds),
+	and a later same-specificity transparent pin silently cancels them — that
+	exact ordering mistake made the active-tab tint and modal-close hover vanish
+	when this block lived at the end of the file. Keep it here, above the
+	component sections, so stateful rules win the cascade tie.
+
+	The toggle is NOT in this list — its unchecked track is a filled control, so
+	it gets the same defense pinned to var(--bn-line-strong) next to its base
+	rule below. Button-scoped for the lightbox wildcard so the backdrop div keeps
+	its overlay. Visually a no-op under themes that don't bleed. */
+.bn-app .bn-tab,
+.bn-app .bn-composer__tool,
+.bn-app .bn-more-menu-item,
+.bn-app .bn-modal__close,
+.bn-app button[class*="bn-lightbox__"] {
+	background-color: transparent;
+}
+
+/* ── Toggle switch ──────────────────────────────────────────────────── */
+.bn-toggle {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	flex-shrink: 0;
+	width: 40px;
+	height: 22px;
+	border-radius: var(--bn-r-full);
+	background: var(--bn-line-strong);
+	cursor: pointer;
+	transition: background var(--bn-dur) var(--bn-ease);
+	border: none;
+	padding: 0;
+
+	/* Knob travel distance, read by the checked-state transform below. Held as a
+		token (not a literal) so each size variant only restates the distance, and
+		so the RTL rule can negate ONE value instead of mirroring every size rule.
+		The knob is pinned with inset-inline-start, so under RTL it starts at the
+		right edge and must travel the other way — hence the negated travel. */
+	--bn-toggle-travel: 18px;
+}
+
+/* Background-bleed defense for the toggle: pinned to its TRACK fill, not
+	transparent like the ghost controls further down — the unchecked track is a
+	filled control (pinning it transparent made every OFF switch invisible,
+	spaces settings → Integrations was where QA caught it). 0,2,0 out-specifies
+	themed bare-button fills (BuddyX `.bx-tokens-applied button`, 0,1,1).
+	Checked fills still win: [aria-checked="true"] (0,2,0, later in this
+	sheet), :has(:checked) (0,2,1), and `:checked + .bn-toggle` (later sheet). */
+.bn-app .bn-toggle {
+	background-color: var(--bn-line-strong);
+}
+.bn-toggle::before {
+	content: '';
+	position: absolute;
+	top: 3px;
+	inset-inline-start: 3px;
+	width: 16px;
+	height: 16px;
+	border-radius: 50%;
+	background: var(--bn-surface);
+	box-shadow: var(--bn-shadow-xs);
+	transition: transform var(--bn-dur) var(--bn-ease);
+}
+.bn-toggle[aria-checked="true"] {
+	background: var(--bn-accent);
+}
+.bn-toggle[aria-checked="true"]::before {
+	transform: translateX(var(--bn-toggle-travel));
+}
+[dir="rtl"] .bn-toggle[aria-checked="true"]::before {
+	transform: translateX(calc(-1 * var(--bn-toggle-travel)));
+}
+.bn-toggle:focus-visible {
+	box-shadow: var(--bn-ring);
+	outline: 2px solid transparent;
+	outline-offset: 2px;
+}
+.bn-toggle[disabled],
+.bn-toggle[aria-disabled="true"] {
+	opacity: 0.55;
+	cursor: not-allowed;
+}
+.bn-toggle[data-size="sm"] {
+	width: 32px;
+	height: 18px;
+	--bn-toggle-travel: 14px;
+}
+.bn-toggle[data-size="sm"]::before {
+	width: 12px;
+	height: 12px;
+}
+.bn-toggle[data-size="lg"] {
+	width: 48px;
+	height: 28px;
+	--bn-toggle-travel: 20px;
+}
+.bn-toggle[data-size="lg"]::before {
+	width: 22px;
+	height: 22px;
+}
+
+/* Toggle group — label + description + switch in one row. */
+.bn-toggle-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--bn-s4);
+	padding: var(--bn-s3) 0;
+	border-bottom: 1px solid var(--bn-line-faint);
+}
+.bn-toggle-row:last-child { border-bottom: none; }
+.bn-toggle-row__copy {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+.bn-toggle-row__label {
+	font-size: var(--bn-text-sm);
+	font-weight: var(--bn-fw-medium-semibold);
+	color: var(--bn-ink);
+}
+.bn-toggle-row__desc {
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+	line-height: 1.45;
+}
+
+/* ── Modal / dialog ─────────────────────────────────────────────────── */
+.bn-modal-backdrop {
+	position: fixed;
+	inset: 0;
+	z-index: 10000;
+	background: color-mix(in oklch, var(--bn-ink) 55%, transparent);
+	-webkit-backdrop-filter: blur(2px);
+	backdrop-filter: blur(2px);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: var(--bn-s4);
+	animation: bn-modal-backdrop-in var(--bn-dur) var(--bn-ease);
+}
+@keyframes bn-modal-backdrop-in {
+	from { opacity: 0; }
+	to   { opacity: 1; }
+}
+.bn-modal__panel {
+	background: var(--bn-surface);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-lg);
+	box-shadow: var(--bn-shadow-lg);
+	width: 100%;
+	max-width: 480px;
+	max-height: calc(100vh - var(--bn-s8));
+	display: flex;
+	flex-direction: column;
+	animation: bn-modal-in 0.18s var(--bn-ease-out);
+}
+@keyframes bn-modal-in {
+	from { opacity: 0; transform: translateY(8px) scale(0.98); }
+	to   { opacity: 1; transform: translateY(0)   scale(1); }
+}
+.bn-modal__panel[data-size="sm"] { max-width: 360px; }
+.bn-modal__panel[data-size="lg"] { max-width: 640px; }
+.bn-modal__panel[data-size="xl"] { max-width: 880px; }
+
+.bn-modal__head {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s3);
+	padding: var(--bn-s5) var(--bn-s5) var(--bn-s3);
+	border-bottom: 1px solid var(--bn-line-faint);
+}
+.bn-modal__title {
+	flex: 1;
+	font-family: var(--bn-font-display);
+	font-size: var(--bn-text-lg);
+	font-weight: 600;
+	letter-spacing: -0.01em;
+	color: var(--bn-ink);
+	margin: 0;
+}
+.bn-modal__close {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 28px;
+	height: 28px;
+	/* Explicit 0 so the close stays a clean 28x28 icon button even where a theme
+		or composer button rule would otherwise leak padding onto the <button>. */
+	padding: 0;
+	border-radius: var(--bn-r-sm);
+	color: var(--bn-ink-3);
+	background: transparent;
+	border: none;
+	cursor: pointer;
+	transition: background var(--bn-dur-fast) var(--bn-ease), color var(--bn-dur-fast) var(--bn-ease);
+}
+.bn-modal__close:hover {
+	background: var(--bn-sunken);
+	color: var(--bn-ink);
+}
+.bn-modal__body {
+	flex: 1;
+	padding: var(--bn-s5);
+	overflow-y: auto;
+	color: var(--bn-ink-2);
+	font-size: var(--bn-text-sm);
+	line-height: 1.5;
+}
+
+/* Stacked body — even row spacing for modals that lay out a help line + form
+	fields. Use on bodies whose children would otherwise have no row gap (e.g. the
+	report modal, which reuses the profile-edit .bn-ep-field--full grid cell where
+	the grid modifier is inert). Lives in the primitive layer so it applies on any
+	surface, since bn-profile.css is not enqueued on the members directory. */
+.bn-modal__body--stack {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s4);
+}
+/* Let the flex gap be the single source of row spacing so the help line and
+	fields are evenly separated (the help <p> otherwise adds its own margin). */
+.bn-modal__body--stack > * {
+	margin-block: 0;
+}
+.bn-modal__foot {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: var(--bn-s2);
+	padding: var(--bn-s3) var(--bn-s5) var(--bn-s5);
+	border-top: 1px solid var(--bn-line-faint);
+}
+.bn-modal[hidden],
+.bn-modal-backdrop[hidden],
+.bn-modal-backdrop.is-hidden { display: none !important; }
+
+/* Danger-tone modal (destructive confirm). */
+.bn-modal__panel[data-tone="danger"] .bn-modal__title {
+	color: var(--bn-danger);
+}
+
+/* ── Tab strip — promoted from home-feed.html .feed-tabs ────────────── */
+.bn-tabs {
+	display: flex;
+	border-bottom: 1px solid var(--bn-line);
+	gap: var(--bn-s1);
+	margin: 0;
+	/* Single source of truth: a tab strip scrolls horizontally when it
+		overflows, with the scrollbar hidden on every platform. Feature tab
+		variants that carry .bn-tabs inherit this; standalone tab classes that
+		do not use .bn-tabs (e.g. .bn-mod-filterbar__tabs) keep their own. */
+	overflow-x: auto;
+	scrollbar-width: none;
+	/* Lock touch scrolling to the horizontal axis. Without this, a horizontal
+		swipe that drifts slightly vertically let the page/container scroll
+		vertically mid-swipe (browser default touch-action: auto). pan-x is the
+		standard for a horizontal tab strip (Facebook / LinkedIn do the same);
+		overscroll-behavior-x stops the horizontal fling from chaining into the
+		browser's back/forward navigation swipe. */
+	touch-action: pan-x;
+	overscroll-behavior-x: contain;
+}
+.bn-tabs::-webkit-scrollbar { display: none; }
+.bn-tabs[data-density="compact"] { gap: 2px; }
+
+/* Overflow affordance: when the strip scrolls, fade ONLY the edge that has
+	hidden tabs beyond it, so it is discoverable there are more tabs (esp. on
+	mobile) without faded edges appearing when nothing is hidden. Scroll-driven,
+	no JS; progressive enhancement - browsers without scroll() timelines just
+	keep the plain hidden-scrollbar strip. */
+@supports (animation-timeline: scroll()) {
+	.bn-tabs {
+		animation: bn-tabs-edge-fade linear both;
+		animation-timeline: scroll(self inline);
+	}
+	@keyframes bn-tabs-edge-fade {
+		/* scroll start: nothing hidden left, tabs hidden right -> right fade only */
+		0% {
+			-webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - var(--bn-s8)), transparent 100%);
+			mask-image: linear-gradient(to right, #000 0, #000 calc(100% - var(--bn-s8)), transparent 100%);
+		}
+		/* mid scroll: tabs hidden on both sides -> both edges fade */
+		1%, 99% {
+			-webkit-mask-image: linear-gradient(to right, transparent 0, #000 var(--bn-s8), #000 calc(100% - var(--bn-s8)), transparent 100%);
+			mask-image: linear-gradient(to right, transparent 0, #000 var(--bn-s8), #000 calc(100% - var(--bn-s8)), transparent 100%);
+		}
+		/* scroll end: nothing hidden right, tabs hidden left -> left fade only */
+		100% {
+			-webkit-mask-image: linear-gradient(to right, transparent 0, #000 var(--bn-s8), #000 100%);
+			mask-image: linear-gradient(to right, transparent 0, #000 var(--bn-s8), #000 100%);
+		}
+	}
+}
+
+.bn-tab {
+	/* Inline padding gives the same-tone hover/active highlight room to read as
+		a soft pill; the rounded TOP + flat bottom keeps the active underline.
+		--bn-tab-px is the overridable inline-padding token: a variant (e.g.
+		.bn-sd-chip's wider pill) changes ONLY this var, and both the base rule and
+		the theme-defense interactive-state lock below read it — so a variant can
+		never desync rest vs hover padding again (the pill-vibrate class of bug). */
+	--bn-tab-px: var(--bn-s3);
+	/* A tab is a navigation target, so it takes the 40px floor. The 34px density
+	   exception in the standard is for compact ADMIN list rows, not for a member-
+	   facing tab strip. Touch already raised these to 44px at the bottom of this
+	   file; this is the desktop half of the same rule. */
+	min-block-size: 40px;
+	padding: var(--bn-s2) var(--bn-tab-px);
+	/* Normalise font + metrics so an <a> tab and a <button> tab render
+		IDENTICALLY. Without this, a <button class="bn-tab"> falls back to the
+		UA button font + line-height and sits at a different height/baseline than
+		its <a> siblings - the "jumpy / misaligned" tab bar. */
+	font-family: var(--bn-font-ui);
+	font-size: var(--bn-text-sm);
+	font-weight: var(--bn-fw-medium-semibold);
+	line-height: var(--bn-leading-tight);
+	color: var(--bn-ink-3);
+	border: none;
+	border-bottom: 2px solid transparent;
+	margin-bottom: -1px;
+	border-radius: var(--bn-r-sm) var(--bn-r-sm) 0 0;
+	background: transparent;
+	-webkit-appearance: none;
+	appearance: none;
+	cursor: pointer;
+	transition: color var(--bn-dur-fast) var(--bn-ease),
+				background var(--bn-dur-fast) var(--bn-ease),
+				border-color var(--bn-dur-fast) var(--bn-ease);
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	text-decoration: none;
+	/* Keep a multi-word label ("For you") + its count chip on one line; under
+		width pressure the .bn-tabs row scrolls horizontally rather than wrapping
+		a tab's text into two rows. */
+	white-space: nowrap;
+	flex: 0 0 auto;
+}
+/* Hover / focus / active read as a soft SAME-TONE highlight (accent at low
+	opacity) — never a heavy fill and never a box. Keyboard focus adds a clean
+	accent underline (inset shadow, no layout shift). */
+.bn-tabs .bn-tab:hover,
+.bn-tabs .bn-tab:focus,
+.bn-tabs .bn-tab:active {
+	color: var(--bn-ink);
+	background: color-mix(in oklab, var(--bn-accent) 8%, transparent);
+}
+/* Tabs live in an overflow-x:auto strip, which clips an outset ring, so the
+	focus ring is INSET here — same accent, same intent as --bn-ring, just drawn
+	inside the tab so it can never be clipped. Transparent outline = forced-colors
+	fallback. */
+.bn-tabs .bn-tab:focus-visible {
+	color: var(--bn-ink);
+	background: color-mix(in oklab, var(--bn-accent) 8%, transparent);
+	outline: 2px solid transparent;
+	outline-offset: -2px;
+	box-shadow: inset 0 0 0 2px var(--bn-accent);
+	border-radius: var(--bn-r-sm);
+}
+.bn-tab[aria-selected="true"],
+.bn-tab[aria-current="true"],
+.bn-tab[data-active],
+.bn-tab.is-active {
+	color: var(--bn-ink);
+	border-bottom-color: var(--bn-accent);
+	background: color-mix(in oklab, var(--bn-accent) 12%, transparent);
+}
+.bn-tab__count {
+	font-size: var(--bn-text-2xs);
+	color: var(--bn-ink-3);
+	background: var(--bn-sunken);
+	padding: 1px 6px;
+	border-radius: var(--bn-r-full);
+}
+.bn-tab[aria-selected="true"] .bn-tab__count,
+.bn-tab[aria-current="true"] .bn-tab__count {
+	background: var(--bn-accent-100);
+	color: var(--bn-accent-700);
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+	THE NAV SYSTEM — three independent components, three class namespaces, ZERO
+	shared inheritance. Every surface + every integration (own + 3rd party) uses
+	these via the Nav API (buddynext_register_nav) → the shared render parts. Keep
+	them separate so a change to one can never bleed into another:
+
+	1. STATS      .bn-nav-metrics / .bn-nav-metric        (parts/nav-metrics.php)
+	2. PRIMARY    .bn-tabs / .bn-tab                       (parts/nav-bar.php)
+	3. SUB-NAV    .bn-subnav / .bn-subnav__item           (parts/nav-subnav.php)
+
+	.bn-navgroup wraps PRIMARY + its SUB-NAV as one unit so a page stack gap can't
+	space the sub-nav off as its own section.
+	════════════════════════════════════════════════════════════════════════════ */
+.bn-navgroup {
+	display: block;
+	position: relative;
+}
+
+/* Overflow scroll buttons: clickable chevrons that FLANK the PRIMARY tab bar
+	when it has hidden tabs, so a scrollable strip is usable with a mouse (no
+	scrollbar) and still swipeable on touch. shell/extras.js wraps the strip in a
+	.bn-navgroup__scroller flex row and injects a button on each side, toggling
+	[hidden] per edge as the strip scrolls - cross-browser ( iOS Safari + Firefox
+	included ), unlike the Chrome-only scroll-timeline edge-fade. The buttons sit
+	BESIDE the strip (never over it), so no tab is ever covered or blocked; the
+	strip just narrows by a button's width when one appears. They are aria-hidden
+	+ tabindex -1: keyboard users already scroll tabs into view by tabbing through
+	them, so these are pointer affordances only and add no duplicate tab stops. */
+.bn-navgroup__scroller {
+	display: flex;
+	align-items: stretch;
+	min-width: 0;
+}
+.bn-navgroup__scroller > .bn-tabs {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+.bn-navgroup__nav {
+	flex: 0 0 auto;
+	align-self: stretch;
+	width: 2rem;
+	margin: 0;
+	padding: 0;
+	border: 0;
+	border-bottom: 1px solid var(--bn-line);
+	cursor: pointer;
+	-webkit-appearance: none;
+	appearance: none;
+	/* Token-coloured glyph via mask, so it adapts to dark mode automatically. */
+	background: var(--bn-ink-3);
+	-webkit-mask: center / 1.1rem 1.1rem no-repeat;
+	mask: center / 1.1rem 1.1rem no-repeat;
+	transition: background-color var(--bn-dur-fast) var(--bn-ease);
+}
+.bn-navgroup__nav[hidden] { display: none; }
+.bn-navgroup__nav:hover,
+.bn-navgroup__nav:active { background: var(--bn-ink); }
+.bn-navgroup__nav:focus-visible {
+	outline: 2px solid transparent;
+	outline-offset: 2px;
+	box-shadow: var(--bn-ring);
+}
+.bn-navgroup__nav--start {
+	-webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15 18l-6-6 6-6'/%3E%3C/svg%3E");
+	mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15 18l-6-6 6-6'/%3E%3C/svg%3E");
+}
+.bn-navgroup__nav--end {
+	-webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 18l6-6-6-6'/%3E%3C/svg%3E");
+	mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 18l6-6-6-6'/%3E%3C/svg%3E");
+}
+@media (prefers-reduced-motion: reduce) {
+	.bn-navgroup__nav { transition: none; }
+}
+
+/* ── (3) SUB-NAV — the canonical secondary nav. A premium TEXT toggle, NOT a
+	second tab bar: its OWN namespace (never .bn-tab), so no rail, no box, no
+	underline, and nothing to override. Active = accent + semibold; inactive =
+	muted. Sits tight under the primary bar inside .bn-navgroup. */
+.bn-subnav {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--bn-s4);
+	margin-top: var(--bn-s2);
+	/* Indent so the first sub item's text lines up vertically under the first
+		primary tab's text (primary .bn-tab carries var(--bn-s3) inline padding). */
+	padding-inline-start: var(--bn-s3);
+}
+/* Base + ALL interaction states scoped under .bn-app so the host theme's bare
+	<button> chrome (border / padding / hover + active + focus background) can
+	never bleed in — the sub-nav is text only, in every state. Hover, active
+	(selected) and :active (press) are covered together. */
+.bn-app .bn-subnav__item {
+	display: inline-flex;
+	align-items: baseline;
+	gap: 6px;
+	margin: 0;
+	padding: var(--bn-s1) 0;
+	border: 0;
+	border-radius: 0;
+	background: none;
+	box-shadow: none;
+	/* appearance:none stops the host theme (and the UA) from painting any native
+		<button> chrome in any state — the sub-nav is text, period. */
+	appearance: none;
+	-webkit-appearance: none;
+	font: inherit;
+	font-size: var(--bn-text-sm);
+	font-weight: var(--bn-fw-medium);
+	line-height: 1.4;
+	color: var(--bn-ink-3);
+	text-decoration: none;
+	cursor: pointer;
+}
+/* Hover / focus / press (:active) all covered together — no theme bg, no ring,
+	no box; only the text colour lifts to ink. */
+.bn-app .bn-subnav__item:hover,
+.bn-app .bn-subnav__item:focus,
+.bn-app .bn-subnav__item:active {
+	color: var(--bn-ink);
+	background: none;
+	box-shadow: none;
+	border: 0;
+}
+.bn-app .bn-subnav__item:focus-visible {
+	outline: 2px solid transparent;
+	outline-offset: 2px;
+	box-shadow: var(--bn-ring);
+	border-radius: var(--bn-r-sm);
+}
+/* Selected wins over hover AND press, so an active item under the cursor stays
+	accent (covers the theme's :hover/:active that would otherwise repaint it). */
+.bn-app .bn-subnav__item[aria-selected="true"],
+.bn-app .bn-subnav__item[aria-selected="true"]:hover,
+.bn-app .bn-subnav__item[aria-selected="true"]:focus,
+.bn-app .bn-subnav__item[aria-selected="true"]:active,
+.bn-app .bn-subnav__item.active {
+	color: var(--bn-accent);
+	background: none;
+	box-shadow: none;
+	font-weight: var(--bn-fw-semibold);
+}
+.bn-subnav__count {
+	font-size: var(--bn-text-2xs);
+	color: var(--bn-ink-3);
+	background: var(--bn-sunken);
+	padding: 1px 6px;
+	border-radius: var(--bn-r-full);
+}
+
+/* ── Shared metric / stat row (parts/nav-metrics.php) ──────────────────────
+	The count-pill row used by BOTH the profile and space surfaces: value (bold
+	ink) + muted label, optional week-over-week delta chip. Display-only by
+	default; the <a>/<button> variants deep-link (list / tab jump) but read as
+	counts, never a second navigation. Token-driven + dark-safe. */
+.bn-nav-metrics {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--bn-s2) var(--bn-s4);
+}
+.bn-app .bn-nav-metric {
+	display: inline-flex;
+	align-items: baseline;
+	gap: 6px;
+	margin: 0;
+	padding: 0;
+	border: 0;
+	background: none;
+	font: inherit;
+	color: var(--bn-ink);
+	text-decoration: none;
+	cursor: default;
+}
+.bn-app a.bn-nav-metric,
+.bn-app button.bn-nav-metric {
+	cursor: pointer;
+}
+.bn-app a.bn-nav-metric:hover .bn-nav-metric__label,
+.bn-app button.bn-nav-metric:hover .bn-nav-metric__label {
+	color: var(--bn-ink);
+}
+.bn-app a.bn-nav-metric:focus-visible,
+.bn-app button.bn-nav-metric:focus-visible {
+	outline: 2px solid transparent;
+	outline-offset: 2px;
+	box-shadow: var(--bn-ring);
+	border-radius: var(--bn-r-sm);
+}
+.bn-nav-metric__value {
+	font-weight: var(--bn-fw-bold);
+	font-size: var(--bn-text-md);
+	color: var(--bn-ink);
+}
+.bn-nav-metric__label {
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink-3);
+}
+.bn-nav-metric__delta {
+	font-size: var(--bn-text-xs);
+	font-weight: var(--bn-fw-semibold);
+}
+.bn-nav-metric__delta[data-trend="up"] {
+	color: var(--bn-success);
+}
+.bn-nav-metric__delta[data-trend="down"] {
+	color: var(--bn-danger);
+}
+.bn-nav-metric__delta[data-trend="flat"] {
+	color: var(--bn-ink-3);
+}
+
+/* Profile-hero variant: the metric row reads as the hero's bottom stat band —
+	middot-separated counts on a subtle band, NOT a second nav. (Replaces the old
+	.bn-pf-pills strip; same look, one canonical component.) */
+.bn-nav-metrics.bn-pf-metricrow {
+	gap: 0;
+	align-items: baseline;
+	padding: var(--bn-s3) var(--bn-s4);
+	border-block-start: 1px solid var(--bn-line);
+	background: var(--bn-canvas);
+	/* This strip is the LAST child of the rounded .bn-pf-hero (.bn-card, radius
+		--bn-r-lg), which keeps overflow:visible so its More-Options dropdown is
+		not clipped. Because the hero can't clip, this opaque strip has to carry
+		the card's bottom radius itself — otherwise its square corners paint over
+		the hero's rounded bottom, and the bottom outline reads as square. */
+	border-end-start-radius: var(--bn-r-lg);
+	border-end-end-radius: var(--bn-r-lg);
+}
+.bn-pf-metricrow .bn-nav-metric + .bn-nav-metric::before {
+	content: "\00B7";
+	margin-inline: var(--bn-s2);
+	color: var(--bn-ink-4);
+	font-weight: 400;
+}
+.bn-pf-metricrow .bn-nav-metric {
+	font-size: var(--bn-text-sm);
+}
+.bn-pf-metricrow a.bn-nav-metric:hover,
+.bn-pf-metricrow button.bn-nav-metric:hover {
+	/* Color-shift hover, not an underline — the stat band is a plain middot row,
+	   and a text-link underline read as a broken affordance here. */
+	color: var(--bn-ink);
+}
+
+@media (max-width: 640px) {
+	.bn-nav-metrics {
+		gap: var(--bn-s2) var(--bn-s3);
+	}
+	/* On a narrow band the metric row wraps; drop the middot separators (a wrap
+		would otherwise leave a dangling leading "·") and lean on the row/column
+		gap for clean separation across lines. */
+	.bn-nav-metrics.bn-pf-metricrow {
+		gap: var(--bn-s1) var(--bn-s4);
+	}
+	.bn-pf-metricrow .bn-nav-metric + .bn-nav-metric::before {
+		content: none;
+	}
+}
+
+/* ══ Theme-proof interactive controls — THE single defensive layer ══════════
+	Host themes style bare <button>/<a> with their own geometry (Reign gives every
+	button 10px 20px; BuddyX paints its own fills). A bare `.bn-composer__tool`
+	(0,1,0) loses to `.theme-wrap button` (0,1,1), so the theme's padding lands on
+	our icon button and the control reflows.
+
+	HOW THIS LAYER WORKS, and the mistake it exists to prevent
+	----------------------------------------------------------
+	Two rules, and they are not optional:
+
+	1. A primitive OWNS its geometry at the BASE, under `.bn-app` (0,2,0 —
+	   class+context out-specifies the theme's element selector). Base == hover, so
+	   nothing moves. The original per-component fix reset padding on :hover ONLY,
+	   which left the theme's 10px 20px on the base and made the icon *shrink* on
+	   hover — the "jumpy controls" glitch.
+
+	2. The defense NEVER hard-codes a value for a shared primitive. It re-applies a
+	   TOKEN, and each variant sets that token on itself. This is the important one.
+	   The old lock pinned `.bn-app .bn-tab:hover` to .bn-tab's NARROW padding — and
+	   that out-specified `.bn-sd-chip`'s wider pill padding (0,3,0 beats 0,2,0), so
+	   the Spaces filter pills snapped 16px → 12px on hover and appeared to shrink
+	   and vibrate. The defense was fighting our own variant. A token cannot do that:
+	   `.bn-sd-chip { --bn-tab-px: var(--bn-s4) }` changes the value the lock itself
+	   reads, at rest AND on every state, with no specificity war and no per-variant
+	   re-lock.
+
+	   => Add a new bare-button control by giving it a token here. NEVER by writing
+	      another `:hover` patch in its component file. That is how we got here.
+
+	State coverage: every entry below locks base AND :hover/:focus/:active/
+	:focus-visible. Base alone is only sufficient while no theme sets geometry on an
+	interactive state — which is true of Reign/BuddyX/BuddyX Pro *today* (measured,
+	zero reflow) and is not a property we control. A theme that adds
+	`button:hover { padding: … }` (0,1,1) tomorrow is out-specified by the 0,3,0
+	selectors below and cannot reflow us.
+
+	Colour, background and focus rings stay with the components — this layer owns
+	GEOMETRY only.
+
+	SCOPE OF THIS LAYER — and why `.bn-btn` is deliberately NOT in it yet
+	---------------------------------------------------------------------
+	Everything locked below has ONE geometry: it has no size or shape variants, so
+	the lock cannot collide with our own CSS. That is the only safe thing to lock
+	with a literal value.
+
+	`.bn-btn` IS locked here now, and it is the exception that proves the rule
+	above: it has many geometries, so the lock cannot carry a literal. It carries
+	about ten overrides across five stylesheets — [data-size="sm"], [data-size="lg"],
+	[data-variant], the feed follow button, the comment submit, the auth social
+	button, the compact member/sidebar rows, the .bn-btn--* modifiers and a
+	responsive @media — most at 0,2,0, some at 0,1,0. A lock re-applying a literal
+	would be 0,3,0 and out-specify EVERY one of them on hover: a small button would
+	jump from `4px 12px` to `8px 16px` the moment the pointer touched it. That is
+	the pill bug again with a bigger blast radius, and writing it is how this card
+	nearly shipped the thing it was raised to prevent.
+
+	The lock re-applies the TOKENS instead. Every rule that changes a button's
+	padding now sets --bn-btn-py/--bn-btn-px rather than `padding`, so the locked
+	declaration resolves to whatever the winning variant asked for. A variant can
+	never be out-specified by the lock, because the lock is not competing with it —
+	it restates the same custom properties the cascade already resolved. Same
+	pattern as .bn-sd-chip and --bn-tab-px.
+
+	Any NEW rule that wants a different button geometry must set the tokens too. A
+	literal `padding` on a .bn-btn selector will be silently overridden on hover —
+	which is exactly the failure this layer exists to make impossible.
+
+	Also note `.bn-btn[data-variant]:active { transform: scale(0.98) }` — BuddyNext
+	INTENTIONALLY scales a button on press. A blanket `transform: none` on interactive
+	states would silently delete that press feedback across the whole product. Any
+	future neutraliser must opt that back in, not assume "no transform" is safe.
+
+	Fixed-geometry controls: no size/shape variants exist, so a literal lock is safe
+   and cannot fight our own CSS. Base AND every interactive state, so a theme rule on
+   :hover (0,1,1) cannot out-specify us (0,3,0) and reflow the control. */
+/* .bn-btn — locked through its tokens, never a literal. See the note above.
+   `transform` is deliberately absent from this lock: .bn-btn[data-variant]:active
+   scales to 0.98 as press feedback, and a blanket `transform: none` here would
+   silently delete that across the whole product. */
+.bn-app .bn-btn,
+.bn-app .bn-btn:hover,
+.bn-app .bn-btn:focus,
+.bn-app .bn-btn:active,
+.bn-app .bn-btn:focus-visible {
+	padding: var(--bn-btn-py) var(--bn-btn-px);
+}
+
+.bn-app .bn-modal__close,
+.bn-app .bn-modal__close:hover,
+.bn-app .bn-modal__close:focus,
+.bn-app .bn-modal__close:active,
+.bn-app .bn-modal__close:focus-visible {
+	padding: 0;
+	margin: 0;
+	border: 0;
+}
+
+.bn-app .bn-nav-metric,
+.bn-app .bn-nav-metric:hover,
+.bn-app .bn-nav-metric:focus,
+.bn-app .bn-nav-metric:active,
+.bn-app .bn-nav-metric:focus-visible {
+	padding: 0;
+	margin: 0;
+	border: 0;
+}
+.bn-app .bn-composer__tool,
+.bn-app .bn-composer__tool:hover,
+.bn-app .bn-composer__tool:focus,
+.bn-app .bn-composer__tool:active,
+.bn-app .bn-composer__tool:focus-visible {
+	box-sizing: border-box;
+	width: 32px;
+	height: 32px;
+	min-width: 0;
+	min-height: 0;
+	padding: 0;
+	margin: 0;
+	border: 0;
+}
+.bn-app .bn-post-card__action-btn,
+.bn-app .bn-post-card__action-btn:hover,
+.bn-app .bn-post-card__action-btn:focus,
+.bn-app .bn-post-card__action-btn:active,
+.bn-app .bn-post-card__action-btn:focus-visible {
+	padding: 6px 14px;
+	margin: 0;
+	border: 0;
+}
+.bn-app .bn-tab,
+.bn-app .bn-tab:hover,
+.bn-app .bn-tab:focus,
+.bn-app .bn-tab:active,
+.bn-app .bn-tab:focus-visible {
+	/* Own the padding on every interactive state so a host theme's bare-button
+		:hover (e.g. Reign's `button:hover { padding: 10px 20px }`, 0,2,1) cannot
+		out-specify it (0,3,0 here) and reflow the tab row on hover/press — the same
+		geometry lock the composer/post-card action buttons use. Reads --bn-tab-px
+		(not a hardcoded value) so a padding variant like .bn-sd-chip is honoured on
+		hover too — the lock follows the variant instead of overriding it. */
+	padding: var(--bn-s2) var(--bn-tab-px);
+}
+.bn-app .bn-tab {
+	border-top: 0;
+	border-inline: 0;
+	/* Pin the underline edge's width + style (not colour — the active tab sets
+		border-bottom-color) so a themed border can't reflow the tab row. */
+	border-bottom-width: 2px;
+	border-bottom-style: solid;
+}
+
+/* ── Tooltip ────────────────────────────────────────────────────────── */
+.bn-tooltip {
+	position: absolute;
+	z-index: 9999;
+	padding: var(--bn-s1) var(--bn-s2);
+	border-radius: var(--bn-r-sm);
+	background: var(--bn-ink);
+	color: var(--bn-surface);
+	font-size: var(--bn-text-xs);
+	font-weight: 500;
+	line-height: 1.4;
+	pointer-events: none;
+	opacity: 0;
+	transform: translateY(2px);
+	transition: opacity var(--bn-dur-fast) var(--bn-ease),
+				transform var(--bn-dur-fast) var(--bn-ease);
+	max-width: 240px;
+	white-space: nowrap;
+}
+.bn-tooltip[data-show],
+[data-bn-tooltip]:hover > .bn-tooltip,
+[data-bn-tooltip]:focus-visible > .bn-tooltip {
+	opacity: 1;
+	transform: translateY(0);
+}
+.bn-tooltip[data-multiline] {
+	white-space: normal;
+}
+
+/* Anchor-relative variant — tooltip lives inside the trigger element. */
+.bn-tooltip-trigger {
+	position: relative;
+	display: inline-flex;
+}
+.bn-tooltip-trigger > .bn-tooltip[data-pos="top"]    { bottom: calc(100% + 4px); left: 50%; transform: translateX(-50%) translateY(2px); }
+.bn-tooltip-trigger > .bn-tooltip[data-pos="bottom"] { top:    calc(100% + 4px); left: 50%; transform: translateX(-50%) translateY(-2px); }
+/* Side-anchored variants are inline-relative: "left" means the inline-start side
+   of the trigger, so under RTL both the anchor edge AND the settle nudge mirror.
+   (data-pos top/bottom above stay on left:50% + translateX(-50%) — that pair is
+   a centering idiom, not a direction, and centres identically in RTL.) */
+.bn-tooltip-trigger > .bn-tooltip[data-pos="left"]   { inset-inline-end:   calc(100% + 4px); top: 50%; transform: translateY(-50%) translateX(2px); }
+.bn-tooltip-trigger > .bn-tooltip[data-pos="right"]  { inset-inline-start: calc(100% + 4px); top: 50%; transform: translateY(-50%) translateX(-2px); }
+[dir="rtl"] .bn-tooltip-trigger > .bn-tooltip[data-pos="left"]  { transform: translateY(-50%) translateX(-2px); }
+[dir="rtl"] .bn-tooltip-trigger > .bn-tooltip[data-pos="right"] { transform: translateY(-50%) translateX(2px); }
+.bn-tooltip-trigger:hover  > .bn-tooltip[data-pos="top"],
+.bn-tooltip-trigger:focus-visible > .bn-tooltip[data-pos="top"]    { transform: translateX(-50%) translateY(0); }
+.bn-tooltip-trigger:hover  > .bn-tooltip[data-pos="bottom"],
+.bn-tooltip-trigger:focus-visible > .bn-tooltip[data-pos="bottom"] { transform: translateX(-50%) translateY(0); }
+
+/* ── Stat tile — used on Analytics, Integration hub, dashboards ─────── */
+.bn-stat {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s1);
+	padding: var(--bn-s4);
+	background: var(--bn-surface);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-lg);
+	min-width: 140px;
+}
+.bn-stat__label {
+	font-size: var(--bn-text-xs);
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	color: var(--bn-ink-3);
+}
+.bn-stat__value {
+	font-family: var(--bn-font-display);
+	font-size: var(--bn-text-2xl);
+	font-weight: 600;
+	letter-spacing: -0.025em;
+	color: var(--bn-ink);
+	line-height: 1.1;
+}
+.bn-stat__delta {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-s1);
+	font-size: var(--bn-text-xs);
+	font-weight: var(--bn-fw-medium-semibold);
+	margin-top: 2px;
+}
+.bn-stat__delta[data-trend="up"]   { color: var(--bn-success); }
+.bn-stat__delta[data-trend="down"] { color: var(--bn-danger); }
+.bn-stat__delta[data-trend="flat"] { color: var(--bn-ink-3); }
+
+.bn-stat-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+	gap: var(--bn-s3);
+}
+
+/* ── Section head — composable header used by hub + admin templates ── */
+.bn-section-head {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: var(--bn-s4);
+	padding: var(--bn-s4) 0;
+	margin-bottom: var(--bn-s4);
+	border-block-end: 1px solid var(--bn-line-faint);
+	flex-wrap: wrap;
+}
+.bn-section-head__lead {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--bn-s3);
+	min-width: 0;
+	flex: 1 1 auto;
+}
+.bn-section-head__icon {
+	display: inline-flex;
+	width: 32px;
+	height: 32px;
+	align-items: center;
+	justify-content: center;
+	color: var(--bn-accent);
+	flex-shrink: 0;
+}
+.bn-section-head__text {
+	min-width: 0;
+}
+.bn-section-head__title {
+	font-family: var(--bn-font-display);
+	font-size: var(--bn-text-xl);
+	font-weight: 600;
+	letter-spacing: -0.02em;
+	color: var(--bn-ink);
+	margin: 0;
+	line-height: 1.2;
+}
+.bn-section-head__subtitle {
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink-3);
+	margin: var(--bn-s1) 0 0;
+}
+.bn-section-head__meta {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--bn-s3);
+	margin-top: var(--bn-s2);
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink-2);
+}
+.bn-section-head__meta-item {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-s1);
+}
+.bn-section-head__actions {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	flex-shrink: 0;
+}
+
+/* ── Filter strip — top-of-list chrome wrapping .bn-tabs + filters ─── */
+.bn-filter-strip {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--bn-s3);
+	margin-bottom: var(--bn-s4);
+}
+.bn-filter-strip__form {
+	display: inline-flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--bn-s2);
+	margin-inline-start: auto;
+}
+.bn-filter-strip__form .bn-input {
+	min-width: 200px;
+}
+
+/* ── Data table ─────────────────────────────────────────────────────── */
+.bn-table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink);
+}
+.bn-table th,
+.bn-table td {
+	padding: var(--bn-s3) var(--bn-s4);
+	text-align: start;
+	border-bottom: 1px solid var(--bn-line-faint);
+	vertical-align: middle;
+}
+.bn-table th {
+	font-size: var(--bn-text-xs);
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	color: var(--bn-ink-3);
+	background: var(--bn-sunken);
+	border-bottom-color: var(--bn-line);
+	position: sticky;
+	top: 0;
+	z-index: 1;
+}
+.bn-table tbody tr {
+	transition: background var(--bn-dur-fast) var(--bn-ease);
+}
+.bn-table tbody tr:hover {
+	background: var(--bn-sunken);
+}
+.bn-table tbody tr[data-selected] {
+	background: var(--bn-accent-100);
+}
+.bn-table td[data-align="end"]    { text-align: end; }
+.bn-table td[data-align="center"] { text-align: center; }
+.bn-table[data-density="compact"] th,
+.bn-table[data-density="compact"] td {
+	padding: var(--bn-s2) var(--bn-s3);
+}
+
+.bn-table-wrap {
+	background: var(--bn-surface);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-lg);
+	overflow: hidden;
+}
+.bn-table-wrap__scroll {
+	overflow-x: auto;
+	/* contain:paint, not just overflow-x:auto.
+	 *
+	 * The wrapper scrolled correctly and the page STILL grew a horizontal
+	 * scrollbar - 277px of it on Members > Directory at 1024px. The table inside
+	 * carries 66 position:sticky cells (the sticky header row and the checkbox
+	 * column), and a sticky box's layout width leaks past a scroll ancestor, so
+	 * the document scroll region grew to the table's full width even though the
+	 * table itself was reachable only by scrolling the wrapper.
+	 *
+	 * contain:paint tells the browser this box paints its own subtree and nothing
+	 * escapes it. Verified: the wrapper still scrolls, the sticky header is still
+	 * sticky, and the row overflow menu still opens and is fully visible - it
+	 * renders inside the wrapper, so nothing needed to escape. */
+	contain: paint;
+}
+
+/* ── Drag-handle list row ───────────────────────────────────────────── */
+.bn-drag-row {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s3);
+	padding: var(--bn-s3) var(--bn-s4);
+	background: var(--bn-surface);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-md);
+	transition: border-color var(--bn-dur) var(--bn-ease),
+				box-shadow var(--bn-dur) var(--bn-ease);
+}
+.bn-drag-row + .bn-drag-row { margin-top: var(--bn-s2); }
+.bn-drag-row:hover { border-color: var(--bn-line-strong); }
+.bn-drag-row[data-dragging] {
+	box-shadow: var(--bn-shadow-md);
+	border-color: var(--bn-accent);
+	opacity: 0.95;
+}
+.bn-drag-row__handle {
+	display: inline-flex;
+	flex-direction: column;
+	gap: 3px;
+	flex-shrink: 0;
+	width: 18px;
+	height: 18px;
+	color: var(--bn-ink-4);
+	cursor: grab;
+	align-items: center;
+	justify-content: center;
+}
+/* The mobile bar's Create slot is centred by arithmetic, so it cannot be dragged. It keeps a
+   handle-shaped placeholder — removing it would misalign the row against its siblings — but it
+   reads as fixed, not as a grab target that silently refuses to move. */
+.bn-drag-row__handle--pinned {
+	cursor: default;
+	opacity: 0.35;
+}
+
+.bn-drag-row__handle::before,
+.bn-drag-row__handle::after,
+.bn-drag-row__handle span {
+	content: '';
+	display: block;
+	width: 14px;
+	height: 2px;
+	background: currentColor;
+	border-radius: 1px;
+}
+.bn-drag-row__handle:active { cursor: grabbing; }
+.bn-drag-row__body { flex: 1; min-width: 0; }
+.bn-drag-row__actions {
+	display: inline-flex;
+	gap: var(--bn-s2);
+	align-items: center;
+	flex-shrink: 0;
+}
+
+/* ── Split-pane editor — list on left, detail on right ───────────────── */
+.bn-split {
+	display: grid;
+	/* minmax(0, 1fr), never a bare 1fr: a grid track's automatic minimum is
+	   MIN-CONTENT, so a bare 1fr refuses to shrink below the widest thing in the
+	   pane. This container has overflow:hidden, so the moment that happens the
+	   pane is not scrolled - it is CLIPPED, at both edges, with no scrollbar to
+	   reach it. minmax(0, …) lets the column shrink and the pane's own
+	   overflow-y handle the rest. */
+	grid-template-columns: var(--bn-railw) minmax(0, 1fr);
+	gap: var(--bn-s4);
+	min-height: 480px;
+	background: var(--bn-surface);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-lg);
+	overflow: hidden;
+}
+.bn-split__rail {
+	border-inline-end: 1px solid var(--bn-line-faint);
+	background: var(--bn-canvas);
+	overflow-y: auto;
+}
+.bn-split__rail-head {
+	padding: var(--bn-s4);
+	border-bottom: 1px solid var(--bn-line-faint);
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--bn-s2);
+}
+.bn-split__rail-title {
+	font-size: var(--bn-text-xs);
+	font-weight: 600;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--bn-ink-3);
+}
+.bn-split__rail-item {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding: var(--bn-s3) var(--bn-s4);
+	border-bottom: 1px solid var(--bn-line-faint);
+	cursor: pointer;
+	transition: background var(--bn-dur-fast) var(--bn-ease);
+	/* Rail items are whole-row links; the row's hover + active states convey
+		interactivity, so drop the inherited underline (WP-admin defaults links
+		to underline) that cluttered the title/meta text. */
+	text-decoration: none;
+}
+.bn-split__rail-item,
+.bn-split__rail-item:hover,
+.bn-split__rail-item:focus { text-decoration: none; }
+.bn-split__rail-item:hover { background: var(--bn-sunken); }
+.bn-split__rail-item[aria-current="true"],
+.bn-split__rail-item[data-active] {
+	background: var(--bn-accent-100);
+	box-shadow: inset 3px 0 0 var(--bn-accent);
+}
+.bn-split__rail-item-title {
+	font-size: var(--bn-text-sm);
+	font-weight: var(--bn-fw-medium-semibold);
+	color: var(--bn-ink);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.bn-split__rail-item-meta {
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+}
+.bn-split__pane {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+}
+.bn-split__pane-head {
+	padding: var(--bn-s4) var(--bn-s5);
+	border-bottom: 1px solid var(--bn-line-faint);
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--bn-s3);
+}
+.bn-split__pane-body {
+	flex: 1;
+	padding: var(--bn-s5);
+	overflow-y: auto;
+}
+@media (max-width: 768px) {
+	.bn-split { grid-template-columns: 1fr; min-height: 0; }
+	.bn-split__rail { border-inline-end: none; border-bottom: 1px solid var(--bn-line-faint); max-height: 220px; }
+}
+
+/* ── Stepper / progress bar ─────────────────────────────────────────── */
+.bn-stepper {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	margin: 0 0 var(--bn-s5);
+}
+.bn-stepper__item {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	font-size: var(--bn-text-xs);
+	font-weight: var(--bn-fw-medium-semibold);
+	color: var(--bn-ink-3);
+}
+.bn-stepper__dot {
+	width: 24px;
+	height: 24px;
+	border-radius: 50%;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	background: var(--bn-sunken);
+	color: var(--bn-ink-3);
+	font-size: var(--bn-text-xs);
+	font-weight: 600;
+	flex-shrink: 0;
+	border: 1px solid var(--bn-line);
+}
+/* Match both the reactive class form (data-wp-class--is-active, used by the
+   onboarding stepper) and the attribute form (data-state) so either highlights
+   the current step. Previously the CSS keyed only on [data-state], while the
+   onboarding stepper applies .is-active / .is-done classes, so the current step
+   was never highlighted. */
+.bn-stepper__item.is-active .bn-stepper__dot,
+.bn-stepper__item[data-state="active"] .bn-stepper__dot {
+	background: var(--bn-accent);
+	color: var(--bn-accent-fg);
+	border-color: transparent;
+}
+.bn-stepper__item.is-active,
+.bn-stepper__item[data-state="active"] {
+	color: var(--bn-ink);
+}
+.bn-stepper__item.is-done .bn-stepper__dot,
+.bn-stepper__item[data-state="done"] .bn-stepper__dot {
+	background: var(--bn-success);
+	color: var(--bn-accent-fg);
+	border-color: transparent;
+}
+.bn-stepper__item.is-done,
+.bn-stepper__item[data-state="done"] {
+	color: var(--bn-ink-2);
+}
+.bn-stepper__bar {
+	flex: 1;
+	min-width: 16px;
+	height: 1px;
+	background: var(--bn-line);
+}
+
+/* Linear progress bar — capacity / loading state. */
+.bn-progress {
+	width: 100%;
+	height: 6px;
+	background: var(--bn-sunken);
+	border-radius: var(--bn-r-full);
+	overflow: hidden;
+	position: relative;
+}
+.bn-progress__fill {
+	height: 100%;
+	background: var(--bn-accent);
+	border-radius: inherit;
+	transition: width var(--bn-dur) var(--bn-ease);
+}
+.bn-progress[data-tone="success"] .bn-progress__fill { background: var(--bn-success); }
+.bn-progress[data-tone="warn"]    .bn-progress__fill { background: var(--bn-warn); }
+.bn-progress[data-tone="danger"]  .bn-progress__fill { background: var(--bn-danger); }
+.bn-progress[data-indeterminate] .bn-progress__fill {
+	width: 35% !important;
+	animation: bn-progress-indeterminate 1.4s var(--bn-ease) infinite;
+}
+@keyframes bn-progress-indeterminate {
+	0%   { transform: translateX(-100%); }
+	100% { transform: translateX(360%); }
+}
+
+/* ── Toast — v2 tone API on the existing container ──────────────────── */
+.bn-toast[data-tone="success"] { background: var(--bn-success); color: var(--bn-accent-fg); }
+.bn-toast[data-tone="warn"]    { background: var(--bn-warn);    color: var(--bn-accent-fg); }
+.bn-toast[data-tone="danger"]  { background: var(--bn-danger);  color: var(--bn-accent-fg); }
+.bn-toast[data-tone="info"]    { background: var(--bn-info);    color: var(--bn-accent-fg); }
+
+/* ════════════════════════════════════════════════════════════════════════
+ * Mobile tap-target compliance — Style-guide.html Rule 04
+ *
+ * At touch viewports (≤ 768px) every primitive interactive control grows
+ * to at least 44px hit area. Compact-density on mobile still respects the
+ * 44px floor — accessibility wins over density.
+ *
+ * That last sentence used to be contradicted three lines below it: a
+ * `.bn-btn[data-size="sm"] { min-height: 36px }` override sat inside this very
+ * block and exempted the compact size from the floor — and `sm` is exactly what
+ * every card action cluster uses, so Follow / Connect / Join were 36-38px on a
+ * phone while the rule above them said 44. The exception is gone; density does
+ * not get a carve-out from the thing the block exists to guarantee.
+ *
+ * Desktop no longer needs a note here either: the ladder itself now starts at
+ * the design system's own sm/md/lg = 32/40/48, rather than 28.
+ * ════════════════════════════════════════════════════════════════════════ */
+@media (pointer: coarse), (max-width: 768px) {
+	.bn-btn[data-variant] {
+		min-height: 44px;
+		--bn-btn-px: var(--bn-s4);
+	}
+	.bn-input,
+	.bn-textarea,
+	.bn-select {
+		min-height: 44px;
+	}
+	.bn-tab { min-height: 44px; }
+
+	/* Pagination is a target too, and was never listed here — it sat at the
+	   desktop 40px on touch. Square, because the numbers are narrow. */
+	.bn-page-btn {
+		min-block-size: 44px;
+		min-inline-size: 44px;
+	}
+
+	/* Standalone icon buttons — the control's own box grows to the touch floor.
+	 * These sit in toolbars, card headers and sheet headers where there is room
+	 * to grow, so the box IS the target. The four originally listed here were
+	 * the only ones covered; every icon-only control below was shipping at
+	 * 26-36px on touch (UI-006). */
+	.bn-modal__close,
+	.bn-composer__tool,
+	.bn-composer__footer-btn,
+	.bn-post-card__menu,
+	.bn-mobile-more__close,
+	.bn-navgroup__nav,
+	.bn-md-card__menu,
+	.bn-pf-avatar-edit,
+	.bn-ep-avatar-btn,
+	.bn-ep-avatar-remove,
+	.bn-ep-cover-remove,
+	.bn-ep-repeater-remove,
+	.bn-dm-msg__action,
+	.bn-dm-emoji-pop__close,
+	.bn-emoji-popover__option,
+	.bn-lightbox__close,
+	.bn-lightbox__dm-btn,
+	.bn-lightbox__action {
+		min-width: 44px;
+		min-height: 44px;
+	}
+
+	/* The composer toolbar needs its own rule, and it needs THIS selector list.
+	 *
+	 * `.bn-composer__tool` is in the list above, and it still shipped at 32x32 on
+	 * every touch device. The theme-proof lock earlier in this file pins
+	 * `.bn-app .bn-composer__tool` (and its :hover / :focus / :active /
+	 * :focus-visible variants) to width/height 32px with min-width/min-height 0.
+	 * That loses to nothing above: it is more specific (two classes vs one), and
+	 * min-* cannot beat an explicit width/height anyway. Two independent reasons
+	 * the accessibility rule never applied.
+	 *
+	 * So match the lock's selector list exactly -- the pseudo-class variants are
+	 * needed or the 32px returns on hover and focus -- and override width/height,
+	 * not just the minimums. Equal specificity, later in the file, so this wins.
+	 * The lock itself stays: it exists to stop host themes painting their own
+	 * button fills, which is still worth having. */
+	.bn-app .bn-composer__tool,
+	.bn-app .bn-composer__tool:hover,
+	.bn-app .bn-composer__tool:focus,
+	.bn-app .bn-composer__tool:active,
+	.bn-app .bn-composer__tool:focus-visible {
+		width: 44px;
+		height: 44px;
+		min-width: 44px;
+		min-height: 44px;
+	}
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+ * Tap-target expansion for the small overlay "remove" badges
+ *
+ * Two controls are DELIBERATELY tiny: the "x" pinned to the corner of an 80px
+ * composer thumbnail (20px) and the dismiss on the composer link-preview card
+ * (24px). Growing their painted box to 40px would swamp the thing they sit on,
+ * so we grow only the TARGET with a transparent pseudo-element. WCAG 2.5.8
+ * measures the target area, not the painted pixels, so both become tappable
+ * with zero visual change.
+ *
+ * The hit box is anchored to the corner the badge already occupies and grows
+ * INWARD (toward the inline start and downward), never outward. Both parents
+ * (.bn-composer__media-thumb, .bn-composer__link-preview) set `overflow:
+ * hidden`, and a pseudo that escaped the clip would also lose its pointer
+ * events — anchoring it this way keeps all 40px inside the clipping parent.
+ *
+ * NOT applied to .bn-dm-compose__chip-x / .bn-ep-tag-remove: those sit in
+ * wrapping chip rows, where a 40px hit box would overhang the neighbouring
+ * chip and steal its taps. Those need the CHIP to grow on touch, which is a
+ * visual-design change, so they are left alone and reported instead.
+ * ════════════════════════════════════════════════════════════════════════ */
+.bn-composer__media-remove::after,
+.bn-composer__link-remove::after {
+	content: '';
+	position: absolute;
+	inset-block-start: 0;
+	inset-inline-end: 0;
+	min-width: var(--bn-tap);
+	min-height: var(--bn-tap);
+}
+/* .bn-composer__link-remove is statically positioned, so it needs to become a
+   containing block for the pseudo. .bn-composer__media-remove already is one
+   (position: absolute in bn-feed.css). */
+.bn-composer__link-remove { position: relative; }
+
+/* ── Cookie consent banner (Privacy → Cookie Consent) ─────────────────────── */
+.bn-cookie-consent {
+	position: fixed;
+	inset-inline: var(--bn-s4);
+	inset-block-end: var(--bn-s4);
+	z-index: 9990;
+	margin-inline: auto;
+	max-width: 44rem;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--bn-s4);
+	flex-wrap: wrap;
+	padding: var(--bn-s3) var(--bn-s4);
+	background: var(--bn-surface);
+	color: var(--bn-ink);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-lg);
+	box-shadow: var(--bn-shadow-lg, var(--bn-shadow-md, none));
+}
+
+.bn-cookie-consent__text {
+	margin: 0;
+	flex: 1 1 16rem;
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink-2);
+}
+
+.bn-cookie-consent__link {
+	color: var(--bn-accent);
+	text-decoration: underline;
+}
+
+@media (max-width: 640px) {
+	.bn-cookie-consent {
+		inset-inline: var(--bn-s2);
+		inset-block-end: var(--bn-s2);
+		flex-direction: column;
+		align-items: stretch;
+	}
+
+	.bn-cookie-consent .bn-btn {
+		width: 100%;
+	}
+}
+
+/* ── Email unsubscribe confirmation banner ──────────────────────────────
+	Rendered by EmailDispatchListener::render_unsubscribe_status_notice() on
+	?bn_unsub_status=… redirects. Fixed toast-style so it reads on any page
+	(logged-in or logged-out) without theme cooperation. */
+.bn-unsub-notice {
+	position: fixed;
+	inset-inline: 0;
+	bottom: var(--bn-s6);
+	margin-inline: auto;
+	width: fit-content;
+	max-width: min(92vw, 34rem);
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s3);
+	padding: var(--bn-s3) var(--bn-s4);
+	border: 1px solid var(--bn-line);
+	border-inline-start: 3px solid var(--bn-line-strong);
+	border-radius: var(--bn-r-lg);
+	background: var(--bn-raised, var(--bn-surface));
+	color: var(--bn-ink);
+	box-shadow: var(--bn-shadow-lg);
+	font-size: var(--bn-text-sm);
+	z-index: 1200;
+}
+.bn-unsub-notice--success { border-inline-start-color: var(--bn-success); }
+.bn-unsub-notice--error { border-inline-start-color: var(--bn-danger); }
+.bn-unsub-notice__manage {
+	color: var(--bn-accent);
+	font-weight: var(--bn-fw-semibold);
+	text-decoration: none;
+	white-space: nowrap;
+}
+.bn-unsub-notice__manage:hover,
+.bn-unsub-notice__manage:focus-visible { text-decoration: underline; }
+.bn-unsub-notice__dismiss {
+	color: var(--bn-ink-3);
+	text-decoration: none;
+	font-size: var(--bn-text-lg);
+	line-height: 1;
+	padding: 0 var(--bn-s1);
+}
+@media (max-width: 640px) {
+	.bn-unsub-notice {
+		bottom: var(--bn-s4);
+		flex-wrap: wrap;
+	}
+}
+
+/* ── Settings hold banner ────────────────────────────────────────────────────
+   Shown on Settings → Account when a policy is holding the member there (today:
+   forced 2FA enrolment). Explains WHY they were routed here; without it the
+   redirect reads as a broken link. Inline, not a toast - it must stay on screen
+   until the hold clears, so it cannot auto-dismiss. */
+.bn-settings-hold {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--bn-s3);
+	margin-block-end: var(--bn-s4);
+	padding: var(--bn-s3) var(--bn-s4);
+	border: 1px solid var(--bn-line);
+	border-inline-start: 3px solid var(--bn-warn);
+	border-radius: var(--bn-r-lg);
+	background: var(--bn-warn-bg);
+	color: var(--bn-ink);
+}
+.bn-settings-hold__icon {
+	flex: none;
+	display: inline-flex;
+	color: var(--bn-warn);
+}
+.bn-settings-hold__icon svg { width: 20px; height: 20px; }
+/* min-width:0 so a long translation wraps instead of forcing the banner wider
+   than its column - the flex min-content floor bites here otherwise. */
+.bn-settings-hold__body { min-width: 0; }
+.bn-settings-hold__title {
+	display: block;
+	font-size: var(--bn-text-sm);
+	line-height: 1.4;
+}
+.bn-settings-hold__text {
+	margin: var(--bn-s1) 0 0;
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink-2);
+	line-height: 1.5;
+}
+@media (max-width: 640px) {
+	.bn-settings-hold {
+		padding: var(--bn-s3);
+		gap: var(--bn-s2);
+	}
+}

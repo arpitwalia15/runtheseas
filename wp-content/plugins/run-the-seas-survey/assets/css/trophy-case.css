@@ -1,0 +1,2023 @@
+.rts-trophy-case {
+	--rts-case-gold: #d89a25;
+	--rts-case-gold-light: #ffd875;
+	position: relative;
+	width: 100%;
+	max-width: 1380px;
+	padding: clamp(16px, 2vw, 28px);
+	border: 1px solid #a66b10;
+	margin: 24px auto;
+	background: radial-gradient(circle at 50% 0, rgba(52, 92, 145, .22), transparent 32%), linear-gradient(135deg, #010810, #03131f);
+	box-shadow: inset 0 0 0 5px #02070d, inset 0 0 0 6px rgba(216, 154, 37, .45), 0 24px 60px rgba(0, 0, 0, .45);
+	box-sizing: border-box;
+	color: #f8e5b8;
+	font-family: Georgia, "Times New Roman", serif;
+}
+
+.rts-trophy-case *, .rts-trophy-case *::before, .rts-trophy-case *::after { box-sizing: border-box; }
+
+/* Do not inherit the theme's global alarm icon on plaque small elements. */
+.rts-trophy-case small::before {
+	display: none !important;
+	background: none !important;
+	content: none !important;
+}
+
+.rts-trophy-case__header {
+	padding: 12px 20px 22px;
+	border-bottom: 1px solid rgba(216, 154, 37, .62);
+	text-align: center;
+	text-transform: uppercase;
+}
+
+.rts-trophy-case__anchor { display: block; color: var(--rts-case-gold-light); font-size: 1.5rem; }
+.rts-trophy-case__header h1 {
+	margin: 0;
+	background: linear-gradient(#fff2bd, #e49a22 54%, #7d4305);
+	-webkit-background-clip: text;
+	background-clip: text;
+	color: transparent;
+	font-size: clamp(2.5rem, 7vw, 5.8rem);
+	font-weight: 500;
+	letter-spacing: .06em;
+	line-height: .95;
+}
+
+.rts-trophy-case__header > p {
+	width: min(520px, 90%);
+	padding: 7px 20px;
+	border-top: 1px solid rgba(216, 154, 37, .7);
+	border-bottom: 1px solid rgba(216, 154, 37, .7);
+	margin: 12px auto 0;
+	color: var(--rts-case-gold-light);
+	font-size: clamp(1rem, 2vw, 1.55rem);
+	letter-spacing: .08em;
+}
+
+.rts-trophy-case__summary {
+	display: flex;
+	margin-top: 14px;
+	color: #d7b668;
+	font-size: .72rem;
+	gap: 8px 24px;
+	justify-content: center;
+	letter-spacing: .05em;
+	flex-wrap: wrap;
+}
+
+.rts-trophy-case__cabinet {
+	padding: 20px 12px 10px;
+	background: repeating-linear-gradient(90deg, transparent 0, transparent calc(14.285% - 1px), rgba(216, 154, 37, .11) calc(14.285% - 1px), rgba(216, 154, 37, .11) 14.285%), linear-gradient(rgba(1, 10, 18, .94), rgba(1, 8, 14, .99));
+}
+
+.rts-trophy-case__grid {
+	display: grid;
+	grid-template-columns: repeat(5, minmax(0, 1fr));
+	gap: 28px 14px;
+	align-items: end;
+}
+
+.rts-trophy-case__item {
+	display: flex;
+	grid-column: auto;
+	flex-direction: column;
+	position: relative;
+	min-width: 0;
+	padding-bottom: 11px;
+	border-bottom: 7px solid #6e3d07;
+	background: radial-gradient(ellipse at 50% 15%, rgba(255, 206, 98, .12), transparent 45%);
+	box-shadow: inset 0 -1px #f0b84c, 0 8px 0 #150c03, 0 11px 15px rgba(0, 0, 0, .56);
+	text-align: center;
+}
+
+.rts-trophy-case__item--founding-runner,
+.rts-trophy-case__item--21k,
+.rts-trophy-case__item--42k { grid-column: auto; }
+
+.rts-trophy-case__milestone-label {
+	align-self: center;
+	padding: 22px 8px;
+	color: #e9bd63;
+	text-align: center;
+	text-transform: uppercase;
+}
+
+.rts-trophy-case__milestone-label--half { grid-column: 4 / span 2; }
+.rts-trophy-case__milestone-label--marathon { grid-column: 12 / span 3; }
+
+.rts-trophy-case__milestone-label::before,
+.rts-trophy-case__milestone-label::after {
+	display: block;
+	width: 75%;
+	height: 1px;
+	margin: 0 auto 17px;
+	background: linear-gradient(90deg, transparent, #b97a18, transparent);
+	content: "";
+}
+
+.rts-trophy-case__milestone-label::after { margin: 17px auto 0; }
+.rts-trophy-case__milestone-label span,
+.rts-trophy-case__milestone-label strong,
+.rts-trophy-case__milestone-label em { display: block; }
+.rts-trophy-case__milestone-label span { font-size: clamp(.78rem, 1.2vw, 1.16rem); letter-spacing: .08em; }
+.rts-trophy-case__milestone-label strong { margin: 5px 0; color: #f4c866; font-size: clamp(1.25rem, 2vw, 2rem); font-weight: 500; letter-spacing: .05em; }
+.rts-trophy-case__milestone-label em { font-size: clamp(.8rem, 1.25vw, 1.2rem); font-style: italic; letter-spacing: .04em; text-transform: none; }
+
+.rts-trophy-case__display {
+	position: relative;
+	display: block;
+	height: 350px;
+	color: inherit;
+	text-decoration: none;
+}
+.rts-trophy-case__item.is-major .rts-trophy-case__display { height: 350px; }
+
+.rts-trophy-case__spotlight {
+	position: absolute;
+	top: -7px;
+	left: 50%;
+	width: 72%;
+	height: 85%;
+	background: linear-gradient(100deg, transparent 8%, rgba(255, 221, 144, .16) 48%, transparent 84%);
+	clip-path: polygon(42% 0, 58% 0, 100% 100%, 0 100%);
+	transform: translateX(-50%);
+}
+
+.rts-trophy-case__image {
+	position: absolute;
+	inset: 5px 7px 14px;
+	z-index: 1;
+	display: block;
+	width: calc(100% - 14px);
+	height: calc(100% - 19px);
+	object-fit: contain;
+	filter: drop-shadow(0 9px 8px rgba(0, 0, 0, .62));
+	transition: filter .25s ease, transform .25s ease;
+}
+
+/*.rts-trophy-case__item.is-earned .rts-trophy-case__display:hover .rts-trophy-case__image { filter: drop-shadow(0 10px 12px rgba(255, 186, 49, .34)); transform: translateY(-3px); }*/
+.rts-trophy-case__item.is-locked .rts-trophy-case__image { filter: grayscale(.28) brightness(.58) drop-shadow(0 8px 8px rgba(0, 0, 0, .68)); }
+.rts-trophy-case__item.has-locked-artwork .rts-trophy-case__image { filter: drop-shadow(0 8px 8px rgba(0, 0, 0, .68)); }
+
+.rts-trophy-case__plaque {
+	position: relative;
+	z-index: 4;
+	display: block;
+	width: calc(100% - 24px);
+	min-height: 48px;
+	padding: 7px 6px;
+	border: 1px solid #cf8f20;
+	margin: -4px auto 0;
+	background: linear-gradient(#17130c, #030303);
+	box-shadow: inset 0 0 0 2px #4e2b05, 0 3px 7px rgba(0, 0, 0, .65);
+	clip-path: polygon(7px 0, calc(100% - 7px) 0, 100% 7px, 100% calc(100% - 7px), calc(100% - 7px) 100%, 7px 100%, 0 calc(100% - 7px), 0 7px);
+	color: #f7c65e;
+	line-height: 1.05;
+	text-transform: uppercase;
+}
+
+.rts-trophy-case__plaque b { display: block; font-size: clamp(.72rem, 1vw, 1rem); font-weight: 500; }
+.rts-trophy-case__plaque small { display: block; overflow: hidden; margin-top: 5px; font: 600 clamp(.58rem, .7vw, .75rem)/1 Arial, sans-serif; letter-spacing: .03em; text-overflow: ellipsis; text-transform: none; white-space: nowrap; }
+
+.rts-trophy-case__glass {
+	position: absolute;
+	top: 17px;
+	right: 6%;
+	bottom: 5px;
+	left: 6%;
+	z-index: 3;
+	border-right: 2px solid rgba(255, 238, 189, .5);
+	border-left: 2px solid rgba(255, 238, 189, .35);
+	border-radius: 44% 44% 18% 18% / 7% 7% 4% 4%;
+	background: linear-gradient(100deg, rgba(255, 255, 255, .05), rgba(255, 243, 204, .15) 18%, transparent 32%, rgba(255, 255, 255, .08) 68%, transparent 84%);
+	box-shadow: inset 12px 0 18px rgba(255, 255, 255, .04), inset -8px 0 14px rgba(255, 224, 156, .05);
+	pointer-events: none;
+}
+
+.rts-trophy-case__glass::before, .rts-trophy-case__glass::after {
+	position: absolute;
+	right: -3px;
+	left: -3px;
+	height: 24px;
+	border: 2px solid rgba(255, 226, 156, .58);
+	border-radius: 50%;
+	content: "";
+}
+.rts-trophy-case__glass::before { top: -8px; background: rgba(255, 255, 255, .025); }
+.rts-trophy-case__glass::after { bottom: -8px; border-color: rgba(255, 196, 77, .44); }
+
+.rts-trophy-case__lock {
+	position: absolute;
+	top: 24px;
+	left: 50%;
+	z-index: 6;
+	display: block;
+	width: 32px;
+	height: 29px;
+	border: 1px solid #ffe092;
+	border-radius: 3px 3px 5px 5px;
+	background: linear-gradient(#ffd87c, #a85b08);
+	box-shadow: inset 0 0 0 2px #5e3104, 0 4px 8px rgba(0, 0, 0, .6);
+	transform: translateX(-50%);
+}
+
+.rts-trophy-case__lock::before { position: absolute; top: -21px; left: 5px; width: 20px; height: 23px; border: 4px solid #d99424; border-bottom: 0; border-radius: 13px 13px 0 0; box-shadow: inset 1px 0 rgba(255, 230, 155, .55); content: ""; }
+.rts-trophy-case__lock i, .rts-trophy-case__lock i::after { position: absolute; display: block; content: ""; }
+.rts-trophy-case__lock i { top: 8px; left: 13px; width: 6px; height: 7px; border-radius: 50%; background: #2b1602; }
+.rts-trophy-case__lock i::after { top: 4px; left: 2px; width: 2px; height: 7px; background: #2b1602; }
+.rts-trophy-case__lock.has-image {
+	width: 38px;
+	height: 38px;
+	border: 0;
+	background: none;
+	box-shadow: none;
+}
+.rts-trophy-case__lock.has-image::before { display: none; content: none; }
+.rts-trophy-case__lock.has-image img { display: block; width: 100%; height: 100%; object-fit: contain; }
+
+.rts-trophy-case__status { min-height: 22px; padding-top: 8px; color: #c8a154; font-size: .68rem; letter-spacing: .07em; text-transform: uppercase; }
+.rts-trophy-case__item.is-earned .rts-trophy-case__status { color: #f2c567; }
+
+.rts-trophy-case__footer { padding: 20px 20px 8px; border-top: 1px solid rgba(216, 154, 37, .5); text-align: center; }
+.rts-trophy-case__footer p { margin: 0; color: #d7a94a; font-size: clamp(.85rem, 1.3vw, 1.1rem); letter-spacing: .08em; text-transform: uppercase; }
+.rts-trophy-case__footer strong { color: var(--rts-case-gold-light); font-weight: 500; }
+.rts-trophy-case__progress { overflow: hidden; width: min(680px, 90%); height: 4px; margin: 16px auto 0; background: #0e2433; }
+.rts-trophy-case__progress span { display: block; height: 100%; background: linear-gradient(90deg, #9a5b0c, #ffd774); box-shadow: 0 0 9px #d89a25; }
+
+.rts-trophy-case__milestone-copy { display: none; }
+
+@media (max-width: 1100px) {
+	.rts-trophy-case__grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+	.rts-trophy-case__item,
+	.rts-trophy-case__item--founding-runner,
+	.rts-trophy-case__item--21k,
+	.rts-trophy-case__item--42k,
+	.rts-trophy-case__milestone-label--half,
+	.rts-trophy-case__milestone-label--marathon { grid-column: auto; }
+	.rts-trophy-case__display,
+	.rts-trophy-case__item.is-major .rts-trophy-case__display { height: 360px; }
+}
+
+@media (max-width: 680px) {
+	.rts-trophy-case { width: 100%; padding: 10px; }
+	.rts-trophy-case__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 8px; }
+	.rts-trophy-case__display, .rts-trophy-case__item.is-major .rts-trophy-case__display { height: 320px; }
+	.rts-trophy-case__header h1 { font-size: 2.35rem; }
+}
+
+@media (max-width: 420px) {
+	.rts-trophy-case__grid { grid-template-columns: 1fr; }
+	.rts-trophy-case__display, .rts-trophy-case__item.is-major .rts-trophy-case__display { height: 330px; }
+}
+
+/* Fixed cabinet composition used when an administrator uploads the 3:2 background. */
+.rts-trophy-case.has-background-artwork {
+	isolation: isolate;
+	left: 50%;
+	width: min(1800px, calc(100vw - 24px));
+	max-width: none;
+	padding: 0;
+	border: 0;
+	margin: 24px auto;
+	aspect-ratio: 3 / 2;
+	overflow: hidden;
+	background: var(--rts-trophy-case-background) center / 100% 100% no-repeat;
+	box-shadow: none;
+	transform: translateX(-50%);
+}
+
+.rts-trophy-case.has-background-artwork .rts-trophy-case__header {
+	position: absolute;
+	top: 12.2%;
+	right: 12%;
+	left: 12%;
+	z-index: 5;
+	padding: 0;
+	border: 0;
+}
+
+.rts-trophy-case.has-background-artwork .rts-trophy-case__anchor,
+.rts-trophy-case.has-background-artwork .rts-trophy-case__summary { display: none; }
+
+.rts-trophy-case.has-background-artwork .rts-trophy-case__header h1 {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	border: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	clip-path: inset(50%);
+	white-space: nowrap;
+}
+
+.rts-trophy-case.has-background-artwork .rts-trophy-case__header > p {
+	width: min(38%, 440px);
+	padding: 0;
+	border: 0;
+	margin: 0 auto;
+	font-size: clamp(7px, 1.2vw, 18px);
+	line-height: 1;
+	text-shadow: 0 1px 2px #000;
+}
+
+.rts-trophy-case__title-image,
+.rts-trophy-case__title-icon-image { display: none; }
+
+.rts-trophy-case.has-background-artwork.has-title-artwork .rts-trophy-case__header {
+	top: 1.2%;
+	right: 10%;
+	left: 10%;
+	height: 16.5%;
+}
+
+.rts-trophy-case.has-background-artwork.has-title-artwork .rts-trophy-case__title-image {
+	position: absolute;
+	top: -13px;
+	left: 50%;
+	display: block;
+	width: 85%;
+	height: 100%;
+	object-fit: contain;
+	transform: translateX(-50%);
+}
+
+.rts-trophy-case.has-background-artwork .rts-trophy-case__title-icon-image {
+	position: absolute;
+	top: -9%;
+	left: 50%;
+	z-index: 3;
+	display: block;
+	width: 5%;
+	height: 27%;
+	object-fit: contain;
+	transform: translateX(-50%);
+}
+
+.rts-trophy-case.has-background-artwork.has-title-artwork .rts-trophy-case__header > p {
+	position: absolute;
+	top: 61%;
+	right: 29%;
+	bottom: 0;
+	left: 29%;
+	z-index: 2;
+	display: flex;
+	width: auto;
+	height: 30%;
+	margin: 0;
+	color: #f7c65e;
+	font-size: clamp(11px, 1.35vw, 24px);
+	font-weight: 600;
+	letter-spacing: .04em;
+	line-height: 1;
+	align-items: center;
+	justify-content: center;
+	white-space: nowrap;
+}
+
+.rts-trophy-case.has-background-artwork .rts-trophy-case__cabinet,
+.rts-trophy-case.has-background-artwork .rts-trophy-case__grid {
+	position: absolute;
+	inset: 0;
+	padding: 0;
+	background: none;
+}
+
+.rts-trophy-case.has-background-artwork .rts-trophy-case__grid { display: block; }
+
+/* Split gold divider: the shelf remains visible through the intentional gap. */
+.rts-trophy-case.has-background-artwork .rts-trophy-case__grid::before,
+.rts-trophy-case.has-background-artwork .rts-trophy-case__grid::after {
+	position: absolute;
+	left: 28%;
+	z-index: 1;
+	width: 2px;
+	background: linear-gradient(180deg, rgba(255, 218, 126, .45), #d29a2c 7%, #d29a2c 93%, rgba(255, 218, 126, .45));
+	box-shadow: 0 0 3px rgba(210, 154, 44, .3);
+	content: "";
+	pointer-events: none;
+}
+
+.rts-trophy-case.has-background-artwork .rts-trophy-case__grid::before {
+	top: 48%;
+	bottom: 15.8%;
+}
+
+.rts-trophy-case.has-background-artwork .rts-trophy-case__grid::after {
+	top: 85.8%;
+	bottom: 11.2%;
+}
+
+.rts-trophy-case.has-background-artwork .rts-trophy-case__item {
+	position: absolute;
+	z-index: 2;
+	display: block;
+	min-width: 0;
+	padding: 0;
+	border: 0;
+	background: none;
+	box-shadow: none;
+}
+
+/* Seven smaller milestones on the illuminated upper shelf. */
+.rts-trophy-case.has-background-artwork .rts-trophy-case__item--5k,
+.rts-trophy-case.has-background-artwork .rts-trophy-case__item--10k,
+.rts-trophy-case.has-background-artwork .rts-trophy-case__item--15k,
+.rts-trophy-case.has-background-artwork .rts-trophy-case__item--20k,
+.rts-trophy-case.has-background-artwork .rts-trophy-case__item--25k,
+.rts-trophy-case.has-background-artwork .rts-trophy-case__item--30k,
+.rts-trophy-case.has-background-artwork .rts-trophy-case__item--35k {
+	top: 16.9%;
+	width: 10.4%;
+	height: 29.3%;
+}
+
+.rts-trophy-case.has-background-artwork .rts-trophy-case__item--5k  { left: 11.4%; --rts-podium-name-bottom: 10.0%; --rts-podium-name-left: 3%; --rts-podium-name-right: 3%; --rts-podium-name-size: clamp(6px, .72vw, 12px); }
+.rts-trophy-case.has-background-artwork .rts-trophy-case__item--10k { left: 22.7%; --rts-podium-name-bottom: 9.5%; --rts-podium-name-left: 3%; --rts-podium-name-right: 3%; --rts-podium-name-size: clamp(6px, .72vw, 12px); }
+.rts-trophy-case.has-background-artwork .rts-trophy-case__item--15k { left: 34%; --rts-podium-name-bottom: 9.5%; --rts-podium-name-left: 3%; --rts-podium-name-right: 3%; --rts-podium-name-size: clamp(6px, .72vw, 12px); }
+.rts-trophy-case.has-background-artwork .rts-trophy-case__item--20k { left: 45.3%; --rts-podium-name-bottom: 9.5%; --rts-podium-name-left: 3%; --rts-podium-name-right: 3%; --rts-podium-name-size: clamp(6px, .72vw, 12px); }
+.rts-trophy-case.has-background-artwork .rts-trophy-case__item--25k { left: 56.6%; --rts-podium-name-bottom: 9.5%; --rts-podium-name-left: 3%; --rts-podium-name-right: 3%; --rts-podium-name-size: clamp(6px, .72vw, 12px); }
+.rts-trophy-case.has-background-artwork .rts-trophy-case__item--30k { left: 67.9%; --rts-podium-name-bottom: 9.5%; --rts-podium-name-left: 3%; --rts-podium-name-right: 3%; --rts-podium-name-size: clamp(6px, .72vw, 12px); }
+.rts-trophy-case.has-background-artwork .rts-trophy-case__item--35k { left: 79.2%; --rts-podium-name-bottom: 9.5%; --rts-podium-name-left: 3%; --rts-podium-name-right: 3%; --rts-podium-name-size: clamp(6px, .72vw, 12px); }
+
+/* The three feature trophies use the taller lower-shelf bays. */
+.rts-trophy-case.has-background-artwork .rts-trophy-case__item--founding-runner {
+	top: 58%;
+	left: 14.4%;
+	width: 12.5%;
+	height: 30%;
+	--rts-podium-name-bottom: 14.5%;
+	--rts-podium-name-left: 8%;
+	--rts-podium-name-right: 8%;
+	--rts-podium-name-size: clamp(6px, .78vw, 13px);
+}
+
+.rts-trophy-case.has-background-artwork .rts-trophy-case__item--21k {
+	top: 48.2%;
+	left: 39.7%;
+	width: 16.2%;
+	height: 40.5%;
+	--rts-podium-name-bottom: 15.5%;
+	--rts-podium-name-left: 9%;
+	--rts-podium-name-right: 9%;
+	--rts-podium-name-size: clamp(6px, .78vw, 13px);
+}
+
+.rts-trophy-case.has-background-artwork .rts-trophy-case__item--42k {
+	top: 48.2%;
+	left: 58.1%;
+	width: 16.2%;
+	height: 40.5%;
+	--rts-podium-name-bottom: 15.5%;
+	--rts-podium-name-left: 9%;
+	--rts-podium-name-right: 9%;
+	--rts-podium-name-size: clamp(6px, .78vw, 13px);
+}
+
+.rts-trophy-case.has-background-artwork .rts-trophy-case__display,
+.rts-trophy-case.has-background-artwork .rts-trophy-case__item.is-major .rts-trophy-case__display {
+	position: absolute;
+	inset: 0;
+	height: 100%;
+}
+
+.rts-trophy-case.has-background-artwork .rts-trophy-case__image {
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	object-fit: contain;
+	object-position: center bottom;
+}
+
+.rts-trophy-case.has-background-artwork .rts-trophy-case__spotlight { display: none; }
+
+.rts-trophy-case.has-background-artwork .rts-trophy-case__plaque {
+	position: absolute;
+	right: var(--rts-podium-name-right, 8%);
+	bottom: var(--rts-podium-name-bottom, 1.5%);
+	left: var(--rts-podium-name-left, 8%);
+	z-index: 7;
+	display: flex;
+	height: 5.5%;
+	width: auto;
+	min-height: 0;
+	padding: 0;
+	border: 0;
+	margin: 0;
+	background: none;
+	box-shadow: none;
+	clip-path: none;
+	align-items: center;
+	justify-content: center;
+	line-height: 1;
+}
+
+.rts-trophy-case.has-background-artwork .rts-trophy-case__plaque small {
+	margin: 0;
+	color: #f7c65e;
+	font-size: var(--rts-podium-name-size, clamp(6px, .72vw, 12px));
+	line-height: 1;
+	text-shadow: 0 1px 1px #000;
+}
+
+.rts-trophy-case.has-background-artwork .rts-trophy-case__status { display: none; }
+
+.rts-trophy-case.has-background-artwork .rts-trophy-case__milestone-copy {
+	position: absolute;
+	z-index: 4;
+	display: flex;
+	color: #e2ad4c;
+	font-size: clamp(10px, 1.65vw, 27px);
+	line-height: 1.12;
+	text-align: center;
+	text-shadow: 0 1px 2px #000;
+	text-transform: uppercase;
+	flex-direction: column;
+	align-items: center;
+}
+
+.rts-trophy-case.has-background-artwork .rts-trophy-case__milestone-copy strong { font-weight: 500; letter-spacing: .035em; }
+.rts-trophy-case.has-background-artwork .rts-trophy-case__milestone-copy b { color: #f5c763; font-size: 1.12em; font-weight: 500; letter-spacing: .025em; }
+.rts-trophy-case.has-background-artwork .rts-trophy-case__milestone-copy em {
+	font-family: "Segoe Script", "Brush Script MT", "Lucida Handwriting", cursive;
+	font-size: 1em;
+	font-style: italic;
+	line-height: 1.25;
+	text-transform: none;
+}
+.rts-trophy-case.has-background-artwork .rts-trophy-case__milestone-copy--founding { top: 54.7%; left: 11.5%; width: 16.5%; font-size: 1.4rem; text-align: center; }
+.rts-trophy-case.has-background-artwork .rts-trophy-case__milestone-copy--half { top: 64%; left: 27.5%; width: 14%; font-size: 1.4rem; text-align: center;}
+.rts-trophy-case.has-background-artwork .rts-trophy-case__milestone-copy--marathon { top: 64%; left: 73.5%; width: 14%; font-size: 1.4rem; text-align: center;}
+
+.rts-trophy-case.has-background-artwork .rts-trophy-case__ornamented-line {
+	display: flex;
+	width: 100%;
+	margin: .2em 0;
+	align-items: center;
+	justify-content: center;
+	gap: .35em;
+}
+
+.rts-trophy-case.has-background-artwork .rts-trophy-case__member-line {
+	margin-top: .18em;
+	font-size: .62em;
+	white-space: nowrap;
+}
+
+.rts-trophy-case.has-background-artwork .rts-trophy-case__member-line b {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.rts-trophy-case.has-background-artwork .rts-trophy-case__milestone-copy--half > strong {
+	width: 6.5em;
+}
+
+.rts-trophy-case.has-background-artwork .rts-trophy-case__ornament {
+	position: relative;
+	display: block;
+	width: 1.85em;
+	height: .7em;
+	flex: 0 0 1.85em;
+}
+
+.rts-trophy-case.has-background-artwork .rts-trophy-case__ornament img {
+	display: block;
+	width: 100%;
+	height: 100%;
+	object-fit: contain;
+}
+
+.rts-trophy-case.has-background-artwork .rts-trophy-case__ornament:empty::before {
+	position: absolute;
+	top: 50%;
+	right: 0;
+	left: 0;
+	height: 1px;
+	background: #dba439;
+	box-shadow: 0 1px 2px rgba(0, 0, 0, .6);
+	content: "";
+}
+
+.rts-trophy-case.has-background-artwork .rts-trophy-case__ornament:empty::after {
+	position: absolute;
+	top: 50%;
+	width: .4em;
+	height: .4em;
+	border-top: 1px solid #dba439;
+	border-left: 1px solid #dba439;
+	content: "";
+}
+
+.rts-trophy-case.has-background-artwork .rts-trophy-case__ornament--left:empty::after {
+	left: 0;
+	transform: translateY(-50%) rotate(-45deg);
+}
+
+.rts-trophy-case.has-background-artwork .rts-trophy-case__ornament--right:empty::after {
+	right: 0;
+	transform: translateY(-50%) rotate(135deg);
+}
+
+.rts-trophy-case.has-background-artwork .rts-trophy-case__milestone-copy.has-image .rts-trophy-case__caption-art {
+	display: block;
+	width: 100%;
+	height: auto;
+	max-height: 100%;
+	object-fit: contain;
+}
+
+.rts-trophy-case.has-background-artwork .rts-trophy-case__milestone-copy--founding.has-image { height: 13%; }
+.rts-trophy-case.has-background-artwork .rts-trophy-case__milestone-copy--founding.has-image .rts-trophy-case__caption-art { max-height: 72%; }
+.rts-trophy-case.has-background-artwork .rts-trophy-case__milestone-copy--half.has-image,
+.rts-trophy-case.has-background-artwork .rts-trophy-case__milestone-copy--marathon.has-image { height: 14%; }
+
+.rts-trophy-case.has-background-artwork .rts-trophy-case__footer {
+	position: absolute;
+	right: 21%;
+	bottom: 2.8%;
+	left: 21%;
+	z-index: 5;
+	padding: 0;
+	border: 0;
+}
+
+.rts-trophy-case.has-background-artwork.has-footer-frame-artwork .rts-trophy-case__footer {
+	right: 24%;
+	bottom: 4.2%;
+	left: 24%;
+	display: flex;
+	height: 6.3%;
+	padding: 0 5%;
+	background: var(--rts-trophy-case-footer-frame) center / 100% 100% no-repeat;
+	align-items: center;
+	justify-content: center;
+}
+
+.rts-trophy-case.has-background-artwork .rts-trophy-case__footer p {
+	font-size: clamp(5px, .75vw, 11px);
+	line-height: 1.15;
+}
+
+.rts-trophy-case.has-background-artwork.has-footer-frame-artwork .rts-trophy-case__footer p {
+	display: block;
+	width: 100%;
+	margin: 0;
+    font-size: clamp(11px, 3.76vw, 19px);
+	line-height: 1.08;
+	text-align: center;
+	transform: translateY(-4%);
+}
+
+.rts-trophy-case.has-background-artwork .rts-trophy-case__progress { display: none; }
+
+/* Marathon 1 follows the founding-member cabinet reference: eight trophies on
+ * the upper shelf, the half/full marathon trophies below, and optional artwork
+ * icons for the informational panels and footer. */
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__grid::before,
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__grid::after,
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__milestone-copy { display: none; content: none; }
+
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__item--founding-runner,
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__item--5k,
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__item--10k,
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__item--15k,
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__item--20k,
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__item--25k,
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__item--30k,
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__item--35k {
+	top: 14.5%;
+	width: 10%;
+	height: 33.5%;
+	--rts-podium-name-bottom: 2%;
+	--rts-podium-name-left: 4%;
+	--rts-podium-name-right: 4%;
+	--rts-podium-name-size: clamp(6px, .7vw, 12px);
+}
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__item--founding-runner { left: 7%; }
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__item--5k { left: 18%; }
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__item--10k { left: 29%; }
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__item--15k { left: 40%; }
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__item--20k { left: 51%; }
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__item--25k { left: 62%; }
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__item--30k { left: 73%; }
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__item--35k { left: 84%; }
+
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__item--21k,
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__item--42k {
+	top: 49.5%;
+	width: 16.5%;
+	height: 36.5%;
+	--rts-podium-name-bottom: 13%;
+	--rts-podium-name-left: 9%;
+	--rts-podium-name-right: 9%;
+	--rts-podium-name-size: clamp(6px, .78vw, 13px);
+}
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__item--21k { left: 27%; }
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__item--42k { left: 48.5%; }
+
+/* Marathon 1 uploads are deliberately artwork-only. All wording is rendered
+ * as responsive HTML so names, dates and progress stay current. */
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__header,
+.rts-trophy-case--marathon-one.has-background-artwork.has-title-artwork .rts-trophy-case__header {
+	top: 2.4%;
+	right: 11%;
+	left: 11%;
+	height: 14.5%;
+}
+
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__title-image { display: none; }
+
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__marathon-one-title {
+	position: absolute;
+	top: 2px;
+	right: 0;
+	left: 0;
+	display: flex;
+	height: 72%;
+	color: #e6ad3c;
+	font-family: Georgia, "Times New Roman", serif;
+	line-height: 1;
+	text-align: center;
+	text-shadow: 0 1px 2px #000, 0 0 8px rgba(210, 142, 22, .3);
+	text-transform: uppercase;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	box-sizing: border-box;
+	padding: .5% 2%;
+	background-image: var(--rts-m1-heading-frame, none), radial-gradient(ellipse at center, rgba(0, 8, 19, .94) 0%, rgba(0, 8, 19, .75) 65%, rgba(0, 8, 19, 0) 100%);
+	background-position: center;
+	background-size: 100% 100%, 96% 100%;
+	background-repeat: no-repeat;
+}
+
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__title-run-line {
+    display: flex;
+    width: 25%;
+    height: 18%;
+    align-items: center;
+    justify-content: center;
+    gap: .8em;
+    background: #010409;
+    padding: 3px 4px;
+}
+
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__title-run-line > img {
+	display: block;
+	width: 3.25em;
+	height: 2.1em;
+	object-fit: contain;
+}
+
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__title-run-copy {
+	display: inline-flex;
+	font-size: clamp(6px, 1.12vw, 20px);
+	letter-spacing: .22em;
+	align-items: center;
+	justify-content: center;
+	white-space: nowrap;
+}
+
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__title-word-icon {
+	display: inline-block;
+	width: 1.05em;
+	height: 1.45em;
+	margin: 0 .04em 0 -.12em;
+	object-fit: contain;
+}
+
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__marathon-one-title small {
+	margin-top: .3em;
+	font-size: clamp(6px, 1.15vw, 21px);
+	letter-spacing: .15em;
+}
+
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__marathon-one-title strong {
+	font-size: clamp(20px, 5.25vw, 90px);
+	font-weight: 500;
+	letter-spacing: .1em;
+	white-space: nowrap;
+}
+
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__title-case-line {
+	display: flex;
+	width: 100%;
+	margin-top: .12em;
+	align-items: center;
+	justify-content: center;
+	gap: 1.2%;
+}
+
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__title-case-line > img {
+	display: block;
+	width: 16%;
+	height: clamp(24px, 8.8vw, 104px);
+	object-fit: contain;
+}
+
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__header > p, .rts-trophy-case--marathon-one.has-background-artwork.has-title-artwork .rts-trophy-case__header > p {
+    position: absolute;
+    top: auto;
+    right: 37%;
+    bottom: -11px;
+    left: 37%;
+    z-index: 4;
+    display: flex;
+    width: auto;
+    height: 23%;
+    margin: 0;
+    color: #f5c75e;
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: clamp(7px, 1.22vw, 21px);
+    letter-spacing: .08em;
+    line-height: 1;
+    text-transform: uppercase;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    /* background: linear-gradient(90deg, rgba(0, 7, 17, 0), rgba(0, 7, 17, .96) 10%, rgba(0, 7, 17, .96) 90%, rgba(0, 7, 17, 0)); */
+    background: #010409;
+}
+
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__header > p > span {
+	position: relative;
+	z-index: 2;
+	display: block;
+	max-width: 88%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__nameplate-frame {
+	position: absolute;
+	inset: 0;
+	z-index: 1;
+	display: block;
+	width: 100%;
+	height: 100%;
+	object-fit: fill;
+	pointer-events: none;
+}
+
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__plaque {
+	right: 2%;
+	bottom: 1.5%;
+	left: 2%;
+	display: flex;
+	height: 25%;
+	color: #f2bc45;
+	font-family: Georgia, "Times New Roman", serif;
+	line-height: 1.05;
+	text-align: center;
+	text-shadow: 0 1px 2px #000;
+	text-transform: uppercase;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+}
+
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__plaque > b {
+    display: block;
+    font-size: clamp(5px, .75vw, 13px);
+    font-weight: 500;
+    letter-spacing: .02em;
+    max-width: 130px;
+}
+
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__founding-details {
+	display: flex;
+	margin-top: .45em;
+	font-size: clamp(4px, .52vw, 9px);
+	line-height: 1.25;
+	flex-direction: column;
+	gap: .25em;
+}
+
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__founding-details em { font-style: normal; }
+
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__founding-details small {
+	color: #f2bc45;
+	font-size: inherit;
+	line-height: inherit;
+}
+
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__day-stats {
+	display: flex;
+	width: 90%;
+	margin-top: .45em;
+	font-size: clamp(4px, .48vw, 8px);
+	line-height: 1.05;
+	justify-content: center;
+}
+
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__day-stats em {
+	display: flex;
+	width: 50%;
+	font-style: normal;
+	flex-direction: column;
+	gap: .3em;
+}
+
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__day-stats em + em { border-left: 1px solid rgba(226, 173, 76, .8); }
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__day-stats i { font-size: 1.35em; font-style: normal; }
+
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__item--21k .rts-trophy-case__plaque,
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__item--42k .rts-trophy-case__plaque {
+	right: 11%;
+	bottom: 4%;
+	left: 11%;
+	height: 24%;
+}
+
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__item--21k .rts-trophy-case__plaque > b,
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__item--42k .rts-trophy-case__plaque > b { font-size: clamp(6px, .9vw, 15px); }
+
+.rts-trophy-case__marathon-one-panel {
+	position: absolute;
+	z-index: 4;
+	display: flex;
+	color: #e7b44e;
+	font-family: Georgia, "Times New Roman", serif;
+	font-size: clamp(4px, .63vw, 11px);
+	line-height: 1.35;
+	text-align: center;
+	text-shadow: 0 1px 2px #000;
+	text-transform: uppercase;
+	flex-direction: column;
+	align-items: center;
+	box-sizing: border-box;
+	overflow: hidden;
+	border: clamp(1px, .08vw, 2px) solid rgba(211, 158, 54, .72);
+	box-shadow: inset 0 0 12px rgba(218, 160, 42, .08);
+}
+
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__marathon-one-panel > :not(.rts-trophy-case__panel-frame) {
+	position: relative;
+	z-index: 2;
+}
+
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__panel-frame {
+	position: absolute;
+	inset: 0;
+	z-index: 1;
+	display: block;
+	width: 100%;
+	height: 100%;
+	max-width: none;
+	padding: 0;
+	border: 0;
+	margin: 0;
+	object-fit: fill;
+	pointer-events: none;
+}
+
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__marathon-one-panel h2 {
+	width: 100%;
+	margin: 0 0 .8em;
+	color: #efbd57;
+	font: 500 clamp(7px, 1.12vw, 20px)/1.1 Georgia, "Times New Roman", serif;
+	letter-spacing: .02em;
+	text-align: center;
+	text-transform: uppercase;
+}
+
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__marathon-one-panel p {
+	width: 100%;
+	margin: 0;
+	line-height: 1.35;
+	text-align: center;
+	word-break: normal;
+	overflow-wrap: normal;
+}
+
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__marathon-one-panel a {
+	display: inline-flex;
+	width: auto;
+	min-height: 2.5em;
+	padding: .35em .85em;
+	border: 1px solid #d99b29;
+	margin-top: auto;
+	color: #efbd57;
+	font-size: 1.15em;
+	font-weight: 600;
+	text-decoration: none;
+	align-items: center;
+	gap: .45em;
+	white-space: nowrap;
+}
+
+.rts-trophy-case__marathon-one-panel--earn {
+	top: 60%;
+	left: 7.5%;
+	width: 16.5%;
+	height: 24%;
+	padding: 5% 9% 7%;
+}
+.rts-trophy-case__marathon-one-panel--earn p { margin-top: 20%; }
+.rts-trophy-case__marathon-one-panel--progress {
+	top: 60%;
+	left: 64.5%;
+	width: 15.5%;
+	height: 25%;
+	padding: 5% 8% 7%;
+}
+.rts-trophy-case__marathon-one-panel--marathon-two {
+	top: 60%;
+	left: 82%;
+	width: 11.5%;
+	height: 25%;
+	padding: 7% 10% 8%;
+}
+.rts-trophy-case__marathon-one-panel--marathon-two p { margin-top: 35%; }
+
+.rts-trophy-case__marathon-one-panel--progress > span { margin-top: 16%; font-size: .95em; }
+.rts-trophy-case__marathon-one-panel--progress > strong {
+	width: 100%;
+	margin: .1em 0 .35em;
+	font-size: 2.25em;
+	font-weight: 500;
+	white-space: nowrap;
+}
+.rts-trophy-case__marathon-one-panel--progress > i {
+	display: block;
+	width: 90%;
+	height: .8em;
+	border: 1px solid #d99b29;
+	margin-bottom: .7em;
+	background: #020a16;
+}
+.rts-trophy-case__marathon-one-panel--progress > i > b {
+	display: block;
+	height: 100%;
+	background: linear-gradient(90deg, #082692, #194ee5);
+}
+
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__footer {
+	right: 7%;
+	bottom: 1.4%;
+	left: 7%;
+	display: flex;
+	height: 6.5%;
+	padding: 0;
+	align-items: center;
+	justify-content: center;
+}
+
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork.has-footer-frame-artwork .rts-trophy-case__footer {
+    right: 7%;
+    bottom: 3.6%;
+    left: 7%;
+    height: 7.5%;
+    padding: 0;
+    background: none;
+}
+
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__footer-frame {
+	position: absolute;
+	inset: 0;
+	z-index: 0;
+	display: block;
+	width: 100%;
+	height: 100%;
+	max-width: none;
+	padding: 0;
+	border: 0;
+	margin: 0;
+	object-fit: fill;
+	pointer-events: none;
+}
+
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__footer > :not(.rts-trophy-case__footer-frame) {
+	position: relative;
+	z-index: 2;
+}
+
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__footer p {
+	width: 62%;
+	margin: 0;
+	font-family: Georgia, "Times New Roman", serif;
+	font-size: clamp(5px, .75vw, 13px);
+	letter-spacing: .04em;
+	line-height: 1.4;
+	text-transform: uppercase;
+}
+
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork.has-footer-frame-artwork .rts-trophy-case__footer p {
+	display: block;
+	width: 62%;
+	margin: 0;
+	font-size: clamp(5px, .75vw, 13px);
+	line-height: 1.4;
+	transform: none;
+}
+
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__footer p strong {
+	font-size: 1.5em;
+	font-weight: 500;
+	letter-spacing: .13em;
+}
+
+.rts-trophy-case__journey-date {
+	position: absolute;
+	left: 3%;
+	display: flex;
+	font-family: Georgia, "Times New Roman", serif;
+	font-size: clamp(5px, .72vw, 12px);
+	line-height: 1.2;
+	text-transform: uppercase;
+	flex-direction: column;
+	gap: .35em;
+}
+
+.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__footer .rts-trophy-case__journey-date {
+	position: absolute;
+	top: 50%;
+	left: 3%;
+	z-index: 2;
+	width: 16%;
+	text-align: left;
+	transform: translateY(-50%);
+}
+
+.rts-trophy-case__journey-date strong { font-size: 1.4em; font-weight: 500; }
+
+.rts-trophy-case__marathon-one-icons {
+	position: absolute;
+	inset: 0;
+	z-index: 3;
+	display: block;
+	pointer-events: none;
+}
+.rts-trophy-case__panel-icon { position: absolute; display: block; object-fit: contain; }
+.rts-trophy-case__panel-icon--how-to-earn-icon { top: 64%; left: 13.5%; width: 4.5%; height: 7%; }
+.rts-trophy-case__panel-icon--learn-more-link-icon { top: 80%; left: 20%; width: 2%; height: 3%; }
+.rts-trophy-case__panel-icon--race-progress-icon { top: 65%; left: 65.5%; width: 5%; height: 7%; }
+.rts-trophy-case__panel-icon--view-race-link-icon { top: 81%; left: 77%; width: 2%; height: 3%; }
+.rts-trophy-case__panel-icon--marathon-two-lock-icon { top: 65%; left: 84.5%; width: 5.5%; height: 8%; }
+.rts-trophy-case__panel-icon--marathon-two-compass-icon { top: 80%; left: 85.8%; width: 4%; height: 5%; }
+.rts-trophy-case__panel-icon--footer-calendar-icon { top: 91.5%; left: 7%; width: 4%; height: 6%; }
+.rts-trophy-case__panel-icon--footer-compass-icon { top: 91%; left: 87%; width: 5%; height: 7%; }
+.rts-trophy-case__panel-icon--footer-calendar-icon,
+.rts-trophy-case__panel-icon--footer-compass-icon { z-index: 7; }
+
+/* Marathon 1 lower-cabinet composition. Icons now live inside their own
+ * panels so theme typography and page-level positioning cannot squeeze the
+ * copy or push it outside the uploaded frames. */
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__marathon-one-panel {
+	display: flex;
+	padding: 2.2% 1.4% 2.4%;
+	border: none;
+	border-color: rgba(211, 158, 54, .72);
+	font-size: clamp(6px, .72vw, 13px);
+	line-height: 1.3;
+	text-align: center;
+	align-items: center;
+	justify-content: flex-start;
+	overflow: hidden;
+}
+
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__marathon-one-panel--earn {
+	top: 53.7%;
+	left: 7.2%;
+	width: 18%;
+	height: 29.5%;
+}
+
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__marathon-one-panel--progress {
+	top: 53.7%;
+	left: 63.5%;
+	width: 15.5%;
+	height: 29.5%;
+}
+
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__marathon-one-panel--marathon-two {
+	top: 53.7%;
+	left: 79.7%;
+	width: 12.2%;
+	height: 29.5%;
+}
+
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__marathon-one-panel h2 {
+    display: block;
+    width: 100% !important;
+    max-width: none !important;
+    min-width: 0;
+    padding: 0 !important;
+    margin: 0 0 .75em !important;
+    font: 500 clamp(12px, 1vw, 24px)/1.15 "Times New Roman", serif !important;
+    letter-spacing: .01em;
+    text-align: center !important;
+    text-transform: uppercase;
+    white-space: normal;
+    word-break: normal !important;
+    overflow-wrap: normal !important;
+}
+
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__marathon-one-panel p {
+	display: block;
+	width: 100% !important;
+	max-width: none !important;
+	min-width: 0;
+	padding: 0 !important;
+	margin: 0 !important;
+	font: 400 clamp(6px, .68vw, 12px)/1.45 Georgia, "Times New Roman", serif !important;
+	letter-spacing: 0;
+	text-align: center !important;
+	text-transform: none;
+	white-space: normal;
+	word-break: normal !important;
+	overflow-wrap: normal !important;
+}
+
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__panel-heading-icon {
+	display: block;
+	width: 12%;
+	height: 10%;
+	max-width: none;
+	margin: 0 auto 3%;
+	object-fit: contain;
+}
+
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__marathon-one-panel--earn p {
+	width: 88% !important;
+	margin: 8% auto 0 !important;
+}
+
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__marathon-one-panel a {
+	display: inline-flex;
+	width: auto !important;
+	max-width: 90% !important;
+	min-height: 2.35em;
+	padding: .35em .9em !important;
+	margin: auto auto 0 !important;
+	font: 600 clamp(7px, .76vw, 14px)/1 Georgia, "Times New Roman", serif !important;
+	text-align: center !important;
+	text-transform: uppercase;
+	align-items: center;
+	justify-content: center;
+	white-space: nowrap;
+}
+
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__marathon-one-panel a img {
+	display: block;
+	width: 1.05em;
+	height: 1.05em;
+	max-width: none;
+	object-fit: contain;
+}
+
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__crew-count {
+	display: flex;
+	width: 88%;
+	height: 23%;
+	margin: 2% auto 3%;
+	align-items: center;
+	justify-content: center;
+	gap: 6%;
+}
+
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__crew-count > img {
+	display: block;
+	width: 34%;
+	height: 100%;
+	max-width: none;
+	object-fit: contain;
+}
+
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__crew-count > span {
+	display: flex;
+	min-width: 0;
+	flex-direction: column;
+	align-items: center;
+}
+
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__crew-count em {
+	font-size: .82em;
+	font-style: normal;
+	line-height: 1.15;
+	white-space: nowrap;
+}
+
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__crew-count strong {
+	margin-top: .12em;
+	font-size: 2.05em;
+	font-weight: 500;
+	line-height: 1;
+	white-space: nowrap;
+	font-family: "Times New Roman", serif;
+}
+
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__race-meter {
+	display: block;
+	width: 86%;
+	height: 6%;
+	min-height: 4px;
+	border: 1px solid #d99b29;
+	margin: 0 auto 4%;
+	background: #020a16;
+}
+
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__race-meter > b {
+	display: block;
+	height: 100%;
+	background: linear-gradient(90deg, #082692, #194ee5);
+}
+
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__marathon-one-panel--progress p {
+    width: 79% !important;
+    font-size: clamp(9px, 1.57vw, 12px) !important;
+    line-height: 1.35 !important;
+    text-transform: uppercase;
+}
+
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__marathon-two-lock {
+	display: block;
+	width: 33%;
+	height: 22%;
+	max-width: none;
+	margin: 2% auto 5%;
+	object-fit: contain;
+}
+
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__marathon-one-panel--marathon-two p {
+    width: 89% !important;
+    margin: 0 auto !important;
+    font-size: clamp(7px, 1.56vw, 12px) !important;
+    line-height: 1.45 !important;
+    text-transform: uppercase;
+}
+
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__marathon-two-compass {
+	display: block;
+	width: 28%;
+	height: 16%;
+	max-width: none;
+	margin: auto auto 0;
+	object-fit: contain;
+}
+
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork.has-footer-frame-artwork .rts-trophy-case__footer {
+    right: 7%;
+    bottom: 3.8%;
+    left: 7%;
+    height: 7.5%;
+}
+
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__footer .rts-trophy-case__journey-date {
+	top: 50%;
+	left: 3.3%;
+	display: flex;
+	width: 19%;
+	height: 70%;
+	font-size: clamp(6px, .72vw, 13px);
+	text-align: left;
+	transform: translateY(-50%);
+	flex-direction: row;
+	align-items: center;
+	gap: 8%;
+}
+
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__journey-date > img {
+	display: block;
+	width: 28%;
+	height: 85%;
+	max-width: none;
+	object-fit: contain;
+}
+
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__journey-date > span {
+	display: flex;
+	min-width: 0;
+	flex-direction: column;
+	gap: .35em;
+}
+
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__journey-date em {
+	font-style: normal;
+	white-space: nowrap;
+}
+
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__journey-date strong {
+	font-size: 1.35em;
+	font-weight: 500;
+	white-space: nowrap;
+}
+
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork.has-footer-frame-artwork .rts-trophy-case__footer p {
+	width: 58%;
+	max-width: none;
+	padding: 0;
+	font-size: clamp(6px, .75vw, 13px);
+	line-height: 1.35;
+	text-align: center;
+}
+
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__footer-compass {
+	position: absolute;
+	top: 50%;
+	right: 3.2%;
+	z-index: 2;
+	display: block;
+	width: 6%;
+	height: 82%;
+	max-width: none;
+	object-fit: contain;
+	transform: translateY(-50%);
+}
+
+/* Final Marathon 1 artwork alignment. */
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__item--21k,
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__item--42k {
+	width: 20%;
+}
+
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__item--21k { left: 26.5%; }
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__item--42k { left: 44%; }
+
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__item--21k .rts-trophy-case__plaque,
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__item--42k .rts-trophy-case__plaque {
+	right: 13%;
+	left: 13%;
+}
+
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__panel-heading-icon {
+    position: absolute !important;
+    top: -15px;
+    left: 50%;
+    z-index: 4 !important;
+    display: block;
+    width: 7%;
+    height: 9%;
+    max-width: none;
+    box-sizing: content-box;
+    padding: 3px;
+    margin: 0;
+    background: #01040b;
+    box-shadow: 0 0 0 .28em #01040b;
+    object-fit: contain;
+    transform: translateX(-50%);
+}
+
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__marathon-one-panel--earn h2,
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__marathon-one-panel--progress h2 {
+	margin-top: 8% !important;
+}
+
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__marathon-one-panel a {
+	border: 1px solid #e0a42f;
+	color: #f5c55b;
+	background: linear-gradient(180deg, #164dbd 0%, #0a2b83 48%, #061a57 100%);
+	box-shadow: inset 0 0 0 1px rgba(39, 93, 220, .55), 0 2px 5px rgba(0, 0, 0, .65);
+}
+
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__marathon-one-panel a:hover,
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__marathon-one-panel a:focus {
+	color: #fff0b5;
+	background: linear-gradient(180deg, #2262dc 0%, #103b9f 50%, #082169 100%);
+}
+
+/* Keep panel crests outside the top edge visible, and use deliberate trophy
+ * title lines instead of browser-dependent wrapping. */
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__marathon-one-panel {
+	overflow: visible;
+}
+
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__panel-heading-icon {
+	top: -4.5%;
+	border-radius: 2px;
+}
+
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__plaque > b {
+	display: flex;
+	width: 100%;
+	max-width: none;
+	line-height: 1.08;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+}
+
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__plaque > b > span {
+	display: block;
+	width: 100%;
+	white-space: nowrap;
+}
+
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__item--21k .rts-trophy-case__plaque,
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__item--42k .rts-trophy-case__plaque {
+	bottom: 3%;
+	height: 40%;
+}
+
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__item--21k .rts-trophy-case__plaque > b,
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__item--42k .rts-trophy-case__plaque > b {
+	font-size: clamp(7px, .84vw, 14px);
+}
+
+/* Cabinet dividers and lining-numeral typography from the reference design. */
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__marathon-one-panel--earn::after {
+	position: absolute;
+	top: -39px;
+	right: -8%;
+	bottom: 0;
+	width: 1px;
+	background: linear-gradient(180deg, rgba(222, 174, 74, .2), #d9a53f 8%, #d9a53f 92%, rgba(222, 174, 74, .2));
+	box-shadow: 0 0 2px rgba(218, 164, 60, .45);
+	content: "";
+	pointer-events: none;
+}
+
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork.has-footer-frame-artwork .rts-trophy-case__footer p::before,
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork.has-footer-frame-artwork .rts-trophy-case__footer p::after {
+	position: absolute;
+	top: 50%;
+	width: 1px;
+	height: 72%;
+	background: linear-gradient(180deg, rgba(222, 174, 74, .15), #d9a53f 12%, #d9a53f 88%, rgba(222, 174, 74, .15));
+	box-shadow: 0 0 2px rgba(218, 164, 60, .4);
+	content: "";
+	transform: translateY(-50%);
+	pointer-events: none;
+}
+
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork.has-footer-frame-artwork .rts-trophy-case__footer p::before { left: 0; }
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork.has-footer-frame-artwork .rts-trophy-case__footer p::after { right: 0; }
+
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__header > p,
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__header > p *,
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__plaque,
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__plaque *,
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__journey-date,
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__footer p {
+	font-family: "Times New Roman", Times, serif !important;
+	font-variant-numeric: lining-nums tabular-nums;
+	font-feature-settings: "lnum" 1, "tnum" 1;
+	font-synthesis: none;
+}
+
+/* Place plaque copy against the artwork's intended top and bottom guides.
+ * This avoids vertically centering all lines as one tight block. */
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork {
+	/* Podium typography controls. Change these values to restyle the live text. */
+	--rts-m1-podium-title-font: Georgia, "Times New Roman", serif;
+	--rts-m1-day-label-font: Arial, Helvetica, sans-serif;
+	--rts-m1-day-label-size: clamp(6px, .58vw, 10px);
+	--rts-m1-day-label-large-size: clamp(7px, .66vw, 11px);
+	--rts-m1-day-value-size: 1.3em;
+}
+
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__plaque {
+	position: absolute;
+	display: block;
+	padding: 0;
+	box-sizing: border-box;
+	font-family: var(--rts-m1-podium-title-font);
+}
+
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__plaque > b {
+	position: absolute;
+	top: 15%;
+	right: 0;
+	left: 0;
+	margin: 0;
+	font-family: var(--rts-m1-podium-title-font) !important;
+	font-size: clamp(8px, .9vw, 16px);
+	line-height: 1.08;
+}
+
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__item--founding-runner .rts-trophy-case__plaque > b {
+	top: 13%;
+	right: 7%;
+	left: 7%;
+	width: auto;
+	font-size: clamp(6px, .68vw, 12px);
+	line-height: 1.06;
+}
+
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__day-stats {
+    position: absolute;
+    top: 54%;
+    right: 10%;
+    bottom: auto;
+    left: 10%;
+    width: auto;
+    margin: 0;
+    font-family: var(--rts-m1-day-label-font) !important;
+    font-size: var(--rts-m1-day-label-size);
+    line-height: 1.05;
+}
+
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__day-stats em {
+	box-sizing: border-box;
+	justify-content: flex-end;
+	gap: .12em;
+}
+
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__day-stats em:first-child {
+	padding-right: 5%;
+}
+
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__day-stats em:last-child {
+	padding-left: 5%;
+}
+
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__day-stats i {
+	font-size: var(--rts-m1-day-value-size);
+}
+
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__founding-details {
+    position: absolute;
+    top: 47%;
+    right: 6%;
+    bottom: auto;
+    left: 6%;
+    margin: 0;
+    font-size: clamp(6px, 1.52vw, 12px);
+    line-height: 1.2;
+    gap: .35em;
+    white-space: nowrap;
+}
+
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__item--21k .rts-trophy-case__plaque > b, 
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__item--42k .rts-trophy-case__plaque > b {
+    top: 17%;
+    font-size: clamp(10px, 1.05vw, 14px);
+    line-height: 1.12;
+}
+
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__item--21k .rts-trophy-case__day-stats, 
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__item--42k .rts-trophy-case__day-stats {
+    top: 47%;
+    right: 19%;
+    bottom: auto;
+    left: 24%;
+    font-size: var(--rts-m1-day-label-large-size);
+}
+
+/* Center the two lower trophy names independently of the uploaded artwork's
+ * transparent side padding and any custom plaque-stat offsets. */
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__item--21k .rts-trophy-case__plaque > b,
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__item--42k .rts-trophy-case__plaque > b {
+	right: auto;
+	left: 53%;
+	display: grid;
+	width: 100%;
+	box-sizing: border-box;
+	text-align: center;
+	transform: translateX(-50%);
+	justify-items: center;
+}
+
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__item--21k .rts-trophy-case__plaque > b > span,
+.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork .rts-trophy-case__item--42k .rts-trophy-case__plaque > b > span {
+	width: 100%;
+	text-align: center;
+}
+
+/* Mobile/tablet cabinet artwork. Both responsive cabinets provide five
+ * illuminated trophy shelves, so the ten milestones are deliberately paired
+ * into five rows. Desktop keeps the original fixed cabinet composition. */
+@media (max-width: 1100px) {
+	.rts-trophy-case.has-background-artwork.has-responsive-background-artwork {
+		left: 50%;
+		width: min(760px, calc(100vw - 16px));
+		max-width: none;
+		margin: 16px auto;
+		overflow: hidden;
+		background: var(--rts-trophy-case-responsive-background) center / 100% 100% no-repeat;
+		transform: translateX(-50%);
+	}
+
+	.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork.has-responsive-background-artwork {
+		aspect-ratio: 375 / 1689;
+	}
+
+	.rts-trophy-case.rts-trophy-case--marathon-two.has-background-artwork.has-responsive-background-artwork {
+		aspect-ratio: 375 / 2197;
+	}
+
+	.rts-trophy-case.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__cabinet,
+	.rts-trophy-case.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__grid {
+		position: absolute;
+		inset: 0;
+		display: block;
+		padding: 0;
+	}
+
+	.rts-trophy-case.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__grid::before,
+	.rts-trophy-case.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__grid::after {
+		display: none;
+		content: none;
+	}
+
+	.rts-trophy-case.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item {
+		position: absolute;
+		z-index: 2;
+		display: block;
+		width: 38%;
+		min-width: 0;
+		padding: 0;
+		border: 0;
+		background: none;
+		box-shadow: none;
+	}
+
+	/* Left and right trophy positions shared by both responsive cabinets. */
+	.rts-trophy-case.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--founding-runner,
+	.rts-trophy-case.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--10k,
+	.rts-trophy-case.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--20k,
+	.rts-trophy-case.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--25k,
+	.rts-trophy-case.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--35k {
+		left: 10%;
+	}
+
+	.rts-trophy-case.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--5k,
+	.rts-trophy-case.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--15k,
+	.rts-trophy-case.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--21k,
+	.rts-trophy-case.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--30k,
+	.rts-trophy-case.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--42k {
+		left: 52%;
+	}
+
+	.rts-trophy-case.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__display,
+	.rts-trophy-case.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item.is-major .rts-trophy-case__display {
+		position: absolute;
+		inset: 0;
+		display: block;
+		height: 100%;
+	}
+
+	.rts-trophy-case.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__image {
+		position: absolute;
+		inset: 0;
+		width: 100%;
+		height: 100%;
+		object-fit: contain;
+		object-position: center bottom;
+	}
+
+	/* Marathon 1: title/nameplate, five trophy shelves, then its information bay. */
+	.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__header,
+	.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork.has-responsive-background-artwork.has-title-artwork .rts-trophy-case__header {
+		top: 0;
+		right: 0;
+		left: 0;
+		height: 10.8%;
+	}
+
+	.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__marathon-one-title,
+	.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__nameplate-frame {
+		display: none;
+	}
+
+	.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__header > p {
+		top: 68%;
+		right: 20%;
+		bottom: auto;
+		left: 20%;
+		display: flex;
+		width: auto;
+		height: 20%;
+		font-size: clamp(8px, 2.7vw, 18px);
+		align-items: center;
+		justify-content: center;
+	}
+
+	.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item {
+		height: 12.4%;
+		--rts-m1-day-label-size: clamp(6px, 1.45vw, 9px);
+		--rts-m1-day-label-large-size: clamp(7px, 1.6vw, 10px);
+	}
+
+	.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__plaque > b {
+		font-size: clamp(8px, 2.05vw, 13px);
+		letter-spacing: .01em;
+	}
+
+	.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--founding-runner .rts-trophy-case__plaque > b {
+		font-size: clamp(7px, 1.75vw, 11px);
+	}
+
+	.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__founding-details {
+		top: 45%;
+		font-size: clamp(6px, 1.45vw, 9px);
+		line-height: 1.15;
+	}
+
+	.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__day-stats {
+		top: 52%;
+		font-weight: 600;
+		letter-spacing: -.01em;
+	}
+
+	/* The half/full-marathon artwork is intrinsically wider than the standard
+	 * trophy PNGs. Narrow its item while preserving the light-centre alignment. */
+	.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--21k,
+	.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--42k {
+		left: 54%;
+		width: 34%;
+	}
+
+	.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--21k .rts-trophy-case__plaque > b,
+	.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--42k .rts-trophy-case__plaque > b {
+		top: 18%;
+		font-size: clamp(8px, 1.95vw, 12px);
+	}
+
+	.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--21k .rts-trophy-case__day-stats,
+	.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--42k .rts-trophy-case__day-stats {
+		top: 50%;
+		right: 15%;
+		left: 19%;
+	}
+
+	.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--founding-runner,
+	.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--5k { top: 11.1%; }
+
+	.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--10k,
+	.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--15k { top: 24.0%; }
+
+	.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--20k,
+	.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--21k { top: 37.9%; }
+
+	.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--25k,
+	.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--30k { top: 51.7%; }
+
+	.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--35k,
+	.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--42k { top: 65.4%; }
+
+	/* The final illuminated Marathon 1 bay holds the supporting panels. */
+	.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__marathon-one-panel {
+		font-size: clamp(7px, 1.75vw, 13px);
+	}
+
+	.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__marathon-one-panel--earn {
+		top: 79.4%;
+		left: 7%;
+		width: 42%;
+		height: 8.8%;
+	}
+
+	.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__marathon-one-panel--progress {
+		top: 79.4%;
+		left: 51%;
+		width: 42%;
+		height: 8.8%;
+	}
+
+	.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__marathon-one-panel--marathon-two {
+		top: 88.1%;
+		left: 27%;
+		width: 46%;
+		height: 5.5%;
+	}
+
+	.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__marathon-one-panel h2 {
+		margin-bottom: .55em !important;
+		font-size: clamp(10px, 2.65vw, 18px) !important;
+	}
+
+	.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__marathon-one-panel p {
+		font-size: clamp(7px, 1.75vw, 12px) !important;
+		line-height: 1.3 !important;
+	}
+
+	.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__marathon-one-panel a {
+		min-height: 2.1em;
+		padding: .3em .75em !important;
+		font-size: clamp(7px, 1.75vw, 11px) !important;
+	}
+
+	.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork.has-responsive-background-artwork.has-footer-frame-artwork .rts-trophy-case__footer {
+		right: 8%;
+		bottom: 1.1%;
+		left: 8%;
+		height: 4.1%;
+		background: none;
+	}
+
+	.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__footer-frame {
+		display: none;
+	}
+
+	.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__footer .rts-trophy-case__journey-date {
+		left: 2%;
+		width: 23%;
+		font-size: clamp(6px, 1.45vw, 9px);
+		gap: 5%;
+	}
+
+	.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork.has-responsive-background-artwork.has-footer-frame-artwork .rts-trophy-case__footer p {
+		width: 52%;
+		font-size: clamp(7px, 1.55vw, 10px);
+		line-height: 1.18;
+	}
+
+	.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork.has-responsive-background-artwork.has-footer-frame-artwork .rts-trophy-case__footer p::before,
+	.rts-trophy-case.rts-trophy-case--marathon-one.has-background-artwork.has-responsive-background-artwork.has-footer-frame-artwork .rts-trophy-case__footer p::after {
+		display: none;
+		content: none;
+	}
+
+	/* Marathon 2: its narrower shelf bays sit above the large milestone area. */
+	.rts-trophy-case.rts-trophy-case--marathon-two.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item {
+		height: 8.25%;
+		--rts-podium-name-bottom: 4.2%;
+		--rts-podium-name-left: 7%;
+		--rts-podium-name-right: 7%;
+		--rts-podium-name-size: clamp(8px, 2.35vw, 15px);
+	}
+
+	/* Balance the wider founding, half-marathon and marathon artwork against
+	 * the narrow standard trophy domes without moving them off their lights. */
+	.rts-trophy-case.rts-trophy-case--marathon-two.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--founding-runner {
+		left: 12%;
+		width: 34%;
+	}
+
+	.rts-trophy-case.rts-trophy-case--marathon-two.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--21k,
+	.rts-trophy-case.rts-trophy-case--marathon-two.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--42k {
+		left: 54%;
+		width: 34%;
+	}
+
+	.rts-trophy-case.rts-trophy-case--marathon-two.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--founding-runner,
+	.rts-trophy-case.rts-trophy-case--marathon-two.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--5k { top: 5.0%; }
+
+	.rts-trophy-case.rts-trophy-case--marathon-two.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--10k,
+	.rts-trophy-case.rts-trophy-case--marathon-two.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--15k { top: 13.6%; }
+
+	.rts-trophy-case.rts-trophy-case--marathon-two.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--20k,
+	.rts-trophy-case.rts-trophy-case--marathon-two.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--21k { top: 22.0%; }
+
+	.rts-trophy-case.rts-trophy-case--marathon-two.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--25k,
+	.rts-trophy-case.rts-trophy-case--marathon-two.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--30k { top: 30.6%; }
+
+	.rts-trophy-case.rts-trophy-case--marathon-two.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--35k,
+	.rts-trophy-case.rts-trophy-case--marathon-two.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--42k { top: 39.0%; }
+
+	.rts-trophy-case.rts-trophy-case--marathon-two.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__header,
+	.rts-trophy-case.rts-trophy-case--marathon-two.has-background-artwork.has-responsive-background-artwork.has-title-artwork .rts-trophy-case__header {
+		top: .25%;
+		right: 9%;
+		left: 9%;
+		height: 4.5%;
+	}
+
+	.rts-trophy-case.rts-trophy-case--marathon-two.has-background-artwork.has-responsive-background-artwork.has-title-artwork .rts-trophy-case__title-image {
+		top: 0;
+		width: 100%;
+		height: 100%;
+	}
+
+	.rts-trophy-case.rts-trophy-case--marathon-two.has-background-artwork.has-responsive-background-artwork.has-title-artwork .rts-trophy-case__header > p {
+		top: 59%;
+		height: 34%;
+		font-size: clamp(9px, 2.7vw, 17px);
+	}
+
+	.rts-trophy-case.rts-trophy-case--marathon-two.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__milestone-copy--founding {
+		top: 51.5%;
+		left: 14%;
+		width: 72%;
+		font-size: clamp(15px, 4.5vw, 30px);
+	}
+
+	.rts-trophy-case.rts-trophy-case--marathon-two.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__milestone-copy--half {
+		top: 64%;
+		left: 7%;
+		width: 42%;
+		font-size: clamp(14px, 4vw, 27px);
+	}
+
+	.rts-trophy-case.rts-trophy-case--marathon-two.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__milestone-copy--marathon {
+		top: 64%;
+		left: 51%;
+		width: 42%;
+		font-size: clamp(14px, 4vw, 27px);
+	}
+
+	.rts-trophy-case.rts-trophy-case--marathon-two.has-background-artwork.has-responsive-background-artwork.has-footer-frame-artwork .rts-trophy-case__footer {
+		right: 8%;
+		bottom: 1.1%;
+		left: 8%;
+		height: 5.5%;
+	}
+
+	.rts-trophy-case.rts-trophy-case--marathon-two.has-background-artwork.has-responsive-background-artwork.has-footer-frame-artwork .rts-trophy-case__footer p {
+		font-size: clamp(11px, 3.2vw, 22px);
+		line-height: 1.12;
+	}
+}
+
+@media (max-width: 420px) {
+	/* Keep two columns even on narrow phones; the artwork was authored for it. */
+	.rts-trophy-case.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__grid {
+		display: block;
+		grid-template-columns: none;
+	}
+}

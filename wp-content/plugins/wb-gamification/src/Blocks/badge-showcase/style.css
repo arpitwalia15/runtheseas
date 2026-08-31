@@ -1,0 +1,421 @@
+/**
+ * Badge Showcase — frontend stylesheet.
+ *
+ * 1.4.0 UX refactor (hub flyout / "My Badges" panel):
+ *   - earned card: white surface, colored ring around image, green check
+ *     pip top-right, earned date visible
+ *   - locked card: muted surface, grayscale image, padlock pip, hint text
+ *   - clear "N / M earned" header with progress bar + filter tabs
+ *   - grid is responsive — auto-fills the available column width so the
+ *     flyout panel doesn't waste space
+ */
+
+/* ── Wrapper ───────────────────────────────────────────────────────── */
+/* Block-local aliases all resolve to global design tokens
+ * (src/shared/design-tokens.css). Per-block local names stay for
+ * readability inside this stylesheet, but every value flows from a
+ * single source so a token bump (e.g. theme.json override) cascades
+ * across every block. */
+.wb-gam-badge-showcase {
+	--wb-gam-badge-earned-bg:    var( --wb-gam-color-white );
+	--wb-gam-badge-locked-bg:    var( --wb-gam-color-surface-muted );
+	--wb-gam-badge-border:       var( --wb-gam-color-border );
+	--wb-gam-badge-text:         var( --wb-gam-color-text );
+	--wb-gam-badge-text-muted:   var( --wb-gam-color-text-muted );
+	--wb-gam-badge-accent:       var( --wb-gam-color-warning );
+	--wb-gam-badge-success:      var( --wb-gam-color-success );
+	--wb-gam-badge-success-soft: var( --wb-gam-color-success-soft );
+	--wb-gam-badge-locked-soft:  var( --wb-gam-color-locked-soft );
+}
+
+/* ── Header ────────────────────────────────────────────────────────── */
+.wb-gam-badge-showcase__header {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 12px 16px;
+	margin: 0 0 16px;
+	padding: 0;
+}
+
+.wb-gam-badge-showcase__counter {
+	display: inline-flex;
+	align-items: baseline;
+	gap: 6px;
+	flex-shrink: 0;
+}
+
+.wb-gam-badge-showcase__count-num {
+	font-size: 1.5rem;
+	font-weight: 700;
+	color: var( --wb-gam-badge-text );
+	font-variant-numeric: tabular-nums;
+}
+
+.wb-gam-badge-showcase__count-label {
+	font-size: 0.875rem;
+	color: var( --wb-gam-badge-text-muted );
+	font-weight: 500;
+}
+
+.wb-gam-badge-showcase__progress {
+	flex: 1 1 120px;
+	min-width: 80px;
+	height: 6px;
+	background: var( --wb-gam-badge-border );
+	border-radius: 999px;
+	overflow: hidden;
+	order: 3;
+	width: 100%;
+}
+
+.wb-gam-badge-showcase__progress-fill {
+	height: 100%;
+	background: linear-gradient( 90deg, var( --wb-gam-badge-accent ), var( --wb-gam-badge-success ) );
+	border-radius: 999px;
+	transition: width 360ms ease;
+	min-width: 4px;
+}
+
+/* ── Filters ───────────────────────────────────────────────────────── */
+.wb-gam-badge-showcase__filters {
+	display: inline-flex;
+	gap: 4px;
+	background: var( --wb-gam-badge-locked-bg );
+	border-radius: 999px;
+	padding: 4px;
+	flex-shrink: 0;
+	margin-left: auto;
+}
+
+.wb-gam-badge-showcase__filter {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 6px 14px;
+	border-radius: 999px;
+	border: 0;
+	background: transparent;
+	color: var( --wb-gam-badge-text-muted );
+	font-size: 0.8125rem;
+	font-weight: 500;
+	cursor: pointer;
+	transition: background 160ms ease, color 160ms ease;
+}
+
+.wb-gam-badge-showcase__filter:hover {
+	color: var( --wb-gam-badge-text );
+}
+
+.wb-gam-badge-showcase__filter.is-active {
+	background: var( --wb-gam-badge-earned-bg );
+	color: var( --wb-gam-badge-text );
+	box-shadow: 0 1px 2px rgba( 0, 0, 0, 0.06 );
+}
+
+.wb-gam-badge-showcase__filter-count {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 20px;
+	height: 18px;
+	padding: 0 6px;
+	border-radius: 999px;
+	font-size: 0.6875rem;
+	font-weight: 700;
+	background: var( --wb-gam-badge-border );
+	color: var( --wb-gam-badge-text );
+}
+
+.wb-gam-badge-showcase__filter.is-active .wb-gam-badge-showcase__filter-count {
+	background: var( --wb-gam-badge-accent );
+	color: var( --wb-gam-color-white );
+}
+
+.wb-gam-badge-showcase__filter:focus-visible {
+	outline: 2px solid var( --wb-gam-badge-accent );
+	outline-offset: 2px;
+}
+
+/* ── Grid ──────────────────────────────────────────────────────────── */
+/* Container queries — the showcase adapts to its host width.
+ * Hub flyout (~720px) gets 5 cols; standalone page (~1100px) gets
+ * 7; a column inside a 3-col layout (~340px) gets 2. The badge
+ * cards need ~120px of horizontal breathing room — anything tighter
+ * crams the title and looks congested.
+ */
+.wb-gam-badge-showcase {
+	container-type: inline-size;
+}
+
+.wb-gam-badge-showcase__list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: grid;
+	grid-template-columns: repeat( auto-fill, minmax( 140px, 1fr ) );
+	gap: 12px;
+}
+
+/* Container-query breakpoints keep card width readable regardless of
+ * the host (hub flyout, sidebar widget, full-page block). The min-
+ * width chosen for each step is the smallest at which the badge
+ * title can render on 1–2 lines without ellipsis. */
+@container (max-width: 520px) {
+	.wb-gam-badge-showcase__list {
+		/* Hub flyout (~465px wide) — 3 cols of ~140px each. */
+		grid-template-columns: repeat( 3, minmax( 0, 1fr ) );
+		gap: 10px;
+	}
+}
+
+@container (max-width: 360px) {
+	.wb-gam-badge-showcase__list {
+		grid-template-columns: repeat( 2, minmax( 0, 1fr ) );
+		gap: 8px;
+	}
+}
+
+.wb-gam-badge-showcase__badge {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 8px;
+	padding: 16px 10px 14px;
+	text-align: center;
+	background: var( --wb-gam-badge-earned-bg );
+	border: 1px solid var( --wb-gam-badge-border );
+	border-radius: 14px;
+	min-height: 156px;
+	transition: transform 200ms ease, box-shadow 200ms ease, border-color 200ms ease;
+}
+
+.wb-gam-badge-showcase__badge:hover {
+	transform: translateY( -2px );
+	box-shadow: 0 6px 20px rgba( 15, 23, 42, 0.08 );
+}
+
+/* ── Earned card ──────────────────────────────────────────────────── */
+.wb-gam-badge-showcase__badge--earned {
+	border-color: rgba( 22, 163, 74, 0.30 );
+}
+
+.wb-gam-badge-showcase__badge--earned .wb-gam-badge-showcase__icon-wrap {
+	background: var( --wb-gam-badge-success-soft );
+}
+
+/* ── Locked card ──────────────────────────────────────────────────── */
+.wb-gam-badge-showcase__badge--locked {
+	background: var( --wb-gam-badge-locked-bg );
+	border-color: var( --wb-gam-badge-border );
+}
+
+.wb-gam-badge-showcase__badge--locked .wb-gam-badge-showcase__icon-wrap {
+	background: var( --wb-gam-badge-locked-soft );
+}
+
+.wb-gam-badge-showcase__badge--locked .wb-gam-badge-showcase__image,
+.wb-gam-badge-showcase__badge--locked .wb-gam-badge-showcase__placeholder {
+	filter: grayscale( 1 );
+	opacity: 0.5;
+}
+
+.wb-gam-badge-showcase__badge--locked .wb-gam-badge-showcase__name {
+	color: var( --wb-gam-badge-text-muted );
+}
+
+/* ── Icon wrap (circular backdrop) ────────────────────────────────── */
+.wb-gam-badge-showcase__icon-wrap {
+	position: relative;
+	width: 78px;
+	height: 78px;
+	border-radius: 50%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+}
+
+.wb-gam-badge-showcase__image {
+	width: 56px;
+	height: 56px;
+	object-fit: contain;
+}
+
+.wb-gam-badge-showcase__placeholder {
+	font-size: 2.25rem;
+	line-height: 1;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+/* ── Pip (top-right indicator) ────────────────────────────────────── */
+.wb-gam-badge-showcase__pip {
+	position: absolute;
+	top: -4px;
+	right: -4px;
+	width: 24px;
+	height: 24px;
+	border-radius: 50%;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	background: var( --wb-gam-color-white );
+	border: 2px solid var( --wb-gam-badge-earned-bg );
+}
+
+.wb-gam-badge-showcase__pip--earned {
+	color: var( --wb-gam-badge-success );
+	border-color: var( --wb-gam-badge-earned-bg );
+	box-shadow: 0 2px 6px rgba( 22, 163, 74, 0.25 );
+}
+
+.wb-gam-badge-showcase__pip--locked {
+	color: var( --wb-gam-badge-text-muted );
+	background: var( --wb-gam-badge-locked-bg );
+	border-color: var( --wb-gam-badge-locked-bg );
+}
+
+/* ── Text ─────────────────────────────────────────────────────────── */
+.wb-gam-badge-showcase__name {
+	font-size: 0.9375rem;
+	font-weight: 600;
+	line-height: 1.25;
+	color: var( --wb-gam-badge-text );
+	/* No line-clamp — badge names like "Five Hundred Strong" or
+	 * "1-Year Member" must render in full, not truncate with an
+	 * ellipsis. Cards in the grid grow vertically to fit the longest
+	 * name; align-items:stretch on the parent keeps them visually
+	 * aligned at the top. */
+	overflow-wrap: anywhere;
+	word-break: break-word;
+	min-height: 2.3em;
+}
+
+.wb-gam-badge-showcase__earned-at {
+	display: inline-block;
+	padding: 3px 10px;
+	border-radius: 999px;
+	font-size: 0.75rem;
+	font-weight: 600;
+	color: var( --wb-gam-badge-success );
+	background: var( --wb-gam-badge-success-soft );
+	margin-top: auto;
+}
+
+.wb-gam-badge-showcase__hint {
+	/* Hint text describes what action unlocks the badge — never
+	 * truncate, the member needs to read it in full to know what to do.
+	 * Card height grows to fit the longest hint in the row. */
+	font-size: 0.75rem;
+	line-height: 1.4;
+	color: var( --wb-gam-badge-text-muted );
+	margin-top: auto;
+	overflow-wrap: anywhere;
+	word-break: break-word;
+}
+
+/* ── Empty state ─────────────────────────────────────────────────── */
+.wb-gam-badge-showcase__empty {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 24px;
+	margin: 0;
+	background: var( --wb-gam-badge-locked-bg );
+	border-radius: 12px;
+	color: var( --wb-gam-badge-text-muted );
+	font-size: 0.9375rem;
+}
+
+.wb-gam-badge-showcase__empty-icon {
+	flex-shrink: 0;
+	color: var( --wb-gam-badge-accent );
+	opacity: 0.6;
+}
+
+/* ── Hidden via filter ─────────────────────────────────────────────── */
+.wb-gam-badge-showcase[data-filter="earned"] .wb-gam-badge-showcase__badge[data-state="locked"],
+.wb-gam-badge-showcase[data-filter="locked"] .wb-gam-badge-showcase__badge[data-state="earned"] {
+	display: none;
+}
+
+/* ── Credential ring ──────────────────────────────────────────────── */
+.wb-gam-badge-showcase__badge--credential .wb-gam-badge-showcase__image {
+	box-shadow: 0 0 0 2px var(--wb-gam-primary);
+	border-radius: 8px;
+}
+
+/* ── Mobile ────────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+	.wb-gam-badge-showcase__list {
+		grid-template-columns: repeat( auto-fill, minmax( 110px, 1fr ) );
+		gap: 8px;
+	}
+	.wb-gam-badge-showcase__badge {
+		padding: 12px 8px 10px;
+		min-height: 138px;
+	}
+	.wb-gam-badge-showcase__icon-wrap {
+		width: 64px;
+		height: 64px;
+	}
+	.wb-gam-badge-showcase__image,
+	.wb-gam-badge-showcase__placeholder {
+		width: 44px;
+		height: 44px;
+	}
+	.wb-gam-badge-showcase__count-num {
+		font-size: 1.25rem;
+	}
+	.wb-gam-badge-showcase__filters {
+		margin-left: 0;
+		width: 100%;
+		order: 4;
+	}
+	.wb-gam-badge-showcase__filter {
+		flex: 1;
+		justify-content: center;
+		padding: 6px 8px;
+	}
+}
+
+/* ── Reduced motion ─────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+	.wb-gam-badge-showcase__badge,
+	.wb-gam-badge-showcase__progress-fill {
+		transition: none;
+	}
+	.wb-gam-badge-showcase__badge:hover {
+		transform: none;
+	}
+}
+
+/* ── Dark mode ─────────────────────────────────────────────────────────
+ * Badge artwork loads via <img>: the bundled assets/badges/*.svg use
+ * stroke="currentColor", which resolves to BLACK inside an <img> (the page's
+ * colour context does not cross the <img> boundary), and custom-uploaded
+ * badges keep their own colours. On the dark card that dark line-art became
+ * invisible, so give the medallion a light plate in dark mode — any artwork
+ * (mono line-art, colour SVG, uploaded image) stays legible against it.
+ * Scoped to the same dark selectors BuddyX / BuddyX Pro use. */
+:root[data-bx-mode="dark"] .wb-gam-badge-showcase__badge--earned .wb-gam-badge-showcase__icon-wrap,
+body.buddyx-dark-theme .wb-gam-badge-showcase__badge--earned .wb-gam-badge-showcase__icon-wrap {
+	background: color-mix( in srgb, var( --wb-gam-color-success ) 16%, white );
+}
+
+:root[data-bx-mode="dark"] .wb-gam-badge-showcase__badge--locked .wb-gam-badge-showcase__icon-wrap,
+body.buddyx-dark-theme .wb-gam-badge-showcase__badge--locked .wb-gam-badge-showcase__icon-wrap {
+	background: color-mix( in srgb, var( --wb-gam-color-text-muted ) 14%, white );
+}
+
+@media ( prefers-color-scheme: dark ) {
+	:root[data-bx-mode="auto"] .wb-gam-badge-showcase__badge--earned .wb-gam-badge-showcase__icon-wrap {
+		background: color-mix( in srgb, var( --wb-gam-color-success ) 16%, white );
+	}
+	:root[data-bx-mode="auto"] .wb-gam-badge-showcase__badge--locked .wb-gam-badge-showcase__icon-wrap {
+		background: color-mix( in srgb, var( --wb-gam-color-text-muted ) 14%, white );
+	}
+}

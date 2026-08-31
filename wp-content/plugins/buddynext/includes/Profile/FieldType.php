@@ -1,0 +1,1916 @@
+<?php // phpcs:disable WordPress.Files.FileName.NotHyphenatedLowercase,WordPress.Files.FileName.InvalidClassFileName -- PSR-4 naming used throughout this plugin.
+/**
+ * BuddyNext profile field-type engine.
+ *
+ * The single source of truth for how every profile field type behaves across
+ * all six layers: input → validate → store → display → search → privacy.
+ *
+ * Every consumer (ProfileService, the directory search, the edit/view
+ * templates, the admin field config) delegates here so that adding a niche
+ * field type is pure data (admin UI) and never code. The class is pure and
+ * dependency-free: no DB access, no globals, no side effects beyond reading
+ * the field definition array it is handed.
+ *
+ * Field definition array shape (as produced by ProfileService::get_fields):
+ *
+ *   [
+ *     'field_key'     => 'favourite_opening',
+ *     'label'         => 'Favourite Opening',
+ *     'type'          => 'select',
+ *     'options'       => ['Sicilian', 'Caro-Kann', ...] | null,   // JSON-decoded
+ *     'is_searchable' => true|false,
+ *     ...
+ *   ]
+ *
+ * Options-bearing types (select / radio / multiselect) read their choices from
+ * $field['options'] — a flat list of human-readable strings. Each option's
+ * machine slug is sanitize_title() of the string; its label is the string
+ * itself. multi (multiselect) values are stored as a comma-joined list of
+ * option SLUGS.
+ *
+ * Two deliberate exceptions to the "no DB access" purity rule — the LIVE-OPTIONED
+ * types. Their choices are resolved on every call rather than read from a stored
+ * options snapshot, so the pick list can never drift from the owner's own data (a
+ * snapshot goes stale on every rename/delete):
+ *
+ *   - category_multiselect     → SpaceCategoryService (see category_options()).
+ *                                Values are category IDs; multi-entry storage.
+ *   - member_type_multiselect  → MemberTypeService (see member_type_options()).
+ *                                Values are member-type SLUGS; stored as one
+ *                                comma-joined string (NOT multi-entry).
+ *
+ * Both service calls are object-cached, and an unavailable schema degrades to an
+ * empty choice list (renderers show an empty state; sanitisation accepts nothing;
+ * nothing errors). Resolving choices at USE time is also what lets a field offer
+ * live choices without putting a query in the always-on registration hook.
+ *
+ * @package BuddyNext\Profile
+ */
+
+declare( strict_types=1 );
+
+namespace BuddyNext\Profile;
+
+use WP_Error;
+
+/**
+ * Stateless field-type engine. All members are static.
+ */
+class FieldType {
+
+	/**
+	 * Built-in type registry.
+	 *
+	 * Keyed by type slug; each entry is:
+	 *   'label'                 => string  Human label for the admin type picker.
+	 *   'value_kind'            => string  scalar | multi | bool.
+	 *   'is_choice'             => bool    Reads choices from $field['options'].
+	 *   'is_searchable_capable' => bool    May expose a free-text search mirror.
+	 *
+	 * @var array<string,array{label:string,value_kind:string,is_choice:bool,is_searchable_capable:bool}>
+	 */
+	private static function builtin_types(): array {
+		return array(
+			'text'                    => array(
+				'label'                 => __( 'Text', 'buddynext' ),
+				'value_kind'            => 'scalar',
+				'is_choice'             => false,
+				'is_searchable_capable' => true,
+			),
+			'textarea'                => array(
+				'label'                 => __( 'Paragraph', 'buddynext' ),
+				'value_kind'            => 'scalar',
+				'is_choice'             => false,
+				'is_searchable_capable' => true,
+			),
+			'url'                     => array(
+				'label'                 => __( 'URL', 'buddynext' ),
+				'value_kind'            => 'scalar',
+				'is_choice'             => false,
+				'is_searchable_capable' => true,
+			),
+			'email'                   => array(
+				'label'                 => __( 'Email', 'buddynext' ),
+				'value_kind'            => 'scalar',
+				'is_choice'             => false,
+				'is_searchable_capable' => true,
+			),
+			'phone'                   => array(
+				'label'                 => __( 'Phone', 'buddynext' ),
+				'value_kind'            => 'scalar',
+				'is_choice'             => false,
+				'is_searchable_capable' => true,
+			),
+			'number'                  => array(
+				'label'                 => __( 'Number', 'buddynext' ),
+				'value_kind'            => 'scalar',
+				'is_choice'             => false,
+				'is_searchable_capable' => false,
+			),
+			'date'                    => array(
+				'label'                 => __( 'Date', 'buddynext' ),
+				'value_kind'            => 'scalar',
+				'is_choice'             => false,
+				'is_date'               => true,
+				'is_searchable_capable' => false,
+			),
+			'boolean'                 => array(
+				'label'                 => __( 'Yes / No', 'buddynext' ),
+				'value_kind'            => 'bool',
+				'is_choice'             => false,
+				'is_searchable_capable' => false,
+			),
+			'select'                  => array(
+				'label'                 => __( 'Dropdown', 'buddynext' ),
+				'value_kind'            => 'scalar',
+				'is_choice'             => true,
+				'is_searchable_capable' => true,
+			),
+			'radio'                   => array(
+				'label'                 => __( 'Radio', 'buddynext' ),
+				'value_kind'            => 'scalar',
+				'is_choice'             => true,
+				'is_searchable_capable' => true,
+			),
+			'multiselect'             => array(
+				'label'                 => __( 'Multi-select', 'buddynext' ),
+				'value_kind'            => 'multi',
+				'is_choice'             => true,
+				'is_searchable_capable' => true,
+			),
+			// Choices come LIVE from the owner's space categories, never from an
+			// admin-authored options list — hence is_choice = false (no options
+			// editor). Values are category IDs, stored one bn_profile_values row
+			// per pick (see ProfileService::save_multi_entry_value()).
+			'category_multiselect'    => array(
+				'label'                 => __( 'Space Categories', 'buddynext' ),
+				'value_kind'            => 'multi',
+				'is_choice'             => false,
+				'is_searchable_capable' => true,
+			),
+			// Choices come LIVE from the owner's member types. Same live-options
+			// contract as category_multiselect, but the values are member-type SLUGS
+			// (not IDs) and they are stored as one comma-joined space-meta string, so
+			// this is NOT multi-entry. Exists so a space field can offer member types
+			// without baking a per-request query into the always-on registration hook.
+			'member_type_multiselect' => array(
+				'label'                 => __( 'Member Types', 'buddynext' ),
+				'value_kind'            => 'multi',
+				'is_choice'             => false,
+				'is_searchable_capable' => false,
+			),
+			// A single member type per user — the public classification a community
+			// segments members by (Student / Instructor, Buyer / Seller, …) and the
+			// pivot a future engine uses for per-type profile layouts + conditional
+			// fields. Unlike member_type_multiselect (a SPACE setting picking which
+			// types may auto-join), this is the USER's own one type. It is NOT a
+			// bn_profile_values field: it is a thin UI over the member-type ASSIGNMENT
+			// (MemberTypeService — usermeta bn_member_type + bn_member_type_assignments),
+			// which is the one source of truth the directory filter and the pivot read.
+			// See render_member_type_input() (set-once, self_select-gated) and
+			// ProfileService::apply_member_type_selection() (assign on save).
+			'member_type'             => array(
+				'label'                 => __( 'Member Type', 'buddynext' ),
+				'value_kind'            => 'scalar',
+				'is_choice'             => false,
+				'is_searchable_capable' => false,
+			),
+			'color'                   => array(
+				'label'                 => __( 'Colour', 'buddynext' ),
+				'value_kind'            => 'scalar',
+				'is_choice'             => false,
+				'is_searchable_capable' => false,
+			),
+		);
+	}
+
+	/**
+	 * Return the full type registry, filterable by add-ons.
+	 *
+	 * Add-ons register new types by hooking `buddynext_field_types` and adding
+	 * a slug => descriptor entry. Each descriptor MUST provide the four keys
+	 * (label, value_kind, is_choice, is_searchable_capable); malformed entries
+	 * are normalised so consumers can rely on the shape.
+	 *
+	 * @return array<string,array{label:string,value_kind:string,is_choice:bool,is_searchable_capable:bool}>
+	 */
+	public static function types(): array {
+		/**
+		 * Filter the registered profile field types.
+		 *
+		 * @since 1.0.0
+		 *
+		 * @param array<string,array> $types slug => descriptor map.
+		 */
+		$types = (array) apply_filters( 'buddynext_field_types', self::builtin_types() );
+
+		$normalised = array();
+		foreach ( $types as $slug => $descriptor ) {
+			$slug = sanitize_key( (string) $slug );
+			if ( '' === $slug ) {
+				continue;
+			}
+			$descriptor          = is_array( $descriptor ) ? $descriptor : array();
+			$normalised[ $slug ] = array(
+				'label'                 => isset( $descriptor['label'] ) ? (string) $descriptor['label'] : ucfirst( $slug ),
+				'value_kind'            => in_array( $descriptor['value_kind'] ?? '', array( 'scalar', 'multi', 'bool' ), true ) ? (string) $descriptor['value_kind'] : 'scalar',
+				'is_choice'             => ! empty( $descriptor['is_choice'] ),
+				// A date-family type shows the "Date Format / Display As" options box.
+				// Registry-driven (like is_choice) so an add-on date type — e.g. Pro's
+				// date_extended — is recognised by the admin editor without editing a
+				// hardcoded list in two places (PHP + JS) that drift apart.
+				'is_date'               => ! empty( $descriptor['is_date'] ),
+				'is_searchable_capable' => ! empty( $descriptor['is_searchable_capable'] ),
+			);
+
+			// A representative stored value, declared by the type itself.
+			//
+			// Part of the type contract, not test furniture: it is what lets the
+			// conformance suite prove that a type renders its own storage on every
+			// engine output. Only a type knows what its storage looks like, so only a
+			// type can supply it — and a type that supplies none cannot be verified,
+			// which is precisely how five types shipped handing back raw payloads.
+			// Carried through the normaliser because this map is the only thing
+			// consumers see; without it the declaration is silently dropped.
+			if ( isset( $descriptor['sample_value'] ) ) {
+				$normalised[ $slug ]['sample_value'] = $descriptor['sample_value'];
+			}
+			if ( isset( $descriptor['sample_options'] ) && is_array( $descriptor['sample_options'] ) ) {
+				$normalised[ $slug ]['sample_options'] = $descriptor['sample_options'];
+			}
+		}
+
+		return $normalised;
+	}
+
+	/**
+	 * Resolve a raw type slug to a known type, degrading to `text`.
+	 *
+	 * @param string $type Requested type slug.
+	 * @return string A slug guaranteed to exist in self::types().
+	 */
+	private static function resolve_type( string $type ): string {
+		$types = self::types();
+		if ( isset( $types[ $type ] ) ) {
+			return $type;
+		}
+
+		return isset( $types['text'] ) ? 'text' : (string) array_key_first( $types );
+	}
+
+	/**
+	 * Whether a type slug is actually registered with the engine.
+	 *
+	 * Distinct from resolve_type(), which silently answers 'text' for anything it
+	 * does not know. That fallback is right for rendering a control and wrong for
+	 * deciding whether we UNDERSTAND a stored value.
+	 *
+	 * @since 1.1.5
+	 *
+	 * @param string $type Field type slug.
+	 * @return bool
+	 */
+	public static function is_registered_type( string $type ): bool {
+		$types = self::types();
+		return '' !== $type && isset( $types[ $type ] );
+	}
+
+	/**
+	 * Whether a value is a structured payload we have no registered type to read.
+	 *
+	 * Deactivating Pro (a lapsed licence, a plan downgrade) leaves fields whose DB
+	 * type is still `location` while nothing can decode them any more. resolve_type()
+	 * degrades those to `text`, so free would render and INDEX the raw JSON — a
+	 * member became findable by searching "lat" or "components", and re-activating
+	 * Pro did not heal the mirror because it is only rewritten on the next save.
+	 *
+	 * Fail closed instead: show and index nothing rather than storage internals. The
+	 * data is untouched, so re-activating Pro restores the real value immediately.
+	 *
+	 * @since 1.1.5
+	 *
+	 * @param array<string,mixed> $field Field definition.
+	 * @param mixed               $value Stored value.
+	 * @return bool
+	 */
+	public static function is_unreadable_payload( array $field, $value ): bool {
+		$declared = isset( $field['type'] ) ? (string) $field['type'] : '';
+		if ( '' === $declared || self::is_registered_type( $declared ) ) {
+			return false;
+		}
+
+		// An unregistered type holding plain text is still perfectly readable — a
+		// legacy value, or a field re-typed back to text. Only structured storage
+		// is unreadable without the type that wrote it.
+		return is_string( $value ) && is_array( json_decode( $value, true ) );
+	}
+
+	/**
+	 * Whether a type exposes a free-text search mirror.
+	 *
+	 * Text / textarea / url / email / phone / select / radio / multiselect are
+	 * searchable; number / date / boolean / color / file are not free-text.
+	 *
+	 * @param string $type Field type slug.
+	 * @return bool True when the type may back a searchable mirror.
+	 */
+	public static function is_text_searchable( string $type ): bool {
+		$types = self::types();
+		$type  = self::resolve_type( $type );
+
+		return ! empty( $types[ $type ]['is_searchable_capable'] );
+	}
+
+	/**
+	 * The display PRESENTATION mode for a field type — how its label + value are
+	 * laid out on the profile About tab. This is the whole "we can't predict the
+	 * groups or fields, so render by TYPE" contract: the About renderer never
+	 * knows a field's identity, only its type, and this maps every type (built-in
+	 * or add-on) to one of four layouts. The VALUE itself is still produced by
+	 * render_display(); this only picks the wrapper.
+	 *
+	 *  - `block`  full-width block (a paragraph) — textarea / long prose.
+	 *  - `chips`  a row of chips — any multi-value type (multiselect, category /
+	 *             member-type multiselect, and future `value_kind === 'multi'`).
+	 *  - `link`   a standalone external link affordance — url.
+	 *  - `inline` label + value on one line (the default) — every scalar/bool
+	 *             type: text, number, date, email, phone, select, radio, boolean,
+	 *             color, and any unknown type (degrades safely).
+	 *
+	 * Add-ons override a type's mode via the `buddynext_field_presentation` filter.
+	 *
+	 * @param string $type Field type slug.
+	 * @return string One of: block | chips | link | inline.
+	 */
+	public static function presentation_for( string $type ): string {
+		$type = self::resolve_type( $type );
+
+		if ( 'textarea' === $type ) {
+			$mode = 'block';
+		} elseif ( 'url' === $type ) {
+			$mode = 'link';
+		} elseif ( 'multi' === ( self::types()[ $type ]['value_kind'] ?? 'scalar' ) ) {
+			$mode = 'chips';
+		} else {
+			$mode = 'inline';
+		}
+
+		/**
+		 * Filter the About-tab presentation mode for a field type.
+		 *
+		 * @param string $mode One of block|chips|link|inline.
+		 * @param string $type Resolved field type slug.
+		 */
+		$mode = (string) apply_filters( 'buddynext_field_presentation', $mode, $type );
+
+		return in_array( $mode, array( 'block', 'chips', 'link', 'inline' ), true ) ? $mode : 'inline';
+	}
+
+	/**
+	 * Whether a placeholder can actually render inside this type's control.
+	 *
+	 * A placeholder is an attribute of a free-text input. The browser IGNORES it on
+	 * `<input type="date">`, on `<input type="checkbox">`, on `<input type="color">`
+	 * and on every `<select>` — HTML has no placeholder attribute for a select at all.
+	 *
+	 * This exists so the owner is never offered a setting that cannot work. The admin
+	 * used to collect and store a placeholder for EVERY field type while several
+	 * renderers never emitted one, which is the "an option that lies" defect: the
+	 * owner configures it, believes it, and is wrong.
+	 *
+	 * A type may declare `supports_placeholder` in its type meta to override the
+	 * default (Pro's advanced types do this for their free-text controls). The
+	 * default below covers the built-in types without repeating the flag 14 times.
+	 *
+	 * @param string $type Field type slug.
+	 * @return bool True when a placeholder attribute would actually be honoured.
+	 */
+	public static function supports_placeholder( string $type ): bool {
+		$types = self::types();
+		$type  = self::resolve_type( $type );
+
+		if ( isset( $types[ $type ]['supports_placeholder'] ) ) {
+			return (bool) $types[ $type ]['supports_placeholder'];
+		}
+
+		return in_array( $type, array( 'text', 'textarea', 'url', 'email', 'phone', 'number' ), true );
+	}
+
+	/**
+	 * Normalise a field definition's options into slug => label pairs.
+	 *
+	 * Options are stored as a flat list of human-readable strings. Each option's
+	 * machine slug is sanitize_title() of the string; the label is the string.
+	 * Already-associative (slug => label) arrays are respected as-is.
+	 *
+	 * @param array $field Field definition.
+	 * @return array<string,string> slug => label.
+	 */
+	private static function options( array $field ): array {
+		// Live-optioned types: the choice list is the owner's own taxonomy, resolved
+		// fresh on every call — never the stored options JSON. This is what lets a
+		// field offer live choices without a query in the registration hook.
+		$field_type = (string) ( $field['type'] ?? '' );
+
+		if ( 'category_multiselect' === $field_type ) {
+			return self::category_options();
+		}
+
+		if ( 'member_type_multiselect' === $field_type ) {
+			return self::member_type_options();
+		}
+
+		$raw = $field['options'] ?? null;
+		if ( ! is_array( $raw ) ) {
+			return array();
+		}
+
+		$pairs = array();
+		foreach ( $raw as $key => $value ) {
+			if ( is_int( $key ) ) {
+				$label = (string) $value;
+				$slug  = sanitize_title( $label );
+			} else {
+				$slug  = sanitize_title( (string) $key );
+				$label = (string) $value;
+			}
+			if ( '' === $slug ) {
+				continue;
+			}
+			$pairs[ $slug ] = $label;
+		}
+
+		return $pairs;
+	}
+
+	/**
+	 * Live space-category choices for category_multiselect fields.
+	 *
+	 * Keyed by the category ID (as a string), value = category name. Resolved
+	 * from SpaceCategoryService on every call — the service response is
+	 * object-cached, so this stays cheap on hot paths. Returns an empty list
+	 * when the Spaces layer is unavailable or the owner has no categories:
+	 * renderers then show nothing and sanitisation accepts nothing — never an
+	 * error. (This is the engine's one deliberate data dependency; see the
+	 * file header.)
+	 *
+	 * @return array<int|string,string> Category ID => name (PHP coerces the
+	 *                                  numeric-string keys to int).
+	 */
+	public static function category_options(): array {
+		if ( ! class_exists( '\BuddyNext\Spaces\SpaceCategoryService' ) ) {
+			return array();
+		}
+
+		$pairs = array();
+		foreach ( ( new \BuddyNext\Spaces\SpaceCategoryService() )->get_all() as $category ) {
+			$id = isset( $category['id'] ) ? (int) $category['id'] : 0;
+			if ( $id <= 0 ) {
+				continue;
+			}
+			$pairs[ (string) $id ] = (string) ( $category['name'] ?? $id );
+		}
+
+		return $pairs;
+	}
+
+	/**
+	 * The choice list a client should render for this field.
+	 *
+	 * Public accessor for options(). Payload builders MUST come through here rather
+	 * than reading $field['options'] directly: a live-optioned type stores no options
+	 * at registration (that is the whole point — no query in the registration hook),
+	 * so the raw definition advertises an EMPTY pick list. Reading it directly hands
+	 * the app a picker with nothing in it.
+	 *
+	 * @param array $field Field definition.
+	 * @return array<string,string> slug => label.
+	 */
+	public static function choices( array $field ): array {
+		return self::options( $field );
+	}
+
+	/**
+	 * Live member-type choices for member_type_multiselect fields.
+	 *
+	 * Keyed by member-type SLUG (that is what the value stores, and what
+	 * AutoJoinService matches on), value = the type's display name. Resolved from
+	 * MemberTypeService on every call — get_all() is object-cached, so this stays
+	 * cheap. Returns an empty list when the member-types layer is unavailable or the
+	 * owner has defined no types: renderers then show an empty state and
+	 * sanitisation accepts nothing — never an error.
+	 *
+	 * @return array<string,string> Member-type slug => name.
+	 */
+	public static function member_type_options(): array {
+		if ( ! function_exists( 'buddynext_service' ) ) {
+			return array();
+		}
+
+		$service = buddynext_service( 'member_types' );
+		if ( ! is_object( $service ) || ! method_exists( $service, 'get_all' ) ) {
+			return array();
+		}
+
+		$pairs = array();
+		foreach ( (array) $service->get_all() as $type ) {
+			$slug = isset( $type['slug'] ) ? (string) $type['slug'] : '';
+			if ( '' === $slug ) {
+				continue;
+			}
+			$pairs[ $slug ] = (string) ( $type['name'] ?? $slug );
+		}
+
+		return $pairs;
+	}
+
+	/**
+	 * Member-type choices a member may pick for THEMSELVES (self_select = 1 only).
+	 *
+	 * Drives the single-select `member_type` USER field. Admin-only types
+	 * (self_select = 0) are pure classifications and never appear as a self-service
+	 * choice — the same gate MemberTypeController enforces on the REST assign route.
+	 * Keyed by slug => display name, resolved live from MemberTypeService.
+	 *
+	 * @return array<string,string> Self-selectable member-type slug => name.
+	 */
+	public static function member_type_self_select_options(): array {
+		if ( ! function_exists( 'buddynext_service' ) ) {
+			return array();
+		}
+
+		$service = buddynext_service( 'member_types' );
+		if ( ! is_object( $service ) || ! method_exists( $service, 'get_all' ) ) {
+			return array();
+		}
+
+		$pairs = array();
+		foreach ( (array) $service->get_all() as $type ) {
+			if ( empty( $type['self_select'] ) ) {
+				continue;
+			}
+			$slug = isset( $type['slug'] ) ? (string) $type['slug'] : '';
+			if ( '' === $slug ) {
+				continue;
+			}
+			$pairs[ $slug ] = (string) ( $type['name'] ?? $slug );
+		}
+
+		return $pairs;
+	}
+
+	/**
+	 * Whether a type stores ONE bn_profile_values row per selected value
+	 * (entry_index 0..n) instead of a single scalar row.
+	 *
+	 * Set-valued types keep each pick individually matchable through the
+	 * (field_id, value) index — suggestion engines rely on that shape. The
+	 * sanitised comma-joined value is only the in-memory transport;
+	 * ProfileService splits it into rows on save and re-aggregates on read.
+	 *
+	 * @param string $type Field type slug.
+	 * @return bool
+	 */
+	public static function is_multi_entry( string $type ): bool {
+		return 'category_multiselect' === $type;
+	}
+
+	/**
+	 * Whether a stored value represents something the member actually entered.
+	 *
+	 * "Is this filled in?" is a PER-TYPE question, and it was being answered by
+	 * two hand-rolled predicates that both got it wrong for one type:
+	 * ProfileService::get_strength()'s closure and get_completion_score()'s SQL
+	 * both treated any non-empty string as filled. `boolean` is the only type in
+	 * the engine whose sanitiser turns EMPTY input into a non-empty stored value
+	 * — sanitize() returns '0' for an unticked box — so an untouched checkbox
+	 * read as "filled" everywhere completeness was measured.
+	 *
+	 * That is the whole of the "Profile Strength ticks sections I never filled"
+	 * report: the seeded schema's only booleans are work_current and edu_current,
+	 * which is exactly why Work Experience and Education ticked while Social
+	 * Links, Skills and Interests did not.
+	 *
+	 * render_display() already took this view — it renders '' for a falsy boolean
+	 * — so the profile VIEW showed the section empty while the strength widget
+	 * called it complete. This method is the single answer all three now share.
+	 *
+	 * Note `'0'` is filled for every other type: it is a real entry for a number
+	 * field, and only `boolean` manufactures it from nothing.
+	 *
+	 * @since 1.1.1
+	 *
+	 * @param array<string, mixed> $field Field row (needs `type`).
+	 * @param mixed                $value Stored or submitted value.
+	 * @return bool True when the member put something there.
+	 */
+	public static function is_filled( array $field, $value ): bool {
+		$type = self::resolve_type( isset( $field['type'] ) ? (string) $field['type'] : 'text' );
+
+		if ( is_array( $value ) ) {
+			foreach ( $value as $item ) {
+				if ( self::is_filled( $field, $item ) ) {
+					return true;
+				}
+			}
+
+			return false;
+		}
+
+		if ( 'boolean' === $type ) {
+			return self::truthy( $value );
+		}
+
+		return '' !== trim( (string) $value );
+	}
+
+	/**
+	 * Whether a type holds a SET of values (chips, comma-joined transport).
+	 *
+	 * The three multiselect types differ in where their choices come from and in
+	 * how they are stored, but every "render as chips / label as a list / expose as
+	 * an array" decision is the same for all of them. One predicate so a new
+	 * set-valued type cannot be added to some of those branches and forgotten in
+	 * the others.
+	 *
+	 * @param string $type Field type slug.
+	 * @return bool
+	 */
+	public static function is_multiselect_family( string $type ): bool {
+		return in_array( $type, array( 'multiselect', 'category_multiselect', 'member_type_multiselect' ), true );
+	}
+
+	/**
+	 * The DOM id render_input() gives the control for a submitted field name.
+	 *
+	 * The id was being derived in two files that cannot see each other:
+	 * render_input() built `bn-field-` + sanitize_html_class( $name ), while
+	 * templates/profile/edit.php built `bn-ep-` + the key with underscores turned
+	 * into dashes. The two differ twice over — prefix AND underscore handling —
+	 * so every `<label for>` on the profile editor pointed at an element that does
+	 * not exist. Clicking a field's label focused nothing, and a screen reader
+	 * could not compute the control's accessible name (WCAG 2.1 SC 1.3.1 / 4.1.2).
+	 *
+	 * One function, called by both sides, so they cannot drift again.
+	 *
+	 * @since 1.1.1
+	 *
+	 * @param string $name Submitted field name, e.g. `bio` or
+	 *                     `work_experience[0][work_company]`.
+	 * @return string DOM id.
+	 */
+	public static function input_id( string $name ): string {
+		return 'bn-field-' . sanitize_html_class( $name );
+	}
+
+	/**
+	 * Whether a type renders ONE labelable control that a `<label for>` may target.
+	 *
+	 * False for the group types: radio, member_type and the multiselect family
+	 * render a `<fieldset>` of individually-labelled options, so there is no
+	 * element carrying the field-level id at all. Pointing an outer `<label for>`
+	 * at a fieldset is invalid HTML and does not give the group an accessible
+	 * name — such a label must omit `for` (the option labels inside are already
+	 * correct). `boolean` is also false: render_input() wraps its checkbox in its
+	 * own `<label>`, which is a valid implicit association the editor must not
+	 * duplicate.
+	 *
+	 * @since 1.1.1
+	 *
+	 * @param string $type Field type slug.
+	 * @return bool
+	 */
+	public static function has_labelable_control( string $type ): bool {
+		if ( 'boolean' === $type || 'radio' === $type || 'member_type' === $type ) {
+			return false;
+		}
+
+		return ! self::is_multiselect_family( $type );
+	}
+
+	/**
+	 * Split a stored multi value (comma-joined slugs) into a slug list.
+	 *
+	 * @param mixed $value Stored value (string of comma-joined slugs, or array).
+	 * @return string[] Option slugs.
+	 */
+	private static function multi_values( $value ): array {
+		if ( is_array( $value ) ) {
+			$parts = $value;
+		} else {
+			$parts = explode( ',', (string) $value );
+		}
+
+		$slugs = array();
+		foreach ( $parts as $part ) {
+			$slug = sanitize_title( (string) $part );
+			if ( '' !== $slug ) {
+				$slugs[] = $slug;
+			}
+		}
+
+		return array_values( array_unique( $slugs ) );
+	}
+
+	/**
+	 * Is this PROFILE field active (editable) for the given member?
+	 *
+	 * The single render-side gate every profile surface must consult before
+	 * emitting an editable control (card 10134744714). It answers the same
+	 * `buddynext_profile_field_is_active` predicate the save path's REQUIRED
+	 * check uses, so render and save cannot disagree: a field the API would
+	 * refuse (e.g. a plan-gated advanced type) never gets an input.
+	 *
+	 * Rendering an editable control for a field the API will refuse is a trap:
+	 * the member fills it in, saves, and is told the field is not in their
+	 * plan. When the field is also marked required, the member can neither
+	 * satisfy it nor omit it and the whole form dead-ends.
+	 *
+	 * Profile surfaces only — space-settings fields render through
+	 * render_input() directly and must NOT be gated by a profile entitlement.
+	 *
+	 * @param array $field   Field definition.
+	 * @param int   $user_id Member the form is for. 0 = anonymous (signup).
+	 * @return bool
+	 */
+	public static function is_profile_field_active( array $field, int $user_id ): bool {
+		/** This filter is documented in includes/Profile/ProfileService.php */
+		return (bool) apply_filters( 'buddynext_profile_field_is_active', true, $field, array(), $user_id );
+	}
+
+	/**
+	 * Render a PROFILE field's control, or the locked explanation when the
+	 * field is inactive for this member.
+	 *
+	 * The inactive branch renders a short plain paragraph instead of an input,
+	 * so nothing is posted for the field and an omitted key stays a legal
+	 * partial update.
+	 *
+	 * @param array  $field   Field definition.
+	 * @param mixed  $value   Current stored value.
+	 * @param string $name    Form field `name` attribute.
+	 * @param int    $user_id Member the form is for.
+	 * @return string Escaped HTML control or locked message.
+	 */
+	public static function render_profile_input( array $field, $value, string $name, int $user_id ): string {
+		if ( ! self::is_profile_field_active( $field, $user_id ) ) {
+			return '<p class="bn-ep-field-locked">' . esc_html__( 'Not available on your current plan.', 'buddynext' ) . '</p>';
+		}
+
+		return self::render_input( $field, $value, $name );
+	}
+
+	/**
+	 * Render the edit-form input control for a field. Always escaped.
+	 *
+	 * @param array  $field Field definition.
+	 * @param mixed  $value Current stored value.
+	 * @param string $name  Form field `name` attribute.
+	 * @return string Escaped HTML control.
+	 */
+	public static function render_input( array $field, $value, string $name ): string {
+		// Add-on hook: lets Pro / extensions render their own field types (e.g.
+		// location, conditional) registered via buddynext_field_types. Return an
+		// escaped HTML string to take over; null falls through to the core types
+		// (and unknown-without-handler degrades to a text input below).
+		$custom = apply_filters( 'buddynext_field_render_input', null, $field, $value, $name );
+		if ( is_string( $custom ) ) {
+			return $custom;
+		}
+
+		// The control that wrote this value is gone (Pro deactivated with its field
+		// types still configured), so there is nothing here that can edit it safely.
+		// Degrading to a text input prefilled with the raw payload — which is what
+		// the unknown-type fallback below does — invites the member to hand-edit
+		// JSON and destroy their own coordinates with one keystroke. Show a
+		// read-only placeholder and preserve the value on save instead.
+		if ( self::is_unreadable_payload( $field, $value ) ) {
+			return sprintf(
+				'<div class="bn-field bn-field--unavailable">
+					<input type="hidden" name="%1$s" value="%2$s" />
+					<p class="bn-field-unavailable-note">%3$s</p>
+				</div>',
+				esc_attr( $name ),
+				esc_attr( (string) $value ),
+				esc_html__( 'This field needs BuddyNext Pro to edit. Your saved value is kept.', 'buddynext' )
+			);
+		}
+
+		$type     = self::resolve_type( isset( $field['type'] ) ? (string) $field['type'] : 'text' );
+		$id       = self::input_id( $name );
+		$required = ! empty( $field['is_required'] ) ? ' required' : '';
+
+		// G1: owner-authored placeholder (bn_profile_fields.placeholder). The
+		// simple <input> types read it inside render_simple_input(); textarea
+		// needs it here. Empty = no attribute at all.
+		$placeholder_attr = '';
+		if ( isset( $field['placeholder'] ) && '' !== (string) $field['placeholder'] ) {
+			$placeholder_attr = ' placeholder="' . esc_attr( (string) $field['placeholder'] ) . '"';
+		}
+
+		switch ( $type ) {
+			case 'textarea':
+				// .bn-textarea, not .bn-input: the design system pins .bn-input to a
+				// fixed 36px height (which beats the rows attribute), while
+				// .bn-textarea is the multi-line control (auto height, min 80px,
+				// vertical resize). With .bn-input the field rendered one line tall.
+				return sprintf(
+					'<textarea class="bn-textarea bn-field-textarea" id="%1$s" name="%2$s" rows="4"%4$s%5$s>%3$s</textarea>',
+					esc_attr( $id ),
+					esc_attr( $name ),
+					esc_textarea( (string) $value ),
+					$required,
+					$placeholder_attr
+				);
+
+			case 'select':
+				return self::render_select_input( $field, $value, $name, $id, $required );
+
+			case 'radio':
+				return self::render_radio_input( $field, $value, $name, $id, $required );
+
+			case 'multiselect':
+				return self::render_multiselect_input( $field, $value, $name, $id, $required );
+
+			case 'category_multiselect':
+				// Same checkbox-grid control with live category choices. An owner
+				// with zero categories gets an intentional empty state instead of
+				// a bare fieldset with an orphaned label.
+				if ( array() === self::options( $field ) ) {
+					return '<span class="bn-field-value">' . esc_html__( 'No categories are available yet.', 'buddynext' ) . '</span>';
+				}
+				return self::render_multiselect_input( $field, $value, $name, $id, $required );
+
+			case 'member_type_multiselect':
+				// Same checkbox grid, live member-type choices. An owner who has
+				// defined no member types gets an empty state, not an orphaned label.
+				if ( array() === self::options( $field ) ) {
+					return '<span class="bn-field-value">' . esc_html__( 'No member types have been created yet.', 'buddynext' ) . '</span>';
+				}
+				return self::render_multiselect_input( $field, $value, $name, $id, $required );
+
+			case 'member_type':
+				return self::render_member_type_input( $field, $value, $name, $id, $required );
+
+			case 'boolean':
+				// A single checkbox is the one grouped control where native
+				// `required` says exactly the right thing: this box must be
+				// ticked. Groups below cannot use it -- see render_group_required().
+				return sprintf(
+					'<label class="bn-field-checkbox"><input type="checkbox" id="%1$s" name="%2$s" value="1"%3$s%5$s /> <span>%4$s</span></label>',
+					esc_attr( $id ),
+					esc_attr( $name ),
+					checked( self::truthy( $value ), true, false ),
+					esc_html( isset( $field['label'] ) ? (string) $field['label'] : '' ),
+					$required
+				);
+
+			case 'date':
+				return self::render_simple_input( 'date', $field, (string) $value, $name, $id, $required );
+
+			case 'number':
+				return self::render_simple_input( 'number', $field, (string) $value, $name, $id, $required );
+
+			case 'url':
+				return self::render_simple_input( 'url', $field, (string) $value, $name, $id, $required );
+
+			case 'email':
+				return self::render_simple_input( 'email', $field, (string) $value, $name, $id, $required );
+
+			case 'phone':
+				return self::render_simple_input( 'tel', $field, (string) $value, $name, $id, $required );
+
+			case 'color':
+				$color = '' !== (string) $value ? (string) $value : '#000000';
+				return sprintf(
+					'<input type="color" class="bn-input bn-field-color" id="%1$s" name="%2$s" value="%3$s"%4$s />',
+					esc_attr( $id ),
+					esc_attr( $name ),
+					esc_attr( $color ),
+					$required
+				);
+
+			case 'text':
+			default:
+				return self::render_simple_input( 'text', $field, (string) $value, $name, $id, $required );
+		}
+	}
+
+	/**
+	 * Render a plain <input> of the given HTML type.
+	 *
+	 * @param string $html_type HTML input type attribute.
+	 * @param array  $field     Field definition.
+	 * @param string $value     Current value.
+	 * @param string $name      Form name.
+	 * @param string $id        Element id.
+	 * @param string $required  Pre-built ` required` attribute or ''.
+	 * @return string Escaped HTML.
+	 */
+	private static function render_simple_input( string $html_type, array $field, string $value, string $name, string $id, string $required ): string {
+		$placeholder = isset( $field['placeholder'] ) ? (string) $field['placeholder'] : '';
+
+		return sprintf(
+			'<input type="%1$s" class="bn-input bn-field-%1$s" id="%2$s" name="%3$s" value="%4$s"%5$s%6$s />',
+			esc_attr( $html_type ),
+			esc_attr( $id ),
+			esc_attr( $name ),
+			esc_attr( $value ),
+			'' !== $placeholder ? ' placeholder="' . esc_attr( $placeholder ) . '"' : '',
+			$required
+		);
+	}
+
+	/**
+	 * Render a <select> control for select-type fields.
+	 *
+	 * @param array  $field    Field definition.
+	 * @param mixed  $value    Current value (slug).
+	 * @param string $name     Form name.
+	 * @param string $id       Element id.
+	 * @param string $required Pre-built ` required` attribute or ''.
+	 * @return string Escaped HTML.
+	 */
+	private static function render_select_input( array $field, $value, string $name, string $id, string $required ): string {
+		$options  = self::options( $field );
+		$selected = sanitize_title( (string) $value );
+
+		$html  = sprintf(
+			'<select class="bn-input bn-field-select" id="%1$s" name="%2$s"%3$s>',
+			esc_attr( $id ),
+			esc_attr( $name ),
+			$required
+		);
+		$html .= '<option value="">' . esc_html__( 'Select…', 'buddynext' ) . '</option>';
+
+		foreach ( $options as $slug => $label ) {
+			$html .= sprintf(
+				'<option value="%1$s"%2$s>%3$s</option>',
+				esc_attr( $slug ),
+				selected( $slug, $selected, false ),
+				esc_html( $label )
+			);
+		}
+
+		$html .= '</select>';
+
+		return $html;
+	}
+
+	/**
+	 * Render a radio-button group.
+	 *
+	 * @param array  $field    Field definition.
+	 * @param mixed  $value    Current value (slug).
+	 * @param string $name     Form name.
+	 * @param string $id       Element id base.
+	 * @param string $required Pre-built ` required` attribute, or '' when optional.
+	 * @return string Escaped HTML.
+	 */
+	private static function render_radio_input( array $field, $value, string $name, string $id, string $required = '' ): string {
+		$options  = self::options( $field );
+		$selected = sanitize_title( (string) $value );
+
+		$html = '<fieldset class="bn-field-radio-group"' . self::group_required_attrs( $required ) . '>';
+		$i    = 0;
+		foreach ( $options as $slug => $label ) {
+			$opt_id = $id . '-' . (string) $i;
+			$html  .= sprintf(
+				'<label class="bn-field-radio" for="%1$s"><input type="radio" id="%1$s" name="%2$s" value="%3$s"%4$s /> <span>%5$s</span></label>',
+				esc_attr( $opt_id ),
+				esc_attr( $name ),
+				esc_attr( $slug ),
+				checked( $slug, $selected, false ),
+				esc_html( $label )
+			);
+			++$i;
+		}
+		$html .= '</fieldset>';
+
+		return $html;
+	}
+
+	/**
+	 * Render the single-select member-type USER control.
+	 *
+	 * Member type is a public classification and the pivot a future engine uses for
+	 * per-type profile layouts + conditional fields, so a member must not change it
+	 * once set:
+	 *   - Already classified ($value non-empty) → a read-only badge, no control. The
+	 *     value is not re-submitted, so a save never disturbs an existing assignment;
+	 *     only an admin changes it (Members → Member Types).
+	 *   - Not yet classified → a single-select radio of ONLY self-selectable types
+	 *     (self_select = 1); the pick is assigned on save via assign_type().
+	 *   - No self-selectable types → an empty state (nothing a member could pick).
+	 *
+	 * $value is the member's current type SLUG, injected by ProfileService from the
+	 * live assignment (never a bn_profile_values row — see the type's registry note).
+	 *
+	 * @param array  $field    Field definition (unused; kept for signature parity).
+	 * @param mixed  $value    Current member-type slug, or '' when unclassified.
+	 * @param string $name     Form field name attribute.
+	 * @param string $id       Base id for the control.
+	 * @param string $required Pre-built ` required` attribute, or '' when optional.
+	 * @return string Escaped HTML.
+	 */
+	private static function render_member_type_input( array $field, $value, string $name, string $id, string $required = '' ): string {
+		unset( $field );
+		$current = sanitize_key( (string) $value );
+
+		// Already classified — read-only badge, no editable control, nothing resubmitted.
+		if ( '' !== $current ) {
+			$all   = self::member_type_options();
+			$label = $all[ $current ] ?? $current;
+			return sprintf(
+				'<div class="bn-field-membertype is-set"><span class="bn-membertype-badge">%1$s</span> <span class="bn-field-hint">%2$s</span></div>',
+				esc_html( $label ),
+				esc_html__( 'Set by the community — contact an admin to change it.', 'buddynext' )
+			);
+		}
+
+		// Unclassified — offer only the types a member may self-assign.
+		$options = self::member_type_self_select_options();
+		if ( array() === $options ) {
+			return '<span class="bn-field-value">' . esc_html__( 'No member types are available to choose.', 'buddynext' ) . '</span>';
+		}
+
+		$html = '<fieldset class="bn-field-radio-group bn-field-membertype-choices"' . self::group_required_attrs( $required ) . '>';
+		$i    = 0;
+		foreach ( $options as $slug => $label ) {
+			$opt_id = $id . '-' . (string) $i;
+			$html  .= sprintf(
+				'<label class="bn-field-radio" for="%1$s"><input type="radio" id="%1$s" name="%2$s" value="%3$s" /> <span>%4$s</span></label>',
+				esc_attr( $opt_id ),
+				esc_attr( $name ),
+				esc_attr( $slug ),
+				esc_html( $label )
+			);
+			++$i;
+		}
+		$html .= '</fieldset>';
+
+		return $html;
+	}
+
+	/**
+	 * Render a checkbox group for multiselect fields.
+	 *
+	 * Submits as `name[]` so the consumer receives an array; sanitize() joins
+	 * the chosen option slugs with commas for storage.
+	 *
+	 * @param array  $field Field definition.
+	 * @param mixed  $value Current value (comma-joined slugs or array).
+	 * @param string $name  Form name (the `[]` suffix is appended).
+	 * @param string $id    Element id base.
+	 * @return string Escaped HTML.
+	 */
+	/**
+	 * The attributes that mark a radio / checkbox GROUP as required.
+	 *
+	 * Native `required` cannot express "at least one of these". On a checkbox it
+	 * demands that particular box, so putting it on each member of a group would
+	 * require ALL of them -- the opposite of the intent. Radios could carry it,
+	 * but marking the group keeps one rule for both and keeps the decision where
+	 * the validator can read it.
+	 *
+	 * This existed as a silent gap rather than a decision: `$required` was
+	 * computed once in render_input() and then simply not passed to the radio,
+	 * multiselect, category / member-type multiselect or member-type renderers.
+	 * Six field types rendered with no requiredness in the markup at all, so the
+	 * client pass -- which looks for [required] -- could not see them, the form
+	 * submitted, and the SERVER refused it. The member paid a round trip to be
+	 * told about a rule the form never showed them (Basecamp 10184320781).
+	 *
+	 * aria-required carries the same fact to assistive tech, which the missing
+	 * attribute also denied.
+	 *
+	 * PUBLIC because Pro renders its own multi-value types through the
+	 * `buddynext_field_render_input` seam and needs the SAME attributes: the
+	 * client-side pass keys off `[data-bn-required]` by exact name, so a second
+	 * hand-written copy in Pro would silently stop matching the day this pair
+	 * changes. Sharing the helper makes the attribute names one contract instead
+	 * of a string duplicated across the free/pro boundary. Pro had exactly this
+	 * bug for its four advanced types (Basecamp 10184320781, QA reject 1.1.3).
+	 *
+	 * @since 1.1.3 Exposed for Pro's AdvancedFieldRenderer.
+	 *
+	 * @param string $required Pre-built ` required` attribute, or '' when optional.
+	 * @return string Attributes for the group's fieldset.
+	 */
+	public static function group_required_attrs( string $required ): string {
+		return '' === $required ? '' : ' data-bn-required="1" aria-required="true"';
+	}
+
+	/**
+	 * Render a multi-select field as a checkbox group.
+	 *
+	 * @param array  $field    Field definition (its options source).
+	 * @param mixed  $value    Current value (array, or a delimited string of slugs).
+	 * @param string $name     Form field name attribute (submitted as name[]).
+	 * @param string $id       Base id for the checkbox controls.
+	 * @param string $required Pre-built ` required` attribute, or '' when optional.
+	 * @return string Escaped HTML.
+	 */
+	private static function render_multiselect_input( array $field, $value, string $name, string $id, string $required = '' ): string {
+		$options  = self::options( $field );
+		$selected = self::multi_values( $value );
+
+		$html = '<fieldset class="bn-field-checkbox-group"' . self::group_required_attrs( $required ) . '>';
+		$i    = 0;
+		foreach ( $options as $slug => $label ) {
+			// PHP coerces numeric-string array keys (category IDs) to int, so the
+			// key must be re-cast before the strict membership check — otherwise
+			// saved picks never render as checked.
+			$slug   = (string) $slug;
+			$opt_id = $id . '-' . (string) $i;
+			$html  .= sprintf(
+				'<label class="bn-field-checkbox" for="%1$s"><input type="checkbox" id="%1$s" name="%2$s[]" value="%3$s"%4$s /> <span>%5$s</span></label>',
+				esc_attr( $opt_id ),
+				esc_attr( $name ),
+				esc_attr( $slug ),
+				checked( in_array( $slug, $selected, true ), true, false ),
+				esc_html( $label )
+			);
+			++$i;
+		}
+		$html .= '</fieldset>';
+
+		return $html;
+	}
+
+	/**
+	 * Compose the display date range for a Work Experience / Education entry.
+	 *
+	 * The predefined repeater groups store real sub-field keys
+	 * (work_start_date/work_end_date, edu_start_year/edu_end_year) — no
+	 * "daterange" field exists. Both profile display surfaces (the About
+	 * timeline cards and the right sidebar) compose the range through this
+	 * single helper so the format cannot drift between them.
+	 *
+	 * @param array  $entry_fields Template-shaped entry field list (each item an
+	 *                             array carrying field_key + value; the string
+	 *                             `_visibility` companion is skipped).
+	 * @param string $prefix       'work' or 'edu'.
+	 * @return string "start – end", "start – Present", a single side, "Current"
+	 *                (ongoing with no dates), or '' when nothing is set.
+	 */
+	public static function entry_daterange( array $entry_fields, string $prefix ): string {
+		$value_of = static function ( string $key ) use ( $entry_fields ): string {
+			foreach ( $entry_fields as $entry_field ) {
+				if ( is_array( $entry_field ) && ( $entry_field['field_key'] ?? '' ) === $key ) {
+					$entry_value = $entry_field['value'] ?? '';
+					return is_scalar( $entry_value ) ? (string) $entry_value : '';
+				}
+			}
+			return '';
+		};
+
+		$start   = 'edu' === $prefix ? $value_of( 'edu_start_year' ) : $value_of( $prefix . '_start_date' );
+		$end     = 'edu' === $prefix ? $value_of( 'edu_end_year' ) : $value_of( $prefix . '_end_date' );
+		$current = $value_of( $prefix . '_current' );
+
+		if ( '' === $start && '' === $end ) {
+			return '1' === $current ? __( 'Current', 'buddynext' ) : '';
+		}
+		if ( '1' === $current ) {
+			$end = __( 'Present', 'buddynext' );
+		}
+		if ( '' !== $start && '' !== $end ) {
+			return sprintf(
+				/* translators: 1: start date/year, 2: end date/year or "Present". */
+				_x( '%1$s – %2$s', 'profile entry date range', 'buddynext' ),
+				$start,
+				$end
+			);
+		}
+		return '' !== $start ? $start : $end;
+	}
+
+	/**
+	 * Render the profile-view display for a field. Always escaped.
+	 *
+	 * @param array $field Field definition.
+	 * @param mixed $value Stored value.
+	 * @return string Escaped HTML (empty string when there is nothing to show).
+	 */
+	public static function render_display( array $field, $value ): string {
+		// Add-on hook: extensions render their own types' display output. Return
+		// an escaped string to take over; null falls through to core types.
+		$custom = apply_filters( 'buddynext_field_render_display', null, $field, $value );
+		if ( is_string( $custom ) ) {
+			return $custom;
+		}
+
+		$type = self::resolve_type( isset( $field['type'] ) ? (string) $field['type'] : 'text' );
+
+		// Boolean is special: false/empty hides the row entirely.
+		if ( 'boolean' === $type ) {
+			if ( ! self::truthy( $value ) ) {
+				return '';
+			}
+			return '<span class="bn-field-value bn-field-bool">' . esc_html__( 'Yes', 'buddynext' ) . '</span>';
+		}
+
+		if ( self::is_multiselect_family( $type ) ) {
+			return self::render_chips( $field, $value );
+		}
+
+		// Everything else: nothing to show for an empty value.
+		if ( '' === trim( (string) $value ) ) {
+			return '';
+		}
+
+		switch ( $type ) {
+			case 'textarea':
+				return '<div class="bn-field-value bn-field-paragraphs">' . wp_kses_post( wpautop( esc_html( (string) $value ) ) ) . '</div>';
+
+			case 'url':
+				$url = esc_url( (string) $value );
+				if ( '' === $url ) {
+					return '';
+				}
+				return sprintf(
+					'<a class="bn-field-value bn-field-link" href="%1$s" target="_blank" rel="noopener noreferrer">%2$s</a>',
+					$url,
+					esc_html( self::display_host( (string) $value ) )
+				);
+
+			case 'email':
+				$email = sanitize_email( (string) $value );
+				if ( '' === $email || ! is_email( $email ) ) {
+					return '';
+				}
+				return sprintf(
+					'<a class="bn-field-value bn-field-mailto" href="%1$s">%2$s</a>',
+					esc_url( 'mailto:' . $email ),
+					esc_html( $email )
+				);
+
+			case 'phone':
+				$tel = preg_replace( '/[^0-9+]/', '', (string) $value );
+				if ( null === $tel || '' === $tel ) {
+					return esc_html( (string) $value );
+				}
+				return sprintf(
+					'<a class="bn-field-value bn-field-tel" href="%1$s">%2$s</a>',
+					esc_url( 'tel:' . $tel ),
+					esc_html( (string) $value )
+				);
+
+			case 'date':
+				// The value arrives already in its "Display as" form (ProfileService::view_value
+				// formats every date mode through format_date). Re-parsing it here re-ran
+				// strtotime on strings like "1996" or "April 1996" and printed a wrong full date
+				// — the "Display as" setting looked ignored (card 10123106438). Present it as-is;
+				// pass a raw value through format_date so a direct caller still gets a real date.
+				$date = self::looks_like_raw_date( (string) $value )
+					? self::format_date( $field, (string) $value )
+					: (string) $value;
+				return '<span class="bn-field-value bn-field-date">' . esc_html( $date ) . '</span>';
+
+			case 'number':
+				return '<span class="bn-field-value bn-field-number">' . esc_html( (string) $value ) . '</span>';
+
+			case 'color':
+				$color = self::valid_color( (string) $value );
+				if ( '' === $color ) {
+					return '';
+				}
+				return sprintf(
+					'<span class="bn-field-value bn-field-color"><span class="bn-color-swatch" style="background-color:%1$s"></span> <code>%2$s</code></span>',
+					esc_attr( $color ),
+					esc_html( $color )
+				);
+
+			case 'select':
+			case 'radio':
+				$options = self::options( $field );
+				$slug    = sanitize_title( (string) $value );
+				$label   = $options[ $slug ] ?? (string) $value;
+				return '<span class="bn-field-value bn-field-option">' . esc_html( $label ) . '</span>';
+
+			case 'text':
+			default:
+				return '<span class="bn-field-value bn-field-text">' . esc_html( (string) $value ) . '</span>';
+		}
+	}
+
+	/**
+	 * Render multiselect values as chips.
+	 *
+	 * Category-backed chips (category_multiselect) are links into the spaces
+	 * directory filtered to that category — a discovery surface, not
+	 * decoration. Admin-authored option chips stay plain spans.
+	 *
+	 * @param array $field Field definition.
+	 * @param mixed $value Stored value (comma-joined slugs or array).
+	 * @return string Escaped HTML chip list (empty string when no values).
+	 */
+	private static function render_chips( array $field, $value ): string {
+		$options  = self::options( $field );
+		$selected = self::multi_values( $value );
+		if ( empty( $selected ) ) {
+			return '';
+		}
+
+		// Live-optioned types: a value that no longer resolves (its category was
+		// deleted) is dropped — a raw ID chip would be meaningless. Admin-authored
+		// option types keep the slug fallback (the option list may be edited back).
+		$drop_unresolved = self::is_multi_entry( (string) ( $field['type'] ?? '' ) );
+
+		// Category chips deep-link to /spaces/?bn_cat={slug} — the directory's
+		// existing category filter (templates/spaces/directory.php reads bn_cat
+		// and lights the matching chip). Keyed by category ID.
+		$links = $drop_unresolved ? self::category_directory_links() : array();
+
+		$chips = '';
+		foreach ( $selected as $slug ) {
+			if ( $drop_unresolved && ! isset( $options[ $slug ] ) ) {
+				continue;
+			}
+			$label = $options[ $slug ] ?? $slug;
+			if ( isset( $links[ $slug ] ) ) {
+				$chips .= '<a class="bn-chip bn-field-chip" href="' . esc_url( $links[ $slug ] ) . '">' . esc_html( $label ) . '</a>';
+			} else {
+				$chips .= '<span class="bn-chip bn-field-chip">' . esc_html( $label ) . '</span>';
+			}
+		}
+
+		if ( '' === $chips ) {
+			return '';
+		}
+
+		return '<span class="bn-field-value bn-field-chips">' . $chips . '</span>';
+	}
+
+	/**
+	 * Spaces-directory deep links for every live category, keyed by category ID.
+	 *
+	 * PHP coerces the numeric-string keys to integers, so consumers should
+	 * look up with (int) casts or rely on loose array access.
+	 *
+	 * @return array<int,string> Category ID => directory URL filtered to it.
+	 */
+	public static function category_directory_links(): array {
+		if ( ! class_exists( '\BuddyNext\Spaces\SpaceCategoryService' )
+			|| ! class_exists( '\BuddyNext\Core\PageRouter' ) ) {
+			return array();
+		}
+
+		$base  = \BuddyNext\Core\PageRouter::spaces_url();
+		$links = array();
+		foreach ( ( new \BuddyNext\Spaces\SpaceCategoryService() )->get_all() as $category ) {
+			$id       = isset( $category['id'] ) ? (int) $category['id'] : 0;
+			$cat_slug = (string) ( $category['slug'] ?? '' );
+			if ( $id <= 0 || '' === $cat_slug ) {
+				continue;
+			}
+			$links[ (string) $id ] = add_query_arg( 'bn_cat', rawurlencode( $cat_slug ), $base );
+		}
+
+		return $links;
+	}
+
+	/**
+	 * Validate + sanitize a raw submitted value into a storable scalar.
+	 *
+	 * Returns a storable scalar string (multi → comma-joined option slugs) or a
+	 * WP_Error when validation fails.
+	 *
+	 * @param array $field Field definition.
+	 * @param mixed $raw   Raw submitted value.
+	 * @return string|WP_Error Storable scalar, or WP_Error on validation failure.
+	 */
+	public static function sanitize( array $field, $raw ) {
+		// Add-on hook: extensions validate/sanitize their own types. Return a
+		// scalar string (or WP_Error) to take over; null falls through to core.
+		$custom = apply_filters( 'buddynext_field_sanitize', null, $field, $raw );
+		if ( null !== $custom ) {
+			return $custom;
+		}
+
+		$type  = self::resolve_type( isset( $field['type'] ) ? (string) $field['type'] : 'text' );
+		$label = isset( $field['label'] ) ? (string) $field['label'] : ( isset( $field['field_key'] ) ? (string) $field['field_key'] : '' );
+
+		switch ( $type ) {
+			case 'textarea':
+				return sanitize_textarea_field( (string) ( is_array( $raw ) ? '' : $raw ) );
+
+			case 'url':
+				$url = esc_url_raw( trim( (string) $raw ) );
+				if ( '' !== trim( (string) $raw ) && '' === $url ) {
+					/* translators: %s: field label. */
+					return new WP_Error( 'bn_invalid_url', sprintf( __( '%s must be a valid URL.', 'buddynext' ), $label ) );
+				}
+				return $url;
+
+			case 'email':
+				$value = trim( (string) $raw );
+				if ( '' === $value ) {
+					return '';
+				}
+				$email = sanitize_email( $value );
+				if ( '' === $email || ! is_email( $email ) ) {
+					/* translators: %s: field label. */
+					return new WP_Error( 'bn_invalid_email', sprintf( __( '%s must be a valid email address.', 'buddynext' ), $label ) );
+				}
+				return $email;
+
+			case 'phone':
+				$value = trim( (string) $raw );
+				if ( '' === $value ) {
+					return '';
+				}
+				if ( ! preg_match( '/^[0-9+()\-.\s]{3,32}$/', $value ) ) {
+					/* translators: %s: field label. */
+					return new WP_Error( 'bn_invalid_phone', sprintf( __( '%s must be a valid phone number.', 'buddynext' ), $label ) );
+				}
+				return sanitize_text_field( $value );
+
+			case 'number':
+				$value = trim( (string) $raw );
+				if ( '' === $value ) {
+					return '';
+				}
+				if ( ! is_numeric( $value ) ) {
+					/* translators: %s: field label. */
+					return new WP_Error( 'bn_invalid_number', sprintf( __( '%s must be a number.', 'buddynext' ), $label ) );
+				}
+				// Preserve integers as-is, normalise floats.
+				return (string) ( $value + 0 );
+
+			case 'date':
+				$value = trim( (string) $raw );
+				if ( '' === $value ) {
+					return '';
+				}
+				$ts = strtotime( $value );
+				if ( false === $ts ) {
+					/* translators: %s: field label. */
+					return new WP_Error( 'bn_invalid_date', sprintf( __( '%s must be a valid date.', 'buddynext' ), $label ) );
+				}
+				return gmdate( 'Y-m-d', $ts );
+
+			case 'boolean':
+				return self::truthy( $raw ) ? '1' : '0';
+
+			case 'color':
+				$value = trim( (string) $raw );
+				if ( '' === $value ) {
+					return '';
+				}
+				$color = self::valid_color( $value );
+				if ( '' === $color ) {
+					/* translators: %s: field label. */
+					return new WP_Error( 'bn_invalid_color', sprintf( __( '%s must be a valid colour.', 'buddynext' ), $label ) );
+				}
+				return $color;
+
+			case 'select':
+			case 'radio':
+				$value = trim( (string) ( is_array( $raw ) ? '' : $raw ) );
+				if ( '' === $value ) {
+					return '';
+				}
+				$options = self::options( $field );
+				$slug    = sanitize_title( $value );
+				if ( ! isset( $options[ $slug ] ) ) {
+					/* translators: %s: field label. */
+					return new WP_Error( 'bn_invalid_option', sprintf( __( 'Please choose a valid option for %s.', 'buddynext' ), $label ) );
+				}
+				return $slug;
+
+			case 'multiselect':
+				$options  = self::options( $field );
+				$incoming = self::multi_values( $raw );
+				$valid    = array();
+				foreach ( $incoming as $slug ) {
+					if ( isset( $options[ $slug ] ) ) {
+						$valid[] = $slug;
+					}
+				}
+				return implode( ',', $valid );
+
+			case 'category_multiselect':
+				// Values are category IDs: absint each and keep only IDs that
+				// exist in the live taxonomy (deleted/unknown categories are
+				// silently dropped — the signal degrades, nothing errors).
+				$live     = self::options( $field );
+				$incoming = is_array( $raw ) ? $raw : explode( ',', (string) $raw );
+				$valid    = array();
+				foreach ( $incoming as $one ) {
+					$id = is_scalar( $one ) ? absint( $one ) : 0;
+					if ( $id > 0 && isset( $live[ (string) $id ] ) && ! in_array( (string) $id, $valid, true ) ) {
+						$valid[] = (string) $id;
+					}
+				}
+				return implode( ',', $valid );
+
+			case 'member_type_multiselect':
+				// Values are member-type SLUGS, kept only when the type still exists.
+				// Unlike the plain multiselect branch this validates against the LIVE
+				// list rather than a stored options JSON — which is exactly why the
+				// field could not simply be registered as a multiselect: with no baked
+				// options, that sanitizer drops every submitted slug and saves ''.
+				$live     = self::options( $field );
+				$incoming = is_array( $raw ) ? $raw : explode( ',', (string) $raw );
+				$valid    = array();
+				foreach ( $incoming as $one ) {
+					$slug = is_scalar( $one ) ? sanitize_key( (string) $one ) : '';
+					if ( '' !== $slug && isset( $live[ $slug ] ) && ! in_array( $slug, $valid, true ) ) {
+						$valid[] = $slug;
+					}
+				}
+				return implode( ',', $valid );
+
+			case 'member_type':
+				// One self-selectable slug, validated against the LIVE self_select list.
+				// Anything else (empty, unknown, or an admin-only type a member should
+				// never see) sanitises to '' — apply_member_type_selection() then makes
+				// it a no-op, so a tampered value cannot self-assign a restricted type.
+				$slug = sanitize_key( (string) ( is_array( $raw ) ? '' : $raw ) );
+				if ( '' === $slug ) {
+					return '';
+				}
+				$options = self::member_type_self_select_options();
+				return isset( $options[ $slug ] ) ? $slug : '';
+
+			case 'text':
+			default:
+				return sanitize_text_field( (string) ( is_array( $raw ) ? '' : $raw ) );
+		}
+	}
+
+	/**
+	 * Produce the human-readable, searchable mirror text for a value.
+	 *
+	 * Scalar types mirror the sanitized value; choice types mirror option
+	 * LABELS (not slugs) so directory search matches what humans typed; multi
+	 * mirrors the comma-joined labels. Non-searchable types return ''.
+	 *
+	 * @param array $field Field definition.
+	 * @param mixed $value Stored value.
+	 * @return string Mirror text (empty when the type is not searchable).
+	 */
+	public static function searchable_text( array $field, $value ): string {
+		// An unreadable payload must never reach the index. Without this a
+		// Pro-deactivated site wrote raw JSON into the mirror on the next profile
+		// save, and members became findable by searching "lat" or "components".
+		if ( self::is_unreadable_payload( $field, $value ) ) {
+			return '';
+		}
+
+		$type = self::resolve_type( isset( $field['type'] ) ? (string) $field['type'] : 'text' );
+		if ( ! self::is_text_searchable( $type ) ) {
+			return '';
+		}
+
+		if ( self::is_multiselect_family( $type ) ) {
+			$options = self::options( $field );
+			$drop    = self::is_multi_entry( $type );
+			$labels  = array();
+			foreach ( self::multi_values( $value ) as $slug ) {
+				if ( $drop && ! isset( $options[ $slug ] ) ) {
+					continue; // Deleted category: a raw ID is not searchable text.
+				}
+				$labels[] = $options[ $slug ] ?? $slug;
+			}
+			return implode( ', ', $labels );
+		}
+
+		if ( 'select' === $type || 'radio' === $type ) {
+			$options = self::options( $field );
+			$slug    = sanitize_title( (string) $value );
+			return $options[ $slug ] ?? (string) $value;
+		}
+
+		// The SEARCH MIRROR must not hold the raw date either. If the owner reduced a birthday
+		// to age-only, indexing the exact Y-m-d would let anyone find a member by searching
+		// their date of birth — the profile hides it and the search box gives it back.
+		if ( self::is_date_type( $type ) ) {
+			return self::format_date( $field, (string) $value );
+		}
+
+		/**
+		 * Filter the text a field contributes to the search mirror.
+		 *
+		 * A type whose STORED form is not human text needs to say what it is
+		 * searchable AS. Pro's `location` stores JSON, and without this the whole
+		 * blob — braces, "lat", coordinates — went into the index, so searching
+		 * "address" matched every member who had one.
+		 *
+		 * The dates above are the same idea handled inline: never index the raw
+		 * stored form when it is not what a member would search for.
+		 *
+		 * @since 1.1.2
+		 *
+		 * @param string              $text  Default searchable text.
+		 * @param array<string,mixed> $field Field definition.
+		 * @param mixed               $value Stored value.
+		 */
+		return (string) apply_filters( 'buddynext_field_searchable_text', (string) $value, $field, $value );
+	}
+
+	/**
+	 * Whether a field type stores a date.
+	 *
+	 * @param string $type Resolved field type.
+	 * @return bool
+	 */
+	private static function is_date_type( string $type ): bool {
+		return in_array( $type, array( 'date', 'date_extended' ), true );
+	}
+
+	/**
+	 * The owner's chosen display mode for a date field.
+	 *
+	 * @param array<string,mixed> $field Field definition.
+	 * @return string One of: date | month_year | year | age.
+	 */
+	public static function date_display_mode( array $field ): string {
+		$options = isset( $field['options'] ) && is_array( $field['options'] ) ? $field['options'] : array();
+		$mode    = (string) ( $options['display'] ?? 'date' );
+
+		return in_array( $mode, array( 'date', 'month_year', 'year', 'age' ), true ) ? $mode : 'date';
+	}
+
+	/**
+	 * Whether a value is still a raw stored date (the date input's Y-m-d), as
+	 * opposed to an already-formatted "Display as" string ("1996", "April 1996",
+	 * "30 years old", "April 21, 1996").
+	 *
+	 * The render_display() method normally receives values that view_value() has
+	 * already formatted, so it must NOT re-parse them. This guard lets a direct
+	 * caller that still holds a raw date get it formatted, without re-mangling the
+	 * formatted values the profile actually passes.
+	 *
+	 * @param string $value Value under test.
+	 * @return bool
+	 */
+	private static function looks_like_raw_date( string $value ): bool {
+		return 1 === preg_match( '/^\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2})?$/', trim( $value ) );
+	}
+
+	/**
+	 * Render a stored date according to the owner's "Display as" choice.
+	 *
+	 * THIS SETTING DID NOTHING. The admin offered date | month_year | year | age, validated
+	 * it, and saved it into options['display'] — and not one line of code ever read it back.
+	 * Every date rendered as the raw stored Y-m-d.
+	 *
+	 * That is not a cosmetic gap. The obvious use of this control is a BIRTHDAY field, and an
+	 * owner who picks "Age only" (or "Year only") is deliberately choosing NOT to expose a
+	 * member's full date of birth. The product accepted that choice, told them it was saved,
+	 * and published the full DOB anyway — with no way for them to notice, because the admin
+	 * screen shows exactly what they picked.
+	 *
+	 * A date of birth is among the most sensitive things a community holds. This was an option
+	 * that lied, in the one place where lying about it actually harms someone.
+	 *
+	 * @param array<string,mixed> $field Field definition.
+	 * @param string              $value Stored date (Y-m-d).
+	 * @return string
+	 */
+	public static function format_date( array $field, string $value ): string {
+		$value = trim( $value );
+
+		if ( '' === $value ) {
+			return '';
+		}
+
+		$ts = strtotime( $value );
+
+		if ( false === $ts ) {
+			return $value;
+		}
+
+		switch ( self::date_display_mode( $field ) ) {
+			case 'age':
+				$birth = new \DateTimeImmutable( '@' . $ts );
+				$now   = new \DateTimeImmutable( 'now' );
+
+				// A future date has no age. Show nothing rather than a negative number.
+				if ( $birth > $now ) {
+					return '';
+				}
+
+				$years = (int) $birth->diff( $now )->y;
+
+				/* translators: %d: the member's age in years. */
+				return sprintf( _n( '%d year old', '%d years old', $years, 'buddynext' ), $years );
+
+			case 'year':
+				return gmdate( 'Y', $ts );
+
+			case 'month_year':
+				return wp_date( 'F Y', $ts );
+
+			case 'date':
+			default:
+				return wp_date( (string) get_option( 'date_format', 'F j, Y' ), $ts );
+		}
+	}
+
+	/**
+	 * Plain-text representation of a value (no HTML) for app-native rendering,
+	 * notifications, and exports.
+	 *
+	 * Unlike searchable_text() this covers every type (including boolean / number /
+	 * date / color), and unlike render_display() it returns no markup.
+	 *
+	 * @param array $field Field definition.
+	 * @param mixed $value Stored value.
+	 * @return string
+	 */
+	public static function display_text( array $field, $value ): string {
+		/**
+		 * Add-on hook: extensions render their own types' plain-text output. Return
+		 * a string to take over; null falls through to core types.
+		 *
+		 * Mirrors `buddynext_field_render_display`. Without this seam a type could
+		 * be fully wired for the About panel and still hand back raw storage to the
+		 * profile hero, notifications and exports — which is exactly how the Pro
+		 * Location map type printed a JSON blob under a member's name.
+		 *
+		 * @since 1.1.5
+		 *
+		 * @param string|null         $custom Plain-text rendering, or null to fall through.
+		 * @param array<string,mixed> $field  Field definition.
+		 * @param mixed               $value  Stored value.
+		 */
+		$custom = apply_filters( 'buddynext_field_display_text', null, $field, $value );
+		if ( is_string( $custom ) ) {
+			return $custom;
+		}
+
+		// Nothing registered can read this payload (Pro deactivated with its field
+		// types still configured). Show nothing rather than storage internals.
+		if ( self::is_unreadable_payload( $field, $value ) ) {
+			return '';
+		}
+
+		$type = self::resolve_type( isset( $field['type'] ) ? (string) $field['type'] : 'text' );
+
+		if ( 'boolean' === $type ) {
+			return self::truthy( $value ) ? __( 'Yes', 'buddynext' ) : __( 'No', 'buddynext' );
+		}
+
+		if ( self::is_multiselect_family( $type ) ) {
+			$options = self::options( $field );
+			$drop    = self::is_multi_entry( $type );
+			$labels  = array();
+			foreach ( self::multi_values( $value ) as $slug ) {
+				if ( $drop && ! isset( $options[ $slug ] ) ) {
+					continue; // Deleted category: no human-readable label to show.
+				}
+				$labels[] = $options[ $slug ] ?? $slug;
+			}
+			return implode( ', ', $labels );
+		}
+
+		if ( 'select' === $type || 'radio' === $type ) {
+			$options = self::options( $field );
+			$slug    = sanitize_title( (string) $value );
+			return $options[ $slug ] ?? (string) $value;
+		}
+
+		// A member type stores its SLUG. ProfileService rewrites `value` to the
+		// display name for the profile payload, which made this look correct there
+		// and leak the slug everywhere else — notifications, exports, and any client
+		// not reading that one payload. Resolve it here so every caller agrees.
+		if ( 'member_type' === $type ) {
+			$options = self::member_type_options();
+			$slug    = (string) $value;
+			return $options[ $slug ] ?? $slug;
+		}
+
+		if ( self::is_date_type( $type ) ) {
+			return self::format_date( $field, (string) $value );
+		}
+		return (string) $value;
+	}
+
+	/**
+	 * Type-shaped value for REST / app payloads: a boolean as bool, a number as
+	 * int|float, a multiselect as an array of slugs, everything else as a string.
+	 *
+	 * Keeps the app client from re-parsing stringified meta values.
+	 *
+	 * @param array $field Field definition.
+	 * @param mixed $value Stored value.
+	 * @return bool|int|float|string|array<int,int|string>
+	 */
+	public static function rest_value( array $field, $value ): bool|int|float|string|array {
+		/**
+		 * Add-on hook: extensions type-shape their own values for REST / app payloads.
+		 * Return a scalar or array to take over; null falls through to core types.
+		 *
+		 * `value` is the DISPLAY channel — the raw structure belongs in the
+		 * owner-only `value_raw`. A type that stores JSON must render here, or every
+		 * API and native-app consumer receives the blob.
+		 *
+		 * @since 1.1.5
+		 *
+		 * @param bool|int|float|string|array|null $custom Type-shaped value, or null to fall through.
+		 * @param array<string,mixed>              $field  Field definition.
+		 * @param mixed                            $value  Stored value.
+		 */
+		$custom = apply_filters( 'buddynext_field_rest_value', null, $field, $value );
+		if ( null !== $custom && ( is_scalar( $custom ) || is_array( $custom ) ) ) {
+			return $custom;
+		}
+
+		$type = self::resolve_type( isset( $field['type'] ) ? (string) $field['type'] : 'text' );
+
+		if ( 'boolean' === $type ) {
+			return self::truthy( $value );
+		}
+
+		// A date in a REDUCED display mode must not leave the server as a raw date.
+		//
+		// This is the half that would have made the fix worthless. Formatting the profile while
+		// the REST payload still carried the exact Y-m-d means the app renders "34 years old"
+		// and the API hands out the date of birth to anyone who reads the response. The leak
+		// survives the fix, in the surface the owner is least likely to look at.
+		//
+		// 'date' mode is unchanged: the owner asked for the full date, so the client gets it
+		// and can format it however it likes.
+		if ( self::is_date_type( $type ) && 'date' !== self::date_display_mode( $field ) ) {
+			return self::format_date( $field, (string) $value );
+		}
+
+		if ( 'number' === $type ) {
+			$string = (string) $value;
+			if ( '' === $string ) {
+				return '';
+			}
+			$number = (float) $string;
+			// Return a whole number as int, a fractional number as float.
+			return ( is_finite( $number ) && floor( $number ) === $number ) ? (int) $number : $number;
+		}
+
+		// Slug-valued sets: hand the client an array of slugs, never a comma string
+		// it would have to re-parse. member_type_multiselect belongs here (its values
+		// are slugs), not with category_multiselect (whose values are ints).
+		if ( 'multiselect' === $type || 'member_type_multiselect' === $type ) {
+			return self::multi_values( $value );
+		}
+
+		if ( 'category_multiselect' === $type ) {
+			// A set of category IDs — typed as ints so app clients can join
+			// against the categories payload without re-parsing strings.
+			return array_values(
+				array_filter(
+					array_map( 'absint', self::multi_values( $value ) )
+				)
+			);
+		}
+
+		return (string) $value;
+	}
+
+	/**
+	 * Loosely coerce a value to bool for checkbox / boolean handling.
+	 *
+	 * @param mixed $value Raw value.
+	 * @return bool
+	 */
+	private static function truthy( $value ): bool {
+		if ( is_bool( $value ) ) {
+			return $value;
+		}
+		if ( is_array( $value ) ) {
+			return ! empty( $value );
+		}
+		$value = strtolower( trim( (string) $value ) );
+
+		return in_array( $value, array( '1', 'true', 'yes', 'on' ), true );
+	}
+
+	/**
+	 * Validate a colour string (#rgb or #rrggbb), returning a normalised value.
+	 *
+	 * @param string $value Raw colour.
+	 * @return string Normalised lowercase hex colour, or '' when invalid.
+	 */
+	private static function valid_color( string $value ): string {
+		$value = trim( $value );
+		if ( preg_match( '/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/', $value ) ) {
+			return strtolower( $value );
+		}
+
+		return '';
+	}
+
+	/**
+	 * Reduce a URL to its host for compact link display, falling back to the URL.
+	 *
+	 * @param string $url Full URL.
+	 * @return string Host or the original URL.
+	 */
+	private static function display_host( string $url ): string {
+		$host = wp_parse_url( $url, PHP_URL_HOST );
+
+		return is_string( $host ) && '' !== $host ? $host : $url;
+	}
+}

@@ -1,0 +1,151 @@
+/**
+ * Challenges — frontend stylesheet.
+ *
+ * Phase F migration: extracted from assets/css/frontend.css so the
+ * block ships its own CSS via block.json (`style` field).
+ */
+
+/* ── Challenges ─────────────────────────────────────────────────────────────── */
+.wb-gam-challenges__list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: var(--wb-gam-gap);
+}
+
+.wb-gam-challenges__item {
+	padding: 14px 16px;
+	border-radius: var(--wb-gam-radius);
+	background: var(--wb-gam-color-white);
+	border: 1px solid var(--wb-gam-color-border);
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	transition: box-shadow 200ms ease, border-color 200ms ease;
+}
+.wb-gam-challenges__item:hover {
+	box-shadow: var(--wb-gam-shadow-md);
+	border-color: var(--wb-gam-color-border-strong);
+}
+
+.wb-gam-challenges__hint {
+	margin: 0;
+	font-size: 0.8125rem;
+	color: var(--wb-gam-color-text-muted);
+	line-height: 1.4;
+}
+
+.wb-gam-challenges__item--completed {
+	background: var(--wb-gam-color-success-bg);
+	border-color: var(--wb-gam-color-success-soft);
+}
+
+.wb-gam-challenges__header {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	flex-wrap: wrap;
+}
+
+.wb-gam-challenges__title {
+	font-weight: 600;
+	flex: 1;
+	font-size: 0.9375rem;
+}
+
+.wb-gam-challenges__badge {
+	font-size: 0.6875rem;
+	font-weight: 600;
+	padding: 0.1875rem 0.5rem;
+	border-radius: 999px;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+
+.wb-gam-challenges__badge--team {
+	background: var(--wb-gam-primary-light);
+	color: var(--wb-gam-primary);
+}
+
+.wb-gam-challenges__badge--done {
+	background: var(--wb-gam-color-success-bg);
+	color: var(--wb-gam-color-success-strong);
+}
+
+.wb-gam-challenges__meta {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	flex-wrap: wrap;
+}
+
+.wb-gam-challenges__progress-text {
+	font-size: 0.8125rem;
+	font-weight: 600;
+	color: var(--wb-gam-primary);
+}
+
+.wb-gam-challenges__bonus {
+	display: inline-flex;
+	align-items: center;
+	gap: 3px;
+	padding: 2px 8px;
+	border-radius: 999px;
+	font-size: 0.75rem;
+	font-weight: 700;
+	color: var(--wb-gam-color-warning-strong);
+	background: var(--wb-gam-color-warning-soft);
+}
+
+.wb-gam-challenges__deadline {
+	font-size: 0.75rem;
+	color: var(--wb-gam-silver);
+	margin-inline-start: auto;
+}
+
+.wb-gam-challenges__bar-wrap {
+	height: 6px;
+	background: var(--wb-gam-color-border);
+	border-radius: 999px;
+	overflow: hidden;
+}
+
+.wb-gam-challenges__item--completed .wb-gam-challenges__bar-wrap {
+	background: var(--wb-gam-color-success-soft);
+}
+
+.wb-gam-challenges__bar {
+	height: 100%;
+	width: var(--wb-gam-fill, 0%);
+	background: var(--wb-gam-primary);
+	border-radius: 999px;
+	transition: width 0.4s ease;
+}
+
+.wb-gam-challenges__item--completed .wb-gam-challenges__bar {
+	background: var(--wb-gam-color-success);
+}
+
+.wb-gam-challenges__empty {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 12px;
+	padding: 32px 24px;
+	margin: 0;
+	background: var(--wb-gam-color-surface-muted);
+	border-radius: 12px;
+	text-align: center;
+}
+.wb-gam-challenges__empty p {
+	margin: 0;
+	max-width: 36ch;
+	color: var(--wb-gam-color-text-muted);
+	font-size: 0.9375rem;
+}
+.wb-gam-challenges__empty-icon {
+	color: var(--wb-gam-color-accent);
+	opacity: 0.6;
+}

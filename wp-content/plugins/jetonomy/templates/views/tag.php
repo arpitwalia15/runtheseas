@@ -1,0 +1,218 @@
+<?php
+/**
+ * Tag view.
+ *
+ * @package Jetonomy
+ */
+
+defined( 'ABSPATH' ) || exit;
+
+$tag_slug = $data['slug'] ?? '';
+$tag      = \Jetonomy\Models\Tag::find_by_slug( $tag_slug );
+
+if ( ! $tag ) {
+	status_header( 404 );
+	\Jetonomy\Template_Loader::partial(
+		'empty-state',
+		[
+			'icon'      => 'empty-search',
+			'icon_size' => 48,
+			'message'   => __( 'Tag not found.', 'jetonomy' ),
+			'tone'      => 'warn',
+		]
+	);
+	return;
+}
+
+global $wpdb;
+$posts_tbl     = \Jetonomy\table( 'posts' );
+$spaces_tbl    = \Jetonomy\table( 'spaces' );
+$post_tags_tbl = \Jetonomy\table( 'post_tags' );
+
+// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+$sort = isset( $_GET['sort'] ) ? sanitize_key( $_GET['sort'] ) : 'latest';
+if ( ! in_array( $sort, [ 'latest', 'popular' ], true ) ) {
+	$sort = 'latest';
+}
+
+// 1.4.0 C.4 fix: classic offset pagination so popular tags don't silently
+// drop post 31+. 30/page balances density with viewport — page param via
+// `?paged=2`. Total post count comes from $tag->post_count which is kept
+// in sync by the tag denormaliser.
+$order_by = 'popular' === $sort ? 'p.vote_score DESC' : 'p.created_at DESC';
+$per_page = 30;
+// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+$paged       = max( 1, (int) ( $_GET['paged'] ?? 1 ) );
+$offset      = ( $paged - 1 ) * $per_page;
+$total_posts = (int) $tag->post_count;
+$total_pages = (int) ceil( max( 1, $total_posts ) / $per_page );
+
+// Space-visibility + per-post is_private gate so a tag page never leaks posts
+// from private/hidden spaces (or private posts in public spaces) to viewers
+// who aren't members / authors.
+[ $jt_space_vis_sql, $jt_space_vis_params ] = \Jetonomy\Models\Space::content_visibility_sql( get_current_user_id(), 'sp' );
+[ $jt_priv_sql, $jt_priv_params ]           = \Jetonomy\Search\Fulltext_Search::visibility_clause( null, 'p' );
+
+$jt_gate_sql    = '';
+$jt_gate_params = array();
+if ( '1=1' !== $jt_space_vis_sql ) {
+	$jt_gate_sql   .= ' AND ' . $jt_space_vis_sql;
+	$jt_gate_params = array_merge( $jt_gate_params, $jt_space_vis_params );
+}
+if ( '' !== $jt_priv_sql ) {
+	$jt_gate_sql   .= ' AND ' . $jt_priv_sql;
+	$jt_gate_params = array_merge( $jt_gate_params, $jt_priv_params );
+}
+
+// Hide posts from users the viewer has blocked. no-op for guests/no-blocks.
+[ $jt_block_sql ] = \Jetonomy\Models\BlockedUser::exclusion_sql( get_current_user_id(), 'p', 'author_id' );
+if ( '' !== $jt_block_sql ) {
+	$jt_gate_sql .= ' AND ' . $jt_block_sql;
+}
+
+// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+$posts = $wpdb->get_results(
+	$wpdb->prepare(
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		"SELECT p.*, sp.slug AS space_slug FROM {$posts_tbl} p
+		 INNER JOIN {$post_tags_tbl} pt ON pt.post_id = p.id
+		 LEFT JOIN {$spaces_tbl} sp ON sp.id = p.space_id
+		 WHERE pt.tag_id = %d AND p.status = 'publish'{$jt_gate_sql}
+		 ORDER BY {$order_by}
+		 LIMIT %d OFFSET %d",
+		(int) $tag->id,
+		...array_merge( $jt_gate_params, array( $per_page, $offset ) )
+	)
+) ?: [];
+
+$base    = \Jetonomy\base_url();
+$tag_url = $base . '/tag/' . $tag->slug . '/';
+
+$crumbs = [
+	[
+		'label' => $tag->name,
+		'url'   => '',
+	],
+];
+?>
+<?php \Jetonomy\Template_Loader::partial( 'breadcrumb', [ 'crumbs' => $crumbs ] ); ?>
+
+<div class="jt-two-col">
+		<main>
+			<div class="jt-flex jt-items-center jt-gap-12 jt-mb-20">
+				<span class="jt-tag jt-tag-hero"><?php echo esc_html( $tag->name ); ?></span>
+				<span class="jt-tag-count-label">
+					<?php
+					/* translators: %d: post count. */
+					echo esc_html( sprintf( _n( '%d post', '%d posts', (int) $tag->post_count, 'jetonomy' ), (int) $tag->post_count ) );
+					?>
+				</span>
+				<?php
+				// A tag page was a browse-only dead end — no way to contribute
+				// to the topic. Give logged-in members a one-click path into the
+				// composer with this tag pre-filled. Tags are cross-space, so we
+				// target the space where the tag already lives (the newest
+				// tagged post's space); hidden silently when none is known.
+				$jt_tag_post_space = '';
+				foreach ( $posts as $jt_pp ) {
+					if ( ! empty( $jt_pp->space_slug ) ) {
+						$jt_tag_post_space = (string) $jt_pp->space_slug;
+						break;
+					}
+				}
+				if ( is_user_logged_in() && '' !== $jt_tag_post_space ) :
+					$jt_tag_compose_url = add_query_arg(
+						'tag',
+						rawurlencode( $tag->slug ),
+						$base . '/s/' . rawurlencode( $jt_tag_post_space ) . '/new/'
+					);
+					?>
+					<a href="<?php echo esc_url( $jt_tag_compose_url ); ?>" class="jt-btn jt-btn-fill jt-btn-sm jt-ml-auto">
+						<?php
+						/* translators: %s: tag name */
+						echo esc_html( sprintf( __( 'Start a discussion tagged %s', 'jetonomy' ), $tag->name ) );
+						?>
+					</a>
+				<?php endif; ?>
+			</div>
+
+			<div class="jt-bar">
+				<div class="jt-pills">
+					<?php
+					$sorts = [
+						'latest'  => __( 'Latest', 'jetonomy' ),
+						'popular' => __( 'Popular', 'jetonomy' ),
+					];
+					foreach ( $sorts as $key => $label ) :
+						$pill_url = add_query_arg( 'sort', $key, $tag_url );
+						?>
+						<a href="<?php echo esc_url( $pill_url ); ?>"
+							class="jt-pill <?php echo $sort === $key ? esc_attr( 'on' ) : ''; ?>"
+							<?php echo $sort === $key ? 'aria-current="true"' : ''; ?>>
+							<?php echo esc_html( $label ); ?>
+						</a>
+					<?php endforeach; ?>
+				</div>
+			</div>
+
+			<?php if ( empty( $posts ) ) : ?>
+				<?php
+				\Jetonomy\Template_Loader::partial(
+					'empty-state',
+					[
+						'icon'      => 'message-circle',
+						'icon_size' => 48,
+						'message'   => __( 'No posts with this tag yet.', 'jetonomy' ),
+					]
+				);
+				?>
+			<?php else : ?>
+				<div class="jt-topics">
+					<?php foreach ( $posts as $post ) : ?>
+						<?php \Jetonomy\Template_Loader::partial( 'post-card', [ 'post' => $post ] ); ?>
+					<?php endforeach; ?>
+				</div>
+
+				<?php
+				if ( $total_pages > 1 ) :
+					$prev_url = add_query_arg(
+						array(
+							'sort'  => $sort,
+							'paged' => $paged - 1,
+						),
+						$tag_url
+					);
+					$next_url = add_query_arg(
+						array(
+							'sort'  => $sort,
+							'paged' => $paged + 1,
+						),
+						$tag_url
+					);
+					?>
+					<nav class="jt-pagination" aria-label="<?php esc_attr_e( 'Tag pagination', 'jetonomy' ); ?>">
+						<?php if ( $paged > 1 ) : ?>
+							<a class="jt-pagination-link" href="<?php echo esc_url( $prev_url ); ?>" rel="prev">
+								<?php jetonomy_echo_icon( 'chevron-left', 14 ); ?>
+								<?php esc_html_e( 'Previous', 'jetonomy' ); ?>
+							</a>
+						<?php endif; ?>
+						<span class="jt-pagination-status">
+							<?php
+							/* translators: 1: current page, 2: total pages */
+							echo esc_html( sprintf( __( 'Page %1$d of %2$d', 'jetonomy' ), $paged, $total_pages ) );
+							?>
+						</span>
+						<?php if ( $paged < $total_pages ) : ?>
+							<a class="jt-pagination-link" href="<?php echo esc_url( $next_url ); ?>" rel="next">
+								<?php esc_html_e( 'Next', 'jetonomy' ); ?>
+								<?php jetonomy_echo_icon( 'chevron-right', 14 ); ?>
+							</a>
+						<?php endif; ?>
+					</nav>
+				<?php endif; ?>
+			<?php endif; ?>
+		</main>
+
+		<?php \Jetonomy\Template_Loader::partial( 'sidebar' ); ?>
+	</div>

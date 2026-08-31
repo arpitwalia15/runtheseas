@@ -1,0 +1,433 @@
+<?php // phpcs:disable WordPress.Files.FileName.NotHyphenatedLowercase,WordPress.Files.FileName.InvalidClassFileName -- PSR-4 naming used throughout this plugin.
+/**
+ * REST controller for onboarding wizard endpoints.
+ *
+ * Routes (all under buddynext/v1):
+ *   GET  /me/onboarding           — read whether the wizard is done + where it is.
+ *   POST /me/onboarding/step      — save data for the current step + advance.
+ *   POST /me/onboarding/skip      — skip the wizard, mark complete.
+ *   POST /me/onboarding/complete  — finalize the wizard with all step payloads.
+ *
+ * @package BuddyNext\Onboarding
+ */
+
+declare( strict_types=1 );
+
+namespace BuddyNext\Onboarding;
+
+use WP_Error;
+use WP_REST_Request;
+use WP_REST_Response;
+
+/**
+ * Handles onboarding wizard REST endpoints.
+ */
+class OnboardingController {
+
+	/**
+	 * Service instance.
+	 *
+	 * @var OnboardingService
+	 */
+	private OnboardingService $service;
+
+	/**
+	 * Constructor.
+	 *
+	 * @param OnboardingService|null $service Injected service or default.
+	 */
+	public function __construct( ?OnboardingService $service = null ) {
+		$this->service = $service ?? new OnboardingService();
+	}
+
+	/**
+	 * Register the controller's routes.
+	 */
+	public function register_routes(): void {
+		register_rest_route(
+			'buddynext/v1',
+			'/me/onboarding/step',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( $this, 'save_step' ),
+				'permission_callback' => array( $this, 'require_auth' ),
+				'args'                => array(
+					'step' => array(
+						'required' => true,
+						'type'     => 'integer',
+					),
+				),
+			)
+		);
+
+		register_rest_route(
+			'buddynext/v1',
+			'/me/onboarding',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( $this, 'get_state' ),
+				'permission_callback' => array( $this, 'require_auth' ),
+			)
+		);
+
+		register_rest_route(
+			'buddynext/v1',
+			'/me/onboarding/skip',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( $this, 'skip' ),
+				'permission_callback' => array( $this, 'require_auth' ),
+			)
+		);
+
+		register_rest_route(
+			'buddynext/v1',
+			'/me/onboarding/complete',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( $this, 'complete' ),
+				'permission_callback' => array( $this, 'require_auth' ),
+				'args'                => array(
+					'display_name' => array(
+						'required' => false,
+						'type'     => 'string',
+					),
+					'bio'          => array(
+						'required' => false,
+						'type'     => 'string',
+					),
+					'slug'         => array(
+						'required' => false,
+						'type'     => 'string',
+					),
+					'channels'     => array(
+						'required' => false,
+						'type'     => 'object',
+					),
+					'spaces'       => array(
+						'required' => false,
+						'type'     => 'array',
+					),
+					'user_ids'     => array(
+						'required' => false,
+						'type'     => 'array',
+					),
+					'interests'    => array(
+						'required' => false,
+						'type'     => 'array',
+					),
+				),
+			)
+		);
+
+		register_rest_route(
+			'buddynext/v1',
+			'/me/interests',
+			array(
+				array(
+					'methods'             => 'GET',
+					'callback'            => array( $this, 'get_interests' ),
+					'permission_callback' => array( $this, 'require_auth' ),
+				),
+				array(
+					'methods'             => 'POST',
+					'callback'            => array( $this, 'save_interests' ),
+					'permission_callback' => array( $this, 'require_auth' ),
+					'args'                => array(
+						'interests' => array(
+							'required' => false,
+							'type'     => 'array',
+							'items'    => array( 'type' => 'integer' ),
+						),
+					),
+				),
+			)
+		);
+	}
+
+	/**
+	 * GET /me/interests — the member's picked interest categories (ids + labels).
+	 *
+	 * @return WP_REST_Response
+	 */
+	public function get_interests(): WP_REST_Response {
+		return new WP_REST_Response(
+			array( 'interests' => $this->interest_payload( get_current_user_id() ) ),
+			200
+		);
+	}
+
+	/**
+	 * POST /me/interests — persist the member's picked interest categories.
+	 *
+	 * Thin alias over the canonical profile-save path: picks land in the
+	 * system 'interests' profile field (category_multiselect, one
+	 * bn_profile_values row per pick) — never in user meta.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response
+	 */
+	public function save_interests( WP_REST_Request $request ): WP_REST_Response {
+		$user_id = get_current_user_id();
+		$this->service->save_interest_ids( $user_id, (array) $request->get_param( 'interests' ) );
+
+		return new WP_REST_Response(
+			array(
+				'saved'     => true,
+				'interests' => $this->interest_payload( $user_id ),
+			),
+			200
+		);
+	}
+
+	/**
+	 * Shape the member's picks as id + label pairs (deleted categories drop out).
+	 *
+	 * @param int $user_id User ID.
+	 * @return array<int, array{id:int, name:string}>
+	 */
+	private function interest_payload( int $user_id ): array {
+		$ids = $this->service->get_interest_ids( $user_id );
+		if ( empty( $ids ) ) {
+			return array();
+		}
+
+		$by_id = array();
+		foreach ( ( new \BuddyNext\Spaces\SpaceCategoryService() )->get_all() as $cat ) {
+			$by_id[ (int) ( $cat['id'] ?? 0 ) ] = (string) ( $cat['name'] ?? '' );
+		}
+
+		$out = array();
+		foreach ( $ids as $id ) {
+			if ( isset( $by_id[ $id ] ) && '' !== $by_id[ $id ] ) {
+				$out[] = array(
+					'id'   => $id,
+					'name' => $by_id[ $id ],
+				);
+			}
+		}
+
+		return $out;
+	}
+
+	/**
+	 * GET /me/onboarding — the wizard's state for the current member.
+	 *
+	 * `bn_onboarding_complete` was only ever WRITTEN over REST, never readable.
+	 * A client therefore had to keep its own per-device "done" flag, so a member
+	 * who finished the wizard on their phone was asked to do it again on a
+	 * tablet. The web gate (PageRouter) has always read this same meta; this is
+	 * the app's equivalent, so both surfaces answer from one source.
+	 *
+	 * `total` is the number of steps THIS site renders, not a constant: the
+	 * Interests step drops out when the owner has authored no space categories,
+	 * so a client hardcoding five would draw a progress bar that never fills.
+	 *
+	 * @return WP_REST_Response
+	 */
+	public function get_state(): WP_REST_Response {
+		$user_id = get_current_user_id();
+
+		return new WP_REST_Response(
+			array(
+				'complete' => $this->service->is_complete( $user_id ),
+				'step'     => $this->service->get_step( $user_id ),
+				'total'    => count( $this->service->step_list() ),
+			),
+			200
+		);
+	}
+
+	/**
+	 * POST /me/onboarding/step — save step data.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response
+	 */
+	public function save_step( WP_REST_Request $request ): WP_REST_Response {
+		$user_id = get_current_user_id();
+		$step    = (int) $request->get_param( 'step' );
+		$data    = (array) $request->get_param( 'data' );
+
+		$this->service->save_step( $user_id, $step, $data );
+
+		return new WP_REST_Response(
+			array(
+				'saved'     => true,
+				'next_step' => $this->service->get_step( $user_id ),
+			),
+			200
+		);
+	}
+
+	/**
+	 * POST /me/onboarding/skip — skip the wizard.
+	 *
+	 * @return WP_REST_Response
+	 */
+	public function skip(): WP_REST_Response {
+		$this->service->skip( get_current_user_id() );
+		return new WP_REST_Response(
+			array( 'skipped' => true ),
+			200
+		);
+	}
+
+	/**
+	 * POST /me/onboarding/complete — finish the wizard.
+	 *
+	 * This is the authoritative completion transaction: it persists every
+	 * piece of wizard state server-side (so the journey is durable even if
+	 * the client's optimistic per-step REST calls failed, were aborted by
+	 * the redirect, or never fired on a slow connection), then marks the
+	 * wizard complete and returns the redirect target.
+	 *
+	 * Body params (all optional):
+	 *   display_name — string profile display name.
+	 *   bio          — string profile bio.
+	 *   slug         — string desired profile slug / handle.
+	 *   channels     — object { email, in_app, push } notification toggles.
+	 *   spaces       — int[] of space IDs to join.
+	 *   user_ids     — int[] of users to follow.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response
+	 */
+	public function complete( WP_REST_Request $request ): WP_REST_Response {
+		$user_id = get_current_user_id();
+
+		// Already complete — idempotent: just return the redirect target so a
+		// double-submit or stale tab cannot re-fire downstream hooks.
+		if ( $this->service->is_complete( $user_id ) ) {
+			return new WP_REST_Response(
+				array(
+					'completed'   => true,
+					'redirect_to' => \BuddyNext\Core\PageRouter::profile_url( $user_id ),
+				),
+				200
+			);
+		}
+
+		// Step 1 — profile (display name + bio).
+		$profile = array();
+		if ( null !== $request->get_param( 'display_name' ) ) {
+			$profile['display_name'] = (string) $request->get_param( 'display_name' );
+		}
+		if ( null !== $request->get_param( 'bio' ) ) {
+			$profile['bio'] = (string) $request->get_param( 'bio' );
+		}
+		if ( ! empty( $profile ) ) {
+			$this->service->save_profile( $user_id, $profile );
+		}
+
+		// Step 1 — chosen handle / slug (non-fatal on collision).
+		//
+		// Keep what was actually stored. save_slug() runs the submitted value
+		// through sanitize_title(), which can differ from what the member typed —
+		// a period is dropped, "Jo Smith" becomes "jo-smith" — and the return was
+		// being discarded, so the response asserted nothing about the handle and
+		// the member first learned their real one from their profile URL.
+		// Reported as onboarding showing "shubham.qa" and publishing "@shubham-qa".
+		$bn_saved_handle = '';
+		$slug            = $request->get_param( 'slug' );
+		if ( is_string( $slug ) && '' !== trim( $slug ) ) {
+			$bn_saved_handle = $this->service->save_slug( $user_id, $slug );
+		}
+
+		// Step 4 — notification channel preferences.
+		$channels = $request->get_param( 'channels' );
+		if ( is_array( $channels ) ) {
+			$this->service->save_channels( $user_id, $channels );
+		}
+
+		// Step 2 — join selected spaces. Route by each space's join method,
+		// exactly like the spaces REST endpoint: a direct join() here let any
+		// authenticated user post a PRIVATE space id to this endpoint and
+		// become an active member with no approval (found on the 1.0.4
+		// dist-zip journey QA). Private -> request_join(); invite-only -> skip.
+		$spaces = (array) $request->get_param( 'spaces' );
+		if ( ! empty( $spaces ) && function_exists( 'buddynext_service' ) ) {
+			$space_members = buddynext_service( 'space_members' );
+			$space_service = buddynext_service( 'spaces' );
+			if ( $space_members && method_exists( $space_members, 'join' ) ) {
+				foreach ( array_map( 'absint', $spaces ) as $space_id ) {
+					if ( $space_id <= 0 ) {
+						continue;
+					}
+					$bn_space = $space_service && method_exists( $space_service, 'get' ) ? $space_service->get( $space_id ) : null;
+					if ( null === $bn_space ) {
+						continue; // Unknown space id - never default-join it.
+					}
+					$bn_method = \BuddyNext\Spaces\SpaceTypeRegistry::instance()->join_method( (string) ( $bn_space['type'] ?? 'open' ) );
+					if ( 'invite' === $bn_method ) {
+						continue;
+					}
+					if ( 'request' === $bn_method && method_exists( $space_members, 'request_join' ) ) {
+						$space_members->request_join( $space_id, $user_id );
+						continue;
+					}
+					$space_members->join( $space_id, $user_id );
+				}
+			}
+		}
+
+		// Step 3 — follow selected members.
+		$user_ids = (array) $request->get_param( 'user_ids' );
+		if ( ! empty( $user_ids ) && function_exists( 'buddynext_service' ) ) {
+			$follows = buddynext_service( 'follows' );
+			if ( $follows && method_exists( $follows, 'follow' ) ) {
+				foreach ( array_map( 'absint', $user_ids ) as $follow_id ) {
+					if ( $follow_id > 0 && $follow_id !== $user_id ) {
+						$follows->follow( $user_id, $follow_id );
+					}
+				}
+			}
+		}
+
+		// Interests — persist picked category IDs (idempotent) when supplied.
+		// Lands in the 'interests' profile field via the canonical save path.
+		$interests = $request->get_param( 'interests' );
+		if ( is_array( $interests ) && ! empty( $interests ) ) {
+			$this->service->save_interest_ids( $user_id, $interests );
+		}
+
+		// Mark complete + fire buddynext_onboarding_completed (first call only).
+		$this->service->finish( $user_id );
+
+		return new WP_REST_Response(
+			array(
+				'completed'         => true,
+				// The handle as STORED, which is not always the string submitted —
+				// sanitize_title() normalizes it. Returned so a client can show the
+				// member the handle they actually got instead of the one they typed.
+				'handle'            => \BuddyNext\Core\PageRouter::member_handle( $user_id ),
+				// True when the submitted handle was rewritten on the way in, so a
+				// client can say so rather than silently swapping the value.
+				'handle_normalized' => '' !== $bn_saved_handle
+					&& is_string( $slug )
+					&& trim( $slug ) !== $bn_saved_handle,
+				// Land the new member on their own profile — the thing they just
+				// built in the wizard — rather than the activity feed. Owners can
+				// override the destination in Settings > Registration & Login.
+				'redirect_to'       => \BuddyNext\Core\RedirectSettings::onboarding( \BuddyNext\Core\PageRouter::profile_url( $user_id ) ),
+			),
+			200
+		);
+	}
+
+	/**
+	 * Permission callback — require an authenticated user.
+	 *
+	 * @return true|WP_Error
+	 */
+	public function require_auth(): bool|WP_Error {
+		if ( ! is_user_logged_in() ) {
+			return new WP_Error(
+				'rest_not_logged_in',
+				__( 'You must be logged in.', 'buddynext' ),
+				array( 'status' => 401 )
+			);
+		}
+		return true;
+	}
+}

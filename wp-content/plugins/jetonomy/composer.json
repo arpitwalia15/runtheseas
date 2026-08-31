@@ -1,0 +1,58 @@
+{
+    "name": "jetonomy/jetonomy",
+    "description": "Next-gen discussion platform for WordPress",
+    "type": "wordpress-plugin",
+    "license": "GPL-2.0-or-later",
+    "require": {
+        "php": ">=8.1"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^9.6",
+        "squizlabs/php_codesniffer": "^3.7",
+        "wp-coding-standards/wpcs": "^3.0",
+        "phpstan/phpstan": "^1.10",
+        "szepeviktor/phpstan-wordpress": "^1.3",
+        "php-stubs/wordpress-stubs": "^6.4",
+        "yoast/phpunit-polyfills": "^2.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Jetonomy\\": "includes/"
+        }
+    },
+    "config": {
+        "allow-plugins": {
+            "dealerdirect/phpcodesniffer-composer-installer": true
+        }
+    },
+    "scripts": {
+        "test": "@test:combo",
+        "test:free": "JETONOMY_TEST_SKIP_PRO=1 phpunit --testdox --testsuite=unit",
+        "test:combo": "phpunit --testdox",
+        "test:pro": "phpunit --testdox --testsuite=pro",
+        "test:unit": "phpunit --testdox --testsuite=unit",
+        "test:docker": "npx wp-env run tests-cli --env-cwd=wp-content/plugins/jetonomy vendor/bin/phpunit --testdox",
+        "test:docker:unit": "npx wp-env run tests-cli --env-cwd=wp-content/plugins/jetonomy vendor/bin/phpunit --testdox --testsuite=unit",
+        "test:docker:start": "npx wp-env start",
+        "test:docker:stop": "npx wp-env stop",
+        "phpcs": "phpcs --standard=phpcs.xml",
+        "phpcbf": "phpcbf --standard=phpcs.xml",
+        "phpstan": "phpstan analyse --memory-limit=1G",
+        "audit-rest": "php bin/audit-rest-routes.php includes/",
+        "hooks:install": "git config core.hooksPath .githooks && echo 'pre-commit hook installed (.githooks/pre-commit)'",
+        "post-install-cmd": "@hooks:install",
+        "post-update-cmd": "@hooks:install"
+    },
+    "scripts-descriptions": {
+        "test": "Run the default test suite (free + pro combo when Pro is present).",
+        "test:free": "Run free plugin in isolation — Pro is not loaded even if checked out.",
+        "test:combo": "Run the full testsuite with Pro loaded (tests/unit + tests/pro).",
+        "test:pro": "Run only tests/pro/* — requires Pro to be loaded.",
+        "test:unit": "Run only tests/unit/* without skipping Pro.",
+        "test:docker": "Run the full PHPUnit suite inside the wp-env Docker container (requires `composer test:docker:start` first).",
+        "test:docker:unit": "Run only tests/unit/* inside the wp-env Docker container.",
+        "test:docker:start": "Bring up the wp-env Docker stack (dev on :8888, tests on :8889).",
+        "test:docker:stop": "Stop the wp-env Docker stack.",
+        "audit-rest": "Audit mutation REST routes for REST_Auth helper usage (WS2-A gate; enforcing after WS2-B route migration)."
+    }
+}

@@ -1,0 +1,710 @@
+<?php
+/**
+ * Gamification leaderboard template (v2 design system).
+ *
+ * Requires wb-gamification to be active. If the plugin is absent, renders a
+ * friendly notice instead of an empty page.
+ *
+ * Data source: wb-gamification PUBLIC read API only — no BuddyNext-side SQL.
+ *  - wb_gam_get_leaderboard( $period, $limit )  → ranked rows
+ *  - wb_gam_get_user_points( $user_id )         → points balance
+ *  - wb_gam_get_user_badges( $user_id )         → earned badges
+ *  - wb_gam_get_user_streak( $user_id )         → streak data
+ * BuddyNext ships zero gamification logic; it only renders these reads.
+ *
+ * Layout:
+ *  - Hero strip: .bn-stat-grid with your-rank / points / level tiles.
+ *  - Level meter: .bn-progress[data-tone="accent"] toward next milestone.
+ *  - Filter strip: .bn-tabs (period) + .bn-select (rank-window).
+ *  - Leaderboard list: .bn-card[data-interactive] rows with rank pill,
+ *    avatar, name/handle, points, badge ribbon, follow CTA. The current
+ *    user's row carries [data-self] + "You" pill.
+ *  - Sidebar widgets: Your Badges, Your Streak, Next Milestone.
+ *
+ * All visual styling lives in assets/css/bn-gamification.css —
+ * no inline <style>, no inline <script>.
+ *
+ * @package BuddyNext
+ */
+
+declare( strict_types=1 );
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+// Declares this fine-grained surface for the sidebar registry (SidebarRegistry
+// reads it via Surface::current()) before the shell renders the right column.
+\BuddyNext\Sidebar\Surface::set( 'leaderboard' );
+
+// Guard: wb-gamification must be active (public API present).
+if ( ! function_exists( 'wb_gam_get_leaderboard' ) ) {
+	?>
+	<div class="bn-lb-shell">
+		<div class="bn-lb-notice" role="status">
+			<span class="bn-lb-notice__icon" aria-hidden="true"><?php buddynext_icon( 'award' ); ?></span>
+			<h2><?php esc_html_e( 'Leaderboard', 'buddynext' ); ?></h2>
+			<p>
+				<?php esc_html_e( 'The leaderboard requires the gamification plugin to be active. Install and activate it to start earning points and see where you rank in the community.', 'buddynext' ); ?>
+			</p>
+		</div>
+	</div>
+	<?php
+	return;
+}
+
+$current_user_id = get_current_user_id();
+
+// Period tab — week | month | alltime (UI) mapped to wb-gamification periods.
+$allowed_periods = array( 'week', 'month', 'alltime' );
+$period          = isset( $_GET['period'] ) ? sanitize_key( wp_unslash( $_GET['period'] ) ) : 'month'; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+if ( ! in_array( $period, $allowed_periods, true ) ) {
+	$period = 'month';
+}
+
+// Map the UI period label to the value the gamification read API expects.
+$api_period = ( 'alltime' === $period ) ? 'all' : $period;
+
+// Rank window — how many top members to show. GET-driven like the period. The
+// engine caps the size internally, so the UI only offers a few sane presets.
+$allowed_windows = array( 10, 25, 50, 100 );
+$window          = isset( $_GET['window'] ) ? absint( wp_unslash( $_GET['window'] ) ) : 10; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+if ( ! in_array( $window, $allowed_windows, true ) ) {
+	$window = 10;
+}
+
+// Fetch the top ranked users via the plugin read API.
+// Each entry: ['rank'=>int,'user_id'=>int,'display_name'=>string,'avatar_url'=>string,'points'=>int,'rank_change'=>int,'is_new'=>bool].
+$leaderboard = wb_gam_get_leaderboard( $api_period, $window );
+if ( ! is_array( $leaderboard ) ) {
+	$leaderboard = array();
+}
+
+/*
+ * Prime the user + usermeta caches for the whole window in one pass before any
+ * row renders. This screen draws up to 100 avatars in a single request - far
+ * more than any other BuddyNext page - so a per-row user lookup that is
+ * invisible elsewhere compounds here: measured at 402 queries for 100 rows,
+ * of which 101 hit wp_users and 100 hit wp_usermeta. cache_users() takes that
+ * to one query each, 402 -> 203.
+ *
+ * The remaining 200 are two per row from OTHER plugins hooking the avatar
+ * filter chain (Jetonomy's jt_user_profiles and WP Sell Services'
+ * wpss_vendor_profiles, one unbatched lookup each). Those belong to their own
+ * plugins and are filed there; nothing here can prime a table this plugin does
+ * not own.
+ *
+ * Deliberately NOT bypassing the avatar filter chain for bulk contexts, which
+ * was the suggested fix on the card. get_avatar() IS the extension point for
+ * custom avatars - going around it would silently break every avatar plugin a
+ * site owner has installed, on the one screen showing the most avatars. Priming
+ * the cache fixes our half without taking anything away.
+ */
+if ( ! empty( $leaderboard ) ) {
+	$bn_lb_user_ids = array_values(
+		array_unique(
+			array_filter(
+				array_map(
+					static function ( $bn_lb_row ): int {
+						return (int) ( $bn_lb_row['user_id'] ?? 0 );
+					},
+					$leaderboard
+				)
+			)
+		)
+	);
+	if ( ! empty( $bn_lb_user_ids ) ) {
+		cache_users( $bn_lb_user_ids );
+	}
+}
+
+/*
+ * Follow-button state for the whole window, three queries instead of three per
+ * row. partials/follow-button.php asks is_blocking_either(), is_following() and
+ * has_pending_request() on every render; across 50 rows that measured 147
+ * queries (50 + 50 + 47). Each has a batched twin, so the list resolves all
+ * three up front and passes the answers into the partial.
+ */
+$bn_lb_blocked_map   = array();
+$bn_lb_following_map = array();
+$bn_lb_pending_map   = array();
+if ( $current_user_id > 0 && ! empty( $bn_lb_user_ids ) ) {
+	$bn_lb_blocked_map   = buddynext_service( 'blocks' )->blocking_either_map( $current_user_id, $bn_lb_user_ids );
+	$bn_lb_following_map = buddynext_service( 'follows' )->following_map( $current_user_id, $bn_lb_user_ids );
+	$bn_lb_pending_map   = buddynext_service( 'follows' )->pending_map( $current_user_id, $bn_lb_user_ids );
+}
+
+// Current user stats from the read API.
+$current_user_pts  = $current_user_id ? (int) wb_gam_get_user_points( $current_user_id ) : 0;
+$current_user_rank = 0;
+
+// Resolve the current user's rank from the returned leaderboard rows first
+// (cheap — already loaded), then fall back to the engine's true rank when the
+// member is outside the visible window, so everyone sees their standing rather
+// than "Unranked".
+if ( $current_user_id ) {
+	foreach ( $leaderboard as $row ) {
+		if ( (int) ( $row['user_id'] ?? 0 ) === $current_user_id ) {
+			$current_user_rank = (int) ( $row['rank'] ?? 0 );
+			break;
+		}
+	}
+
+	if ( 0 === $current_user_rank && is_callable( array( '\WBGam\Engine\LeaderboardEngine', 'get_user_rank' ) ) ) {
+		$rank_data = \WBGam\Engine\LeaderboardEngine::get_user_rank( $current_user_id, $api_period );
+		if ( is_array( $rank_data ) && isset( $rank_data['rank'] ) && $current_user_pts > 0 ) {
+			$current_user_rank = (int) $rank_data['rank'];
+		}
+	}
+}
+
+// Current user's badges via the read API.
+// Each badge: ['id','name','description','image_url','category','earned_at',...].
+$user_badges = $current_user_id ? wb_gam_get_user_badges( $current_user_id ) : array();
+if ( ! is_array( $user_badges ) ) {
+	$user_badges = array();
+}
+$user_badges = array_slice( $user_badges, 0, 8 );
+
+// Current user's streak via the read API.
+// Shape: ['current_streak'=>int,'longest_streak'=>int,'last_active'=>string].
+$user_streak    = $current_user_id ? wb_gam_get_user_streak( $current_user_id ) : array();
+$current_streak = is_array( $user_streak ) ? (int) ( $user_streak['current_streak'] ?? 0 ) : 0;
+$longest_streak = is_array( $user_streak ) ? (int) ( $user_streak['longest_streak'] ?? 0 ) : 0;
+
+// Build a per-user badge ribbon for the leaderboard rows (top earned badges).
+// Sourced exclusively from the read API — no direct table access.
+$ribbon_by_user = array();
+foreach ( $leaderboard as $row ) {
+	$uid = (int) ( $row['user_id'] ?? 0 );
+	if ( $uid <= 0 ) {
+		continue;
+	}
+	$badges = wb_gam_get_user_badges( $uid );
+	if ( is_array( $badges ) && ! empty( $badges ) ) {
+		$ribbon_by_user[ $uid ] = array_slice( $badges, 0, 4 );
+	}
+}
+
+// Rank change — real trend from the engine snapshot (previous rank vs current).
+// Positive = moved up; 0 = no change, a brand-new entrant, or a live read before
+// the first two snapshot ticks exist. No more hardwired zeros.
+$rank_changes = array();
+foreach ( $leaderboard as $row ) {
+	$rank_changes[ (int) ( $row['user_id'] ?? 0 ) ] = (int) ( $row['rank_change'] ?? 0 );
+}
+
+// Compute next milestone for current user (next 100-pt boundary).
+$next_milestone_pts  = $current_user_pts > 0 ? (int) ( ceil( ( $current_user_pts + 1 ) / 100 ) * 100 ) : 100;
+$milestone_progress  = $next_milestone_pts > 0 ? min( 100, (int) ( $current_user_pts % 100 ) ) : 0;
+$milestone_remaining = max( 0, $next_milestone_pts - $current_user_pts );
+
+// Current level — use the engine's level so this surface agrees with the
+// Achievements tab. Falls back to a 1-per-500-pts approximation only when the
+// engine helper is unavailable.
+if ( function_exists( 'wb_gam_get_user_level' ) ) {
+	$current_level = max( 1, (int) wb_gam_get_user_level( $current_user_id ) );
+} else {
+	$current_level = max( 1, (int) floor( $current_user_pts / 500 ) + 1 );
+}
+
+// Rank pill tone for a given rank position.
+$rank_tone = static function ( int $rank ): string {
+	if ( 1 === $rank ) {
+		return 'warn';
+	}
+	if ( 2 === $rank ) {
+		return 'info';
+	}
+	if ( 3 === $rank ) {
+		return 'paid';
+	}
+	return 'ink';
+};
+
+/**
+ * Fires before the leaderboard inner content.
+ */
+do_action( 'buddynext_leaderboard_before' );
+
+$period_tabs = array(
+	'alltime' => __( 'All time', 'buddynext' ),
+	'month'   => __( 'This month', 'buddynext' ),
+	'week'    => __( 'This week', 'buddynext' ),
+);
+
+$updated_iso = gmdate( 'c' );
+?>
+
+<div class="bn-lb-shell"
+	data-wp-interactive="buddynext/gamification"
+	data-wp-context='
+	<?php
+	echo esc_attr(
+		wp_json_encode(
+			array(
+				'period' => $period,
+			)
+		)
+	);
+	?>
+	'>
+
+	<!-- Page header -->
+	<header class="bn-lb-header">
+		<div class="bn-lb-header__row">
+			<h1 class="bn-lb-title"><?php esc_html_e( 'Leaderboard', 'buddynext' ); ?></h1>
+			<span class="bn-badge" data-tone="success">
+				<?php buddynext_icon( 'award' ); ?>
+				<?php esc_html_e( 'Gamification', 'buddynext' ); ?>
+			</span>
+		</div>
+		<p class="bn-lb-subtitle"><?php esc_html_e( 'Top contributors across this community.', 'buddynext' ); ?></p>
+		<div class="bn-lb-header__meta">
+			<span><?php esc_html_e( 'Last updated', 'buddynext' ); ?></span>
+			<time datetime="<?php echo esc_attr( $updated_iso ); ?>">
+				<?php echo esc_html( wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ) ) ); ?>
+			</time>
+		</div>
+	</header>
+
+	<?php if ( $current_user_id ) : ?>
+		<!-- Hero strip — your-rank / points / level -->
+		<section class="bn-lb-hero" aria-label="<?php esc_attr_e( 'Your stats', 'buddynext' ); ?>">
+			<div class="bn-stat-grid">
+				<div class="bn-stat">
+					<span class="bn-stat__label">
+						<span class="bn-lb-stat__icon" aria-hidden="true"><?php buddynext_icon( 'crown' ); ?></span>
+						<?php esc_html_e( 'Your rank', 'buddynext' ); ?>
+					</span>
+					<span class="bn-stat__value">
+						<?php echo $current_user_rank > 0 ? esc_html( '#' . number_format_i18n( $current_user_rank ) ) : esc_html__( 'Unranked', 'buddynext' ); ?>
+					</span>
+					<span class="bn-stat__delta" data-trend="flat">
+						<?php buddynext_icon( 'trending' ); ?>
+						<?php esc_html_e( 'No change', 'buddynext' ); ?>
+					</span>
+				</div>
+
+				<div class="bn-stat">
+					<span class="bn-stat__label">
+						<span class="bn-lb-stat__icon" aria-hidden="true"><?php buddynext_icon( 'zap' ); ?></span>
+						<?php esc_html_e( 'Points', 'buddynext' ); ?>
+					</span>
+					<span class="bn-stat__value">
+						<?php echo esc_html( number_format_i18n( $current_user_pts ) ); ?>
+					</span>
+					<span class="bn-stat__delta" data-trend="up">
+						<?php buddynext_icon( 'arrow-up' ); ?>
+						<?php
+						// $current_user_pts is the member's lifetime total (not the
+						// selected period), so the delta must read "All-time" - the old
+						// "Earned {period}" label wrongly implied the tab's period value.
+						esc_html_e( 'All-time', 'buddynext' );
+						?>
+					</span>
+				</div>
+
+				<div class="bn-stat">
+					<span class="bn-stat__label">
+						<span class="bn-lb-stat__icon" aria-hidden="true"><?php buddynext_icon( 'star' ); ?></span>
+						<?php esc_html_e( 'Level', 'buddynext' ); ?>
+					</span>
+					<span class="bn-stat__value">
+						<?php
+						// translators: %d: current numeric level.
+						echo esc_html( sprintf( __( 'Lv %d', 'buddynext' ), $current_level ) );
+						?>
+					</span>
+					<span class="bn-stat__delta" data-trend="up">
+						<?php
+						// translators: %d: number of points remaining to next milestone.
+						echo esc_html( sprintf( _n( '%d pt to next', '%d pts to next', $milestone_remaining, 'buddynext' ), $milestone_remaining ) );
+						?>
+					</span>
+				</div>
+			</div>
+
+			<!-- Level meter -->
+			<div class="bn-lb-level" aria-label="<?php esc_attr_e( 'Level progress', 'buddynext' ); ?>">
+				<div class="bn-lb-level__head">
+					<span class="bn-lb-level__label">
+						<?php
+						// translators: 1: current level, 2: current points, 3: target milestone points.
+						echo esc_html( sprintf( __( 'Level %1$d — %2$s / %3$s points', 'buddynext' ), $current_level, number_format_i18n( $current_user_pts ), number_format_i18n( $next_milestone_pts ) ) );
+						?>
+					</span>
+					<span class="bn-lb-level__remaining">
+						<?php
+						// translators: %d: points remaining.
+						echo esc_html( sprintf( _n( '%d pt to go', '%d pts to go', $milestone_remaining, 'buddynext' ), $milestone_remaining ) );
+						?>
+					</span>
+				</div>
+				<div class="bn-progress" data-tone="accent" role="progressbar"
+					aria-valuemin="0"
+					aria-valuemax="100"
+					aria-valuenow="<?php echo esc_attr( (string) $milestone_progress ); ?>">
+					<div class="bn-progress__fill" style="width:<?php echo esc_attr( (string) $milestone_progress ); ?>%;"></div>
+				</div>
+			</div>
+		</section>
+	<?php endif; ?>
+
+	<!-- Filter strip — period tabs + rank window select -->
+	<div class="bn-lb-filters">
+		<nav class="bn-lb-filters__tabs" aria-label="<?php esc_attr_e( 'Leaderboard period', 'buddynext' ); ?>">
+			<div class="bn-tabs bn-lb-period" role="tablist">
+				<?php
+				foreach ( $period_tabs as $pkey => $plabel ) :
+					$phref     = esc_url(
+						add_query_arg(
+							array(
+								'period' => $pkey,
+							)
+						)
+					);
+					$is_active = ( $pkey === $period );
+					?>
+					<a href="<?php echo $phref; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped via esc_url(). ?>"
+						class="bn-tab"
+						role="tab"
+						aria-selected="<?php echo $is_active ? 'true' : 'false'; ?>">
+						<?php echo esc_html( $plabel ); ?>
+					</a>
+				<?php endforeach; ?>
+			</div>
+		</nav>
+
+		<div class="bn-lb-filters__select">
+			<label class="bn-lb-filters__select-label" for="bn-lb-window">
+				<?php esc_html_e( 'Show', 'buddynext' ); ?>
+			</label>
+			<select id="bn-lb-window" name="window" class="bn-select" data-wp-on--change="actions.setWindow">
+				<?php foreach ( $allowed_windows as $bn_win ) : ?>
+					<option value="<?php echo esc_attr( (string) $bn_win ); ?>" <?php selected( $window, $bn_win ); ?>>
+						<?php
+						/* translators: %d: number of top members shown. */
+						echo esc_html( sprintf( __( 'Top %d', 'buddynext' ), $bn_win ) );
+						?>
+					</option>
+				<?php endforeach; ?>
+			</select>
+		</div>
+	</div>
+
+	<?php if ( empty( $leaderboard ) ) : ?>
+		<div class="bn-lb-empty">
+			<span class="bn-lb-empty__icon" aria-hidden="true"><?php buddynext_icon( 'award' ); ?></span>
+			<h2 class="bn-lb-empty__title"><?php esc_html_e( 'No leaderboard data yet', 'buddynext' ); ?></h2>
+			<p class="bn-lb-empty__desc">
+				<?php esc_html_e( 'Start contributing to the community to earn points and climb the ranks.', 'buddynext' ); ?>
+			</p>
+		</div>
+	<?php else : ?>
+
+		<!-- Leaderboard list -->
+		<ol class="bn-lb-list" aria-label="<?php esc_attr_e( 'Ranked members', 'buddynext' ); ?>">
+			<?php
+			foreach ( $leaderboard as $idx => $row ) :
+				$uid       = (int) ( $row['user_id'] ?? 0 );
+				$rank      = (int) ( $row['rank'] ?? ( $idx + 1 ) );
+				$is_self   = ( $current_user_id && $uid === $current_user_id );
+				$user_data = $uid ? get_userdata( $uid ) : false;
+				$display   = '' !== (string) ( $row['display_name'] ?? '' )
+					? (string) $row['display_name']
+					: ( $user_data ? $user_data->display_name : __( 'Unknown member', 'buddynext' ) );
+
+				/*
+				 * The @handle must be the slug the profile URL actually resolves on - the same one
+				 * PageRouter::profile_url() uses (bn_profile_slug, else user_nicename). This printed
+				 * user_login, which is a different field: it only LOOKS right because the two match
+				 * on a fresh install. Change a member's profile slug and the leaderboard shows an
+				 * @handle that does not resolve, next to a link that does.
+				 */
+				$bn_lb_slug = $user_data ? (string) get_user_meta( $uid, 'bn_profile_slug', true ) : '';
+				if ( '' === $bn_lb_slug && $user_data ) {
+					$bn_lb_slug = (string) $user_data->user_nicename;
+				}
+				$handle        = '' !== $bn_lb_slug ? '@' . $bn_lb_slug : '';
+				$avatar_url    = (string) ( $row['avatar_url'] ?? '' );
+				$pts_formatted = number_format_i18n( (int) ( $row['points'] ?? 0 ) );
+				$profile_url   = $user_data ? \BuddyNext\Core\PageRouter::profile_url( $uid ) : '#';
+				$tone          = $rank_tone( $rank );
+				$delta         = (int) ( $rank_changes[ $uid ] ?? 0 );
+				$trend         = ( 0 === $delta ) ? 'flat' : ( $delta > 0 ? 'up' : 'down' );
+				$ribbon        = $ribbon_by_user[ $uid ] ?? array();
+				$initials      = \BuddyNext\Profile\AvatarService::initials_for( $display );
+				?>
+				<li>
+					<article class="bn-card bn-lb-row"
+						data-interactive
+						<?php echo $is_self ? 'data-self' : ''; ?>>
+						<span class="bn-lb-row__rank"
+							data-tone="<?php echo esc_attr( $tone ); ?>"
+							aria-label="
+							<?php
+								// translators: %d: numeric rank position.
+								echo esc_attr( sprintf( __( 'Rank %d', 'buddynext' ), $rank ) );
+							?>
+							">
+							<?php echo esc_html( (string) $rank ); ?>
+						</span>
+
+						<div class="bn-lb-row__who">
+							<?php
+							// Prefer the avatar URL supplied by the gamification API;
+							// fall back to WordPress get_avatar() for the user.
+							$avatar_html = '';
+							if ( '' !== $avatar_url ) {
+								$avatar_html = sprintf(
+									'<img src="%1$s" alt="%2$s" class="bn-avatar" width="72" height="72" loading="lazy" decoding="async" data-size="md" />',
+									esc_url( $avatar_url ),
+									esc_attr( $display )
+								);
+							} elseif ( $user_data ) {
+								$avatar_html = get_avatar(
+									$uid,
+									72,
+									'',
+									$display,
+									array(
+										'class'      => 'bn-avatar',
+										'extra_attr' => 'data-size="md"',
+									)
+								);
+							}
+							if ( '' !== $avatar_html ) {
+								echo wp_kses(
+									$avatar_html,
+									array(
+										'img' => array(
+											'src'       => true,
+											'srcset'    => true,
+											'sizes'     => true,
+											'alt'       => true,
+											'class'     => true,
+											'width'     => true,
+											'height'    => true,
+											'loading'   => true,
+											'decoding'  => true,
+											'data-size' => true,
+										),
+									)
+								);
+							} else {
+								?>
+								<span class="bn-avatar" data-size="md" aria-hidden="true"><?php echo esc_html( $initials ); ?></span>
+								<?php
+							}
+							?>
+							<div class="bn-lb-row__id">
+								<a class="bn-lb-row__name" href="<?php echo esc_url( $profile_url ); ?>">
+									<?php echo esc_html( $display ); ?>
+									<?php if ( $is_self ) : ?>
+										<span class="bn-lb-row__self-pill"><?php esc_html_e( 'You', 'buddynext' ); ?></span>
+									<?php endif; ?>
+								</a>
+								<?php if ( '' !== $handle ) : ?>
+									<span class="bn-lb-row__handle"><?php echo esc_html( $handle ); ?></span>
+								<?php endif; ?>
+							</div>
+						</div>
+
+						<?php if ( ! empty( $ribbon ) ) : ?>
+							<div class="bn-lb-ribbon" aria-label="<?php esc_attr_e( 'Earned badges', 'buddynext' ); ?>">
+								<?php
+								$ribbon_shown = array_slice( $ribbon, 0, 3 );
+								$ribbon_extra = max( 0, count( $ribbon ) - count( $ribbon_shown ) );
+								foreach ( $ribbon_shown as $b ) :
+									$bname = isset( $b['name'] ) ? (string) $b['name'] : '';
+									?>
+									<span class="bn-tooltip-trigger" tabindex="0">
+										<span class="bn-lb-ribbon__item" aria-hidden="true">
+											<?php if ( ! empty( $b['image_url'] ) ) : ?>
+												<img src="<?php echo esc_url( (string) $b['image_url'] ); ?>" alt="" />
+											<?php else : ?>
+												<?php buddynext_icon( 'award' ); ?>
+											<?php endif; ?>
+										</span>
+										<span class="bn-tooltip" data-pos="top" role="tooltip">
+											<?php echo esc_html( $bname ); ?>
+										</span>
+										<span class="screen-reader-text"><?php echo esc_html( $bname ); ?></span>
+									</span>
+								<?php endforeach; ?>
+								<?php if ( $ribbon_extra > 0 ) : ?>
+									<span class="bn-lb-ribbon__more">
+										<?php
+										// translators: %d: number of additional badges not shown.
+										echo esc_html( sprintf( __( '+%d', 'buddynext' ), $ribbon_extra ) );
+										?>
+									</span>
+								<?php endif; ?>
+							</div>
+						<?php else : ?>
+							<span aria-hidden="true"></span>
+						<?php endif; ?>
+
+						<div class="bn-lb-row__points">
+							<span class="bn-lb-row__points-val"><?php echo esc_html( $pts_formatted ); ?></span>
+							<span class="bn-lb-row__points-unit"><?php esc_html_e( 'pts', 'buddynext' ); ?></span>
+						</div>
+
+						<?php if ( $is_self ) : ?>
+							<span class="bn-lb-row__delta" data-trend="<?php echo esc_attr( $trend ); ?>">
+								<?php buddynext_icon( 'trending' ); ?>
+							</span>
+							<?php
+						else :
+							?>
+							<span class="bn-lb-row__cta">
+								<?php
+								// Standalone follow button: self-hydrates follow state and
+								// wires to the buddynext/follow-button store (the
+								// @buddynext/social-buttons module is enqueued on every BN
+								// hub). Renders nothing for self / blocked rows, so the
+								// dead hand-rolled button is no longer needed.
+								buddynext_get_template(
+									'partials/follow-button.php',
+									array(
+										'user_id'         => $uid,
+										// All three resolved for the whole window above, so the
+										// button runs no query of its own. Without these it
+										// costs three per row.
+										'known_blocked'   => (bool) ( $bn_lb_blocked_map[ $uid ] ?? false ),
+										'known_following' => (bool) ( $bn_lb_following_map[ $uid ] ?? false ),
+										'known_pending'   => (bool) ( $bn_lb_pending_map[ $uid ] ?? false ),
+									)
+								);
+								?>
+							</span>
+						<?php endif; ?>
+					</article>
+				</li>
+			<?php endforeach; ?>
+		</ol>
+
+	<?php endif; // End: leaderboard data check. ?>
+
+	<!-- Your-stats widgets: a responsive row (badges · streak · milestone) that fills
+		the width instead of three full-width blocks with dead space beside them. -->
+	<aside class="bn-lb-widgets" aria-label="<?php esc_attr_e( 'Your gamification widgets', 'buddynext' ); ?>">
+
+		<!-- Your Badges -->
+		<div class="bn-widget">
+			<div class="bn-widget-title">
+				<?php buddynext_icon( 'award' ); ?>
+				<?php esc_html_e( 'Your Badges', 'buddynext' ); ?>
+			</div>
+			<?php if ( ! empty( $user_badges ) ) : ?>
+				<div class="bn-lb-badges-grid">
+					<?php
+					foreach ( $user_badges as $badge ) :
+						$badge_name = isset( $badge['name'] ) ? (string) $badge['name'] : '';
+						$badge_img  = isset( $badge['image_url'] ) ? (string) $badge['image_url'] : '';
+						?>
+						<div class="bn-lb-badge-cell" title="<?php echo esc_attr( $badge_name ); ?>">
+							<?php if ( '' !== $badge_img ) : ?>
+								<img src="<?php echo esc_url( $badge_img ); ?>" alt="<?php echo esc_attr( $badge_name ); ?>" />
+							<?php else : ?>
+								<?php buddynext_icon( 'award' ); ?>
+							<?php endif; ?>
+							<span class="bn-lb-badge-cell__name"><?php echo esc_html( $badge_name ); ?></span>
+						</div>
+					<?php endforeach; ?>
+				</div>
+				<div class="bn-lb-badge-hint">
+					<?php
+					// translators: %d: number of badges earned.
+					echo esc_html( sprintf( _n( '%d badge earned', '%d badges earned', count( $user_badges ), 'buddynext' ), count( $user_badges ) ) );
+					?>
+				</div>
+			<?php else : ?>
+				<p class="bn-lb-badge-hint">
+					<?php esc_html_e( 'Earn your first badge by contributing to the community.', 'buddynext' ); ?>
+				</p>
+			<?php endif; ?>
+		</div>
+
+		<!-- Your Streak -->
+		<?php if ( $current_user_id ) : ?>
+			<div class="bn-widget">
+				<div class="bn-widget-title">
+					<?php buddynext_icon( 'zap' ); ?>
+					<?php esc_html_e( 'Your Streak', 'buddynext' ); ?>
+				</div>
+				<?php if ( $current_streak > 0 || $longest_streak > 0 ) : ?>
+					<div class="bn-stat-grid">
+						<div class="bn-stat">
+							<span class="bn-stat__label"><?php esc_html_e( 'Current', 'buddynext' ); ?></span>
+							<span class="bn-stat__value">
+								<?php
+								// translators: %s: number of days.
+								echo esc_html( sprintf( _n( '%s day', '%s days', $current_streak, 'buddynext' ), number_format_i18n( $current_streak ) ) );
+								?>
+							</span>
+						</div>
+						<div class="bn-stat">
+							<span class="bn-stat__label"><?php esc_html_e( 'Longest', 'buddynext' ); ?></span>
+							<span class="bn-stat__value">
+								<?php
+								// translators: %s: number of days.
+								echo esc_html( sprintf( _n( '%s day', '%s days', $longest_streak, 'buddynext' ), number_format_i18n( $longest_streak ) ) );
+								?>
+							</span>
+						</div>
+					</div>
+				<?php else : ?>
+					<p class="bn-lb-badge-hint">
+						<?php esc_html_e( 'Stay active each day to build your streak.', 'buddynext' ); ?>
+					</p>
+				<?php endif; ?>
+			</div>
+		<?php endif; ?>
+
+		<!-- Next Milestone -->
+		<?php if ( $current_user_id ) : ?>
+			<div class="bn-widget">
+				<div class="bn-widget-title">
+					<?php buddynext_icon( 'target' ); ?>
+					<?php esc_html_e( 'Next Milestone', 'buddynext' ); ?>
+				</div>
+				<div class="bn-lb-milestone__name">
+					<?php
+					// translators: %s: target milestone in points.
+					echo esc_html( sprintf( __( '%s pts milestone', 'buddynext' ), number_format_i18n( $next_milestone_pts ) ) );
+					?>
+				</div>
+				<div class="bn-lb-milestone__desc">
+					<?php
+					// translators: %d: number of points remaining.
+					echo esc_html( sprintf( __( 'Earn %d more points to reach the next milestone.', 'buddynext' ), $milestone_remaining ) );
+					?>
+				</div>
+				<div class="bn-progress" data-tone="accent" role="progressbar"
+					aria-valuemin="0"
+					aria-valuemax="100"
+					aria-valuenow="<?php echo esc_attr( (string) $milestone_progress ); ?>">
+					<div class="bn-progress__fill" style="width:<?php echo esc_attr( (string) $milestone_progress ); ?>%;"></div>
+				</div>
+				<div class="bn-lb-milestone__row">
+					<span><?php echo esc_html( number_format_i18n( $current_user_pts ) ); ?> <?php esc_html_e( 'pts', 'buddynext' ); ?></span>
+					<span><?php echo esc_html( number_format_i18n( $next_milestone_pts ) ); ?> <?php esc_html_e( 'pts', 'buddynext' ); ?></span>
+				</div>
+				<div class="bn-lb-milestone__hint">
+					<?php esc_html_e( 'Earn points by posting, commenting, reacting, and keeping a daily streak.', 'buddynext' ); ?>
+				</div>
+			</div>
+		<?php endif; ?>
+
+	</aside>
+
+</div><!-- /.bn-lb-shell -->
+
+<?php
+/**
+ * Fires after the leaderboard inner content.
+ */
+do_action( 'buddynext_leaderboard_after' );
+?>

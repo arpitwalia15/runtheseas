@@ -1,0 +1,210 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "wbcom-essential/progress-bar",
+  "version": "1.0.0",
+  "title": "Progress Bar",
+  "category": "essential-design",
+  "icon": "chart-bar",
+  "description": "Animated horizontal progress bars that trigger on scroll. Display skills, goals, or any percentage-based data.",
+  "keywords": [
+    "progress",
+    "bar",
+    "skills",
+    "percentage",
+    "animated",
+    "chart",
+    "essential",
+    "wbcom"
+  ],
+  "textdomain": "wbcom-essential",
+  "example": {
+    "attributes": {
+      "bars": [
+        {
+          "label": "HTML/CSS",
+          "percentage": 95,
+          "color": "#667eea"
+        },
+        {
+          "label": "JavaScript",
+          "percentage": 85,
+          "color": "#764ba2"
+        },
+        {
+          "label": "React",
+          "percentage": 75,
+          "color": "#f5576c"
+        }
+      ]
+    }
+  },
+  "attributes": {
+    "uniqueId": {
+      "type": "string",
+      "default": ""
+    },
+    "bars": {
+      "type": "array",
+      "default": [
+        {
+          "label": "HTML/CSS",
+          "percentage": 95,
+          "color": "#667eea"
+        },
+        {
+          "label": "JavaScript",
+          "percentage": 85,
+          "color": "#764ba2"
+        },
+        {
+          "label": "React",
+          "percentage": 75,
+          "color": "#f5576c"
+        }
+      ]
+    },
+    "height": {
+      "type": "number",
+      "default": 12
+    },
+    "showPercentage": {
+      "type": "boolean",
+      "default": true
+    },
+    "showLabel": {
+      "type": "boolean",
+      "default": true
+    },
+    "animateOnScroll": {
+      "type": "boolean",
+      "default": true
+    },
+    "trackColor": {
+      "type": "string",
+      "default": "#e9ecef"
+    },
+    "labelColor": {
+      "type": "string",
+      "default": "#1e1e2e"
+    },
+    "percentColor": {
+      "type": "string",
+      "default": "#6c757d"
+    },
+    "barBorderRadius": {
+      "type": "number",
+      "default": 6
+    },
+    "padding": {
+      "type": "object",
+      "default": {
+        "top": 24,
+        "right": 24,
+        "bottom": 24,
+        "left": 24
+      }
+    },
+    "paddingTablet": {
+      "type": "object",
+      "default": null
+    },
+    "paddingMobile": {
+      "type": "object",
+      "default": null
+    },
+    "paddingUnit": {
+      "type": "string",
+      "default": "px"
+    },
+    "margin": {
+      "type": "object",
+      "default": {
+        "top": 0,
+        "right": 0,
+        "bottom": 0,
+        "left": 0
+      }
+    },
+    "marginTablet": {
+      "type": "object",
+      "default": null
+    },
+    "marginMobile": {
+      "type": "object",
+      "default": null
+    },
+    "marginUnit": {
+      "type": "string",
+      "default": "px"
+    },
+    "boxShadow": {
+      "type": "boolean",
+      "default": false
+    },
+    "shadowHorizontal": {
+      "type": "number",
+      "default": 0
+    },
+    "shadowVertical": {
+      "type": "number",
+      "default": 4
+    },
+    "shadowBlur": {
+      "type": "number",
+      "default": 8
+    },
+    "shadowSpread": {
+      "type": "number",
+      "default": 0
+    },
+    "shadowColor": {
+      "type": "string",
+      "default": "rgba(0, 0, 0, 0.12)"
+    },
+    "borderRadius": {
+      "type": "object",
+      "default": {
+        "top": 0,
+        "right": 0,
+        "bottom": 0,
+        "left": 0
+      }
+    },
+    "borderRadiusUnit": {
+      "type": "string",
+      "default": "px"
+    },
+    "hideOnDesktop": {
+      "type": "boolean",
+      "default": false
+    },
+    "hideOnTablet": {
+      "type": "boolean",
+      "default": false
+    },
+    "hideOnMobile": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "supports": {
+    "html": false,
+    "align": [
+      "wide",
+      "full"
+    ],
+    "color": {
+      "background": true,
+      "text": true
+    },
+    "spacing": {
+      "margin": true,
+      "padding": true
+    }
+  },
+  "editorScript": "file:./index.js",
+  "editorStyle": "file:./index.css",
+  "style": "file:./style-index.css",
+  "viewScript": "file:./view.js"
+}

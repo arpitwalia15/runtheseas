@@ -1,0 +1,81 @@
+ul.wbcom-login-form-links {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: -webkit-box;
+    display: -ms-flexbox;
+    display: flex
+}
+
+ul.wbcom-login-form-links li {
+    padding: 0 5px 0 0;
+    margin: 0
+}
+
+.wbcom-login-form-wrapper {
+    display: -webkit-box;
+    display: -ms-flexbox;
+    display: flex;
+    -webkit-box-orient: vertical;
+    -webkit-box-direction: normal;
+    -ms-flex-direction: column;
+    flex-direction: column;
+    -webkit-box-align: center;
+    -ms-flex-align: center;
+    align-items: center;
+    position: relative;
+    z-index: 1
+}
+
+.wbcom-login-form-inner {
+    width: 100%
+}
+
+#wb_login_form input,
+#wb_login_form textarea,
+ul.wbcom-login-form-links li a {
+    -webkit-transition: all .2s ease-in-out;
+    transition: all .2s ease-in-out;
+    outline: 0 !important
+}
+
+#wb_login_form input:focus-visible,
+#wb_login_form textarea:focus-visible,
+ul.wbcom-login-form-links li a:focus-visible {
+    outline: 2px solid currentColor !important;
+    outline-offset: 2px;
+}
+
+#wb_login_form input,
+#wb_login_form textarea {
+    max-width: 100%
+}
+
+#wb_login_form label {
+    display: block
+}
+
+.wbcom-login-form-logo-container {
+    display: -webkit-box;
+    display: -ms-flexbox;
+    display: flex;
+    -webkit-box-orient: vertical;
+    -webkit-box-direction: normal;
+    -ms-flex-direction: column;
+    flex-direction: column
+}
+
+.wbcom-login-form-logo-container .wbcom-login-form-logo {
+    width: 100%;
+    height: auto
+}
+
+.wbcom-loggedout-msg a {
+    text-decoration: underline
+}
+
+p.login-submit {
+    display: -webkit-box;
+    display: -ms-flexbox;
+    display: flex
+}

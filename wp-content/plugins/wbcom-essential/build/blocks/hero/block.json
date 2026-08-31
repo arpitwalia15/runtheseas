@@ -1,0 +1,224 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "wbcom-essential/hero",
+  "version": "1.0.0",
+  "title": "Hero Section",
+  "category": "essential-marketing",
+  "icon": "cover-image",
+  "description": "Full-width hero section with gradient or image background, heading, subheading, and two CTA buttons.",
+  "keywords": [
+    "hero",
+    "banner",
+    "header",
+    "fullwidth",
+    "cta",
+    "gradient",
+    "essential",
+    "wbcom"
+  ],
+  "textdomain": "wbcom-essential",
+  "example": {
+    "attributes": {
+      "heading": "Build Something Amazing",
+      "subheading": "Create beautiful websites with powerful tools"
+    }
+  },
+  "attributes": {
+    "uniqueId": {
+      "type": "string",
+      "default": ""
+    },
+    "heading": {
+      "type": "string",
+      "default": "Build Something Amazing"
+    },
+    "subheading": {
+      "type": "string",
+      "default": "Create beautiful websites with powerful tools"
+    },
+    "buttonOneText": {
+      "type": "string",
+      "default": "Get Started"
+    },
+    "buttonOneUrl": {
+      "type": "string",
+      "default": "#"
+    },
+    "buttonTwoText": {
+      "type": "string",
+      "default": "Learn More"
+    },
+    "buttonTwoUrl": {
+      "type": "string",
+      "default": "#"
+    },
+    "backgroundType": {
+      "type": "string",
+      "default": "gradient"
+    },
+    "backgroundColor": {
+      "type": "string",
+      "default": "#1e1e2e"
+    },
+    "gradientStart": {
+      "type": "string",
+      "default": "#667eea"
+    },
+    "gradientEnd": {
+      "type": "string",
+      "default": "#764ba2"
+    },
+    "backgroundImage": {
+      "type": "object",
+      "default": {}
+    },
+    "overlayColor": {
+      "type": "string",
+      "default": "rgba(0,0,0,0.5)"
+    },
+    "overlayOpacity": {
+      "type": "number",
+      "default": 50
+    },
+    "headingColor": {
+      "type": "string",
+      "default": "#ffffff"
+    },
+    "subheadingColor": {
+      "type": "string",
+      "default": "rgba(255,255,255,0.8)"
+    },
+    "buttonOneBg": {
+      "type": "string",
+      "default": "#ffffff"
+    },
+    "buttonOneColor": {
+      "type": "string",
+      "default": "#1e1e2e"
+    },
+    "buttonTwoBg": {
+      "type": "string",
+      "default": "transparent"
+    },
+    "buttonTwoColor": {
+      "type": "string",
+      "default": "#ffffff"
+    },
+    "contentAlign": {
+      "type": "string",
+      "default": "center"
+    },
+    "minHeight": {
+      "type": "number",
+      "default": 500
+    },
+    "minHeightUnit": {
+      "type": "string",
+      "default": "px"
+    },
+    "padding": {
+      "type": "object",
+      "default": {
+        "top": 80,
+        "right": 24,
+        "bottom": 80,
+        "left": 24
+      }
+    },
+    "paddingTablet": {
+      "type": "object",
+      "default": null
+    },
+    "paddingMobile": {
+      "type": "object",
+      "default": null
+    },
+    "paddingUnit": {
+      "type": "string",
+      "default": "px"
+    },
+    "margin": {
+      "type": "object",
+      "default": {
+        "top": 0,
+        "right": 0,
+        "bottom": 0,
+        "left": 0
+      }
+    },
+    "marginTablet": {
+      "type": "object",
+      "default": null
+    },
+    "marginMobile": {
+      "type": "object",
+      "default": null
+    },
+    "marginUnit": {
+      "type": "string",
+      "default": "px"
+    },
+    "boxShadow": {
+      "type": "boolean",
+      "default": false
+    },
+    "shadowHorizontal": {
+      "type": "number",
+      "default": 0
+    },
+    "shadowVertical": {
+      "type": "number",
+      "default": 4
+    },
+    "shadowBlur": {
+      "type": "number",
+      "default": 8
+    },
+    "shadowSpread": {
+      "type": "number",
+      "default": 0
+    },
+    "shadowColor": {
+      "type": "string",
+      "default": "rgba(0, 0, 0, 0.12)"
+    },
+    "borderRadius": {
+      "type": "object",
+      "default": {
+        "top": 0,
+        "right": 0,
+        "bottom": 0,
+        "left": 0
+      }
+    },
+    "borderRadiusUnit": {
+      "type": "string",
+      "default": "px"
+    },
+    "hideOnDesktop": {
+      "type": "boolean",
+      "default": false
+    },
+    "hideOnTablet": {
+      "type": "boolean",
+      "default": false
+    },
+    "hideOnMobile": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "supports": {
+    "html": false,
+    "align": [
+      "wide",
+      "full"
+    ],
+    "color": false,
+    "spacing": false
+  },
+  "editorScript": "file:./index.js",
+  "editorStyle": "file:./index.css",
+  "style": "file:./style-index.css"
+}

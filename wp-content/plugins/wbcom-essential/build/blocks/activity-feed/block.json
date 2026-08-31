@@ -1,0 +1,209 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "wbcom-essential/activity-feed",
+  "version": "2.0.0",
+  "title": "Activity Feed",
+  "category": "essential-buddypress",
+  "icon": "buddicons-activity",
+  "description": "Premium BuddyPress activity stream with card layout, type icons, human-readable timestamps, and interaction counts.",
+  "keywords": [
+    "activity",
+    "feed",
+    "stream",
+    "buddypress",
+    "community",
+    "social",
+    "essential",
+    "wbcom"
+  ],
+  "textdomain": "wbcom-essential",
+  "example": {},
+  "attributes": {
+    "uniqueId": {
+      "type": "string",
+      "default": ""
+    },
+    "totalActivities": {
+      "type": "number",
+      "default": 10
+    },
+    "activityType": {
+      "type": "string",
+      "default": ""
+    },
+    "layout": {
+      "type": "string",
+      "default": "cards"
+    },
+    "showAvatar": {
+      "type": "boolean",
+      "default": true
+    },
+    "showTime": {
+      "type": "boolean",
+      "default": true
+    },
+    "showAction": {
+      "type": "boolean",
+      "default": true
+    },
+    "showContent": {
+      "type": "boolean",
+      "default": true
+    },
+    "showTypeIcon": {
+      "type": "boolean",
+      "default": true
+    },
+    "showFavoriteBtn": {
+      "type": "boolean",
+      "default": true
+    },
+    "showCommentCount": {
+      "type": "boolean",
+      "default": true
+    },
+    "showMediaPreview": {
+      "type": "boolean",
+      "default": true
+    },
+    "avatarSize": {
+      "type": "number",
+      "default": 44
+    },
+    "cardBg": {
+      "type": "string",
+      "default": "#ffffff"
+    },
+    "nameColor": {
+      "type": "string",
+      "default": "#1e1e2e"
+    },
+    "contentColor": {
+      "type": "string",
+      "default": "#4a5568"
+    },
+    "timeColor": {
+      "type": "string",
+      "default": "#a0aec0"
+    },
+    "borderColor": {
+      "type": "string",
+      "default": "#edf2f7"
+    },
+    "accentColor": {
+      "type": "string",
+      "default": "#667eea"
+    },
+    "iconBg": {
+      "type": "string",
+      "default": "#eef2ff"
+    },
+    "padding": {
+      "type": "object",
+      "default": {
+        "top": 0,
+        "right": 0,
+        "bottom": 0,
+        "left": 0
+      }
+    },
+    "paddingTablet": {
+      "type": "object",
+      "default": null
+    },
+    "paddingMobile": {
+      "type": "object",
+      "default": null
+    },
+    "paddingUnit": {
+      "type": "string",
+      "default": "px"
+    },
+    "margin": {
+      "type": "object",
+      "default": {
+        "top": 0,
+        "right": 0,
+        "bottom": 0,
+        "left": 0
+      }
+    },
+    "marginTablet": {
+      "type": "object",
+      "default": null
+    },
+    "marginMobile": {
+      "type": "object",
+      "default": null
+    },
+    "marginUnit": {
+      "type": "string",
+      "default": "px"
+    },
+    "boxShadow": {
+      "type": "boolean",
+      "default": false
+    },
+    "shadowHorizontal": {
+      "type": "number",
+      "default": 0
+    },
+    "shadowVertical": {
+      "type": "number",
+      "default": 4
+    },
+    "shadowBlur": {
+      "type": "number",
+      "default": 8
+    },
+    "shadowSpread": {
+      "type": "number",
+      "default": 0
+    },
+    "shadowColor": {
+      "type": "string",
+      "default": "rgba(0, 0, 0, 0.06)"
+    },
+    "borderRadius": {
+      "type": "object",
+      "default": {
+        "top": 12,
+        "right": 12,
+        "bottom": 12,
+        "left": 12
+      }
+    },
+    "borderRadiusUnit": {
+      "type": "string",
+      "default": "px"
+    },
+    "hideOnDesktop": {
+      "type": "boolean",
+      "default": false
+    },
+    "hideOnTablet": {
+      "type": "boolean",
+      "default": false
+    },
+    "hideOnMobile": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "supports": {
+    "html": false,
+    "align": [
+      "wide",
+      "full"
+    ],
+    "color": false,
+    "spacing": false
+  },
+  "render": "file:./render.php",
+  "viewScript": "file:./view.js",
+  "editorScript": "file:./index.js",
+  "editorStyle": "file:./index.css",
+  "style": "file:./style-index.css"
+}

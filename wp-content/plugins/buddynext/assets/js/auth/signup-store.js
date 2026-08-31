@@ -1,0 +1,421 @@
+/* BuddyNext — Signup Interactivity API store.
+ *
+ * Powers templates/auth/signup.php. Submits POST /buddynext/v1/auth/register
+ * with email + user_login + password + terms_agreed. On success, redirects
+ * to the verify-email page (when verification is enabled) or onboarding.
+ * On 422, surfaces per-field errors inline.
+ */
+import { store, getContext } from '@wordpress/interactivity';
+import { restFetch } from '@buddynext/rest-client';
+
+/* -- i18n -------------------------------------------------------------- */
+/* Translated strings are injected server-side into the Interactivity state
+ * (AssetService::i18n_auth_signup) because Script Modules cannot use
+ * wp_set_script_translations(). The dictionary is read once from the
+ * buddynext/auth-signup namespace below; each lookup keeps the English literal
+ * as a fallback so the UI never breaks if the state is absent. fmt() fills
+ * sprintf-style '%s'/'%d' placeholders. */
+let I18N = {};
+function t( k, fb ) { return ( I18N && I18N[ k ] ) || fb; }
+function fmt( tpl, ...vals ) { let i = 0; return String( null == tpl ? '' : tpl ).replace( /%(?:(\d+)\$)?[sd]/g, ( m, pos ) => String( vals[ pos ? pos - 1 : i++ ] ?? '' ) ); }
+
+function strengthLabel( s ) {
+	switch ( Number( s ) || 0 ) {
+		case 1: return t( 'strengthWeak', 'Weak' );
+		case 2: return t( 'strengthFair', 'Fair' );
+		case 3: return t( 'strengthGood', 'Good' );
+		case 4: return t( 'strengthStrong', 'Strong' );
+		default: return '';
+	}
+}
+
+function ctx() {
+	try {
+		return getContext();
+	} catch ( _e ) {
+		return {};
+	}
+}
+
+function rest( c, path, opts ) {
+	opts = opts || {};
+	const init = {
+		base: c.restUrl || '/wp-json/buddynext/v1/',
+		nonce: c.restNonce || '',
+		method: opts.method,
+		toastOnError: false,
+	};
+	if ( typeof opts.body !== 'undefined' ) {
+		init.body = opts.body;
+	}
+	return restFetch( '/' + String( path ).replace( /^\//, '' ), init );
+}
+
+/**
+ * Fold the server-rendered custom registration fields into a REST body.
+ *
+ * Shared by the sign-up form and the finish-sign-up form (the social path, where
+ * the provider could not supply a field the owner marked required). Both render
+ * the same server-side markup, so both collect it the same way — the store never
+ * needs to know the fields up front.
+ *
+ * @param {HTMLFormElement|null} form The submitted form.
+ * @param {Object}               body REST body, mutated in place.
+ */
+function collectRegFields( form, body ) {
+	if ( ! form || ! form.querySelectorAll ) { return; }
+
+	form.querySelectorAll( '[data-bn-reg-field]' ).forEach( function ( el ) {
+		const name = el.getAttribute( 'name' );
+		if ( ! name ) { return; }
+
+		// Checkbox GROUP (multiselect / category_multiselect render name="key[]"):
+		// collect the checked values as an array under the bare key. Mirrors the
+		// profile-edit collector. A per-element assignment overwrote body[name]
+		// with whatever checkbox came last, so a multi-pick — and any REQUIRED
+		// multiselect — could never be submitted (permanent 422).
+		if ( 'checkbox' === el.type && /\[\]$/.test( name ) ) {
+			const groupKey = name.slice( 0, -2 );
+			if ( ! Array.isArray( body[ groupKey ] ) ) { body[ groupKey ] = []; }
+			if ( el.checked ) { body[ groupKey ].push( el.value ); }
+			return;
+		}
+		// Single checkbox (boolean field): the checked STATE is the value.
+		if ( 'checkbox' === el.type ) {
+			body[ name ] = el.checked ? ( el.value || '1' ) : '';
+			return;
+		}
+		// Radio group: only the checked option wins (default empty). Reading
+		// el.value per element made the LAST rendered option always win
+		// regardless of the user's pick (Zoho #40859).
+		if ( 'radio' === el.type ) {
+			if ( ! ( name in body ) ) { body[ name ] = ''; }
+			if ( el.checked ) { body[ name ] = el.value; }
+			return;
+		}
+		if ( el.multiple ) {
+			body[ name ] = Array.prototype.map.call(
+				el.selectedOptions || [],
+				function ( o ) { return o.value; }
+			);
+			return;
+		}
+		body[ name ] = el.value || '';
+	} );
+}
+
+/**
+ * Fold server-rendered extra signup inputs into a REST body.
+ *
+ * Anything hooked onto `buddynext_signup_form_fields` (Pro's plan-intent token,
+ * for one) can print an <input data-bn-signup-extra> and have it reach
+ * POST /auth/register untouched — no JavaScript of its own, and no field list
+ * hardcoded here. Values are opaque to the store; the server validates them.
+ *
+ * @param {HTMLFormElement|null} form The submitted form.
+ * @param {Object}               body REST body, mutated in place.
+ */
+function collectExtraFields( form, body ) {
+	if ( ! form || ! form.querySelectorAll ) { return; }
+
+	form.querySelectorAll( '[data-bn-signup-extra]' ).forEach( function ( el ) {
+		const name = el.getAttribute( 'name' );
+		if ( ! name ) { return; }
+		body[ name ] = el.value || '';
+	} );
+}
+
+function toast( message, tone ) {
+	if ( typeof window.bnToast === 'function' ) {
+		window.bnToast( message, tone || 'info' );
+	}
+}
+
+const signupStore = store( 'buddynext/auth-signup', {
+	state: {
+		get error() { return ctx().error || ''; },
+		get submitting() { return !! ctx().submitting; },
+		// Approval mode: registration succeeded but issued no session. The form is
+		// swapped for a confirmation notice rather than redirected anywhere.
+		get pending() { return !! ctx().pendingMessage; },
+		get pendingMessage() { return ctx().pendingMessage || ''; },
+		get strengthWidth() {
+			const s = Number( ctx().passwordStrength ) || 0;
+			return ( ( s / 4 ) * 100 ) + '%';
+		},
+		get strengthLabelText() {
+			const c = ctx();
+			if ( ! c.password ) { return ''; }
+			return strengthLabel( c.passwordStrength );
+		},
+		get emailError() {
+			const c = ctx();
+			return ( c.fieldErrors && c.fieldErrors.email ) || '';
+		},
+		get usernameError() {
+			const c = ctx();
+			return ( c.fieldErrors && c.fieldErrors.user_login ) || '';
+		},
+		get passwordError() {
+			const c = ctx();
+			return ( c.fieldErrors && c.fieldErrors.password ) || '';
+		},
+		get termsError() {
+			const c = ctx();
+			return ( c.fieldErrors && c.fieldErrors.terms_agreed ) || '';
+		},
+		get challengeError() {
+			const c = ctx();
+			return ( c.fieldErrors && c.fieldErrors.challenge ) || '';
+		},
+		get emailInvalid() { return !! this.emailError; },
+		get usernameInvalid() { return !! this.usernameError; },
+		get passwordInvalid() { return !! this.passwordError; },
+		get challengeInvalid() { return !! this.challengeError; },
+		get submitDisabled() {
+			// Only disabled while submitting — the button stays full strength at
+			// rest and required fields/terms are validated on click in
+			// submitSignup() with inline messages (matches the login surface).
+			return !! ctx().submitting;
+		},
+	},
+	actions: {
+		setName( event ) {
+			const c = ctx();
+			c.name = event && event.target ? String( event.target.value || '' ) : '';
+			if ( c.fieldErrors && c.fieldErrors.name ) {
+				const next = Object.assign( {}, c.fieldErrors );
+				delete next.name;
+				c.fieldErrors = next;
+			}
+		},
+		setEmail( event ) {
+			const c = ctx();
+			c.email = event && event.target ? String( event.target.value || '' ) : '';
+			if ( c.fieldErrors && c.fieldErrors.email ) {
+				const next = Object.assign( {}, c.fieldErrors );
+				delete next.email;
+				c.fieldErrors = next;
+			}
+		},
+		setUserLogin( event ) {
+			const c = ctx();
+			c.userLogin = event && event.target ? String( event.target.value || '' ) : '';
+			if ( c.fieldErrors && c.fieldErrors.user_login ) {
+				const next = Object.assign( {}, c.fieldErrors );
+				delete next.user_login;
+				c.fieldErrors = next;
+			}
+		},
+		setPassword( event ) {
+			const c = ctx();
+			const v = event && event.target ? String( event.target.value || '' ) : '';
+			c.password = v;
+			let s = 0;
+			if ( v.length >= 8 ) { s++; }
+			if ( /[A-Z]/.test( v ) && /[a-z]/.test( v ) ) { s++; }
+			if ( /\d/.test( v ) ) { s++; }
+			if ( /[^A-Za-z0-9]/.test( v ) ) { s++; }
+			c.passwordStrength = s;
+			c.strengthLabel = v.length === 0 ? '' : strengthLabel( s );
+			if ( c.fieldErrors && c.fieldErrors.password ) {
+				const next = Object.assign( {}, c.fieldErrors );
+				delete next.password;
+				c.fieldErrors = next;
+			}
+		},
+		toggleTerms( event ) {
+			const c = ctx();
+			c.termsAgreed = !! ( event && event.target && event.target.checked );
+			if ( c.termsAgreed && c.fieldErrors && c.fieldErrors.terms_agreed ) {
+				const next = Object.assign( {}, c.fieldErrors );
+				delete next.terms_agreed;
+				c.fieldErrors = next;
+			}
+		},
+		setChallengeAnswer( event ) {
+			const c = ctx();
+			c.challengeAnswer = event && event.target ? String( event.target.value || '' ) : '';
+			if ( c.fieldErrors && c.fieldErrors.challenge ) {
+				const next = Object.assign( {}, c.fieldErrors );
+				delete next.challenge;
+				c.fieldErrors = next;
+			}
+		},
+		setHoneypot( event ) {
+			const c = ctx();
+			c.honeypot = event && event.target ? String( event.target.value || '' ) : '';
+		},
+		* submitSignup( event ) {
+			if ( event && typeof event.preventDefault === 'function' ) {
+				event.preventDefault();
+			}
+			// The submit event fires on the <form>, so event.target is the form —
+			// use it to collect any custom registration fields below.
+			const regForm = event && event.target ? event.target : null;
+			const c = ctx();
+			if ( c.submitting ) { return; }
+			// Validate on click rather than disabling the button up front.
+			//
+			// Only demand a username when the form actually ASKS for one. The username
+			// field is OFF BY DEFAULT (the server derives a handle from the email), so
+			// this guard used to require a value that nothing on the page could ever
+			// set: `userLogin` stayed empty, every submit was refused with "Please fill
+			// in your email, username, and password" — naming a field that was not
+			// there — and web signup was impossible on a DEFAULT install.
+			if ( ! ( c.email || '' ).trim() || ! ( c.password || '' ) ) {
+				c.error = t( 'fillRequired', 'Please fill in your email and password.' );
+				return;
+			}
+			if ( c.askUsername && ! ( c.userLogin || '' ).trim() ) {
+				c.error = t( 'fillUsername', 'Please choose a username.' );
+				return;
+			}
+			if ( ! c.termsAgreed ) {
+				c.error = t( 'agreeTerms', 'Please agree to the Terms of Service and Privacy Policy to continue.' );
+				return;
+			}
+			if ( c.challengeEnabled && ! ( c.challengeAnswer || '' ).trim() ) {
+				c.error = t( 'answerChallenge', 'Please answer the verification question.' );
+				return;
+			}
+			c.submitting = true;
+			c.error = '';
+			c.fieldErrors = {};
+			try {
+				const body = {
+					// The display name the visitor typed. The form used to render this
+					// field but never bind or send it, so the server always fell back to
+					// the email handle prefix — a member who entered "Club One" appeared
+					// as "my.test.account". Sent when the field is shown (ask_name on).
+					name:            c.name || '',
+					email:           c.email || '',
+					user_login:      c.userLogin || '',
+					password:        c.password || '',
+					terms_agreed:    !! c.termsAgreed,
+					reg_token:       c.regToken || '',
+					challenge_token: c.challengeToken || '',
+					challenge_answer: c.challengeAnswer || '',
+					// The invitation, when the visitor arrived from an invite link. The
+					// form used to send NOTHING here, so an invite-only community refused
+					// its own invited members ("This community is invite-only") and a
+					// space-bound invite never joined them to the space it named.
+					invite:          c.invite || '',
+				};
+				// Honeypot under its server-issued (rotatable) field name.
+				if ( c.honeypotName ) {
+					body[ c.honeypotName ] = c.honeypot || '';
+				}
+				// Forward any custom registration profile fields (rendered server-
+				// side, tagged data-bn-reg-field). Keeps the store generic: it does
+				// not need to know each field up front.
+				collectRegFields( regForm, body );
+				// Same idea for anything a listener added to the form (e.g. Pro's
+				// signed membership plan-intent token).
+				collectExtraFields( regForm, body );
+
+				const r = yield rest( c, 'auth/register', {
+					method: 'POST',
+					body:   body,
+				} );
+				const data = r.data;
+				// An OK response with an unparseable body is a SUCCESS: by the time the
+				// response left the server the account and session cookie were already
+				// committed, and proxies (LiteSpeed among them) can strip the JSON
+				// content-type so data comes back null. Erroring here told the user
+				// "Could not create your account" while they were in fact registered
+				// and logged in. Only an explicit success:false on an OK response —
+				// or a non-OK status — is a failure.
+				if ( ! r.ok || ( data && ! data.success ) ) {
+					if ( data && data.data && data.data.fields ) {
+						c.fieldErrors = data.data.fields;
+					}
+					c.error = ( data && data.message ) || t( 'createFailed', 'Could not create your account.' );
+					c.submitting = false;
+					return;
+				}
+
+				// Admin-approval mode: the account exists but is held for review and was
+				// issued NO session. Redirecting to /onboarding/ (login-required) would
+				// bounce this session-less user straight to a login they cannot pass —
+				// a dead end seconds after being told they were in. Show the real reason
+				// and stay put. Mirrors the social-completion branch below.
+				if ( data && data.pending ) {
+					c.pendingMessage = data.message || t( 'awaitingApproval', 'Your account is awaiting administrator approval.' );
+					c.submitting = false;
+					c.error = '';
+					return;
+				}
+
+				toast( t( 'accountCreated', 'Account created. Welcome aboard!' ), 'success' );
+				window.location.href = ( data && data.redirect_to ) || '/onboarding/';
+			} catch ( _e ) {
+				c.error = t( 'genericError', 'Something went wrong. Please try again.' );
+				c.submitting = false;
+			}
+		},
+
+		/**
+		 * Finish a parked social sign-up.
+		 *
+		 * The provider gave us an email; it could not give us terms consent or a
+		 * profile field the owner marked required. No account exists yet — it is
+		 * created only when this submits.
+		 *
+		 * @param {Event} event Submit event.
+		 */
+		* submitComplete( event ) {
+			if ( event && typeof event.preventDefault === 'function' ) {
+				event.preventDefault();
+			}
+			const regForm = event && event.target ? event.target : null;
+			const c = ctx();
+			if ( c.submitting ) { return; }
+
+			c.submitting = true;
+			c.error = '';
+			c.fieldErrors = {};
+
+			try {
+				const body = {
+					pending_token: c.pendingToken || '',
+					terms_agreed:  !! c.termsAgreed,
+				};
+				collectRegFields( regForm, body );
+
+				const r = yield rest( c, 'auth/register/complete', {
+					method: 'POST',
+					body:   body,
+				} );
+				const data = r.data;
+
+				// Same contract as submit(): an OK response with an unparseable body
+				// (proxy stripped the JSON content-type) is a success, not a failure.
+				if ( ! r.ok || ( data && ! data.success ) ) {
+					if ( data && data.data && data.data.fields ) {
+						c.fieldErrors = data.data.fields;
+					}
+					c.error = ( data && data.message ) || t( 'createFailed', 'Could not create your account.' );
+					c.submitting = false;
+					return;
+				}
+
+				// Admin-approval mode: the account exists but is held for review.
+				if ( data && data.pending ) {
+					c.submitting = false;
+					c.error = '';
+					toast( data.message || t( 'awaitingApproval', 'Your account is awaiting administrator approval.' ), 'success' );
+					return;
+				}
+
+				toast( t( 'accountCreated', 'Account created. Welcome aboard!' ), 'success' );
+				window.location.href = ( data && data.redirect_to ) || '/onboarding/';
+			} catch ( _e ) {
+				c.error = t( 'genericError', 'Something went wrong. Please try again.' );
+				c.submitting = false;
+			}
+		},
+	},
+} );
+
+I18N = ( signupStore.state && signupStore.state.i18n ) || {};

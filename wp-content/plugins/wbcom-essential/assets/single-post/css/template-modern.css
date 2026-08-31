@@ -1,0 +1,217 @@
+/**
+ * Template: Modern
+ *
+ * Reading progress bar, sticky ToC sidebar, floating share bar.
+ * Collapses to single column when no ToC headings found.
+ *
+ * @package wbcom-essential
+ * @since 4.3.0
+ */
+
+/* Progress bar */
+.wbcom-sp__progress {
+	position: fixed;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 3px;
+	z-index: 9999;
+	background: transparent;
+}
+
+.wbcom-sp__progress-bar {
+	height: 100%;
+	width: 0;
+	background: var(--sp-primary);
+	transition: width 0.1s linear;
+}
+
+/* WP Admin bar offset */
+.admin-bar .wbcom-sp__progress {
+	top: 32px;
+}
+
+@media (max-width: 782px) {
+	.admin-bar .wbcom-sp__progress {
+		top: 46px;
+	}
+}
+
+/* Hero */
+.wbcom-sp--modern .wbcom-sp__hero {
+	position: relative;
+	min-height: 60vh;
+	background-size: cover;
+	background-position: center;
+	display: flex;
+	align-items: flex-end;
+}
+
+.wbcom-sp--modern .wbcom-sp__hero-overlay {
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(to top, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0.2) 50%, transparent 100%);
+	display: flex;
+	align-items: flex-end;
+}
+
+.wbcom-sp--modern .wbcom-sp__hero-content {
+	max-width: 900px;
+	padding: 48px 24px;
+	margin: 0 auto;
+	width: 100%;
+}
+
+.wbcom-sp--modern .wbcom-sp__hero .wbcom-sp__title {
+	color: var(--sp-white);
+	font-size: clamp(2rem, 5vw, 2.75rem);
+	text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.wbcom-sp--modern .wbcom-sp__hero .wbcom-sp__meta {
+	color: rgba(255, 255, 255, 0.85);
+}
+
+.wbcom-sp--modern .wbcom-sp__hero .wbcom-sp__meta a {
+	color: rgba(255, 255, 255, 0.85);
+}
+
+.wbcom-sp--modern .wbcom-sp__hero .wbcom-sp__meta a:hover {
+	color: var(--sp-white);
+}
+
+/* Category badges */
+.wbcom-sp--modern .wbcom-sp__hero-cats {
+	margin-bottom: 12px;
+}
+
+.wbcom-sp--modern .wbcom-sp__hero-cats a {
+	display: inline-block;
+	padding: 4px 12px;
+	background: var(--sp-primary);
+	color: var(--sp-white);
+	font-size: 0.75rem;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	border-radius: 3px;
+	text-decoration: none;
+	margin-right: 6px;
+}
+
+/* No-hero fallback */
+.wbcom-sp--modern .wbcom-sp__header--no-hero {
+	padding: 48px 0 24px;
+	border-bottom: 1px solid var(--sp-border);
+}
+
+/* Grid: ToC sidebar + content */
+.wbcom-sp--modern .wbcom-sp__grid {
+	display: grid;
+	grid-template-columns: 260px 1fr;
+	gap: 40px;
+	align-items: start;
+	padding: 48px 0;
+}
+
+/* No ToC — single column, narrower content */
+.wbcom-sp--modern.wbcom-sp--no-toc .wbcom-sp__grid {
+	grid-template-columns: 1fr;
+	max-width: 800px;
+	margin: 0 auto;
+}
+
+/* Sticky ToC sidebar */
+.wbcom-sp--modern .wbcom-sp__toc-sidebar {
+	position: sticky;
+	top: 80px;
+}
+
+.admin-bar .wbcom-sp--modern .wbcom-sp__toc-sidebar {
+	top: 112px;
+}
+
+/* ToC styles */
+.wbcom-sp-toc {
+	padding: 20px;
+	background: var(--sp-bg-alt);
+	border-radius: 8px;
+	border-left: 3px solid var(--sp-primary);
+}
+
+.wbcom-sp-toc__title {
+	font-size: 0.8125rem;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	color: var(--sp-text-muted);
+	margin: 0 0 12px;
+}
+
+.wbcom-sp-toc__list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.wbcom-sp-toc__item {
+	margin-bottom: 6px;
+}
+
+.wbcom-sp-toc__item--h3 {
+	padding-left: 16px;
+}
+
+.wbcom-sp-toc__link {
+	display: block;
+	font-size: 0.8125rem;
+	line-height: 1.5;
+	color: var(--sp-text-muted);
+	text-decoration: none;
+	padding: 2px 0;
+	transition: color 0.2s;
+}
+
+.wbcom-sp-toc__link:hover {
+	color: var(--sp-primary);
+}
+
+/* Floating share bar */
+.wbcom-sp__share-float {
+	position: fixed;
+	left: calc(50% - 620px);
+	top: 50%;
+	transform: translateY(-50%);
+	z-index: 100;
+}
+
+.wbcom-sp__share-float .wbcom-sp-share {
+	flex-direction: column;
+}
+
+/* Only show floating share on wide screens */
+@media (max-width: 1400px) {
+	.wbcom-sp__share-float {
+		display: none;
+	}
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+	.wbcom-sp--modern .wbcom-sp__grid {
+		grid-template-columns: 1fr;
+	}
+
+	.wbcom-sp--modern .wbcom-sp__toc-sidebar {
+		position: static;
+		order: -1;
+	}
+
+	.wbcom-sp--modern .wbcom-sp__hero {
+		min-height: 40vh;
+	}
+
+	.wbcom-sp--modern .wbcom-sp__hero-content {
+		padding: 32px 16px;
+	}
+}

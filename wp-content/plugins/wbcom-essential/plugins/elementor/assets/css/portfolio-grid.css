@@ -1,0 +1,268 @@
+.wba-fpg-toolbar {
+    display: -webkit-box;
+    display: -ms-flexbox;
+    display: flex;
+    -webkit-box-pack: justify;
+    -ms-flex-pack: justify;
+    justify-content: space-between;
+    -webkit-box-align: center;
+    -ms-flex-align: center;
+    align-items: center;
+    margin-bottom: 3rem
+}
+
+.wba-fpg-toolbar .wba-fpg-search-wrapper {
+    position: relative;
+    display: -webkit-box;
+    display: -ms-flexbox;
+    display: flex;
+    -ms-flex-wrap: wrap;
+    flex-wrap: wrap;
+    margin: 0;
+    padding: 0;
+    list-style: none !important
+}
+
+.wba-fpg-toolbar .wba-fpg-search-wrapper li {
+    margin: 0 5px 0 0;
+    padding: 0
+}
+
+.wba-fpg-toolbar .wba-fpg-search-wrapper li label {
+    font-size: 16px;
+    padding: 12px 15px;
+    margin: 0;
+    background-color: rgba(0, 0, 0, .1);
+    cursor: pointer;
+    color: #111;
+    line-height: 20px;
+    -webkit-transition: all .2s ease-in-out;
+    transition: all .2s ease-in-out;
+    max-width: 200px
+}
+
+.wba-fpg-toolbar .wba-fpg-search-wrapper li label.active,
+.wba-fpg-toolbar .wba-fpg-search-wrapper li label:hover {
+    background-color: #111;
+    color: #fff
+}
+
+.wba-fpg-toolbar .wba-fpg-search-wrapper li.wba-fpg-mobile-icon {
+    display: none
+}
+
+.wba-fpg-toolbar .wba-fpg-search-wrapper li.wba-fpg-mobile-icon label {
+    background-color: #111;
+    color: #fff
+}
+
+.wba-fpg-toolbar .wba-fpg-view-options {
+    display: -webkit-box;
+    display: -ms-flexbox;
+    display: flex;
+    -webkit-box-align: center;
+    -ms-flex-align: center;
+    align-items: center;
+    list-style: none !important;
+    margin: 0 0 0 auto;
+    padding: 0
+}
+
+.wba-fpg-toolbar .wba-fpg-view-options li {
+    margin: 0 0 0 5px;
+    padding: 0
+}
+
+.wba-fpg-toolbar .wba-fpg-view-options li label {
+    padding: 12px 15px;
+    margin: 0;
+    background-color: rgba(0, 0, 0, .1);
+    cursor: pointer;
+    color: #111;
+    line-height: 1;
+    -webkit-transition: all .2s ease-in-out;
+    transition: all .2s ease-in-out
+}
+
+.wba-fpg-toolbar .wba-fpg-view-options li label .dashicons,
+.wba-fpg-toolbar .wba-fpg-view-options li label .dashicons:before {
+    font-size: 20px;
+    width: 20px;
+    height: 20px
+}
+
+.wba-fpg-toolbar .wba-fpg-view-options li label.active,
+.wba-fpg-toolbar .wba-fpg-view-options li label:hover {
+    background-color: #111;
+    color: #fff
+}
+
+body.rtl .wba-fpg-toolbar .wba-fpg-view-options {
+    margin: 0 auto 0 0
+}
+
+.wba-fpg-container {
+    margin: 0;
+    padding: 0;
+    list-style: none !important
+}
+
+.wba-fpg-container figure {
+    position: relative
+}
+
+.wba-fpg-container figure img {
+    width: 100%;
+    max-width: 100%;
+    vertical-align: bottom
+}
+
+.wba-fpg-container li {
+    -webkit-transition: all .4s ease-in-out;
+    transition: all .4s ease-in-out
+}
+
+.wba-fpg-container li .wba-fpg-inner {
+    background: rgba(0, 0, 0, .1)
+}
+
+.wba-fpg-container li .wba-fpg-inner .wba-fpg-info,
+.wba-fpg-container li .wba-fpg-inner .wba-fpg-title {
+    margin: 0;
+    padding: 0;
+    width: 100%
+}
+
+.wba-fpg-container li .wba-fpg-inner,
+.wba-fpg-container li a {
+    display: block;
+    height: 100%;
+    outline: 0 !important
+}
+
+.wba-fpg-container li .wba-fpg-inner:focus-visible,
+.wba-fpg-container li a:focus-visible {
+    outline: 2px solid currentColor !important;
+    outline-offset: 2px;
+}
+
+.wba-fpg-container li:hover {
+    z-index: 2
+}
+
+.wba-fpg-container.wba-fpg-grid-view {
+    display: grid;
+    grid-gap: 40px;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr))
+}
+
+.wba-fpg-container.wba-fpg-grid-view figcaption {
+    padding: 20px;
+    display: -webkit-box;
+    display: -ms-flexbox;
+    display: flex;
+    -webkit-box-orient: vertical;
+    -webkit-box-direction: normal;
+    -ms-flex-direction: column;
+    flex-direction: column;
+    -webkit-box-pack: start;
+    -ms-flex-pack: start;
+    justify-content: flex-start;
+    -webkit-box-align: start;
+    -ms-flex-align: start;
+    align-items: flex-start
+}
+
+.wba-fpg-container.wba-fpg-grid-view.in-img img {
+    height: 100%;
+    -o-object-fit: cover;
+    object-fit: cover
+}
+
+.wba-fpg-container.wba-fpg-grid-view.in-img figure {
+    height: 100%
+}
+
+.wba-fpg-container.wba-fpg-grid-view.in-img figcaption {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    top: 0;
+    right: 0;
+    -webkit-transition: all .2s ease-in-out;
+    transition: all .2s ease-in-out
+}
+
+.wba-fpg-container.wba-fpg-grid-view.below-img img {
+    height: auto
+}
+
+.wba-fpg-container.wba-fpg-grid-view.wba-fpg-zoom-in li {
+    -webkit-transform: scale(1);
+    transform: scale(1)
+}
+
+.wba-fpg-container.wba-fpg-grid-view.wba-fpg-zoom-out li {
+    -webkit-transform: scale(0);
+    transform: scale(0)
+}
+
+.wba-fpg-container.wba-fpg-list-view div {
+    -webkit-animation: none !important;
+    animation: none !important;
+    -webkit-transition: none !important;
+    transition: none !important;
+    -webkit-transform: none !important;
+    transform: none !important
+}
+
+.wba-fpg-container.wba-fpg-list-view li {
+    margin-bottom: 20px
+}
+
+.wba-fpg-container.wba-fpg-list-view figure {
+    display: grid;
+    grid-gap: 0;
+    grid-template-columns: 200px 1fr;
+    -webkit-box-align: center;
+    -ms-flex-align: center;
+    align-items: center
+}
+
+.wba-fpg-container.wba-fpg-list-view img {
+    height: 100%;
+    -o-object-fit: cover;
+    object-fit: cover
+}
+
+@media only screen and (max-width:767px) {
+    .wba-fpg-toolbar {
+        -webkit-box-align: start;
+        -ms-flex-align: start;
+        align-items: flex-start
+    }
+
+    .wba-fpg-toolbar .wba-fpg-search-wrapper {
+        -webkit-box-orient: vertical;
+        -webkit-box-direction: normal;
+        -ms-flex-direction: column;
+        flex-direction: column;
+        width: 100%
+    }
+
+    .wba-fpg-toolbar .wba-fpg-search-wrapper li label {
+        width: 100%
+    }
+
+    .wba-fpg-toolbar .wba-fpg-search-wrapper li.wba-fpg-mobile-icon label {
+        width: auto
+    }
+
+    .wba-fpg-toolbar .wba-fpg-search-wrapper li {
+        display: none
+    }
+
+    .wba-fpg-toolbar .wba-fpg-search-wrapper li.wba-fpg-mobile-icon {
+        display: block
+    }
+}

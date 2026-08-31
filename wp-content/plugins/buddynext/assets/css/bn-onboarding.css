@@ -1,0 +1,1707 @@
+/* ───────────────────────────────────────────────────────────────────────
+ * BuddyNext — Onboarding wizard
+ *
+ * Implementation of the V2 onboarding prototype
+ * (docs/v2 Plans/v2/onboarding.html), namespaced with the `bn-ob-*` class
+ * names the template + Interactivity store reference. Reads design
+ * tokens (--bn-* spacing, color, type) from bn-base.css.
+ *
+ * Structure:
+ *   .bn-ob-wrap     — outer interactive context (no chrome of its own)
+ *     .bn-ob-shell  — full-height 2-column grid (form left, canvas right)
+ *       .bn-ob-form     — left column: head, stepper, body, actions
+ *         .bn-ob-form-head       — step counter eyebrow
+ *         .bn-ob-stepper         — numbered step nav
+ *         .bn-ob-form-body       — centered max-width content area
+ *           .bn-ob-step …        — only one visible at a time
+ *           .bn-ob-actions       — pinned-bottom action row
+ *       .bn-ob-canvas    — right column: live preview card + caption
+ *   Mobile: shell collapses to 1 column, canvas hides
+ * ─────────────────────────────────────────────────────────────────────── */
+
+/* ── Shell ────────────────────────────────────────────────────────────── */
+
+.bn-ob-wrap {
+	min-height: 100vh;
+	background: var(--bn-canvas);
+	color: var(--bn-ink);
+	font-family: var(--bn-font-ui);
+	font-size: var(--bn-text-base);
+	line-height: 1.55;
+}
+.bn-ob-shell {
+	min-height: 100vh;
+	display: grid;
+	/* minmax(0, …) drops the implicit min-content floor: without it the
+	   stepper's intrinsic width forces the form column wider than the
+	   viewport on small screens and the right edge gets clipped. */
+	grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+.bn-ob-form {
+	background: var(--bn-surface);
+	min-height: 100vh;
+	min-width: 0;
+	padding: var(--bn-s6) var(--bn-s6);
+	display: flex;
+	flex-direction: column;
+}
+.bn-ob-canvas {
+	position: relative;
+	overflow: hidden;
+	padding: var(--bn-s6);
+	background:
+		radial-gradient(circle at 25% 30%, color-mix(in oklch, var(--bn-accent) 20%, transparent), transparent 55%),
+		radial-gradient(circle at 80% 70%, color-mix(in oklch, oklch(60% 0.20 290) 14%, transparent), transparent 50%),
+		var(--bn-canvas);
+}
+.bn-ob-canvas::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+	background: repeating-linear-gradient(-30deg, transparent 0 28px, color-mix(in oklch, var(--bn-ink) 4%, transparent) 28px 29px);
+	mix-blend-mode: multiply;
+	opacity: 0.55;
+	pointer-events: none;
+}
+.bn-ob-canvas__inner {
+	position: relative;
+	z-index: 1;
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	height: 100%;
+	max-width: 460px;
+	margin: 0 auto;
+}
+
+@media (max-width: 960px) {
+	.bn-ob-shell { grid-template-columns: minmax(0, 1fr); }
+	.bn-ob-canvas { display: none; }
+}
+@media (max-width: 768px) {
+	.bn-ob-form { padding: var(--bn-s5) var(--bn-s4); }
+}
+
+/* ── Form column inner sections ───────────────────────────────────────── */
+
+.bn-ob-form-head {
+	max-width: 520px;
+	width: 100%;
+	margin: 0 auto var(--bn-s4);
+}
+.bn-ob-form-head__step {
+	font-family: var(--bn-font-mono, var(--bn-font-ui));
+	font-size: 11px;
+	font-weight: var(--bn-fw-semibold);
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--bn-ink-3);
+}
+
+.bn-ob-stepper {
+	max-width: 520px;
+	width: 100%;
+	margin: 0 auto var(--bn-s4);
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	/* Belt-and-braces only: with the label-per-active-step rule below the
+	   strip fits every viewport, but if a future variant overflows it must
+	   scroll, never clip (base .bn-stepper is plain flex). The onboarding
+	   store centers the active step on every transition. */
+	overflow-x: auto;
+	scrollbar-width: none;
+	touch-action: pan-x;
+	overscroll-behavior-x: contain;
+}
+.bn-ob-stepper::-webkit-scrollbar { display: none; }
+
+/* The strip is a progress INDICATOR, not a table of contents: numbered dots
+   always, the label on the ACTIVE step only (owner decision, 2026-07-24).
+   Every step's full title renders directly beneath in the step head, and the
+   "Step X of Y" eyebrow keeps the count - so per-step labels added nothing
+   but width, and with an addon-appended sixth step the fully-labelled strip
+   could not fit ANY viewport without clipping or scrolling. */
+.bn-ob-stepper .bn-ob-stepper__label { display: none; }
+.bn-ob-stepper .bn-stepper__item.is-active .bn-ob-stepper__label { display: inline; }
+
+@media (max-width: 640px) {
+	/* Tighter rhythm so six dots + the longest active label ("Membership")
+	   fit a 390px viewport without scrolling. */
+	.bn-ob-stepper { gap: var(--bn-s1); }
+	.bn-ob-stepper .bn-stepper__bar { min-width: 8px; }
+}
+.bn-ob-stepper__label {
+	font-size: var(--bn-text-xs);
+	font-weight: var(--bn-fw-semibold);
+}
+
+.bn-ob-form-body {
+	flex: 1;
+	max-width: 520px;
+	width: 100%;
+	margin: 0 auto;
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s5);
+	padding-top: var(--bn-s4);
+}
+
+/* ── Step section ─────────────────────────────────────────────────────── */
+
+.bn-ob-step {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s4);
+}
+.bn-ob-step[hidden] { display: none; }
+.bn-ob-step__head {
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr);
+	align-items: center;
+	column-gap: var(--bn-s3);
+	row-gap: var(--bn-s2);
+}
+.bn-ob-step__head .bn-ob-step__sub {
+	grid-column: 1 / -1;
+}
+.bn-ob-step__icon {
+	color: var(--bn-accent);
+	display: inline-flex;
+}
+.bn-ob-step__icon svg { width: 28px; height: 28px; }
+.bn-ob-step__title {
+	font-family: var(--bn-font-display, var(--bn-font-ui));
+	font-size: clamp(24px, 3.2vw, 32px);
+	font-weight: 800;
+	letter-spacing: -0.025em;
+	line-height: 1.15;
+	color: var(--bn-ink);
+	margin: 0;
+}
+.bn-ob-step__sub {
+	font-size: var(--bn-text-base);
+	color: var(--bn-ink-2);
+	margin: 0;
+}
+
+/* ── Step "card" — neutralised. The form column is itself the surface;
+   step content flows inline without an inner border or shadow. ──────── */
+.bn-ob-card {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s4);
+}
+
+/* ── Avatar row ───────────────────────────────────────────────────────── */
+
+.bn-ob-avatar-row {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s4);
+}
+.bn-ob-avatar {
+	position: relative;
+	width: 72px;
+	height: 72px;
+	border-radius: 50%;
+	background: var(--bn-sunken);
+	border: 1px dashed var(--bn-line);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	color: var(--bn-ink-3);
+	cursor: pointer;
+	overflow: hidden;
+	padding: 0;
+	flex-shrink: 0;
+	transition: border-color var(--bn-dur) var(--bn-ease);
+}
+.bn-ob-avatar:hover { border-color: var(--bn-accent); }
+.bn-ob-avatar img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	border-radius: 50%;
+}
+
+/*
+ * Avatar upload in flight. handleAvatarUpload sets context.avatarUploading for
+ * the duration of the POST /me/avatar; this scrim + spinner replaces the old
+ * fire-and-forget picker that showed nothing until the success toast. Reuses the
+ * global bn-spin keyframes (bn-base.css).
+ */
+.bn-ob-avatar__spinner {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: color-mix(in srgb, var(--bn-sunken) 65%, transparent);
+}
+.bn-ob-avatar__spinner::before {
+	content: "";
+	width: 24px;
+	height: 24px;
+	border: 2px solid var(--bn-line);
+	border-top-color: var(--bn-accent);
+	border-radius: 50%;
+	animation: bn-spin 0.6s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+	.bn-ob-avatar__spinner::before { animation: none; }
+}
+
+.bn-ob-avatar-input { display: none; }
+.bn-ob-avatar-row__hint {
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink-3);
+	line-height: 1.5;
+}
+
+/* The "Add a profile photo" call to action — a real button that looks like the link it
+ * always pretended to be. It used to be a <strong> inside an inert div: it read as the
+ * thing you press and did nothing when pressed. Same weight it had before, so nothing
+ * moves; it just works now, and it is keyboard-reachable, which the avatar-image-only
+ * version was not for anyone reading the words rather than looking at the picture. */
+.bn-ob-avatar-row__cta {
+	display: inline;
+	padding: 0;
+	border: 0;
+	background: none;
+	font: inherit;
+	font-weight: var(--bn-fw-semibold);
+	color: var(--bn-accent);
+	cursor: pointer;
+	text-align: start;
+}
+
+.bn-ob-avatar-row__cta:hover,
+.bn-ob-avatar-row__cta:focus-visible {
+	text-decoration: underline;
+}
+
+/* ── Form fields ──────────────────────────────────────────────────────── */
+
+.bn-ob-field {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+.bn-ob-label {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	font-size: 13px;
+	font-weight: var(--bn-fw-semibold);
+	color: var(--bn-ink-2);
+}
+.bn-ob-label__hint {
+	font-family: var(--bn-font-mono, var(--bn-font-ui));
+	font-size: 10px;
+	font-weight: 500;
+	letter-spacing: 0.02em;
+	color: var(--bn-ink-4);
+}
+.bn-ob-field__hint {
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+}
+.bn-ob-field__msg {
+	font-size: var(--bn-text-xs);
+	color: oklch(58% 0.20 25); /* danger */
+}
+.bn-ob-field input[type="text"],
+.bn-ob-field input[type="email"],
+.bn-ob-field textarea,
+.bn-ob-displayname,
+.bn-ob-username,
+.bn-ob-bio {
+	width: 100%;
+	padding: 10px var(--bn-s3);
+	background: var(--bn-canvas);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-md);
+	color: var(--bn-ink);
+	font: inherit;
+	font-size: 14px;
+	outline: none;
+	transition: border-color var(--bn-dur) var(--bn-ease), box-shadow var(--bn-dur) var(--bn-ease);
+}
+.bn-ob-field input[type="text"]:focus,
+.bn-ob-field input[type="email"]:focus,
+.bn-ob-field textarea:focus,
+.bn-ob-displayname:focus,
+.bn-ob-username:focus,
+.bn-ob-bio:focus {
+	border-color: var(--bn-accent);
+	box-shadow: 0 0 0 3px color-mix(in oklch, var(--bn-accent) 18%, transparent);
+}
+.bn-ob-bio {
+	min-height: 84px;
+	resize: vertical;
+	line-height: 1.5;
+}
+
+/* Username compound input: "@" prefix slot + inline availability badge.
+   The container owns the border so the prefix + input + status pill
+   read as a single control. Matches V2 .ob-input-prefix. */
+.bn-ob-input-prefix {
+	display: flex;
+	align-items: stretch;
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-md);
+	background: var(--bn-canvas);
+	transition: border-color var(--bn-dur) var(--bn-ease), box-shadow var(--bn-dur) var(--bn-ease);
+	overflow: hidden;
+}
+.bn-ob-input-prefix:focus-within {
+	border-color: var(--bn-accent);
+	box-shadow: 0 0 0 3px color-mix(in oklch, var(--bn-accent) 18%, transparent);
+}
+.bn-ob-input-prefix__prefix {
+	background: var(--bn-sunken);
+	border-inline-end: 1px solid var(--bn-line);
+	font-family: var(--bn-font-mono, var(--bn-font-ui));
+	font-size: 13px;
+	color: var(--bn-ink-3);
+	padding: 0 var(--bn-s3);
+	display: inline-flex;
+	align-items: center;
+}
+.bn-ob-field .bn-ob-input-prefix input.bn-ob-username {
+	flex: 1;
+	min-width: 0;
+	/* Higher specificity than `.bn-ob-field input[type="text"]` so the inner
+	   border reset wins — the wrapper (.bn-ob-input-prefix) owns the single
+	   border; without this the input kept its own border too (double border). */
+	border: 0;
+	border-radius: 0;
+	background: transparent;
+	padding: 10px var(--bn-s3);
+}
+.bn-ob-input-prefix .bn-ob-username:focus {
+	box-shadow: none;
+}
+.bn-ob-input-prefix__status {
+	display: inline-flex;
+	align-items: center;
+	padding: 0 var(--bn-s3);
+	font-family: var(--bn-font-mono, var(--bn-font-ui));
+	font-size: 11px;
+	font-weight: var(--bn-fw-semibold);
+	letter-spacing: 0.02em;
+	color: var(--bn-ink-3);
+	white-space: nowrap;
+}
+.bn-ob-input-prefix__status[hidden] { display: none; }
+.bn-ob-input-prefix.is-checking .bn-ob-input-prefix__status,
+.bn-ob-input-prefix__status:not(.tone-ok):not(.tone-bad) {
+	color: var(--bn-ink-3);
+}
+.bn-ob-input-prefix__status.tone-ok {
+	color: oklch(58% 0.16 155); /* success */
+}
+.bn-ob-input-prefix__status.tone-bad {
+	color: oklch(58% 0.20 25); /* danger */
+}
+
+/* ── Chips (interests step) ───────────────────────────────────────────── */
+
+.bn-ob-chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+}
+.bn-ob-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 6px 12px;
+	background: var(--bn-sunken);
+	border: 1px solid transparent;
+	border-radius: 999px;
+	color: var(--bn-ink-2);
+	font-size: var(--bn-text-sm);
+	font-weight: 500;
+	cursor: pointer;
+	transition: all var(--bn-dur-fast) var(--bn-ease);
+}
+.bn-ob-chip:hover {
+	border-color: var(--bn-accent);
+	color: var(--bn-accent);
+}
+.bn-ob-chip[aria-pressed="true"],
+.bn-ob-chip.is-selected {
+	background: var(--bn-accent);
+	color: var(--bn-accent-fg);
+	border-color: var(--bn-accent);
+}
+.bn-ob-chip__icon { display: inline-flex; }
+.bn-ob-chip__icon svg { width: 14px; height: 14px; }
+.bn-ob-chip__label { line-height: 1; }
+.bn-ob-chips__count {
+	font-family: var(--bn-font-mono, var(--bn-font-ui));
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+	margin: 0;
+}
+
+/* ── Spaces grid (spaces step) ────────────────────────────────────────── */
+
+.bn-ob-spaces {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: var(--bn-s2);
+}
+.bn-ob-space-card {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s2);
+	padding: var(--bn-s3);
+	background: var(--bn-canvas);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-md);
+	transition: border-color var(--bn-dur-fast) var(--bn-ease);
+}
+.bn-ob-space-card:hover { border-color: var(--bn-accent); }
+.bn-ob-space-card__head {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2);
+}
+.bn-ob-space-avatar {
+	width: 36px;
+	height: 36px;
+	border-radius: var(--bn-r-sm);
+	background: linear-gradient(135deg,
+		color-mix(in oklch, var(--bn-accent) 25%, var(--bn-surface)),
+		var(--bn-surface)
+	);
+	color: var(--bn-accent);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	font-weight: 700;
+	font-size: 16px;
+	flex-shrink: 0;
+}
+.bn-ob-space-card__name {
+	font-size: var(--bn-text-sm);
+	font-weight: var(--bn-fw-semibold);
+	color: var(--bn-ink);
+	line-height: 1.2;
+}
+.bn-ob-space-card__meta {
+	font-family: var(--bn-font-mono, var(--bn-font-ui));
+	font-size: 10px;
+	color: var(--bn-ink-4);
+	margin-top: 2px;
+}
+.bn-ob-space-card__members {
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+}
+.bn-ob-space-card__desc {
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-2);
+	line-height: 1.45;
+	margin: 0;
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+.bn-ob-space-card__cta {
+	margin-top: auto;
+	align-self: flex-start;
+}
+
+@media (max-width: 768px) {
+	.bn-ob-spaces { grid-template-columns: 1fr; }
+}
+
+/* ── Channels (notifications step) ────────────────────────────────────── */
+
+.bn-ob-channels {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s2);
+}
+.bn-ob-channel {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s3);
+	padding: var(--bn-s3) var(--bn-s4);
+	background: var(--bn-canvas);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-md);
+	cursor: pointer;
+	transition: border-color var(--bn-dur-fast) var(--bn-ease);
+}
+.bn-ob-channel:hover { border-color: var(--bn-accent); }
+.bn-ob-channel[hidden] { display: none; }
+.bn-ob-channel__icon {
+	width: 36px;
+	height: 36px;
+	border-radius: var(--bn-r-sm);
+	background: color-mix(in oklch, var(--bn-accent) 12%, var(--bn-surface));
+	color: var(--bn-accent);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+}
+.bn-ob-channel__icon svg { width: 18px; height: 18px; }
+.bn-ob-channel__body {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+.bn-ob-channel__name {
+	font-size: var(--bn-text-sm);
+	font-weight: var(--bn-fw-semibold);
+	color: var(--bn-ink);
+}
+.bn-ob-channel__hint {
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+	line-height: 1.45;
+}
+/* Native checkbox styled as a toggle pill. The label wraps the input
+   so the entire row is clickable; the input itself is on the right. */
+.bn-ob-channel__toggle {
+	appearance: none;
+	-webkit-appearance: none;
+	width: 38px;
+	height: 22px;
+	background: var(--bn-sunken);
+	border: 1px solid var(--bn-line);
+	border-radius: 999px;
+	position: relative;
+	cursor: pointer;
+	flex-shrink: 0;
+	transition: background var(--bn-dur) var(--bn-ease), border-color var(--bn-dur) var(--bn-ease);
+}
+.bn-ob-channel__toggle::before {
+	content: '';
+	position: absolute;
+	top: 2px;
+	inset-inline-start: 2px;
+	width: 16px;
+	height: 16px;
+	background: var(--bn-surface);
+	border-radius: 50%;
+	box-shadow: 0 1px 2px color-mix(in oklch, var(--bn-ink) 18%, transparent);
+	transition: transform var(--bn-dur) var(--bn-ease);
+}
+.bn-ob-channel__toggle:checked {
+	background: var(--bn-accent);
+	border-color: var(--bn-accent);
+}
+.bn-ob-channel__toggle:checked::before { transform: translateX(var(--bn-toggle-travel, 16px)); }
+[dir="rtl"] .bn-ob-channel__toggle:checked::before { transform: translateX(calc(-1 * var(--bn-toggle-travel, 16px))); }
+.bn-ob-channel__toggle:focus-visible {
+	outline: 2px solid color-mix(in oklch, var(--bn-accent) 50%, transparent);
+	outline-offset: 2px;
+}
+
+/* ── People list (people step) ────────────────────────────────────────── */
+
+.bn-ob-people {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s2);
+}
+.bn-ob-person {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s3);
+	padding: var(--bn-s3);
+	background: var(--bn-canvas);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-md);
+}
+.bn-ob-person__info { flex: 1; min-width: 0; }
+.bn-ob-person__name {
+	font-size: var(--bn-text-sm);
+	font-weight: var(--bn-fw-semibold);
+	color: var(--bn-ink);
+	line-height: 1.2;
+}
+.bn-ob-person__meta {
+	font-family: var(--bn-font-ui);
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+	margin-top: 2px;
+}
+.bn-ob-person__cta {
+	flex-shrink: 0;
+}
+
+/* ── Action row ───────────────────────────────────────────────────────── */
+
+.bn-ob-actions {
+	margin-top: auto;
+	padding-top: var(--bn-s5);
+	border-top: 1px solid var(--bn-line);
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--bn-s3);
+}
+.bn-ob-actions__spacer { display: none; }
+
+/* ── Error banner ─────────────────────────────────────────────────────── */
+
+.bn-ob-error {
+	max-width: 520px;
+	width: 100%;
+	margin: var(--bn-s3) auto 0;
+	padding: var(--bn-s3) var(--bn-s4);
+	background: color-mix(in oklch, oklch(58% 0.20 25) 12%, var(--bn-surface));
+	color: oklch(40% 0.20 25);
+	border: 1px solid color-mix(in oklch, oklch(58% 0.20 25) 30%, transparent);
+	border-radius: var(--bn-r-md);
+	font-size: var(--bn-text-sm);
+}
+.bn-ob-error[hidden] { display: none; }
+
+/* ── Empty state (fallback when a step has no data) ──────────────────── */
+
+.bn-ob-empty {
+	padding: var(--bn-s5);
+	text-align: center;
+	color: var(--bn-ink-3);
+	font-size: var(--bn-text-sm);
+	border: 1px dashed var(--bn-line);
+	border-radius: var(--bn-r-md);
+}
+
+/* ── Right canvas content (live profile preview) ─────────────────────── */
+
+.bn-ob-canvas__eyebrow {
+	font-family: var(--bn-font-mono, var(--bn-font-ui));
+	font-size: 11px;
+	font-weight: var(--bn-fw-semibold);
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--bn-ink-3);
+	margin-bottom: var(--bn-s3);
+}
+.bn-ob-canvas__caption {
+	margin-top: var(--bn-s4);
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+	line-height: 1.5;
+}
+
+.bn-ob-preview-card {
+	background: var(--bn-surface);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-lg);
+	padding: var(--bn-s5);
+	box-shadow: var(--bn-shadow-sm);
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s4);
+}
+.bn-ob-preview-card__head {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s3);
+}
+.bn-ob-preview-card__avatar {
+	width: 56px;
+	height: 56px;
+	border-radius: 50%;
+	background: linear-gradient(135deg,
+		color-mix(in oklch, var(--bn-accent) 60%, var(--bn-surface)),
+		color-mix(in oklch, var(--bn-accent) 30%, var(--bn-surface))
+	);
+	color: var(--bn-accent-fg, var(--bn-surface));
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	font-family: var(--bn-font-display, var(--bn-font-ui));
+	font-weight: 700;
+	font-size: 22px;
+	flex-shrink: 0;
+	letter-spacing: -0.01em;
+	overflow: hidden;
+}
+.bn-ob-preview-card__avatar-img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	border-radius: 50%;
+	display: block;
+}
+.bn-ob-preview-card__id { min-width: 0; flex: 1; }
+.bn-ob-preview-card__name {
+	font-size: var(--bn-text-md);
+	font-weight: var(--bn-fw-semibold);
+	color: var(--bn-ink);
+	line-height: 1.2;
+}
+.bn-ob-preview-card__handle {
+	font-family: var(--bn-font-mono, var(--bn-font-ui));
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+	margin-top: 2px;
+}
+.bn-ob-preview-card__bio {
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink-2);
+	line-height: 1.5;
+	margin: 0;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+ * Admin setup wizard (bn-wizard__*)
+ *
+ * Renders under wp-admin?page=buddynext-setup. Separate namespace from
+ * the front-end onboarding flow above — admins land here on first
+ * activation. Layout: single centred card, thin progress bar header,
+ * dot-and-label stepper, question H2, scannable option rows, two-zone
+ * footer (Back | Skip + Continue).
+ *
+ * All sizes follow the 8px grid; every interactive row is ≥ 44px tall
+ * with ≥ 8px gap from its neighbour.
+ * ═══════════════════════════════════════════════════════════════════════ */
+
+/* Cancel WP's #wpcontent padding so the wizard owns the full surface. Logical so
+   it also cancels the padding-right that wp-admin's RTL sheet sets instead. */
+#wpcontent { padding-inline-start: 0 !important; }
+#wpfooter { display: none !important; }
+.bn-wizard-wrap {
+	/* No negative horizontal margins: the wrap already fills #wpbody-content
+	   edge-to-edge with margin 0. The previous -20px right margin had no admin
+	   padding to cancel and pushed the wrap 20px past the viewport, forcing an
+	   unnecessary horizontal scrollbar on the Setup Wizard. */
+	margin: 0;
+	padding: var(--bn-s5) var(--bn-s4);
+	min-height: calc(100vh - 32px);
+	background: var(--bn-canvas);
+	color: var(--bn-ink);
+	font-family: var(--bn-font-ui);
+	font-size: var(--bn-text-base);
+	line-height: 1.55;
+	-webkit-font-smoothing: antialiased;
+}
+.bn-wizard {
+	max-width: 720px;
+	margin: 0 auto;
+	background: var(--bn-surface);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-lg);
+	box-shadow: var(--bn-shadow-sm);
+	overflow: hidden;
+}
+
+/* ── Header — logo · progress · save & exit ──────────────────────────── */
+
+.bn-wizard__header {
+	display: grid;
+	grid-template-columns: auto 1fr auto;
+	align-items: center;
+	gap: var(--bn-s4);
+	padding: var(--bn-s4) var(--bn-s5);
+	border-bottom: 1px solid var(--bn-line);
+	background: var(--bn-surface);
+}
+.bn-wizard__logo {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	font-weight: var(--bn-fw-semibold);
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink);
+}
+.bn-wizard__logo svg { color: var(--bn-accent); flex-shrink: 0; }
+.bn-wizard__progress {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	min-width: 0;
+	max-width: 260px;
+	margin: 0 auto;
+	width: 100%;
+}
+.bn-wizard__progress-text {
+	font-family: var(--bn-font-mono, var(--bn-font-ui));
+	font-size: 11px;
+	font-weight: var(--bn-fw-semibold);
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--bn-ink-3);
+	text-align: center;
+}
+.bn-wizard__progress-bar {
+	display: block;
+	height: 4px;
+	background: var(--bn-sunken);
+	border-radius: 999px;
+	overflow: hidden;
+}
+.bn-wizard__progress-fill {
+	display: block;
+	height: 100%;
+	background: var(--bn-accent);
+	border-radius: 999px;
+	transition: width var(--bn-dur) var(--bn-ease);
+}
+.bn-wizard__exit {
+	appearance: none;
+	background: transparent;
+	border: 0;
+	padding: 8px 10px;
+	font: inherit;
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+	cursor: pointer;
+	border-radius: var(--bn-r-sm);
+	transition: color var(--bn-dur-fast) var(--bn-ease), background var(--bn-dur-fast) var(--bn-ease);
+}
+.bn-wizard__exit:hover,
+.bn-wizard__exit:focus-visible {
+	color: var(--bn-ink);
+	background: var(--bn-sunken);
+	outline: 2px solid transparent;
+	outline-offset: 2px;
+}
+
+/* ── Step indicator row ──────────────────────────────────────────────── */
+
+.bn-wizard__steps {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	margin: 0;
+	padding: var(--bn-s4) var(--bn-s5);
+	list-style: none;
+	background: var(--bn-sunken);
+	border-bottom: 1px solid var(--bn-line);
+	overflow-x: auto;
+	-webkit-overflow-scrolling: touch;
+	scrollbar-width: none;
+}
+.bn-wizard__steps::-webkit-scrollbar { display: none; }
+.bn-wizard__step {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	flex-shrink: 0;
+	font-size: var(--bn-text-xs);
+	font-weight: 500;
+	color: var(--bn-ink-3);
+}
+.bn-wizard__step + .bn-wizard__step::before {
+	content: '';
+	display: block;
+	width: 14px;
+	height: 1px;
+	background: var(--bn-line);
+	margin-inline-end: 6px;
+}
+.bn-wizard__step-marker {
+	width: 22px;
+	height: 22px;
+	border-radius: 50%;
+	background: var(--bn-surface);
+	border: 1px solid var(--bn-line);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 11px;
+	font-weight: var(--bn-fw-semibold);
+	color: var(--bn-ink-3);
+	flex-shrink: 0;
+}
+.bn-wizard__step-marker .bn-icon { width: 12px; height: 12px; display: block; }
+.bn-wizard__step[data-state="done"] .bn-wizard__step-marker {
+	background: var(--bn-accent);
+	border-color: var(--bn-accent);
+	color: var(--bn-accent-fg, #fff);
+}
+.bn-wizard__step[data-state="active"] .bn-wizard__step-marker {
+	background: var(--bn-surface);
+	border-color: var(--bn-accent);
+	color: var(--bn-accent);
+	box-shadow: 0 0 0 3px color-mix(in oklch, var(--bn-accent) 18%, transparent);
+}
+.bn-wizard__step[data-state="active"] {
+	color: var(--bn-ink);
+	font-weight: var(--bn-fw-semibold);
+}
+.bn-wizard__step[data-state="done"] { color: var(--bn-ink-2); }
+
+/* ── Body / form ─────────────────────────────────────────────────────── */
+
+.bn-wizard__body {
+	padding: var(--bn-s6) var(--bn-s5) var(--bn-s5);
+}
+.bn-wizard__form {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s5);
+}
+
+/* Step head — title, sub, reassurance pill */
+.bn-wizard__head {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s2);
+}
+.bn-wizard__title {
+	font-family: var(--bn-font-display, var(--bn-font-ui));
+	font-size: clamp(22px, 2.6vw, 28px);
+	font-weight: 700;
+	letter-spacing: -0.02em;
+	line-height: 1.2;
+	color: var(--bn-ink);
+	margin: 0;
+}
+.bn-wizard__sub {
+	font-size: var(--bn-text-base);
+	color: var(--bn-ink-2);
+	margin: 0;
+	max-width: 60ch;
+}
+.bn-wizard__reassure {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	margin: var(--bn-s2) 0 0;
+	padding: 6px 12px;
+	background: var(--bn-sunken);
+	border: 1px solid var(--bn-line);
+	border-radius: 999px;
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-2);
+	width: fit-content;
+}
+.bn-wizard__reassure .bn-icon {
+	width: 14px;
+	height: 14px;
+	color: var(--bn-ink-3);
+	flex-shrink: 0;
+}
+
+/* ── Fields (text input, etc.) ───────────────────────────────────────── */
+
+.bn-wizard__fields {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s4);
+}
+.bn-wizard__field {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+.bn-wizard__label {
+	font-size: var(--bn-text-sm);
+	font-weight: var(--bn-fw-semibold);
+	color: var(--bn-ink);
+}
+.bn-wizard__hint {
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+	margin: 4px 0 0;
+	line-height: 1.45;
+}
+.bn-wizard__input {
+	width: 100%;
+	min-height: 44px;
+	padding: 10px var(--bn-s3);
+	background: var(--bn-surface);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-md);
+	color: var(--bn-ink);
+	font: inherit;
+	font-size: var(--bn-text-base);
+	box-shadow: none;
+	transition: border-color var(--bn-dur) var(--bn-ease), box-shadow var(--bn-dur) var(--bn-ease);
+}
+.bn-wizard__input:focus {
+	outline: 2px solid transparent;
+	outline-offset: 2px;
+	border-color: var(--bn-accent);
+	box-shadow: 0 0 0 3px color-mix(in oklch, var(--bn-accent) 18%, transparent);
+}
+
+/* ── Colour picker ───────────────────────────────────────────────────── */
+
+.bn-wizard__color {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s3);
+}
+.bn-wizard__swatch {
+	position: relative;
+	width: 44px;
+	height: 44px;
+	border-radius: var(--bn-r-md);
+	border: 1px solid var(--bn-line);
+	overflow: hidden;
+	cursor: pointer;
+	flex-shrink: 0;
+	background: var(--bn-wiz-color, var(--bn-accent));
+	transition: border-color var(--bn-dur) var(--bn-ease), box-shadow var(--bn-dur) var(--bn-ease);
+}
+.bn-wizard__swatch:hover { border-color: var(--bn-accent); }
+.bn-wizard__swatch:focus-within {
+	border-color: var(--bn-accent);
+	box-shadow: 0 0 0 3px color-mix(in oklch, var(--bn-accent) 22%, transparent);
+}
+.bn-wizard__swatch-fill {
+	position: absolute;
+	inset: 0;
+	background: var(--bn-wiz-color, var(--bn-accent));
+	border-radius: inherit;
+	pointer-events: none;
+}
+.bn-wizard__swatch-input {
+	position: absolute;
+	inset: 0;
+	opacity: 0;
+	width: 100%;
+	height: 100%;
+	border: 0;
+	padding: 0;
+	cursor: pointer;
+}
+.bn-wizard__swatch-value {
+	font-family: var(--bn-font-mono, var(--bn-font-ui));
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink-2);
+	background: var(--bn-sunken);
+	padding: 4px 10px;
+	border-radius: var(--bn-r-sm);
+	letter-spacing: 0.04em;
+}
+
+/* ── Options (radio + check rows, shared) ────────────────────────────── */
+
+.bn-wizard__options {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s2);
+	margin: 0;
+	padding: 0;
+	border: 0;
+	list-style: none;
+}
+.bn-wizard__legend {
+	font-size: var(--bn-text-sm);
+	font-weight: var(--bn-fw-semibold);
+	color: var(--bn-ink);
+	margin-bottom: var(--bn-s2);
+	padding: 0;
+}
+.bn-wizard__option-row { list-style: none; }
+
+.bn-wizard__option {
+	display: grid;
+	grid-template-columns: 36px 1fr auto;
+	align-items: center;
+	gap: var(--bn-s3);
+	min-height: 56px;
+	padding: var(--bn-s3) var(--bn-s4);
+	background: var(--bn-surface);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-md);
+	cursor: pointer;
+	transition:
+		border-color var(--bn-dur-fast) var(--bn-ease),
+		background var(--bn-dur-fast) var(--bn-ease),
+		opacity var(--bn-dur-fast) var(--bn-ease);
+}
+.bn-wizard__option:hover { border-color: var(--bn-line-strong); }
+.bn-wizard__option:focus-within {
+	border-color: var(--bn-accent);
+	box-shadow: 0 0 0 3px color-mix(in oklch, var(--bn-accent) 18%, transparent);
+}
+.bn-wizard__option[data-selected="true"] {
+	border-color: var(--bn-accent);
+	background: var(--bn-surface);
+}
+.bn-wizard__option[data-selected="false"] { opacity: 0.6; }
+.bn-wizard__option[data-selected="false"]:hover { opacity: 0.9; }
+/* The real input is suppressed; .bn-wizard__option-mark is the only indicator.
+   The selector has to carry the type, not just the class: wp-admin's forms.css styles
+   `input[type="checkbox"]` (specificity 0,1,1) and `input[type="checkbox"]:disabled`
+   (0,2,1), and BOTH out-specify a bare `.bn-wizard__option-input` (0,1,0). Core
+   therefore won the width/height back to its own 16px box, and on a DISABLED input it
+   won the opacity too (core sets .7), so every already-created page in the Pages step
+   painted the native checkbox NEXT TO the custom mark: two checkboxes per row. Anchoring
+   the rule on the type selector puts it back above core. */
+.bn-wizard input[type="checkbox"].bn-wizard__option-input,
+.bn-wizard input[type="radio"].bn-wizard__option-input {
+	position: absolute;
+	opacity: 0;
+	width: 1px;
+	height: 1px;
+	min-width: 0;
+	min-height: 0;
+	margin: 0;
+	padding: 0;
+	border: 0;
+	box-shadow: none;
+	pointer-events: none;
+	-webkit-appearance: none;
+	appearance: none;
+}
+.bn-wizard__option-icon {
+	width: 36px;
+	height: 36px;
+	border-radius: var(--bn-r-sm);
+	background: var(--bn-sunken);
+	color: var(--bn-ink-2);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+	transition: color var(--bn-dur-fast) var(--bn-ease);
+}
+.bn-wizard__option-icon .bn-icon { width: 18px; height: 18px; }
+.bn-wizard__option[data-selected="true"] .bn-wizard__option-icon {
+	color: var(--bn-ink);
+}
+.bn-wizard__option-text {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+}
+.bn-wizard__option-title {
+	font-size: var(--bn-text-sm);
+	font-weight: var(--bn-fw-semibold);
+	color: var(--bn-ink);
+	line-height: 1.3;
+}
+.bn-wizard__option-desc {
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+	line-height: 1.45;
+}
+.bn-wizard__option-mark {
+	width: 22px;
+	height: 22px;
+	border-radius: 50%;
+	border: 1.5px solid var(--bn-line);
+	background: var(--bn-surface);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+	color: transparent;
+	transition: all var(--bn-dur-fast) var(--bn-ease);
+}
+.bn-wizard__option-mark .bn-icon { width: 12px; height: 12px; }
+.bn-wizard__option[data-selected="true"] .bn-wizard__option-mark {
+	background: var(--bn-accent);
+	border-color: var(--bn-accent);
+	color: var(--bn-accent-fg, #fff);
+}
+/* Pages list uses <li.bn-wizard__page> (no [data-selected] state); the mark's
+   filled state keys off the sibling checkbox so there is exactly one indicator. */
+.bn-wizard__page-check input:checked + .bn-wizard__option-mark {
+	background: var(--bn-accent);
+	border-color: var(--bn-accent);
+	color: var(--bn-accent-fg, #fff);
+}
+/* Square mark for checkboxes (preset list), circle for radios */
+.bn-wizard__options[data-variant="check"] .bn-wizard__option-mark { border-radius: 6px; }
+
+/* ── Bulk select row (above option list) ─────────────────────────────── */
+
+.bn-wizard__bulk {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	margin: 0 0 calc(var(--bn-s2) * -1);
+	font-size: var(--bn-text-xs);
+}
+.bn-wizard__bulk-btn {
+	appearance: none;
+	background: transparent;
+	border: 0;
+	padding: 4px 2px;
+	font: inherit;
+	font-size: var(--bn-text-xs);
+	font-weight: var(--bn-fw-semibold);
+	color: var(--bn-accent);
+	cursor: pointer;
+	border-radius: 4px;
+}
+.bn-wizard__bulk-btn:hover { text-decoration: underline; }
+.bn-wizard__bulk-btn:focus-visible {
+	outline: 2px solid color-mix(in oklch, var(--bn-accent) 50%, transparent);
+	outline-offset: 2px;
+}
+.bn-wizard__bulk-sep { color: var(--bn-ink-4); }
+
+/* ── Switches (toggle list) ──────────────────────────────────────────── */
+
+.bn-wizard__switches {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s2);
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+.bn-wizard__switches > li { list-style: none; }
+
+.bn-wizard__switch {
+	display: grid;
+	grid-template-columns: 1fr auto;
+	align-items: center;
+	gap: var(--bn-s3);
+	min-height: 56px;
+	padding: var(--bn-s3) var(--bn-s4);
+	background: var(--bn-surface);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-md);
+	cursor: pointer;
+	transition: border-color var(--bn-dur-fast) var(--bn-ease);
+}
+.bn-wizard__switch:hover { border-color: color-mix(in oklch, var(--bn-accent) 50%, var(--bn-line)); }
+.bn-wizard__switch:focus-within {
+	border-color: var(--bn-accent);
+	box-shadow: 0 0 0 3px color-mix(in oklch, var(--bn-accent) 18%, transparent);
+}
+.bn-wizard__switch-text {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+}
+.bn-wizard__switch-title {
+	font-size: var(--bn-text-sm);
+	font-weight: var(--bn-fw-semibold);
+	color: var(--bn-ink);
+	line-height: 1.3;
+}
+.bn-wizard__switch-desc {
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+	line-height: 1.45;
+}
+.bn-wizard__switch-input {
+	position: absolute;
+	opacity: 0;
+	width: 1px;
+	height: 1px;
+	pointer-events: none;
+}
+.bn-wizard__switch-track {
+	position: relative;
+	width: 40px;
+	height: 24px;
+	background: var(--bn-sunken);
+	border: 1px solid var(--bn-line);
+	border-radius: 999px;
+	flex-shrink: 0;
+	transition: background var(--bn-dur) var(--bn-ease), border-color var(--bn-dur) var(--bn-ease);
+}
+.bn-wizard__switch-track::after {
+	content: '';
+	position: absolute;
+	top: 2px;
+	inset-inline-start: 2px;
+	width: 18px;
+	height: 18px;
+	background: var(--bn-surface);
+	border-radius: 50%;
+	box-shadow: 0 1px 3px color-mix(in oklch, var(--bn-ink) 22%, transparent);
+	transition: transform var(--bn-dur) var(--bn-ease);
+}
+.bn-wizard__switch-input:checked ~ .bn-wizard__switch-track {
+	background: var(--bn-accent);
+	border-color: var(--bn-accent);
+}
+.bn-wizard__switch-input:checked ~ .bn-wizard__switch-track::after { transform: translateX(var(--bn-toggle-travel, 16px)); }
+[dir="rtl"] .bn-wizard__switch-input:checked ~ .bn-wizard__switch-track::after { transform: translateX(calc(-1 * var(--bn-toggle-travel, 16px))); }
+
+/* ── Pages list ──────────────────────────────────────────────────────── */
+
+.bn-wizard__pages {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s2);
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+.bn-wizard__page {
+	display: grid;
+	grid-template-columns: 28px 1fr auto;
+	align-items: center;
+	gap: var(--bn-s3);
+	padding: var(--bn-s3) var(--bn-s4);
+	background: var(--bn-surface);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-md);
+	list-style: none;
+}
+.bn-wizard__page[data-state="created"] {
+	background: color-mix(in oklch, oklch(60% 0.16 155) 5%, var(--bn-surface));
+	border-color: color-mix(in oklch, oklch(60% 0.16 155) 30%, var(--bn-line));
+}
+.bn-wizard__page-check {
+	position: relative;
+	width: 22px;
+	height: 22px;
+	cursor: pointer;
+}
+.bn-wizard__page-info {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+}
+.bn-wizard__page-title {
+	font-size: var(--bn-text-sm);
+	font-weight: var(--bn-fw-semibold);
+	color: var(--bn-ink);
+}
+.bn-wizard__page-desc {
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+	line-height: 1.45;
+}
+.bn-wizard__page-slug {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	flex-shrink: 0;
+}
+.bn-wizard__page-link {
+	font-family: var(--bn-font-mono, var(--bn-font-ui));
+	font-size: var(--bn-text-xs);
+	color: var(--bn-accent);
+	text-decoration: none;
+}
+.bn-wizard__page-link:hover { text-decoration: underline; }
+.bn-wizard__page-badge {
+	font-size: 10px;
+	font-weight: var(--bn-fw-semibold);
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	padding: 3px 8px;
+	border-radius: 999px;
+	background: color-mix(in oklch, oklch(60% 0.16 155) 18%, var(--bn-surface));
+	color: oklch(38% 0.16 155);
+}
+.bn-wizard__slug {
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
+	background: var(--bn-sunken);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-sm);
+	padding: 2px 6px;
+}
+.bn-wizard__slug-sep {
+	font-family: var(--bn-font-mono, var(--bn-font-ui));
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+}
+.bn-wizard__slug-input {
+	width: 11ch;
+	border: 0;
+	background: transparent;
+	font: inherit;
+	font-family: var(--bn-font-mono, var(--bn-font-ui));
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink);
+	padding: 4px 2px;
+	box-shadow: none;
+}
+.bn-wizard__slug-input:focus {
+	outline: 2px solid transparent;
+	outline-offset: 2px;
+	background: var(--bn-surface);
+	border-radius: 3px;
+}
+
+/* ── Addons list ─────────────────────────────────────────────────────── */
+
+.bn-wizard__addons {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s2);
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+.bn-wizard__addon {
+	display: grid;
+	grid-template-columns: auto 1fr auto;
+	align-items: center;
+	gap: var(--bn-s3);
+	padding: var(--bn-s3) var(--bn-s4);
+	background: var(--bn-surface);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-md);
+	list-style: none;
+}
+/* Companion install step: pre-checked rows that install + activate on Continue. */
+.bn-wizard__addon-check {
+	width: 16px;
+	height: 16px;
+	margin: 0;
+	flex-shrink: 0;
+	accent-color: var(--bn-accent, var(--brand));
+	cursor: pointer;
+}
+.bn-wizard__addon-info { cursor: default; }
+label.bn-wizard__addon-info[for] { cursor: pointer; }
+.bn-wizard__addon-msg { font-size: var(--bn-text-xs); color: oklch(50% 0.2 28); margin-top: 2px; }
+.bn-wizard__addon-msg:empty { display: none; }
+
+/* Per-row Retry for a failed companion install. */
+.bn-wizard__addon-retry {
+	margin-inline-start: var(--bn-s2);
+	padding: 2px var(--bn-s2);
+	font-size: var(--bn-text-xs);
+	color: var(--bn-accent);
+	background: transparent;
+	border: 1px solid var(--bn-accent);
+	border-radius: var(--bn-r-sm);
+	cursor: pointer;
+}
+
+.bn-wizard__addon-retry:hover {
+	background: color-mix(in oklch, var(--bn-accent) 12%, transparent);
+}
+.bn-wizard__addon[data-state="failed"] .bn-wizard__addon-status {
+	background: color-mix(in oklch, oklch(58% 0.2 28) 16%, var(--bn-surface));
+	color: oklch(45% 0.2 28);
+}
+.bn-wizard__addon-dot {
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	background: var(--bn-line);
+	flex-shrink: 0;
+}
+.bn-wizard__addon[data-state="active"] .bn-wizard__addon-dot {
+	background: oklch(60% 0.16 155);
+	box-shadow: 0 0 0 3px color-mix(in oklch, oklch(60% 0.16 155) 24%, transparent);
+}
+.bn-wizard__addon-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.bn-wizard__addon-name {
+	font-size: var(--bn-text-sm);
+	font-weight: var(--bn-fw-semibold);
+	color: var(--bn-ink);
+}
+.bn-wizard__addon-desc {
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+	line-height: 1.45;
+}
+.bn-wizard__addon-status {
+	font-size: 10px;
+	font-weight: var(--bn-fw-semibold);
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	padding: 3px 8px;
+	border-radius: 999px;
+	color: var(--bn-ink-3);
+	background: var(--bn-sunken);
+}
+.bn-wizard__addon[data-state="active"] .bn-wizard__addon-status {
+	background: color-mix(in oklch, oklch(60% 0.16 155) 18%, var(--bn-surface));
+	color: oklch(38% 0.16 155);
+}
+
+/* ── Footer (back · skip · continue) ─────────────────────────────────── */
+
+.bn-wizard__footer {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--bn-s3);
+	padding-top: var(--bn-s5);
+	margin-top: var(--bn-s3);
+	border-top: 1px solid var(--bn-line);
+}
+.bn-wizard__footer-left,
+.bn-wizard__footer-right {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-s2);
+}
+.bn-wizard__btn-back,
+.bn-wizard__btn-skip,
+.bn-wizard__btn-continue,
+.bn-wizard__btn-secondary {
+	appearance: none;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	min-height: 44px;
+	padding: 0 var(--bn-s4);
+	font: inherit;
+	font-size: var(--bn-text-sm);
+	font-weight: var(--bn-fw-semibold);
+	border: 1px solid transparent;
+	border-radius: var(--bn-r-md);
+	cursor: pointer;
+	background: transparent;
+	color: var(--bn-ink-2);
+	text-decoration: none;
+	line-height: 1;
+	transition: all var(--bn-dur-fast) var(--bn-ease);
+}
+.bn-wizard__btn-back .bn-icon,
+.bn-wizard__btn-continue .bn-icon { width: 16px; height: 16px; }
+.bn-wizard__btn-back:hover,
+.bn-wizard__btn-skip:hover {
+	background: var(--bn-sunken);
+	color: var(--bn-ink);
+}
+.bn-wizard__btn-continue {
+	background: var(--bn-accent);
+	color: var(--bn-accent-fg, #fff);
+	border-color: var(--bn-accent);
+	box-shadow: 0 1px 2px color-mix(in oklch, var(--bn-ink) 12%, transparent);
+}
+.bn-wizard__btn-continue:hover {
+	background: color-mix(in oklch, var(--bn-accent) 88%, black);
+	border-color: color-mix(in oklch, var(--bn-accent) 88%, black);
+}
+.bn-wizard__btn-continue:focus-visible,
+.bn-wizard__btn-back:focus-visible,
+.bn-wizard__btn-skip:focus-visible,
+.bn-wizard__btn-secondary:focus-visible {
+	outline: 2px solid transparent;
+	outline-offset: 2px;
+	box-shadow: 0 0 0 3px color-mix(in oklch, var(--bn-accent) 35%, transparent);
+}
+.bn-wizard__btn-secondary {
+	background: var(--bn-surface);
+	color: var(--bn-ink);
+	border-color: var(--bn-line);
+}
+.bn-wizard__btn-secondary:hover { border-color: var(--bn-accent); color: var(--bn-accent); }
+
+/* ── Done step ───────────────────────────────────────────────────────── */
+
+.bn-wizard__done {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	text-align: center;
+	gap: var(--bn-s3);
+	padding: var(--bn-s5) 0;
+}
+.bn-wizard__done-icon {
+	width: 72px;
+	height: 72px;
+	border-radius: 50%;
+	background: var(--bn-sunken);
+	color: var(--bn-accent);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	margin-bottom: var(--bn-s2);
+}
+.bn-wizard__done-icon .bn-icon { width: 32px; height: 32px; }
+.bn-wizard__title--done {
+	font-size: clamp(24px, 3vw, 32px);
+}
+.bn-wizard__done-actions {
+	display: inline-flex;
+	gap: var(--bn-s3);
+	margin-top: var(--bn-s3);
+	flex-wrap: wrap;
+	justify-content: center;
+}
+
+/* Opt-in sample-content panel on the final step. */
+.bn-wizard__sample {
+	margin: var(--bn-s4) auto 0;
+	max-width: 34rem;
+	padding: var(--bn-s3);
+	border: 1px solid var(--bn-border, var(--bn-line));
+	border-radius: var(--bn-r-md);
+	background: var(--bn-surface-2, var(--bn-canvas));
+}
+
+.bn-wizard__sample-note {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: var(--bn-s2);
+	margin: 0 0 var(--bn-s3);
+	color: var(--bn-ink-2);
+	font-size: var(--bn-text-sm);
+}
+
+.bn-wizard__sample-note:last-child {
+	margin-bottom: 0;
+}
+
+.bn-wizard__sample form {
+	display: flex;
+	justify-content: center;
+	margin: 0;
+}
+
+/* ── Mobile ──────────────────────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+	.bn-wizard-wrap { padding: var(--bn-s3) var(--bn-s2); margin: 0; }
+	.bn-wizard { border-radius: var(--bn-r-md); }
+	.bn-wizard__header {
+		grid-template-columns: 1fr auto;
+		padding: var(--bn-s3) var(--bn-s4);
+	}
+	.bn-wizard__progress {
+		grid-column: 1 / -1;
+		grid-row: 2;
+		max-width: 100%;
+	}
+	.bn-wizard__body { padding: var(--bn-s4) var(--bn-s4) var(--bn-s4); }
+	.bn-wizard__option {
+		grid-template-columns: 32px 1fr auto;
+		min-height: 60px;
+		padding: var(--bn-s3);
+	}
+	.bn-wizard__option-icon { width: 32px; height: 32px; }
+	.bn-wizard__page {
+		grid-template-columns: 22px 1fr;
+		gap: var(--bn-s2);
+	}
+	.bn-wizard__page-slug {
+		grid-column: 1 / -1;
+		padding-inline-start: 30px;
+	}
+	.bn-wizard__footer {
+		flex-direction: column-reverse;
+		align-items: stretch;
+		gap: var(--bn-s2);
+	}
+	.bn-wizard__footer-left,
+	.bn-wizard__footer-right {
+		width: 100%;
+		justify-content: space-between;
+	}
+	.bn-wizard__btn-continue { flex: 1; }
+}
+
+/* ── Reduced motion ──────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+	.bn-wizard *,
+	.bn-wizard *::before,
+	.bn-wizard *::after { transition: none !important; }
+}

@@ -1,0 +1,217 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "wbcom-essential/stats-counter",
+  "version": "1.0.0",
+  "title": "Stats Counter",
+  "category": "essential-design",
+  "icon": "chart-bar",
+  "description": "Animated count-up numbers that trigger on scroll. Display up to 6 stats in a responsive grid.",
+  "keywords": [
+    "stats",
+    "counter",
+    "numbers",
+    "animated",
+    "count",
+    "facts",
+    "essential",
+    "wbcom"
+  ],
+  "textdomain": "wbcom-essential",
+  "example": {
+    "attributes": {
+      "columns": 4,
+      "stats": [
+        {
+          "number": 1500,
+          "prefix": "",
+          "suffix": "+",
+          "label": "Happy Clients"
+        },
+        {
+          "number": 200,
+          "prefix": "",
+          "suffix": "+",
+          "label": "Projects Done"
+        },
+        {
+          "number": 99,
+          "prefix": "",
+          "suffix": "%",
+          "label": "Satisfaction"
+        },
+        {
+          "number": 24,
+          "prefix": "",
+          "suffix": "/7",
+          "label": "Support"
+        }
+      ]
+    }
+  },
+  "attributes": {
+    "uniqueId": {
+      "type": "string",
+      "default": ""
+    },
+    "columns": {
+      "type": "number",
+      "default": 4
+    },
+    "stats": {
+      "type": "array",
+      "default": [
+        {
+          "number": 1500,
+          "prefix": "",
+          "suffix": "+",
+          "label": "Happy Clients"
+        },
+        {
+          "number": 200,
+          "prefix": "",
+          "suffix": "+",
+          "label": "Projects Done"
+        },
+        {
+          "number": 99,
+          "prefix": "",
+          "suffix": "%",
+          "label": "Satisfaction"
+        },
+        {
+          "number": 24,
+          "prefix": "",
+          "suffix": "/7",
+          "label": "Support"
+        }
+      ]
+    },
+    "duration": {
+      "type": "number",
+      "default": 2000
+    },
+    "numberColor": {
+      "type": "string",
+      "default": "#1e1e2e"
+    },
+    "labelColor": {
+      "type": "string",
+      "default": "#6c757d"
+    },
+    "separatorColor": {
+      "type": "string",
+      "default": "#e9ecef"
+    },
+    "padding": {
+      "type": "object",
+      "default": {
+        "top": 40,
+        "right": 24,
+        "bottom": 40,
+        "left": 24
+      }
+    },
+    "paddingTablet": {
+      "type": "object",
+      "default": null
+    },
+    "paddingMobile": {
+      "type": "object",
+      "default": null
+    },
+    "paddingUnit": {
+      "type": "string",
+      "default": "px"
+    },
+    "margin": {
+      "type": "object",
+      "default": {
+        "top": 0,
+        "right": 0,
+        "bottom": 0,
+        "left": 0
+      }
+    },
+    "marginTablet": {
+      "type": "object",
+      "default": null
+    },
+    "marginMobile": {
+      "type": "object",
+      "default": null
+    },
+    "marginUnit": {
+      "type": "string",
+      "default": "px"
+    },
+    "boxShadow": {
+      "type": "boolean",
+      "default": false
+    },
+    "shadowHorizontal": {
+      "type": "number",
+      "default": 0
+    },
+    "shadowVertical": {
+      "type": "number",
+      "default": 4
+    },
+    "shadowBlur": {
+      "type": "number",
+      "default": 8
+    },
+    "shadowSpread": {
+      "type": "number",
+      "default": 0
+    },
+    "shadowColor": {
+      "type": "string",
+      "default": "rgba(0, 0, 0, 0.12)"
+    },
+    "borderRadius": {
+      "type": "object",
+      "default": {
+        "top": 0,
+        "right": 0,
+        "bottom": 0,
+        "left": 0
+      }
+    },
+    "borderRadiusUnit": {
+      "type": "string",
+      "default": "px"
+    },
+    "hideOnDesktop": {
+      "type": "boolean",
+      "default": false
+    },
+    "hideOnTablet": {
+      "type": "boolean",
+      "default": false
+    },
+    "hideOnMobile": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "supports": {
+    "html": false,
+    "align": [
+      "wide",
+      "full"
+    ],
+    "color": {
+      "background": true,
+      "text": true
+    },
+    "spacing": {
+      "margin": true,
+      "padding": true
+    }
+  },
+  "editorScript": "file:./index.js",
+  "editorStyle": "file:./index.css",
+  "style": "file:./style-index.css",
+  "viewScript": "file:./view.js"
+}

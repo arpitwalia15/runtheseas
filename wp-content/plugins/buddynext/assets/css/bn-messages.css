@@ -1,0 +1,2262 @@
+/* BuddyNext — Messages CSS (v2-aligned).
+ *
+ * Covers the DM hub (list.php) + the full split-pane thread view (thread.php).
+ * Visual canon: docs/v2 Plans/v2/dm-list.html + docs/v2 Plans/v2/dm-thread.html
+ *
+ * Primitives consumed:
+ *   .bn-split + .bn-split__rail + .bn-split__pane  (two-pane shell)
+ *   .bn-card                                       (chrome + reply preview)
+ *   .bn-btn[data-variant][data-size]               (every interactive button)
+ *   .bn-input / .bn-textarea                       (search + composer)
+ *   .bn-badge[data-tone="accent|warn|danger"]      (unread, dependency, requests)
+ *   .bn-avatar[data-size][data-presence]           (every avatar)
+ *   .bn-modal-backdrop + .bn-modal__panel          (delete-confirm)
+ *   .bn-tooltip-trigger + .bn-tooltip[data-pos]    (icon-only buttons)
+ *
+ * This file is theme-agnostic — every value reads from a `--bn-*` token, no
+ * hex, no px outside calc() math, no font-family literals.
+ *
+ * Legacy bridge layer (.bn-msg-shell, .bn-msg-sidebar, .bn-msg-thread, .bn-msg-empty)
+ * is still consumed by WPMediaVerseBridge::render_messages() and is kept at the
+ * bottom in a clearly-fenced section until the bridge itself migrates to .bn-split.
+ */
+
+/* ── DM card chrome ──────────────────────────────────────────────────────── */
+.bn-dm-shell {
+	width: 100%;
+}
+
+/*
+ * The messages two-pane. The markup is `.bn-split.bn-dm`, so the override must
+ * target that exact pair — NOT `.bn-dm-split` (no element ever carries it). The
+ * generic .bn-split grid is `var(--bn-railw) 1fr`, which ties the conversation
+ * rail to the shell nav-rail width (72px when the left nav is collapsed); a DM
+ * rail must be a fixed, readable width of its own.
+ */
+.bn-split.bn-dm {
+	flex: 1;
+	/*
+	 * Anchor the two-pane to the viewport so the rail list and thread body
+	 * scroll INTERNALLY and the composer / "New message" footer stay in view —
+	 * a real messenger, no whole-page scroll. The plugin renders inside the
+	 * active theme's chrome (admin bar + theme header), whose combined height
+	 * varies, so `--bn-msg-chrome` is measured per-load by callbacks.fitViewport
+	 * (messages store) and supplied as the exact top offset. The 200px fallback
+	 * only applies for the brief moment before hydration.
+	 */
+	height: calc(100dvh - var(--bn-msg-chrome, 200px));
+	overflow: hidden;
+	min-height: 480px;
+	border: 0;
+	border-radius: 0;
+	background: transparent;
+	grid-template-columns: 320px minmax(0, 1fr);
+	gap: 0;
+}
+
+/*
+ * Thread pane fills its column and lays its children out as a flex column so
+ * the header + composer stay fixed while the message log (.bn-dm-pane__body,
+ * flex:1) takes the remaining space and scrolls. Without this the inner wrapper
+ * is a plain block, the log collapses to content height, and the composer
+ * floats mid-pane instead of sitting at the bottom.
+ */
+.bn-dm-thread {
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+}
+
+.bn-dm-thread__inner {
+	display: flex;
+	flex-direction: column;
+	flex: 1;
+	min-height: 0;
+}
+
+/*
+ * No-conversation / blocked empty state. The thread column is the full-width
+ * 1fr pane, so without this the placeholder sits top-left and the large (and
+ * correct) column reads as broken empty whitespace. Fill the pane and centre
+ * the placeholder the way every messenger shows "Select a conversation".
+ */
+.bn-dm-empty {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: var(--bn-s2);
+	padding: var(--bn-s6);
+	text-align: center;
+	color: var(--bn-ink-2);
+}
+
+.bn-dm-empty__icon svg {
+	width: 40px;
+	height: 40px;
+	opacity: 0.55;
+}
+
+.bn-dm-empty__title {
+	margin: 0;
+}
+
+.bn-dm-empty__body {
+	margin: 0;
+	color: var(--bn-ink-2);
+}
+
+/* ── Conversation rail ────────────────────────────────────────────────────── */
+.bn-dm-rail {
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+	background: var(--bn-surface);
+}
+
+/*
+ * Rail flex discipline — the chrome holds its size, only the list flexes.
+ *
+ * The thread pane already works this way (.bn-dm-composer is flex-shrink: 0 and
+ * .bn-dm-pane__body is flex: 1 + overflow-y: auto); the rail was never given the
+ * same treatment, so under height pressure the browser was free to shrink the
+ * header, search, tab strip and footer instead of the one region designed to
+ * scroll. .bn-dm-rail__tabs is the worst affected because .bn-tabs sets overflow
+ * for horizontal tab scrolling, and a flex item whose overflow is not `visible`
+ * loses the automatic min-height floor — so it can shrink to 1px and leave its
+ * border-bottom rendering as a stray hairline with its 44px tabs spilling out.
+ *
+ * Naming the four chrome rows explicitly (rather than a blanket `> *`) keeps
+ * .bn-dm-rail__list free to be the single flexible, scrolling child.
+ */
+.bn-dm-rail__head,
+.bn-dm-rail__search,
+.bn-dm-rail__tabs,
+.bn-dm-rail__foot {
+	flex-shrink: 0;
+}
+
+.bn-dm-rail__head {
+	/* Group the "Messages" heading and its unread count together on the left
+	   instead of inheriting .bn-split__rail-head's space-between, which shoved
+	   the badge to the far edge and left a dead gap across the header. */
+	justify-content: flex-start;
+	gap: var(--bn-s2);
+}
+
+.bn-dm-rail__search {
+	/* Top padding gives the field breathing room from the header separator above
+	   it (was 0, so the input touched the divider). */
+	padding: var(--bn-s4) var(--bn-s4) var(--bn-s3);
+}
+
+.bn-dm-rail__tabs {
+	padding-inline: var(--bn-s4);
+	border-bottom: 1px solid var(--bn-line-faint);
+}
+
+.bn-dm-rail__tabs .bn-tab {
+	gap: var(--bn-s2);
+}
+
+.bn-dm-rail__list {
+	flex: 1;
+	overflow-y: auto;
+	padding: var(--bn-s2) 0;
+	min-height: 0;
+}
+
+.bn-dm-rail__section {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	padding: var(--bn-s3) var(--bn-s4) var(--bn-s2);
+	font-family: var(--bn-font-mono);
+	font-size: var(--bn-text-2xs);
+	font-weight: var(--bn-fw-semibold);
+	letter-spacing: var(--bn-ls-wider);
+	text-transform: uppercase;
+	color: var(--bn-ink-4);
+}
+
+.bn-dm-rail__section-icon {
+	display: inline-flex;
+	width: var(--bn-s3);
+	height: var(--bn-s3);
+	color: var(--bn-ink-4);
+}
+
+.bn-dm-rail__section-icon svg {
+	width: 100%;
+	height: 100%;
+}
+
+.bn-dm-rail__item {
+	display: grid;
+	grid-template-columns: auto 1fr auto;
+	align-items: center;
+	gap: var(--bn-s3);
+	padding: var(--bn-s3) var(--bn-s4);
+	text-decoration: none;
+	color: inherit;
+	border-bottom: 1px solid var(--bn-line-faint);
+}
+
+.bn-dm-rail__item.is-unread {
+	background: color-mix(in oklch, var(--bn-accent) 4%, transparent);
+}
+
+.bn-dm-rail__item-info {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+}
+
+.bn-dm-rail__item-row {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: var(--bn-s2);
+	min-width: 0;
+}
+
+.bn-dm-rail__item-name {
+	font-size: var(--bn-text-sm);
+	font-weight: var(--bn-fw-semibold);
+	color: var(--bn-ink);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	min-width: 0;
+}
+
+.bn-dm-rail__item.is-unread .bn-dm-rail__item-name {
+	color: var(--bn-ink);
+}
+
+.bn-dm-rail__item-time {
+	font-family: var(--bn-font-mono);
+	font-size: var(--bn-text-2xs);
+	color: var(--bn-ink-4);
+	flex-shrink: 0;
+	letter-spacing: var(--bn-ls-wide);
+}
+
+.bn-dm-rail__item.is-unread .bn-dm-rail__item-time {
+	color: var(--bn-accent);
+	font-weight: var(--bn-fw-semibold);
+}
+
+.bn-dm-rail__item-preview {
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.bn-dm-rail__item.is-unread .bn-dm-rail__item-preview {
+	color: var(--bn-ink-2);
+	font-weight: var(--bn-fw-medium);
+}
+
+.bn-dm-rail__item-preview.is-typing {
+	color: var(--bn-accent);
+	font-style: italic;
+}
+
+.bn-dm-rail__item-meta {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s1);
+	flex-shrink: 0;
+	color: var(--bn-ink-4);
+}
+
+.bn-dm-rail__item-pin {
+	display: inline-flex;
+	width: var(--bn-s3);
+	height: var(--bn-s3);
+	color: var(--bn-ink-4);
+}
+
+.bn-dm-rail__item-pin svg {
+	width: 100%;
+	height: 100%;
+}
+
+.bn-dm-rail__empty {
+	padding: var(--bn-s6) var(--bn-s4);
+	text-align: center;
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink-3);
+}
+
+.bn-dm-rail__foot {
+	padding: var(--bn-s3) var(--bn-s4);
+	border-top: 1px solid var(--bn-line-faint);
+	background: var(--bn-surface);
+}
+
+.bn-dm-rail__foot .bn-btn {
+	width: 100%;
+	justify-content: center;
+}
+
+/* ── Avatar tone palette (8 stable hues derived from v2 palette) ─────────── */
+.bn-dm-avatar {
+	--bn-avatar-presence-border: var(--bn-surface);
+	flex-shrink: 0;
+}
+
+.bn-dm-avatar .bn-avatar__initials,
+.bn-dm-rail__item .bn-dm-avatar,
+.bn-dm-pane__identity .bn-dm-avatar {
+	color: var(--bn-accent-fg);
+	font-family: var(--bn-font-mono);
+	font-weight: var(--bn-fw-semibold);
+}
+
+.bn-dm-tone-1 .bn-avatar__initials,
+.bn-dm-tone-1.bn-avatar { background: oklch(58% var(--bn-chroma) 240); }
+
+.bn-dm-tone-2 .bn-avatar__initials,
+.bn-dm-tone-2.bn-avatar { background: oklch(58% var(--bn-chroma) 155); }
+
+.bn-dm-tone-3 .bn-avatar__initials,
+.bn-dm-tone-3.bn-avatar { background: oklch(58% var(--bn-chroma) 290); }
+
+.bn-dm-tone-4 .bn-avatar__initials,
+.bn-dm-tone-4.bn-avatar { background: oklch(60% var(--bn-chroma) 60); }
+
+.bn-dm-tone-5 .bn-avatar__initials,
+.bn-dm-tone-5.bn-avatar { background: oklch(60% var(--bn-chroma) 350); }
+
+.bn-dm-tone-6 .bn-avatar__initials,
+.bn-dm-tone-6.bn-avatar { background: oklch(58% var(--bn-chroma) 195); }
+
+.bn-dm-tone-7 .bn-avatar__initials,
+.bn-dm-tone-7.bn-avatar { background: oklch(56% var(--bn-chroma) 270); }
+
+.bn-dm-tone-8 .bn-avatar__initials,
+.bn-dm-tone-8.bn-avatar { background: oklch(58% var(--bn-chroma) 25); }
+
+/* ── Thread pane ─────────────────────────────────────────────────────────── */
+.bn-dm-pane {
+	background: var(--bn-canvas);
+	min-height: 0;
+}
+
+.bn-dm-pane__head {
+	/* Self-sufficient flex row: the identity group (avatar + name + status)
+	   pins left and the actions toolbar pins right, independent of whether the
+	   shared .bn-split__pane-head base rule has loaded/applied. Without this the
+	   header collapsed to a block and the avatar appeared floating in the centre. */
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--bn-s3);
+	height: 64px;
+	padding-inline: var(--bn-s5);
+	background: var(--bn-surface);
+}
+
+.bn-dm-pane__back {
+	display: none;
+}
+
+.bn-dm-pane__identity {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s3);
+	text-decoration: none;
+	color: inherit;
+}
+
+.bn-dm-pane__identity-text {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+}
+
+.bn-dm-pane__identity-name {
+	font-family: var(--bn-font-display);
+	font-size: var(--bn-text-md);
+	font-weight: var(--bn-fw-semibold);
+	color: var(--bn-ink);
+	letter-spacing: var(--bn-ls-tight);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.bn-dm-pane__identity-status {
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+}
+
+.bn-dm-pane__identity-status.is-online {
+	color: var(--bn-success);
+	font-weight: var(--bn-fw-medium);
+}
+
+.bn-dm-pane__actions {
+	display: flex;
+	gap: var(--bn-s1);
+	flex-shrink: 0;
+}
+
+.bn-dm-pane__body {
+	flex: 1;
+	overflow-y: auto;
+	padding: var(--bn-s5);
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s2);
+	min-height: 0;
+	background: var(--bn-canvas);
+}
+
+.bn-dm-pane__empty {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	padding: var(--bn-s8);
+	text-align: center;
+	gap: var(--bn-s3);
+	color: var(--bn-ink-3);
+}
+
+.bn-dm-pane__empty-icon {
+	width: 64px;
+	height: 64px;
+	border-radius: var(--bn-r-full);
+	background: var(--bn-accent-100);
+	color: var(--bn-accent);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.bn-dm-pane__empty-icon svg {
+	width: 28px;
+	height: 28px;
+}
+
+.bn-dm-pane__empty-title {
+	font-family: var(--bn-font-display);
+	font-size: var(--bn-text-lg);
+	font-weight: var(--bn-fw-bold);
+	color: var(--bn-ink);
+	margin: 0;
+}
+
+.bn-dm-pane__empty-body {
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink-2);
+	max-width: 320px;
+	margin: 0;
+}
+
+/* ── Day divider ─────────────────────────────────────────────────────────── */
+.bn-dm-divider {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s3);
+	margin: var(--bn-s4) 0 var(--bn-s2);
+	font-family: var(--bn-font-mono);
+	font-size: var(--bn-text-2xs);
+	font-weight: var(--bn-fw-semibold);
+	letter-spacing: var(--bn-ls-wider);
+	text-transform: uppercase;
+	color: var(--bn-ink-4);
+}
+
+.bn-dm-divider::before,
+.bn-dm-divider::after {
+	content: '';
+	flex: 1;
+	height: 1px;
+	background: var(--bn-line-faint);
+}
+
+/* ── Message row ─────────────────────────────────────────────────────────── */
+.bn-dm-msg {
+	display: flex;
+	gap: var(--bn-s2);
+	align-items: flex-end;
+	max-width: 75%;
+	/* Positioned so the hovered row can lift above the next one — the absolute
+	   timestamp overflows below the bubble and was being painted over by the
+	   following consecutive message. */
+	position: relative;
+}
+
+.bn-dm-msg.is-mine {
+	align-self: flex-end;
+	flex-direction: row-reverse;
+}
+
+/* Received messages must firmly left-pin. The body is a flex column whose
+   default align-items: stretch left a max-width row's horizontal position
+   under-specified, so incoming bubbles drifted toward centre. Sent rows pin
+   right via .is-mine above; received rows pin left here. */
+.bn-dm-msg:not(.is-mine) {
+	align-self: flex-start;
+}
+
+.bn-dm-msg__content {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	min-width: 0;
+	position: relative;
+}
+
+.bn-dm-msg.is-mine .bn-dm-msg__content {
+	align-items: flex-end;
+}
+
+.bn-dm-bubble {
+	padding: var(--bn-s2) var(--bn-s3);
+	border-radius: 16px 16px 16px 4px;
+	font-size: var(--bn-text-sm);
+	line-height: var(--bn-leading-snug);
+	word-break: break-word;
+	background: var(--bn-sunken);
+	border: 1px solid var(--bn-line-faint);
+	color: var(--bn-ink);
+}
+
+.bn-dm-bubble.is-mine {
+	background: var(--bn-accent);
+	border-color: var(--bn-accent);
+	color: var(--bn-accent-fg);
+	border-radius: 16px 16px 4px 16px;
+}
+
+.bn-dm-bubble__quoted {
+	margin-bottom: var(--bn-s2);
+	padding: var(--bn-s2) var(--bn-s3);
+	border-radius: var(--bn-r-sm);
+	background: var(--bn-sunken);
+	border-inline-start: 3px solid var(--bn-accent);
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-2);
+}
+
+.bn-dm-bubble.is-mine .bn-dm-bubble__quoted {
+	background: color-mix(in oklch, var(--bn-accent-fg) 20%, transparent);
+	border-inline-start-color: color-mix(in oklch, var(--bn-accent-fg) 60%, transparent);
+	color: var(--bn-accent-fg);
+}
+
+/*
+ * Time + read receipt sit beside the bubble and fade in on hover — Messenger
+ * style — instead of stacking under every message (which cluttered the thread
+ * and pushed the sender avatar into a detached row below the bubble). The day
+ * divider gives at-a-glance date context.
+ */
+.bn-dm-msg__meta {
+	position: absolute;
+	/* Hover timestamp as a floating chip (Messenger-style): it sits just below
+	   the bubble and may overlay the tightly-grouped next message, but its own
+	   surface background + shadow keep it fully legible instead of colliding
+	   with the bubble text. This preserves tight consecutive grouping (no
+	   permanent reserved gap) while fixing the "timestamp partially hidden". */
+	top: calc(100% - 2px);
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	padding: 2px var(--bn-s2);
+	border-radius: var(--bn-r-full);
+	background: var(--bn-surface);
+	box-shadow: var(--bn-shadow-sm, 0 1px 4px rgba(0, 0, 0, 0.14));
+	font-size: var(--bn-text-2xs);
+	color: var(--bn-ink-3);
+	white-space: nowrap;
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity var(--bn-dur-fast) var(--bn-ease);
+}
+
+.bn-dm-msg:not(.is-mine) .bn-dm-msg__meta {
+	inset-inline-start: 4px;
+}
+
+.bn-dm-msg.is-mine .bn-dm-msg__meta {
+	inset-inline-end: 4px;
+	flex-direction: row-reverse;
+}
+
+.bn-dm-msg:hover .bn-dm-msg__meta,
+.bn-dm-msg:focus-within .bn-dm-msg__meta {
+	opacity: 1;
+}
+
+/* Lift the hovered/focused row so its floating timestamp chip is never
+   occluded by the following consecutive bubble. */
+.bn-dm-msg:hover,
+.bn-dm-msg:focus-within {
+	z-index: 2;
+}
+
+/* Touch devices never fire :hover, so the absolute hover-only timestamp would
+   be permanently invisible. Show it inline (in flow) on coarse pointers so
+   every message's time is readable without a hover target. */
+@media (hover: none) {
+	.bn-dm-msg__meta {
+		position: static;
+		opacity: 1;
+		pointer-events: auto;
+		margin-top: 2px;
+		/* Inline (in flow) on touch — drop the floating-chip background/shadow so
+		   it reads as a plain timestamp line, not a pill on every message. */
+		padding: 0;
+		background: none;
+		box-shadow: none;
+	}
+	.bn-dm-msg.is-mine .bn-dm-msg__meta {
+		justify-content: flex-end;
+	}
+}
+
+.bn-dm-msg__time {
+	font-family: var(--bn-font-mono);
+	letter-spacing: var(--bn-ls-wide);
+}
+
+.bn-dm-msg__receipt {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-s1);
+	color: var(--bn-accent);
+	font-weight: var(--bn-fw-medium);
+}
+
+.bn-dm-msg__receipt svg {
+	width: 14px;
+	height: 14px;
+}
+
+.bn-dm-msg__reactions {
+	display: flex;
+	gap: var(--bn-s1);
+	flex-wrap: wrap;
+}
+
+.bn-dm-msg.is-mine .bn-dm-msg__reactions {
+	justify-content: flex-end;
+}
+
+.bn-dm-msg__reaction {
+	background: var(--bn-surface);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-full);
+	padding: 2px var(--bn-s2);
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-2);
+	cursor: pointer;
+	transition: border-color var(--bn-dur-fast) var(--bn-ease);
+}
+
+.bn-dm-msg__reaction:hover {
+	border-color: var(--bn-accent);
+}
+
+.bn-dm-msg__reaction.is-mine {
+	border-color: var(--bn-accent);
+	background: var(--bn-accent-50, var(--bn-sunken));
+	color: var(--bn-accent);
+}
+
+.bn-dm-msg__reaction .bn-emoji {
+	width: 14px;
+	height: 14px;
+	vertical-align: -2px;
+	max-width: none;
+	flex-shrink: 0;
+}
+
+.bn-dm-msg__reaction-count {
+	margin-inline-start: 3px;
+	font-family: var(--bn-font-mono, monospace);
+}
+
+/* ── Per-message hover action bar (reply + react) ────────────────────────── */
+/*
+ * Hover action toolbar (react / reply / more) floats in the gutter beside the
+ * bubble — out of flow, so it neither reserves space below every message nor
+ * pushes the sender avatar into a detached row. Messenger-style.
+ */
+.bn-dm-msg__actions {
+	position: absolute;
+	top: 50%;
+	transform: translateY(-50%);
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-s1);
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity var(--bn-dur-fast) var(--bn-ease);
+}
+
+/*
+ * Gapless hover-bridge. The bar abuts the bubble edge (inset-inline-*: 100%) and
+ * fills the gutter offset with transparent padding instead of a margin gap, so
+ * the pointer travels bubble → padding → buttons over one continuous hoverable
+ * surface. With a real gap the cursor crossed a dead zone where neither the
+ * bubble nor the actions were hovered, so the bar hid before it could be
+ * clicked (the "no hover-bridge" defect, worst on own/right-aligned messages).
+ */
+.bn-dm-msg:not(.is-mine) .bn-dm-msg__actions {
+	inset-inline-start: 100%;
+	padding-inline-start: var(--bn-s2);
+}
+
+.bn-dm-msg.is-mine .bn-dm-msg__actions {
+	inset-inline-end: 100%;
+	padding-inline-end: var(--bn-s2);
+	justify-content: flex-end;
+}
+
+.bn-dm-msg:hover .bn-dm-msg__actions,
+.bn-dm-msg:focus-within .bn-dm-msg__actions,
+.bn-dm-msg__react-wrap.is-open .bn-dm-msg__actions {
+	pointer-events: auto;
+}
+
+.bn-dm-msg:hover .bn-dm-msg__actions,
+.bn-dm-msg:focus-within .bn-dm-msg__actions,
+.bn-dm-msg__react-wrap.is-open .bn-dm-msg__actions {
+	opacity: 1;
+}
+
+.bn-dm-msg__action {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 26px;
+	height: 26px;
+	padding: 0;
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-full);
+	background: var(--bn-surface);
+	color: var(--bn-ink-3);
+	cursor: pointer;
+	transition: color var(--bn-dur-fast) var(--bn-ease), border-color var(--bn-dur-fast) var(--bn-ease);
+}
+
+.bn-dm-msg__action:hover,
+.bn-dm-msg__action:focus,
+.bn-dm-msg__action:focus-visible,
+.bn-dm-msg__action:active {
+	/* Re-assert our own surface + accent on every interactive state. Some host
+	   themes (e.g. Reign) paint a primary-blue fill on button:focus/:active,
+	   which would otherwise leak into these icon buttons. */
+	background: var(--bn-surface);
+	color: var(--bn-accent);
+	border-color: var(--bn-accent);
+}
+.bn-dm-msg__action:focus-visible {
+	outline: 2px solid var(--bn-accent);
+	outline-offset: 2px;
+}
+
+.bn-dm-msg__action svg {
+	width: 15px;
+	height: 15px;
+}
+
+.bn-dm-msg__react-wrap {
+	position: relative;
+}
+
+.bn-dm-msg__react-pop {
+	position: absolute;
+	bottom: calc(100% + 4px);
+	inset-inline-start: 0;
+	display: none;
+	gap: 2px;
+	padding: var(--bn-s1);
+	background: var(--bn-surface);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-full);
+	box-shadow: var(--bn-shadow-md, 0 4px 16px rgba(0, 0, 0, 0.12));
+	z-index: 5;
+}
+
+.bn-dm-msg__react-wrap.is-open .bn-dm-msg__react-pop {
+	display: flex;
+}
+
+/*
+ * Sent (outgoing) bubbles are right-aligned, so a picker opening rightward from
+ * its left edge overflows the thread log and triggers a horizontal scrollbar.
+ * Flip it to open leftward (anchor to the right edge) for .is-mine messages.
+ */
+.bn-dm-msg.is-mine .bn-dm-msg__react-pop {
+	inset-inline-start: auto;
+	inset-inline-end: 0;
+}
+
+/*
+ * Flip the picker below the trigger when there is not enough room above (the
+ * topmost messages in the log, or a short thread). The .is-down class is set by
+ * the store after measuring available space; default remains upward-opening.
+ */
+.bn-dm-msg__react-wrap.is-down .bn-dm-msg__react-pop {
+	bottom: auto;
+	top: calc(100% + 4px);
+}
+
+/*
+ * Touch devices never fire :hover, so the gutter hover-bar would be unreachable.
+ * Make it permanently visible AND drop it back into normal flow (a row directly
+ * under its own bubble). The old touch rule kept it position:absolute at
+ * bottom:100% — floating in the ~8px inter-message gap, so a ~28px bar overlapped
+ * the previous bubble. In-flow it reserves its own space and can never overlap a
+ * neighbour; block-level flex + justify-content aligns it to the sender's side.
+ */
+@media (hover: none) {
+	.bn-dm-msg__actions {
+		position: static;
+		display: flex;
+		opacity: 1;
+		pointer-events: auto;
+		top: auto;
+		bottom: auto;
+		inset-inline: auto;
+		transform: none;
+		padding: 0;
+		margin-top: var(--bn-s1);
+	}
+	.bn-dm-msg:not(.is-mine) .bn-dm-msg__actions {
+		justify-content: flex-start;
+	}
+	.bn-dm-msg.is-mine .bn-dm-msg__actions {
+		justify-content: flex-end;
+	}
+}
+
+.bn-dm-msg__react-opt {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 30px;
+	height: 30px;
+	padding: 0;
+	border: 0;
+	border-radius: var(--bn-r-full);
+	background: transparent;
+	cursor: pointer;
+	transition: transform var(--bn-dur-fast) var(--bn-ease), background var(--bn-dur-fast) var(--bn-ease);
+}
+
+.bn-dm-msg__react-opt:hover {
+	background: var(--bn-sunken);
+	transform: scale(1.15);
+}
+
+.bn-dm-msg__react-opt .bn-emoji {
+	width: 20px;
+	height: 20px;
+	max-width: none;
+	flex-shrink: 0;
+}
+
+/* ── Typing indicator ────────────────────────────────────────────────────── */
+.bn-dm-typing {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	padding: var(--bn-s2) 0;
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+}
+/* The indicator is always in the DOM (1:1 + group) so the poll can toggle it
+   live; `display:flex` above would otherwise defeat the bare `hidden` attribute. */
+.bn-dm-typing[hidden] { display: none; }
+
+.bn-dm-typing__dots {
+	display: inline-flex;
+	gap: 3px;
+}
+
+.bn-dm-typing__dot {
+	width: 6px;
+	height: 6px;
+	border-radius: var(--bn-r-full);
+	background: var(--bn-ink-3);
+	animation: bn-dm-typing-bounce 1.2s infinite;
+}
+
+.bn-dm-typing__dot:nth-child(2) { animation-delay: 0.2s; }
+.bn-dm-typing__dot:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes bn-dm-typing-bounce {
+	0%, 60%, 100% { transform: translateY(0); }
+	30%           { transform: translateY(-4px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.bn-dm-typing__dot { animation: none; }
+}
+
+/* ── Composer ────────────────────────────────────────────────────────────── */
+.bn-dm-composer {
+	padding: var(--bn-s3) var(--bn-s4);
+	border-top: 1px solid var(--bn-line-faint);
+	background: var(--bn-surface);
+	flex-shrink: 0;
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s2);
+}
+
+.bn-dm-composer__reply {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	padding: var(--bn-s2) var(--bn-s3);
+	border-inline-start: 3px solid var(--bn-accent);
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-2);
+}
+
+.bn-dm-composer__reply.is-hidden {
+	display: none;
+}
+
+.bn-dm-composer__reply-label {
+	font-family: var(--bn-font-mono);
+	font-size: var(--bn-text-2xs);
+	font-weight: var(--bn-fw-semibold);
+	letter-spacing: var(--bn-ls-wider);
+	text-transform: uppercase;
+	color: var(--bn-ink-4);
+}
+
+.bn-dm-composer__reply-text {
+	flex: 1;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.bn-dm-composer__row {
+	display: flex;
+	align-items: flex-end;
+	gap: var(--bn-s2);
+	background: var(--bn-sunken);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-xl);
+	padding: var(--bn-s2);
+	transition: border-color var(--bn-dur-fast) var(--bn-ease);
+}
+
+.bn-dm-composer__row:focus-within {
+	border-color: var(--bn-accent);
+	box-shadow: var(--bn-ring);
+}
+
+.bn-dm-composer__input {
+	flex: 1;
+	background: transparent;
+	border: none;
+	min-height: 36px;
+	max-height: 140px;
+	padding: var(--bn-s2);
+	resize: none;
+	font-family: var(--bn-font-ui);
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink);
+	line-height: var(--bn-leading-snug);
+}
+
+/* Focus ring lives on the parent .bn-dm-composer__row:focus-within so the
+ * inner textarea draws nothing of its own. The base .bn-textarea:focus-visible
+ * sets border-color:accent (and out-specifics .bn-dm-composer__input via its
+ * :focus-visible), which made the focused textarea draw a second border INSIDE
+ * the row's border - a nested double box. Reset the border here so only the
+ * row shows a single box on focus. */
+.bn-dm-composer__input:focus-visible {
+	outline: 1px solid transparent;
+	border: none;
+	box-shadow: none;
+}
+
+.bn-dm-composer__input::placeholder {
+	color: var(--bn-ink-4);
+}
+
+/* ── Visually hidden helper (for <label for>) ───────────────────────────── */
+.bn-visually-hidden {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	margin: -1px;
+	padding: 0;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	clip-path: inset(50%);
+	border: 0;
+	white-space: nowrap;
+}
+
+/* ── Delete-confirm + compose + group modals ─────────────────────────────── */
+.bn-dm-confirm.is-hidden,
+.bn-dm-compose.is-hidden,
+.bn-dm-group.is-hidden,
+.bn-dm-info.is-hidden {
+	display: none;
+}
+
+/* ── New-message recipient picker ────────────────────────────────────────── */
+.bn-dm-compose__results {
+	list-style: none;
+	margin: var(--bn-s3) 0 0;
+	padding: 0;
+	max-height: 320px;
+	overflow-y: auto;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.bn-dm-compose__hint {
+	padding: var(--bn-s3);
+	color: var(--bn-ink-3);
+	font-size: var(--bn-text-sm);
+	text-align: center;
+}
+
+.bn-dm-compose__result {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s3);
+	padding: var(--bn-s2) var(--bn-s3);
+	border-radius: var(--bn-r-md);
+	cursor: pointer;
+}
+
+.bn-dm-compose__result:hover,
+.bn-dm-compose__result:focus-visible {
+	background: var(--bn-sunken);
+	outline: 2px solid transparent;
+	outline-offset: 2px;
+}
+
+.bn-dm-compose__result-meta {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+}
+
+.bn-dm-compose__result-name {
+	font-weight: 600;
+	color: var(--bn-ink);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.bn-dm-compose__result-handle {
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+}
+
+/* ── Share-a-photo media picker ──────────────────────────────────────────── */
+.bn-dm-media.is-hidden {
+	display: none;
+}
+
+.bn-dm-media__upload {
+	width: 100%;
+	justify-content: center;
+	margin-bottom: var(--bn-s3);
+}
+
+.bn-dm-media__label {
+	margin: 0 0 var(--bn-s2);
+	font-size: var(--bn-text-sm);
+	font-weight: 600;
+	color: var(--bn-ink-2);
+}
+
+.bn-dm-media__grid {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: grid;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+	gap: var(--bn-s2);
+	max-height: 340px;
+	overflow-y: auto;
+}
+
+.bn-dm-media__hint {
+	grid-column: 1 / -1;
+	padding: var(--bn-s4);
+	text-align: center;
+	color: var(--bn-ink-3);
+	font-size: var(--bn-text-sm);
+}
+
+.bn-dm-media__tile {
+	position: relative;
+	aspect-ratio: 1 / 1;
+	border-radius: var(--bn-r-md);
+	overflow: hidden;
+	cursor: pointer;
+	border: 2px solid transparent;
+	transition: border-color var(--bn-dur-fast) var(--bn-ease);
+}
+
+.bn-dm-media__tile:hover,
+.bn-dm-media__tile:focus-visible {
+	border-color: var(--bn-accent);
+	outline: 2px solid transparent;
+	outline-offset: 2px;
+}
+
+.bn-dm-media__tile img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+}
+
+/* ── Composer pending-attachment chip ────────────────────────────────────── */
+.bn-dm-composer__attachment {
+	position: relative;
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	padding: var(--bn-s2) var(--bn-s3);
+	margin-bottom: var(--bn-s2);
+}
+
+.bn-dm-composer__attachment.is-hidden {
+	display: none;
+}
+
+/*
+ * Attachment upload in flight. onFileSelected sets context.attachmentUploading
+ * while the media POST runs; this spinner overlays the 40x40 thumb slot (and
+ * still shows for non-image files whose preview thumb is hidden), so the chip no
+ * longer looks identical whether the file is still uploading or already landed.
+ * The remove (x) hides and Send disables while this is set. Reuses bn-spin.
+ */
+.bn-dm-composer__attachment-spinner {
+	position: absolute;
+	inset-block-start: var(--bn-s2);
+	inset-inline-start: var(--bn-s3);
+	width: 40px;
+	height: 40px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: var(--bn-r-md);
+	background: color-mix(in srgb, var(--bn-sunken) 60%, transparent);
+}
+
+.bn-dm-composer__attachment-spinner::before {
+	content: "";
+	width: 18px;
+	height: 18px;
+	border: 2px solid var(--bn-line);
+	border-top-color: var(--bn-accent);
+	border-radius: var(--bn-r-full);
+	animation: bn-spin 0.6s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.bn-dm-composer__attachment-spinner::before { animation: none; }
+}
+
+.bn-dm-composer__attachment-thumb {
+	width: 40px;
+	height: 40px;
+	border-radius: var(--bn-r-md);
+	object-fit: cover;
+	background: var(--bn-sunken);
+}
+
+.bn-dm-composer__attachment-thumb:not([src]),
+.bn-dm-composer__attachment-thumb[src=""] {
+	display: none;
+}
+
+.bn-dm-composer__attachment-name {
+	flex: 1 1 auto;
+	min-width: 0;
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink-2);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+/* ── Bubble media attachment ─────────────────────────────────────────────── */
+/* Bare DM media — rendered OUTSIDE the text bubble (no blue chat-bubble wrap).
+   image/video open the shared lightbox; audio plays inline; files are a chip. */
+.bn-dm-msg__media {
+	margin: 0;
+	max-width: 260px;
+}
+
+/* When a text bubble follows the media, add a small gap. */
+.bn-dm-msg__media:not(:last-child) {
+	margin-bottom: var(--bn-s1);
+}
+
+/* Right-align media on the sender's own messages, same side as the bubble. */
+.bn-dm-msg.is-mine .bn-dm-msg__media {
+	margin-inline-start: auto;
+}
+
+/* The image/video IS the lightbox tile (assets/js/media/lightbox.js binds to
+   .bn-media-tile[data-bn-media-id]) — but shown at its NATURAL size, not the
+   feed grid's forced 1:1 square (.bn-media-tile in bn-media.css). Strip the
+   default <button> chrome and let the image size itself. */
+.bn-dm-msg__media .bn-media-tile {
+	display: block;
+	width: auto;
+	margin: 0;
+	padding: 0;
+	border: 0;
+	background: none;
+	aspect-ratio: auto;
+	overflow: hidden;
+	cursor: pointer;
+	line-height: 0;
+	border-radius: var(--bn-r-md);
+}
+
+.bn-dm-msg__media .bn-media-tile__img {
+	display: block;
+	width: auto;
+	height: auto;
+	max-width: 260px;
+	max-height: 320px;
+	object-fit: contain;
+	border-radius: var(--bn-r-md);
+}
+
+/* Inline audio player + file chip, bare (no bubble). */
+.bn-dm-msg__audio {
+	width: 260px;
+	max-width: 100%;
+}
+
+.bn-dm-msg__file {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	padding: var(--bn-s2) var(--bn-s3);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-md);
+	background: var(--bn-sunken);
+	color: inherit;
+	text-decoration: none;
+}
+
+.bn-dm-msg__file:hover {
+	border-color: var(--bn-accent);
+}
+
+.bn-dm-bubble__file {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	padding: var(--bn-s2) var(--bn-s3);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-md);
+	color: inherit;
+	text-decoration: none;
+}
+
+.bn-dm-bubble__file:hover {
+	border-color: var(--bn-accent);
+}
+
+/* ── Composer emoji picker ───────────────────────────────────────────────── */
+.bn-dm-emoji-wrap {
+	position: relative;
+}
+
+.bn-dm-emoji-pop {
+	position: absolute;
+	bottom: calc(100% + 6px);
+	inset-inline-start: 0;
+	display: block;
+	/* Stay inside the composer/pane: never wider than the viewport gutter, and
+	   if anchored near the right edge the browser keeps it on-screen. */
+	width: 320px;
+	max-width: min(320px, calc(100vw - 24px));
+	padding: var(--bn-s2);
+	background: var(--bn-surface);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-md, 10px);
+	box-shadow: var(--bn-shadow-md, 0 4px 16px rgba(0, 0, 0, 0.12));
+	z-index: 10;
+}
+
+.bn-dm-emoji-pop[hidden] {
+	display: none;
+}
+
+.bn-dm-emoji-pop__close {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	margin-inline-start: auto;
+	margin-bottom: var(--bn-s1);
+	width: 28px;
+	height: 28px;
+	padding: 0;
+	border: 0;
+	border-radius: var(--bn-r-sm, 6px);
+	background: transparent;
+	color: var(--bn-ink, #1a1a1a);
+	font-size: 20px;
+	line-height: 1;
+	cursor: pointer;
+}
+
+.bn-dm-emoji-pop__close:hover {
+	background: var(--bn-sunken);
+	color: var(--bn-ink);
+}
+
+.bn-dm-emoji-pop__grid {
+	display: grid;
+	grid-template-columns: repeat(8, 1fr);
+	gap: 2px;
+	/* Keep every emoji inside the popover — cap the grid and scroll internally
+	   so rows can never spill out of the bottom edge onto the composer. */
+	max-height: 200px;
+	overflow-y: auto;
+	overscroll-behavior: contain;
+}
+
+.bn-dm-emoji-pop__item {
+	border: 0;
+	background: transparent;
+	border-radius: var(--bn-r-md);
+	padding: 4px;
+	font-size: 18px;
+	line-height: 1;
+	cursor: pointer;
+	transition: background var(--bn-dur-fast) var(--bn-ease), transform var(--bn-dur-fast) var(--bn-ease);
+}
+
+.bn-dm-emoji-pop__item:hover {
+	background: var(--bn-sunken);
+	transform: scale(1.2);
+}
+
+/* ── Message-request banner (accept before replying) ─────────────────────── */
+.bn-dm-request {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--bn-s3);
+	padding: var(--bn-s4);
+	border-top: 1px solid var(--bn-line);
+	background: var(--bn-sunken);
+}
+
+.bn-dm-request__text {
+	margin: 0;
+	flex: 1 1 220px;
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink-2);
+}
+
+.bn-dm-request__actions {
+	display: flex;
+	gap: var(--bn-s2);
+	flex-shrink: 0;
+}
+
+/* ── Dependency notice (WPMediaVerse not installed) ──────────────────────── */
+.bn-dm-dep-notice {
+	max-width: 540px;
+	margin-inline: auto;
+	padding: var(--bn-s6);
+	text-align: start;
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s3);
+}
+
+.bn-dm-dep-notice__head {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s3);
+}
+
+.bn-dm-dep-notice__icon {
+	display: inline-flex;
+	width: 40px;
+	height: 40px;
+	border-radius: var(--bn-r-full);
+	background: var(--bn-warn-bg);
+	color: var(--bn-warn);
+	align-items: center;
+	justify-content: center;
+}
+
+.bn-dm-dep-notice__icon svg {
+	width: 20px;
+	height: 20px;
+}
+
+.bn-dm-dep-notice__title {
+	font-family: var(--bn-font-display);
+	font-size: var(--bn-text-lg);
+	font-weight: var(--bn-fw-bold);
+	color: var(--bn-ink);
+	margin: 0;
+	letter-spacing: var(--bn-ls-tight);
+}
+
+.bn-dm-dep-notice__body {
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink-2);
+	margin: 0;
+	line-height: var(--bn-leading-normal);
+}
+
+/* ── Mobile (≤768px) — collapse split to single pane per v2 ──────────────── */
+/*
+ * Mobile: collapse the two-pane to a single column. The list (rail) shows by
+ * default; opening a conversation adds .is-thread-open on the container, which
+ * swaps the rail out for the thread and reveals the back button. (The previous
+ * rules here targeted .bn-dm-card / .bn-dm-split / .bn-dm-shell.is-thread-active
+ * — classes the rendered markup never had, so mobile never collapsed.)
+ */
+@media (max-width: 768px) {
+	/*
+	 * Drop the two-column grid for a single flex column. A display:none grid
+	 * item still reserves its track, which left the thread sized to the old
+	 * 320px rail track and overflowing the viewport; flex sidesteps that — the
+	 * one visible pane simply takes the full width.
+	 */
+	.bn-split.bn-dm {
+		display: flex;
+		flex-direction: column;
+	}
+
+	/*
+	 * Restore the HEIGHT contract the grid provided for free.
+	 *
+	 * As a grid item each pane stretched to fill its row, which is what let
+	 * .bn-dm-rail__list (flex: 1) take the slack and scroll. Switching the
+	 * container to a flex column above kept the width behaviour but silently
+	 * dropped that stretch: a flex item in a column sizes to CONTENT unless
+	 * told otherwise. Only width was re-declared here, so the panes collapsed —
+	 * the rail rendered 220px inside a 560px container, __list shrank to 16px,
+	 * and __tabs (which has overflow, so no min-height: auto floor) collapsed to
+	 * 1px while its three 44px tabs overflowed and overlapped the footer.
+	 *
+	 * Exactly one pane is visible at a time on mobile (the other is display:none),
+	 * so the visible one simply takes the whole container. min-height: 0 is what
+	 * lets it shrink below content height, which is what makes the inner
+	 * overflow-y: auto regions scroll instead of pushing the pane taller.
+	 */
+	.bn-split.bn-dm .bn-dm-rail,
+	.bn-split.bn-dm .bn-dm-thread {
+		width: 100%;
+		max-width: 100%;
+		min-width: 0;
+		flex: 1;
+		min-height: 0;
+	}
+
+	/*
+	 * Opt the DM rail out of the STACKED-split mobile treatment.
+	 *
+	 * bn-base.css gives every .bn-split__rail a `max-height: 220px` plus a
+	 * `border-bottom` at this breakpoint. That is right for the stacked pattern
+	 * it was written for — .bn-split collapses to `grid-template-columns: 1fr`,
+	 * the rail sits ABOVE the main pane, the cap stops a long list pushing the
+	 * content off-screen, and the border divides the two stacked panes.
+	 *
+	 * DM is not that pattern. It is a SWAP layout: the container is overridden to
+	 * a flex column above and exactly one pane is ever visible (the other is
+	 * display:none). So:
+	 *   - the cap has to go. max-height beats flex-grow, so while it applied the
+	 *     rail was pinned to 220px inside a 560px container no matter what flex
+	 *     said — that is what starved __list to 16px and collapsed __tabs to 1px.
+	 *   - the border-bottom has to go. Nothing is stacked beneath it, so it drew
+	 *     a divider under the whole rail with only background below — one of the
+	 *     stray hairlines that made this surface look unfinished.
+	 */
+	.bn-split.bn-dm .bn-dm-rail {
+		max-height: none;
+		border-bottom: 0;
+	}
+
+	/* List view (no conversation open): show the rail, hide the empty thread. */
+	.bn-split.bn-dm:not(.is-thread-open) .bn-dm-thread {
+		display: none;
+	}
+
+	/* Thread view: hide the rail, show the thread full-width + the back button. */
+	.bn-split.bn-dm.is-thread-open .bn-dm-rail {
+		display: none;
+	}
+
+	.bn-split.bn-dm.is-thread-open .bn-dm-pane__back {
+		display: inline-flex;
+	}
+
+	/*
+	 * Quick-react picker must stay inside the thread pane on narrow screens. The
+	 * message log scrolls vertically (overflow-y: auto), which also clips anything
+	 * spilling sideways — so a picker wider than the pane, or anchored near an
+	 * edge, had its right/left-most reactions cut off (worse once 7+ reactions are
+	 * enabled). Cap it to the viewport and let extra reactions wrap to a second
+	 * row instead of running off the edge, so every reaction stays tappable.
+	 */
+	.bn-dm-msg__react-pop {
+		/* width:max-content lays the reactions out in a single row at their natural
+		   width; max-width then caps that so 7+ reactions wrap to a second row
+		   rather than collapsing to a 1-wide vertical strip (shrink-to-fit) or
+		   running off the pane edge. */
+		flex-wrap: wrap;
+		justify-content: center;
+		width: max-content;
+		max-width: min(232px, calc(100vw - 2 * var(--bn-s4)));
+	}
+
+	/* Received bubbles sit on the left — open the picker rightward; sent bubbles
+	   sit on the right — open it leftward. Combined with the width cap + wrap
+	   above, neither direction can overflow the pane. */
+	.bn-dm-msg:not(.is-mine) .bn-dm-msg__react-pop {
+		inset-inline-start: 0;
+		inset-inline-end: auto;
+	}
+
+	.bn-dm-msg.is-mine .bn-dm-msg__react-pop {
+		inset-inline-start: auto;
+		inset-inline-end: 0;
+	}
+
+	/*
+	 * Tighten the thread header on mobile so the contact name actually has room.
+	 * At full padding/gap the three action buttons + back + avatar consumed the
+	 * whole 312px width, squeezing the name to a single clipped letter.
+	 */
+	.bn-dm-pane__head {
+		gap: var(--bn-s1);
+		padding-inline: var(--bn-s3);
+	}
+
+	.bn-dm-pane__actions {
+		gap: 0;
+	}
+
+	.bn-dm-pane__actions .bn-btn {
+		--bn-btn-px: var(--bn-s2);
+	}
+}
+
+/* The back button is only meaningful on mobile (desktop shows both panes). */
+@media (min-width: 769px) {
+	.bn-dm-pane__back {
+		display: none;
+	}
+}
+
+/* ── Message requests page (kept v2-aligned) ─────────────────────────────── */
+.bn-message-requests {
+	font-family: var(--bn-font-ui);
+	font-size: var(--bn-text-md);
+	color: var(--bn-ink);
+	line-height: var(--bn-leading-body);
+	max-width: 640px;
+	margin: 0 auto;
+	padding: 0;
+}
+
+.bn-req-breadcrumb {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	margin-bottom: var(--bn-s4);
+	font-size: var(--bn-text-sm);
+}
+
+.bn-req-breadcrumb a { color: var(--bn-accent); text-decoration: none; }
+.bn-req-breadcrumb a:hover { text-decoration: underline; }
+.bn-req-breadcrumb-sep { color: var(--bn-ink-4); }
+.bn-req-breadcrumb-current { color: var(--bn-ink); }
+
+.bn-req-title {
+	font-family: var(--bn-font-display);
+	font-size: var(--bn-text-xl);
+	font-weight: var(--bn-fw-extrabold);
+	margin-bottom: var(--bn-s1);
+	color: var(--bn-ink);
+}
+
+.bn-req-subtitle {
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink-2);
+	margin-bottom: var(--bn-s6);
+	line-height: var(--bn-leading-normal);
+	max-width: 520px;
+}
+
+.bn-req-info-box {
+	background: var(--bn-accent-100);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-sm);
+	padding: var(--bn-s3) var(--bn-s4);
+	margin-bottom: var(--bn-s5);
+	font-size: var(--bn-text-sm);
+	color: var(--bn-accent);
+	line-height: var(--bn-leading-normal);
+}
+
+.bn-request-card {
+	background: var(--bn-surface);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-lg);
+	padding: var(--bn-s4);
+	margin-bottom: var(--bn-s3);
+	transition: border-color var(--bn-dur-fast) var(--bn-ease);
+}
+
+.bn-request-card:hover { border-color: var(--bn-line-strong); }
+
+.bn-req-card-header {
+	display: flex;
+	gap: var(--bn-s3);
+	align-items: flex-start;
+	margin-bottom: var(--bn-s3);
+}
+
+.bn-req-avatar {
+	border-radius: var(--bn-r-full);
+	color: var(--bn-accent-fg);
+	font-weight: var(--bn-fw-bold);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+	width: 48px;
+	height: 48px;
+	font-size: var(--bn-text-md);
+	overflow: hidden;
+}
+
+.bn-req-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.bn-req-identity { flex: 1; min-width: 0; }
+.bn-req-name { font-weight: var(--bn-fw-bold); font-size: var(--bn-text-sm); color: var(--bn-ink); }
+.bn-req-name a { color: inherit; text-decoration: none; }
+.bn-req-name a:hover { color: var(--bn-accent); }
+.bn-req-meta { font-size: var(--bn-text-xs); color: var(--bn-ink-2); margin-top: 2px; }
+
+.bn-req-mutual {
+	font-size: var(--bn-text-xs);
+	color: var(--bn-success);
+	margin-top: 3px;
+	font-weight: var(--bn-fw-semibold);
+}
+
+.bn-req-time {
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-4);
+	flex-shrink: 0;
+	white-space: nowrap;
+}
+
+.bn-req-message-preview {
+	background: var(--bn-sunken);
+	border-radius: var(--bn-r-sm);
+	padding: var(--bn-s3);
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink);
+	line-height: var(--bn-leading-normal);
+	margin-bottom: var(--bn-s4);
+	border-inline-start: 3px solid var(--bn-line);
+	font-style: italic;
+}
+
+.bn-req-actions { display: flex; gap: var(--bn-s2); flex-wrap: wrap; }
+
+.bn-req-empty {
+	text-align: center;
+	padding: var(--bn-s5);
+	background: var(--bn-surface);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-md);
+}
+
+.bn-req-empty-icon { margin-bottom: var(--bn-s3); line-height: 1; }
+.bn-req-empty-title { font-weight: var(--bn-fw-semibold); color: var(--bn-ink); margin-bottom: var(--bn-s1); font-size: var(--bn-text-md); }
+.bn-req-empty-sub { font-size: var(--bn-text-sm); color: var(--bn-ink-2); line-height: var(--bn-leading-normal); }
+
+@media (max-width: 640px) {
+	.bn-message-requests { padding: 0; }
+	.bn-request-card { border-radius: var(--bn-r-md); }
+	.bn-req-actions { flex-direction: column; }
+	.bn-req-card-header { flex-wrap: wrap; }
+	.bn-req-time { width: 100%; text-align: start; }
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * Legacy bridge layer
+ *
+ * Consumed by WPMediaVerseBridge::render_messages() until the bridge itself
+ * migrates to .bn-split. Aligned to v2 tokens. Do not add new consumers.
+ * ────────────────────────────────────────────────────────────────────────── */
+.bn-messages-content {
+	min-width: 0;
+}
+
+.bn-msg-shell {
+	display: flex;
+	background: var(--bn-surface);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-lg);
+	overflow: hidden;
+	box-shadow: var(--bn-shadow-sm);
+	min-height: 560px;
+	max-height: calc(100vh - 180px);
+}
+
+.bn-msg-sidebar {
+	width: 280px;
+	flex-shrink: 0;
+	border-inline-end: 1px solid var(--bn-line);
+	display: flex;
+	flex-direction: column;
+	overflow-y: auto;
+}
+
+.bn-msg-thread {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+}
+
+.bn-msg-empty {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	padding: var(--bn-s8);
+	text-align: center;
+}
+
+.bn-msg-empty-icon {
+	width: 64px;
+	height: 64px;
+	background: var(--bn-accent-100);
+	border-radius: var(--bn-r-full);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	margin-bottom: var(--bn-s4);
+	color: var(--bn-accent);
+}
+
+.bn-msg-empty-icon svg {
+	width: 28px;
+	height: 28px;
+}
+
+.bn-msg-empty-title {
+	font-family: var(--bn-font-display);
+	font-size: var(--bn-text-lg);
+	font-weight: var(--bn-fw-bold);
+	color: var(--bn-ink);
+	margin-bottom: var(--bn-s2);
+}
+
+.bn-msg-empty-sub {
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink-2);
+	max-width: 280px;
+}
+
+@media (max-width: 640px) {
+	.bn-msg-shell {
+		flex-direction: column;
+		min-height: auto;
+		max-height: none;
+		border-radius: 0;
+		border-inline: none;
+	}
+
+	.bn-msg-sidebar {
+		width: 100%;
+		border-inline-end: none;
+		border-bottom: 1px solid var(--bn-line);
+		max-height: none;
+	}
+
+	.bn-msg-shell[data-active-conv] .bn-msg-sidebar { display: none; }
+
+	.bn-msg-shell:not([data-active-conv]) .bn-msg-thread,
+	.bn-msg-shell:not([data-active-conv]) .bn-msg-empty { display: none; }
+}
+
+/* ── Group chat ────────────────────────────────────────────────────────────── */
+/* Group avatar glyph (rail rows + thread header) in place of a person photo. */
+.bn-dm-avatar--group {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	background: var(--bn-accent-100);
+	color: var(--bn-accent, #4f46e5);
+}
+.bn-dm-avatar--group .bn-icon {
+	width: 55%;
+	height: 55%;
+}
+
+/* Compose modal: mode switch (Direct / New group). */
+.bn-dm-compose__modes {
+	display: flex;
+	gap: var(--bn-s2, 8px);
+	margin-bottom: var(--bn-s3, 12px);
+}
+.bn-dm-compose__mode {
+	flex: 1;
+	padding: var(--bn-s2, 8px);
+	border: 1px solid var(--bn-line, #e5e7eb);
+	border-radius: var(--bn-r-md);
+	background: transparent;
+	color: var(--bn-ink-2, #4b5563);
+	font: inherit;
+	cursor: pointer;
+}
+.bn-dm-compose__mode.is-active {
+	border-color: var(--bn-accent, #4f46e5);
+	background: var(--bn-accent-100, #eef2ff);
+	color: var(--bn-accent-700, var(--bn-accent, #4338ca));
+	font-weight: 600;
+}
+
+/* Compose modal: group name + selected-member chips. */
+.bn-dm-compose__group {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s2, 8px);
+	margin-bottom: var(--bn-s3, 12px);
+}
+.bn-dm-compose__chips {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--bn-s2, 8px);
+}
+.bn-dm-compose__chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 4px 6px 4px 10px;
+	background: var(--bn-sunken);
+	border-radius: 999px;
+	font-size: var(--bn-text-sm, 0.875rem);
+}
+.bn-dm-compose__chip-x {
+	border: 0;
+	background: var(--bn-line, #e5e7eb);
+	color: var(--bn-ink-2, #4b5563);
+	width: 18px;
+	height: 18px;
+	border-radius: 50%;
+	line-height: 1;
+	cursor: pointer;
+	font-size: 14px;
+}
+.bn-dm-compose__chip-x:hover { background: var(--bn-danger, #dc2626); color: var( --bn-accent-fg, #fff ); }
+
+.bn-dm-compose__group-actions {
+	margin-top: var(--bn-s3, 12px);
+	display: flex;
+	justify-content: flex-end;
+}
+
+/* ── Group members panel ──────────────────────────────────────────────────── */
+.bn-dm-group__label {
+	display: block;
+	font-size: var(--bn-text-sm, 0.85rem);
+	font-weight: 600;
+	color: var(--bn-ink-2, #4b5563);
+	margin-bottom: var(--bn-s1, 4px);
+}
+.bn-dm-group__rename { margin-bottom: var(--bn-s4, 16px); }
+.bn-dm-group__rename-row {
+	display: flex;
+	gap: var(--bn-s2, 8px);
+}
+.bn-dm-group__rename-row .bn-input { flex: 1; }
+
+.bn-dm-group__members {
+	list-style: none;
+	margin: 0 0 var(--bn-s4, 16px);
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+}
+.bn-dm-group__member {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--bn-s2, 8px);
+	padding: var(--bn-s2, 8px) 0;
+	border-bottom: 1px solid var(--bn-line-faint, #f1f5f9);
+}
+.bn-dm-group__member-id {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2, 8px);
+	min-width: 0;
+}
+.bn-dm-group__member-name {
+	font-weight: 500;
+	color: var(--bn-ink, #111827);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.bn-dm-group__member-actions {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s1, 4px);
+	flex-shrink: 0;
+}
+.bn-dm-group__remove:hover { color: var(--bn-danger, #dc2626); }
+
+.bn-dm-group__add { margin-bottom: var(--bn-s4, 16px); }
+.bn-dm-group__add-results {
+	list-style: none;
+	margin: var(--bn-s1, 4px) 0 0;
+	padding: 0;
+}
+.bn-dm-group__add-results .bn-dm-compose__result { cursor: pointer; }
+
+.bn-dm-group__foot {
+	display: flex;
+	justify-content: flex-end;
+	border-top: 1px solid var(--bn-line, #e5e7eb);
+	padding-top: var(--bn-s3, 12px);
+}
+
+/* ── Dark mode ────────────────────────────────────────────────────────────────
+ * The DM surfaces (rail, thread, bubbles, composer, modals) are token-driven and
+ * already adapt — their backgrounds resolve to the flipping --bn-* tokens under
+ * every dark toggle BN supports ([data-bn-theme], [data-theme], [data-bx-mode]).
+ * The one exception is bare form fields: the host theme paints inputs/selects
+ * white with a selector that outranks the .bn-input primitive, so re-assert the
+ * field surface for the DM's inputs under dark mode. Triple-selector to cover
+ * BN's own toggle and the Wbcom sibling-theme (BuddyX/Reign) color-mode toggle.
+ * ──────────────────────────────────────────────────────────────────────────── */
+[data-bn-theme="dark"] .bn-dm .bn-input,
+[data-bn-theme="dark"] .bn-dm .bn-select,
+[data-bn-theme="dark"] .bn-dm-compose__group-name,
+[data-theme="dark"] .bn-dm .bn-input,
+[data-theme="dark"] .bn-dm .bn-select,
+[data-theme="dark"] .bn-dm-compose__group-name,
+[data-bx-mode="dark"] .bn-dm .bn-input,
+[data-bx-mode="dark"] .bn-dm .bn-select,
+[data-bx-mode="dark"] .bn-dm-compose__group-name {
+	background: var(--bn-surface);
+	color: var(--bn-ink);
+	border-color: var(--bn-line-strong);
+}
+
+
+/* You cannot report your own message — hide the report action on own messages.
+   (The action bar template is shared by both sides; visibility is by side.) */
+.bn-dm-msg.is-mine .bn-dm-msg__action--report {
+	display: none;
+}
+
+/* Unsend / Delete are sender-only — hidden by default, shown only on your own
+   messages (the engine rejects a non-sender, so the UI mirrors that). */
+.bn-dm-msg__action--own {
+	display: none;
+}
+.bn-dm-msg.is-mine .bn-dm-msg__action--own {
+	display: inline-flex;
+}
+.bn-dm-msg__action--danger:hover,
+.bn-dm-msg__action--danger:focus-visible {
+	color: var(--bn-danger);
+	border-color: var(--bn-danger);
+}
+
+/* A deleted message renders a muted, italic tombstone in place of its content. */
+.bn-dm-msg.is-deleted .bn-dm-bubble {
+	font-style: italic;
+	opacity: 0.6;
+}
+
+/* ── Conversation info panel (1:1) ──────────────────────────────────────────
+   A right-anchored slide-in sidebar (per the v2 DM design), not a centered
+   popup. The shared .bn-modal-backdrop provides the dimmed click-to-close
+   layer; here we re-anchor its panel to the right edge as a full-height drawer
+   and slide it in. (Hidden via .bn-dm-info.is-hidden { display:none } above.) */
+.bn-modal-backdrop.bn-dm-info {
+	justify-content: flex-end;
+	align-items: stretch;
+	padding: 0;
+}
+.bn-dm-info .bn-modal__panel {
+	width: min(360px, 100%);
+	max-width: 100%;
+	height: 100%;
+	max-height: 100%;
+	margin: 0;
+	border-radius: 0;
+	display: flex;
+	flex-direction: column;
+	box-shadow: -8px 0 24px -12px rgba(0, 0, 0, 0.25);
+	animation: bn-dm-info-in 0.2s ease;
+}
+/* Sit below the WP admin bar (fixed, z-index above the backdrop) so the panel
+   header is not clipped under it. 32px desktop, 46px on the mobile admin bar. */
+body.admin-bar .bn-dm-info .bn-modal__panel {
+	height: calc(100% - 32px);
+	margin-top: 32px;
+}
+@media screen and (max-width: 782px) {
+	body.admin-bar .bn-dm-info .bn-modal__panel {
+		height: calc(100% - 46px);
+		margin-top: 46px;
+	}
+}
+@keyframes bn-dm-info-in {
+	from { transform: translateX(100%); }
+	to   { transform: translateX(0); }
+}
+.bn-dm-info .bn-modal__body {
+	flex: 1 1 auto;
+	overflow-y: auto;
+}
+
+.bn-dm-info__person {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: var(--bn-s2);
+	padding-block: var(--bn-s3) var(--bn-s5);
+	text-align: center;
+}
+.bn-dm-info__avatar img,
+.bn-dm-info__avatar .bn-monogram {
+	width: 64px;
+	height: 64px;
+	border-radius: 50%;
+	object-fit: cover;
+	font-size: var(--bn-fs-lg, 1.125rem);
+}
+.bn-dm-info__name {
+	font-weight: 600;
+	color: var(--bn-ink, inherit);
+}
+.bn-dm-info__section {
+	border-top: 1px solid var(--bn-line, #e5e7eb);
+	padding-block: var(--bn-s4);
+}
+.bn-dm-info__section-title {
+	margin: 0 0 var(--bn-s3);
+	font-size: var(--bn-fs-sm, 0.875rem);
+	font-weight: 600;
+	color: var(--bn-ink-2, inherit);
+}
+.bn-dm-info__media {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: var(--bn-s2);
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+.bn-dm-info__media-tile {
+	aspect-ratio: 1 / 1;
+	overflow: hidden;
+	border-radius: var(--bn-r-sm, 8px);
+}
+.bn-dm-info__media-tile a,
+.bn-dm-info__media-tile img {
+	display: block;
+	width: 100%;
+	height: 100%;
+}
+.bn-dm-info__media-tile img {
+	object-fit: cover;
+}
+.bn-dm-info__media-empty {
+	grid-column: 1 / -1;
+	color: var(--bn-ink-2, inherit);
+	font-size: var(--bn-fs-sm, 0.875rem);
+}
+.bn-dm-info__actions {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s1);
+	border-top: 1px solid var(--bn-line, #e5e7eb);
+	padding-top: var(--bn-s4);
+}
+.bn-dm-info__actions .bn-dm-info__danger {
+	justify-content: flex-start;
+	gap: var(--bn-s2);
+	color: var(--bn-danger, #dc2626);
+}
+@media (max-width: 480px) {
+	.bn-dm-info__media {
+		grid-template-columns: repeat(4, 1fr);
+	}
+
+	/*
+	 * Composer: stack the actions BELOW the message field on phones.
+	 *
+	 * On one row the three controls are the whole bar. Measured at 390px:
+	 * emoji 46 + attach 46 + send 47, plus the row's gaps and padding, left the
+	 * textarea **99px — under a third of the composer** — and "Type a message…"
+	 * wrapped to two lines inside a 36px min-height box, so the placeholder was
+	 * visibly clipped in half.
+	 *
+	 * Tightening padding cannot fix that: the three controls are 44px tap
+	 * targets (WCAG 2.5.8) and are not negotiable, so ~170px of a 312px bar is
+	 * spoken for no matter how the padding is tuned. The row has to break.
+	 *
+	 * Typing is the primary action, so it takes the full width on its own line;
+	 * emoji and attach sit under it at the inline start, and Send docks to the
+	 * inline end — the one-handed thumb zone, and where every messenger puts it.
+	 *
+	 * KNOWN TRADE-OFF: `order: -1` moves the field visually first while the DOM
+	 * keeps emoji → attach → field → send, so on phones the tab order does not
+	 * match the visual order (WCAG 2.4.3). Accepted deliberately: it is three
+	 * adjacent controls inside one compact widget, both sequences are
+	 * meaningful, and the alternative — reordering the DOM — simply moves the
+	 * same mismatch onto desktop, where the single-row layout needs the icons
+	 * before the field. Revisit if the composer ever grows more controls.
+	 */
+	.bn-dm-composer__row {
+		flex-wrap: wrap;
+	}
+
+	.bn-dm-composer__input {
+		flex: 1 1 100%;
+		order: -1;
+	}
+
+	.bn-dm-composer__row > [type="submit"] {
+		margin-inline-start: auto;
+	}
+}
+
+/* Load-older (thread) + load-more (rail) pagination controls (C17.2). */
+.bn-dm-loadolder {
+	display: flex;
+	justify-content: center;
+	padding: var(--bn-s2, 0.5rem) 0;
+}
+
+.bn-dm-loadolder[aria-busy="true"] {
+	opacity: 0.6;
+	pointer-events: none;
+}
+
+.bn-dm-rail__loadmore {
+	display: block;
+	text-align: center;
+	padding: var(--bn-s3, 0.75rem);
+	font-size: var(--bn-text-sm, 0.875rem);
+	color: var(--bn-accent, var(--brand));
+	text-decoration: none;
+}
+
+.bn-dm-rail__loadmore:hover {
+	background: var(--bn-canvas);
+}
+
+/* In-conversation message search (C17.4). */
+.bn-dm-search {
+	border-bottom: 1px solid var(--bn-line, #e5e7eb);
+	background: var(--bn-surface, #fff);
+}
+
+.bn-dm-search__bar {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2, 0.5rem);
+	padding: var(--bn-s2, 0.5rem) var(--bn-s3, 0.75rem);
+}
+
+.bn-dm-search__input {
+	flex: 1;
+	border: 0;
+	background: none;
+	font-size: var(--bn-text-sm, 0.875rem);
+	color: var(--bn-ink, inherit);
+	outline: none;
+}
+
+.bn-dm-search__results {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	max-height: 40vh;
+	overflow-y: auto;
+}
+
+.bn-dm-search__result {
+	display: block;
+	width: 100%;
+	text-align: start;
+	background: none;
+	border: 0;
+	padding: var(--bn-s2, 0.5rem) var(--bn-s3, 0.75rem);
+	font-size: var(--bn-text-sm, 0.875rem);
+	color: var(--bn-ink-2, #646970);
+	cursor: pointer;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.bn-dm-search__result:hover {
+	background: var(--bn-canvas);
+	color: var(--bn-ink);
+}
+
+.bn-dm-search__empty {
+	padding: var(--bn-s3, 0.75rem);
+	font-size: var(--bn-text-sm, 0.875rem);
+	color: var(--bn-ink-2, #646970);
+	text-align: center;
+}
+
+.bn-dm-msg.is-search-hit {
+	animation: bn-dm-search-flash 1.5s ease;
+}
+
+@keyframes bn-dm-search-flash {
+	0%, 100% { background: transparent; }
+	30% { background: color-mix( in oklab, var(--bn-accent, #2563eb) 18%, transparent ); }
+}

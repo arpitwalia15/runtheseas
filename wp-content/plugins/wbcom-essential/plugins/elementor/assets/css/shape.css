@@ -1,0 +1,56 @@
+.wbcom-custom-shape-wrapper {
+    display: -webkit-box;
+    display: -ms-flexbox;
+    display: flex;
+    -webkit-box-orient: vertical;
+    -webkit-box-direction: normal;
+    -ms-flex-direction: column;
+    flex-direction: column
+}
+
+.wbcom-custom-shape {
+    display: -webkit-box;
+    display: -ms-flexbox;
+    display: flex;
+    position: relative;
+    background-color: #eee;
+    -webkit-box-pack: center;
+    -ms-flex-pack: center;
+    justify-content: center;
+    -webkit-box-align: center;
+    -ms-flex-align: center;
+    align-items: center;
+    -ms-word-wrap: break-word;
+    word-wrap: break-word;
+    -ms-flex-wrap: wrap;
+    flex-wrap: wrap;
+    -webkit-box-orient: vertical;
+    -webkit-box-direction: normal;
+    -ms-flex-direction: column;
+    flex-direction: column;
+    max-width: 100%;
+    -ms-flex-line-pack: center;
+    align-content: center
+}
+
+.wbcom-custom-shape:after,
+.wbcom-custom-shape:before {
+    display: none !important
+}
+
+.wbcom-custom-shape .wbcom-custom-shape-link {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    text-decoration: none !important
+}
+
+.wbcom-custom-shape .wbcom-custom-shape-link:after,
+.wbcom-custom-shape .wbcom-custom-shape-link:before {
+    display: none !important
+}

@@ -1,0 +1,3953 @@
+/* BuddyNext — Feed component styles.
+ *
+ * Covers: post card, reaction bar, poll, link preview, share embed,
+ * announcement card, content warning overlay, feed layout, composer,
+ * skeleton loader, sidebar widgets. Dark mode via the canonical trio
+ * [data-bn-theme="dark"], [data-theme="dark"], [data-bx-mode="dark"].
+ * Mobile responsive at ≤640px.
+ */
+
+/* All --bn-* tokens are defined canonically in bn-base.css. The legacy
+ * :root alias block that used to live here (--bn-s4: var(--bn-s4) etc.)
+ * has been removed — it created circular references when other CSS
+ * files defined --s4 themselves (legacy alias on the OTHER side), and
+ * the resulting alias loop collapsed every spacing token to 0px on any
+ * hub that loaded bn-feed.css alongside another stylesheet.
+ *
+ * If a rule below references a legacy --bn-* name that no longer exists,
+ * it should be updated to use the canonical --bn-* token from bn-base.css. */
+
+/* ── Feed page shell ────────────────────────────────────────────────────────── */
+.bn-feed-page {
+	font-family: var(--bn-font-body);
+	font-size: var(--bn-text-base);
+	line-height: var(--bn-leading-body);
+	color: var(--bn-text-1);
+	background: var(--bn-bg-subtle);
+	-webkit-font-smoothing: antialiased;
+	min-height: 100vh;
+}
+
+/* Feed stack: vertical rhythm for the inner main column.
+   The shell owns the 2-column grid; this rule owns inner spacing. */
+.bn-feed-stack {
+	display: flex;
+	flex-direction: column;
+	/* 20px between cards: the 1px --bn-line border on a light surface reads as
+	   cramped at 16px, so give the feed a touch more premium breathing room. */
+	gap: var(--bn-s5);
+}
+
+/* Profile Activity tab: the owner composer and the .bn-feed-stack sit as direct
+   siblings in .bn-pf-tab-content with no gap; separate the composer from the
+   first post by the same amount as the card-to-card gap so it is not flush. */
+.bn-pf-tab-content > .bn-composer {
+	margin-block-end: var(--bn-s5);
+}
+
+/* ── Post card (v2 pattern) ─────────────────────────────────────────────────────
+   Source: docs/v2 Plans/v2/home-feed.html post sections + post-detail.html.
+   Single border, no shadow at rest, padding `--bn-s5`, gap `--bn-s4` between
+   regions. Theme-agnostic — no BuddyX/Reign/Astra-specific selectors.
+   The card owns its own typography to insulate against community-theme bleed. */
+.bn-post-card {
+	font-family: var(--bn-font-ui);
+	font-size: var(--bn-text-base);
+	line-height: 1.6;
+	color: var(--bn-ink);
+	background: var(--bn-surface);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-lg);
+	padding: var(--bn-s5);
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s4);
+	/* Spacing between cards comes from the parent .bn-feed-stack { gap: var(--bn-s4) }.
+	 * Don't add margin-block-end here — that would double-space. */
+	transition: border-color var(--bn-dur, 200ms) var(--bn-ease, ease);
+}
+
+.bn-post-card:hover {
+	border-color: var(--bn-line-strong);
+}
+
+/*
+ * Announcement + pinned variants carry NO coloured edge rail.
+ *
+ * They used to: a 4px accent border on the inline start, and a 3px warn border on the
+ * block start. Both were a second, weaker way of saying something the card already says
+ * in words — an announcement renders .bn-post-card__announcement-bar with a labelled
+ * badge on a tinted ground, and a pinned post renders .bn-post-card__pin-label. Two
+ * signals for one state, and the rail was the one a member cannot read.
+ *
+ * Neither Facebook nor LinkedIn marks a pinned or promoted post with a coloured card
+ * edge; they label it. The rail also broke the card's silhouette (a 4px stripe against
+ * 1px on the other three sides) and stole width from the text on a phone.
+ *
+ * Keep the state legible in the banner, not in the border.
+ */
+
+/* Announcement / pin banners — flush rows above the head. */
+.bn-post-card__announcement-bar {
+	display: flex;
+	align-items: center;
+	/* gap separates the End action from the × close; the badge takes the free
+	   space (margin-inline-end: auto below) so End + × cluster at the trailing
+	   edge instead of End floating in the middle (space-between did that). */
+	gap: var(--bn-s2);
+	background: var(--bn-accent-100);
+	padding: var(--bn-s2) var(--bn-s3);
+	border-radius: var(--bn-r-md);
+	margin-block-end: calc(var(--bn-s4) * -1 + var(--bn-s2));
+}
+
+.bn-post-card__ann-badge {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-s1);
+	/* Push the trailing controls (End, ×) to the right edge. */
+	margin-inline-end: auto;
+	font-size: var(--bn-text-xs);
+	font-weight: 700;
+	color: var(--bn-accent-700);
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+}
+
+.bn-post-card__ann-dismiss {
+	background: transparent;
+	border: 0;
+	color: var(--bn-ink-3);
+	cursor: pointer;
+	line-height: 1;
+	padding: 2px var(--bn-s1);
+	border-radius: var(--bn-r-sm);
+	transition: color var(--bn-dur-fast, 120ms) var(--bn-ease, ease), background var(--bn-dur-fast, 120ms) var(--bn-ease, ease);
+}
+
+.bn-post-card__ann-dismiss:hover {
+	color: var(--bn-danger);
+	background: var(--bn-danger-bg);
+}
+
+.bn-post-card__pin-label {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-s1);
+	font-size: var(--bn-text-xs);
+	font-weight: 600;
+	color: var(--bn-warn);
+	background: var(--bn-warn-bg);
+	padding: var(--bn-s1) var(--bn-s3);
+	border-radius: var(--bn-r-md);
+	width: max-content;
+	margin-block-end: calc(var(--bn-s4) * -1 + var(--bn-s2));
+}
+
+/* Head row: avatar + author block + kebab (v2 .post-head). */
+.bn-post-card__head {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s3);
+}
+
+.bn-post-card__avatar-link {
+	display: inline-flex;
+	flex-shrink: 0;
+}
+
+.bn-post-card__author-block {
+	flex: 1;
+	min-width: 0;
+}
+
+/* Byline Follow — a compact pill pinned to the right of the head row, beside
+   the options kebab (LinkedIn/X/Facebook pattern). The author block (flex:1)
+   absorbs the remaining width, so this never forces a dead extra row beneath
+   the card head. flex-shrink:0 so the pill keeps its size on narrow cards. */
+.bn-post-card__follow {
+	display: inline-flex;
+	align-items: center;
+	flex-shrink: 0;
+}
+.bn-post-card__follow .bn-follow-btn,
+.bn-post-card__follow .bn-btn {
+	min-height: 0;
+	height: auto;
+	--bn-btn-py: 4px;
+	--bn-btn-px: 14px;
+	font-size: var(--bn-text-xs);
+	font-weight: 600;
+	border-radius: var(--bn-r-full, 999px);
+	line-height: 1.4;
+}
+
+.bn-post-card__author {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	flex-wrap: wrap;
+	font-size: var(--bn-text-sm);
+	font-weight: 600;
+	color: var(--bn-ink);
+	line-height: 1.3;
+}
+
+.bn-post-card__author-name {
+	color: var(--bn-ink);
+	text-decoration: none;
+	font-weight: 600;
+}
+
+.bn-post-card__author-name:hover { color: var(--bn-accent); }
+
+/* Connection-degree pill (1st / 2nd) — matches parts/member-card's
+   .bn-md-card__degree so the byline and directory read consistently. */
+.bn-post-card__degree {
+	font-family: var(--bn-font-mono, var(--bn-font-ui));
+	font-size: 10px;
+	font-weight: var(--bn-fw-semibold, 600);
+	letter-spacing: 0.04em;
+	line-height: 1.2;
+	padding: 2px 6px;
+	border-radius: 999px;
+	color: var(--bn-accent);
+	background: color-mix(in oklch, var(--bn-accent) 14%, var(--bn-surface));
+	border: 1px solid color-mix(in oklch, var(--bn-accent) 28%, transparent);
+}
+.bn-post-card__degree[data-degree="2"] {
+	color: var(--bn-ink-2);
+	background: var(--bn-sunken);
+	border-color: var(--bn-line);
+}
+
+.bn-post-card__meta {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s1);
+	flex-wrap: wrap;
+	margin-block-start: 2px;
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+}
+
+.bn-post-card__handle {
+	color: var(--bn-ink-2);
+	font-weight: 500;
+	text-decoration: none;
+}
+
+.bn-post-card__handle:hover { color: var(--bn-accent); }
+
+.bn-post-card__space-link {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-s1);
+	color: var(--bn-ink-2);
+	font-weight: 500;
+	text-decoration: none;
+}
+.bn-post-card__space-link:hover { color: var(--bn-accent); }
+.bn-post-card__space-link .bn-icon {
+	width: 12px;
+	height: 12px;
+}
+
+.bn-post-card__sep {
+	color: var(--bn-ink-4);
+}
+
+.bn-post-card__time,
+.bn-post-card__edited {
+	color: var(--bn-ink-3);
+}
+
+.bn-post-card__edited {
+	font-style: italic;
+}
+
+.bn-post-card__privacy {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-s1);
+	color: var(--bn-ink-3);
+}
+
+.bn-post-card__privacy svg {
+	width: 12px;
+	height: 12px;
+}
+
+/* Kebab menu trigger + dropdown. */
+.bn-post-card__menu-wrap { position: relative; flex-shrink: 0; }
+
+.bn-post-card__menu {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 32px;
+	height: 32px;
+	padding: 0;
+	background: transparent;
+	border: 0;
+	border-radius: var(--bn-r-md);
+	color: var(--bn-ink-3);
+	cursor: pointer;
+	transition: background var(--bn-dur-fast, 120ms) var(--bn-ease, ease), color var(--bn-dur-fast, 120ms) var(--bn-ease, ease);
+}
+
+.bn-post-card__menu:hover {
+	background: var(--bn-sunken);
+	color: var(--bn-ink);
+}
+
+.bn-post-card__menu:focus-visible {
+	outline: 2px solid var(--bn-accent);
+	outline-offset: 2px;
+}
+
+.bn-post-card__menu svg {
+	width: 16px;
+	height: 16px;
+}
+
+.bn-post-card__options-menu {
+	position: absolute;
+	inset-block-start: calc(100% + 4px);
+	inset-inline-end: 0;
+	background: var(--bn-surface);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-md);
+	box-shadow: var(--bn-shadow-md);
+	min-width: 160px;
+	z-index: 100;
+	overflow: hidden;
+}
+
+.bn-post-card__options-menu[hidden] { display: none; }
+
+.bn-post-card__menu-item {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	width: 100%;
+	padding: var(--bn-s2) var(--bn-s3);
+	background: transparent;
+	border: 0;
+	font-size: var(--bn-text-sm);
+	font-family: var(--bn-font-ui);
+	color: var(--bn-ink);
+	cursor: pointer;
+	text-align: start;
+	transition: background var(--bn-dur-fast, 120ms) var(--bn-ease, ease);
+}
+
+.bn-post-card__menu-item:hover,
+.bn-post-card__menu-item:focus { background: var(--bn-sunken); color: var(--bn-ink); }
+.bn-post-card__menu-item:focus-visible { outline: 2px solid transparent; box-shadow: inset 0 0 0 2px var(--bn-accent); }
+.bn-post-card__menu-item--danger { color: var(--bn-danger); }
+.bn-post-card__menu-item--danger:hover,
+.bn-post-card__menu-item--danger:focus { background: var(--bn-danger-bg); color: var(--bn-danger); }
+
+/* Follow inside the overflow menu is the MOBILE stand-in for the inline pill,
+	which is hidden under 640px. Hidden by default so the two never show at once;
+	the mobile block at the end of this file turns it on.
+
+	This MUST come after the base .bn-post-card__menu-item rule: both are
+	single-class selectors, so source order decides, and placed before it the
+	base `display: flex` won and the menu item showed on desktop ALONGSIDE the
+	inline pill. */
+/* Reads as a menu ROW, not a pill. partials/follow-button.php renders the shared
+	.bn-btn (border, 100px wide, centred, 12px) which is right beside the byline
+	and wrong in a list of borderless icon+label rows — it looked like a button
+	dropped into a menu.
+
+	The button is stretched across the whole row rather than sitting next to the
+	icon, so the icon is not a dead zone: its content is owned by
+	data-wp-text="state.label" and cannot hold an inline SVG. */
+.bn-post-card__menu-item--follow {
+	display: none;
+	position: relative;
+	align-items: center;
+	gap: var(--bn-s2);
+	padding: var(--bn-s2) var(--bn-s3);
+	color: var(--bn-ink);
+	/* Siblings compute line-height: normal; the follow row inherited 20.8px and
+		stood 6px taller than every other item in the same menu. */
+	line-height: normal;
+}
+
+.bn-post-card__menu-item--follow > .bn-follow-btn-wrap,
+.bn-post-card__menu-item--follow .bn-follow-btn {
+	position: absolute;
+	inset: 0;
+	inline-size: 100%;
+	block-size: 100%;
+}
+
+.bn-post-card__menu-item--follow .bn-follow-btn,
+.bn-post-card__menu-item--follow .bn-follow-btn[data-variant],
+.bn-post-card__menu-item--follow .bn-follow-btn[data-size] {
+	display: flex;
+	justify-content: flex-start;
+	align-items: center;
+	/* Clear the icon + gap so the label lines up with every other row's label. */
+	padding: var(--bn-s2) var(--bn-s3) var(--bn-s2) calc( var(--bn-s3) + 16px + var(--bn-s2) );
+	border: 0;
+	border-radius: 0;
+	background: transparent;
+	color: inherit;
+	font-family: var(--bn-font-ui);
+	font-size: var(--bn-text-sm);
+	font-weight: var(--bn-fw-normal);
+	line-height: normal;
+	min-block-size: 0;
+	block-size: auto;
+}
+
+.bn-post-card__menu-item--follow:hover,
+.bn-post-card__menu-item--follow:focus-within {
+	background: var(--bn-sunken);
+}
+
+.bn-post-card__menu-item--follow .bn-follow-btn:focus-visible {
+	outline: 2px solid transparent;
+	box-shadow: inset 0 0 0 2px var(--bn-accent);
+}
+
+/* Already-reported status — a non-interactive confirmation, not an action. */
+.bn-post-card__menu-item--reported { color: var(--bn-ink-3); cursor: default; }
+.bn-post-card__menu-item--reported:hover,
+.bn-post-card__menu-item--reported:focus { background: transparent; color: var(--bn-ink-3); }
+
+/* Content warning overlay — replaces the body until the user clicks "Show anyway". */
+.bn-post-card__cw-overlay {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: var(--bn-s2);
+	border-radius: var(--bn-r-md);
+	background: var(--bn-sunken);
+	border: 1px solid var(--bn-line);
+	text-align: center;
+	padding: var(--bn-s6) var(--bn-s4);
+}
+
+.bn-post-card__cw-overlay[hidden] { display: none; }
+
+.bn-post-card__cw-icon {
+	display: inline-flex;
+	color: var(--bn-warn);
+}
+
+.bn-post-card__cw-icon svg {
+	width: 24px;
+	height: 24px;
+}
+
+.bn-post-card__cw-label {
+	font-size: var(--bn-text-sm);
+	font-weight: 600;
+	color: var(--bn-ink-2);
+	margin: 0;
+}
+
+.bn-post-card__cw-reveal {
+	background: var(--bn-surface);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-full);
+	padding: 6px var(--bn-s4);
+	font-size: var(--bn-text-sm);
+	font-weight: 600;
+	font-family: var(--bn-font-ui);
+	color: var(--bn-ink);
+	cursor: pointer;
+	transition: border-color var(--bn-dur-fast, 120ms) var(--bn-ease, ease), background var(--bn-dur-fast, 120ms) var(--bn-ease, ease);
+}
+
+.bn-post-card__cw-reveal:hover {
+	border-color: var(--bn-accent);
+	background: var(--bn-accent-100);
+	color: var(--bn-accent-700);
+}
+
+/* Body block — v2 baseline. JS swaps `bn-post-card__body--blurred` when CW is active. */
+.bn-post-card__body {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s3);
+	font-size: var(--bn-text-base);
+	line-height: 1.6;
+	color: var(--bn-ink);
+}
+
+/* "Scheduled for <date>" strip on a scheduled post (owner's Scheduled tab). */
+.bn-post-card__scheduled {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	margin-block-start: var(--bn-s2);
+	padding: var(--bn-s2) var(--bn-s3);
+	border-radius: var(--bn-r-md);
+	background: color-mix(in oklch, var(--bn-accent) 8%, var(--bn-surface));
+	color: color-mix(in oklch, var(--bn-ink) 78%, transparent);
+	font-size: var(--bn-text-sm);
+	font-weight: 500;
+}
+.bn-post-card__scheduled svg {
+	width: 16px;
+	height: 16px;
+	flex-shrink: 0;
+}
+
+.bn-post-card__body--blurred {
+	filter: blur(8px);
+	pointer-events: none;
+	user-select: none;
+}
+
+.bn-post-card__content {
+	font-size: var(--bn-text-base);
+	line-height: 1.6;
+	color: var(--bn-ink);
+	/* Break long words ONLY when one cannot fit a line on its own.
+	   `word-break: break-word` is a deprecated alias that resolves to
+	   `overflow-wrap: anywhere`, which lets the browser break at ANY character —
+	   so the preview clamp ended mid-word ("…when configuring notifi"), which
+	   reads as a rendering fault rather than as truncation. The standard pair
+	   below keeps a long URL from overflowing the card while letting ordinary
+	   prose break only at spaces, so the clamp lands on a whole word. */
+	overflow-wrap: break-word;
+	word-break: normal;
+	/* Cap the MEASURE, not the card.
+	   Measured at 1440px: the post body runs 755px wide at 15px, which is 92
+	   characters per line on both the feed and the permalink. Every typographic
+	   reference puts comfortable reading at 45-75 (Bringhurst, ~66 optimal);
+	   past that the eye loses the line return on the way back, which readers
+	   experience as tiring rather than notice as a fault. Facebook, LinkedIn and
+	   X all sit inside the band because their feed columns are narrower than
+	   ours -- we get there by limiting the text instead of rebuilding the layout.
+
+	   ch units track the actual font, so this holds if a theme changes the face
+	   or the owner changes the size. Only the text is constrained: media, polls
+	   and link previews still use the full card width, which is what makes the
+	   difference read as deliberate rather than as a narrow card.
+
+	   The value is 58 and not 66, because `ch` is the advance width of the "0"
+	   glyph and proportional text averages narrower than that -- 68ch measured
+	   as 79 real characters here, still outside the band. 58ch lands inside it.
+	   Any change to this number should be re-measured rather than reasoned. */
+	max-width: 58ch;
+}
+
+/* ── Long-post preview ──────────────────────────────────────────────────────
+   A feed card previews; the permalink reads. Only the FEED clamps -- the body
+   part decides via its render context, so /p/{id}/ is never affected.
+
+   Clamped by LINE, not by character. The server decides WHETHER to preview
+   (~300 chars, about one Twitter post); the line count decides how much shows.
+
+   The two have to AGREE, and getting that wrong is the failure mode worth
+   naming: a 335-character post rendered as four lines in the wide feed column,
+   so a six-line clamp cut nothing while "See more" still appeared underneath
+   fully-visible text. Measured, not theorised -- a clamp that does not bite is
+   a promise of hidden content that is not there.
+
+   So the line count is set BELOW what the threshold can fill, at each width.
+   The feed column is far wider on desktop than on a phone, so the same 300
+   characters occupy roughly three lines there and twice that on mobile; both
+   values keep the visible text under the threshold, which means any post that
+   qualifies for a preview is always genuinely cut. It also keeps the amount of
+   text shown roughly CONSTANT across devices rather than the line count, which
+   is why a feed feels the same on both.
+
+   Three lines on desktop is also what LinkedIn settles on.
+
+   line-clamp is CSS, so it applies to cards the router swaps in on page 2+
+   with no re-initialisation. That matters: the dead-controls-below-the-fold
+   class of bug came from JS that only ran on first paint. */
+.bn-post-card__content--preview {
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 3;
+	line-clamp: 3;
+	overflow: hidden;
+}
+
+.bn-post-card__more {
+	margin-block: var(--bn-s2) 0;
+}
+
+.bn-post-card__more-link {
+	font-size: var(--bn-text-sm);
+	font-weight: var(--bn-fw-medium);
+	color: var(--bn-ink-3);
+	text-decoration: none;
+}
+
+.bn-post-card__more-link:hover,
+.bn-post-card__more-link:focus-visible {
+	color: var(--bn-accent);
+	text-decoration: underline;
+}
+
+.bn-post-card__content a {
+	color: var(--bn-accent);
+	text-decoration: none;
+}
+
+.bn-post-card__content a:hover { text-decoration: underline; }
+
+/* Hashtag chips — inline accent-tinted pills inside post content. The
+   chip background separates tags visually from surrounding text, makes
+   them scannable on dense explore cards, and gives the hover a discrete
+   target. Mentions stay accent-coloured but un-chipped so the @-prefix
+   does the visual lifting. */
+/* A hashtag is a word in a sentence, not a chip.
+ *
+ * It used to render as a filled pill - tinted background, full rounding,
+ * horizontal padding, inline-block. One tag looked deliberate; a normal post
+ * carrying five or six turned the body copy into a row of badges and broke the
+ * line rhythm, because every pill adds padding and its own baseline box.
+ *
+ * X and LinkedIn both render hashtags as plain accent-coloured text inline with
+ * the sentence, and .bn-mention right below already did exactly that here - so
+ * the pill was also the only inline entity in the product that disagreed with
+ * its own sibling. Matching them fixes both problems at once. */
+.bn-hashtag {
+	color: var(--bn-accent);
+	font-weight: 500;
+	text-decoration: none;
+}
+.bn-hashtag:hover { text-decoration: underline; }
+
+.bn-mention {
+	color: var(--bn-accent);
+	font-weight: 500;
+	text-decoration: none;
+}
+.bn-mention:hover { text-decoration: underline; }
+
+.bn-post-card__content--announcement {
+	font-weight: 500;
+}
+
+/* Photo / video / audio media grid + tiles + lightbox live in bn-media.css
+ * (BuddyNext\Media\MediaRenderer markup). The legacy media-item grid that
+ * used to live here was superseded by the bn-media-tile system and removed
+ * to avoid two conflicting .bn-post-card__media-grid definitions. */
+
+/* File attachments. */
+.bn-post-card__file-list {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s1);
+}
+
+.bn-post-card__file-item {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	padding: var(--bn-s2) var(--bn-s3);
+	background: var(--bn-sunken);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-md);
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink-2);
+	cursor: pointer;
+	transition: background var(--bn-dur-fast, 120ms) var(--bn-ease, ease);
+}
+
+.bn-post-card__file-item:hover { background: var(--bn-line-faint); }
+
+/* Link embed (v2 .embed). */
+/* Every embed wrapper is a containing block. The fallback layer below is
+   absolutely positioned, and only the RICH player variant used to establish an
+   anchor for it - so for any other provider shape (WordPress' own internal-post
+   embeds, X/Instagram/Reddit blockquotes) it resolved against .bn-app and
+   painted over the whole feed. The template no longer emits the layer in those
+   cases; this keeps it structurally impossible for a future variant to escape. */
+.bn-post-card__embed,
+.bn-post-card__link-preview {
+	position: relative;
+	display: flex;
+	gap: var(--bn-s3);
+	padding: var(--bn-s3) var(--bn-s4);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-md);
+	background: var(--bn-sunken);
+	text-decoration: none;
+	transition: border-color var(--bn-dur-fast, 120ms) var(--bn-ease, ease);
+}
+
+.bn-post-card__link-preview:hover {
+	border-color: var(--bn-accent);
+}
+
+/* oEmbed video/player (YouTube/Vimeo/etc.): a media container, not a link card -
+   drop the inherited flex/padding/border and cap the height like feed images so a
+   tall or odd-ratio embed can't take over the feed. The width cap keeps the 16/9
+   box no taller than the feed image cap (32rem) without distorting the iframe
+   (iframes can't letterbox via object-fit the way images do).
+   Scoped with :has() to REAL provider players only - WordPress' own internal-post
+   embeds (.wp-embedded-content) keep their default card chrome and auto-size
+   themselves via wp-embed.js, so they are deliberately left untouched. */
+.bn-post-card__oembed:has( iframe:not( .wp-embedded-content ) ),
+.bn-post-card__oembed:has( video ) {
+	display: block;
+	gap: 0;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	width: 100%;
+	/* 32rem tall at 16/9 => this max width; beyond it the height would exceed the cap. */
+	max-width: calc( 32rem * 16 / 9 );
+	margin: var(--bn-s3) 0 0;
+	border-radius: var(--bn-r-md);
+	overflow: hidden;
+	/* Anchor for the fallback layer below. */
+	position: relative;
+}
+
+/* Fallback backdrop BEHIND the player (see post-body.php). A blocked embed
+   leaves a transparent iframe over the reserved box; this layer shows through
+   it so the member sees a designed state with the original link instead of a
+   blank void. A working player stacks above and covers it entirely. */
+.bn-post-card__oembed-fallback {
+	position: absolute;
+	inset: 0;
+	z-index: 0;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: var(--bn-s2);
+	padding: var(--bn-s4);
+	background: var(--bn-sunken);
+	color: var(--bn-ink-3);
+	font-size: var(--bn-text-sm);
+	text-align: center;
+	text-decoration: none;
+}
+
+.bn-post-card__oembed-fallback svg {
+	width: var(--bn-s8);
+	height: var(--bn-s8);
+}
+
+.bn-post-card__oembed iframe:not( .wp-embedded-content ),
+.bn-post-card__oembed video {
+	position: relative;
+	z-index: 1;
+}
+
+/* Reign / FitVids double-reservation: FitVids wraps the iframe in
+   .fluid-width-video-wrapper and reserves height with an INLINE padding-top
+   while our rule below reserves it again via aspect-ratio - two stacked
+   reservations, one blank. The inline style is why these need !important;
+   with the wrapper neutralised, aspect-ratio is the single source of height. */
+.bn-post-card__oembed .fluid-width-video-wrapper {
+	padding: 0 !important;
+	position: static !important;
+	width: auto !important;
+}
+
+.bn-post-card__oembed .fluid-width-video-wrapper iframe {
+	position: relative !important;
+}
+
+.bn-post-card__oembed iframe:not( .wp-embedded-content ),
+.bn-post-card__oembed video,
+.bn-post-card__oembed embed,
+.bn-post-card__oembed object {
+	display: block;
+	width: 100%;
+	height: auto;
+	aspect-ratio: 16 / 9;
+	border: 0;
+	border-radius: var( --bn-r-md );
+}
+
+.bn-post-card__link-thumb {
+	width: 64px;
+	height: 64px;
+	flex-shrink: 0;
+	overflow: hidden;
+	border-radius: var(--bn-r-sm);
+	background: var(--bn-line-faint);
+}
+
+.bn-post-card__link-thumb img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+.bn-post-card__link-info {
+	flex: 1;
+	min-width: 0;
+}
+
+.bn-post-card__link-title {
+	font-size: var(--bn-text-sm);
+	font-weight: 600;
+	color: var(--bn-ink);
+	margin: 0 0 2px;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.bn-post-card__link-desc {
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+	margin: 0 0 var(--bn-s1);
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+	overflow: hidden;
+}
+
+.bn-post-card__link-domain {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-s1);
+	font-family: var(--bn-font-mono);
+	font-size: 10px;
+	color: var(--bn-ink-3);
+}
+
+/* Poll. */
+.bn-post-card__poll-question {
+	font-weight: 600;
+	margin-block-end: var(--bn-s2);
+}
+
+.bn-post-card__poll {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s2);
+}
+
+.bn-post-card__poll-option {
+	position: relative;
+	width: 100%;
+	background: transparent;
+	border: 1.5px solid var(--bn-line);
+	border-radius: var(--bn-r-md);
+	padding: var(--bn-s2) var(--bn-s3);
+	font-size: var(--bn-text-sm);
+	font-family: var(--bn-font-ui);
+	color: var(--bn-ink);
+	cursor: pointer;
+	text-align: start;
+	display: flex;
+	align-items: center;
+	overflow: hidden;
+	transition: border-color var(--bn-dur-fast, 120ms) var(--bn-ease, ease);
+	min-height: 40px;
+}
+
+.bn-post-card__poll-option:hover { border-color: var(--bn-accent); }
+.bn-post-card__poll-option.is-voted {
+	border-color: var(--bn-accent);
+	color: var(--bn-accent-700);
+	font-weight: 600;
+}
+.bn-post-card__poll-option.is-voted .bn-post-card__poll-fill {
+	background: var(--bn-accent-100);
+}
+
+.bn-post-card__poll-option:focus-visible {
+	outline: 2px solid var(--bn-accent);
+	outline-offset: 2px;
+}
+
+.bn-post-card__poll-fill {
+	position: absolute;
+	inset-block: 0;
+	inset-inline-start: 0;
+	background: var(--bn-accent-100);
+	transition: width 0.4s ease;
+	z-index: 0;
+}
+
+.bn-post-card__poll-option-text {
+	position: relative;
+	z-index: 1;
+	flex: 1;
+}
+
+.bn-post-card__poll-pct {
+	position: relative;
+	z-index: 1;
+	font-size: var(--bn-text-xs);
+	font-weight: 700;
+	color: var(--bn-accent-700);
+	margin-inline-start: auto;
+	padding-inline-start: var(--bn-s2);
+}
+
+.bn-post-card__poll-total {
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+	margin: 0;
+	padding-block-start: var(--bn-s1);
+}
+
+/* Bridge cards: media, discussion, job. */
+/* ── Article card (site tracking) ───────────────────────────────────────────
+   A member publishing a post is first-class community content on a platform
+   people came to for blogging, so it gets a real card - cover, headline,
+   excerpt - rather than the compact bridge row used for partner links. The
+   whole card is one anchor, so the entire surface is the tap target. */
+.bn-post-card__article {
+	display: block;
+	margin-block-start: var(--bn-s3);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-md);
+	overflow: hidden;
+	background: var(--bn-surface);
+	text-decoration: none;
+	color: inherit;
+	transition: border-color var(--bn-dur, 0.14s) var(--bn-ease, ease);
+}
+
+.bn-post-card__article:hover,
+.bn-post-card__article:focus-visible {
+	border-color: var(--bn-accent);
+}
+
+.bn-post-card__article-cover {
+	display: block;
+	aspect-ratio: 16 / 9;
+	/* Capped, like the oembed box above. At a desktop column width a pure 16/9
+	   cover is ~415px - 46% of the viewport - so the headline and excerpt, the
+	   things that make the article worth opening, get pushed under the fold by
+	   its own picture. object-fit crops rather than squashes. */
+	max-height: 20rem;
+	background: var(--bn-sunken);
+}
+
+.bn-post-card__article-cover img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+}
+
+.bn-post-card__article-body {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s1);
+	padding: var(--bn-s3) var(--bn-s4) var(--bn-s4);
+}
+
+.bn-post-card__article-kicker {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-s1);
+	color: var(--bn-ink-3);
+	font-size: var(--bn-text-xs);
+	font-weight: var(--bn-fw-semibold);
+	text-transform: uppercase;
+	letter-spacing: var(--bn-ls-wide, 0.04em);
+}
+
+.bn-post-card__article-kicker svg {
+	width: 14px;
+	height: 14px;
+}
+
+.bn-post-card__article-title {
+	font-family: var(--bn-font-display);
+	font-size: var(--bn-text-md);
+	font-weight: var(--bn-fw-bold);
+	line-height: var(--bn-leading-snug);
+	color: var(--bn-ink);
+	/* Two lines maximum: a long headline must not push the excerpt and the
+	   post's own actions off the fold. */
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+
+.bn-post-card__article-excerpt {
+	color: var(--bn-ink-2);
+	font-size: var(--bn-text-sm);
+	line-height: var(--bn-leading-body);
+	display: -webkit-box;
+	-webkit-line-clamp: 3;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+
+.bn-post-card__article-meta {
+	color: var(--bn-ink-3);
+	font-size: var(--bn-text-xs);
+}
+
+@media (max-width: 640px) {
+	/* A phone column fits roughly half the characters per line that the desktop
+	   feed does, so the same ~300-character budget is about six lines here.
+	   Matching the BUDGET rather than the line count is what keeps a preview
+	   showing a comparable amount of text on both. */
+	.bn-post-card__content--preview {
+		-webkit-line-clamp: 6;
+		line-clamp: 6;
+	}
+
+	.bn-post-card__article-body {
+		padding: var(--bn-s3);
+	}
+}
+
+/* Embedded partner content, styled as the SAME box the feed already uses for
+   embedded content of any kind - .bn-post-card__shared / __shared-embed. Same
+   border, radius, background and padding, so a job, a course and a reshared post
+   read as one family instead of three.
+   The accent stripe this used to carry was a bridge-only invention: it marked
+   partner content, but nothing else in the feed marks embedded content that way,
+   so it read as decoration rather than meaning. Owner decision 2026-08-02. */
+.bn-post-card__bridge-card {
+	display: flex;
+	gap: var(--bn-s3);
+	align-items: flex-start;
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-md);
+	padding: var(--bn-s4);
+	background: var(--bn-sunken);
+}
+
+.bn-post-card__bridge-icon {
+	display: inline-flex;
+	flex-shrink: 0;
+	color: var(--bn-ink-3);
+}
+
+/* Optional cover art. A listing, course or job may carry one and just as often
+   may not, so the DEFAULT card is the compact icon+text row above and this only
+   applies when the renderer found an image - no empty box is ever reserved. */
+.bn-post-card__bridge-card.has-cover {
+	align-items: stretch;
+}
+
+/* Cover art carries the card on its own, so the two markers that exist to
+   substitute for imagery step aside: the accent stripe and the type icon. What
+   is left is a plain bordered card with a thumbnail, a source label and text -
+   which is what a reader needs, and one less thing competing with the image.
+   Owner decision 2026-08-02.
+   Cards WITHOUT a cover keep both: there the icon is the only visual anchor and
+   the stripe is what marks the card as partner content at a glance.
+   The icon is aria-hidden, so hiding it costs assistive tech nothing. */
+
+.bn-post-card__bridge-card.has-cover .bn-post-card__bridge-icon {
+	display: none;
+}
+
+.bn-post-card__bridge-cover {
+	flex: 0 0 auto;
+	inline-size: 88px;
+	border-radius: var(--bn-r-sm);
+	overflow: hidden;
+	line-height: 0;
+	background: var(--bn-sunken);
+}
+
+.bn-post-card__bridge-cover img {
+	inline-size: 100%;
+	block-size: 100%;
+	object-fit: cover;
+	display: block;
+}
+
+/* The verb ("posted a new job", "completed a course"). Quiet by design - it is
+   context for the title, not the headline. */
+.bn-post-card__bridge-lead {
+	margin: 0 0 var(--bn-s1);
+	color: var(--bn-ink-3);
+	font-size: var(--bn-text-sm);
+}
+
+@media (max-width: 640px) {
+	/* A 88px thumbnail beside a wrapped title leaves too little room for either,
+	   so the cover goes full width above the text. */
+	.bn-post-card__bridge-card.has-cover {
+		flex-wrap: wrap;
+	}
+
+	.bn-post-card__bridge-cover {
+		inline-size: 100%;
+		aspect-ratio: 16 / 9;
+		order: -1;
+	}
+}
+
+/* Event activity card — date pill + title + date/time + location. Mirrors the
+   v2 "This week" event rows, sized up for the in-feed body. */
+.bn-post-card__event {
+	display: flex;
+	gap: var(--bn-s3);
+	align-items: center;
+	border: 1px solid var(--bn-line);
+	border-inline-start: 3px solid var(--bn-events);
+	border-radius: var(--bn-r-md);
+	padding: var(--bn-s3);
+	background: var(--bn-events-bg);
+}
+
+.bn-post-card__event-date {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	width: 48px;
+	flex-shrink: 0;
+	text-align: center;
+}
+
+.bn-post-card__event-month {
+	font-size: var(--bn-text-2xs);
+	font-weight: var(--bn-fw-semibold);
+	color: var(--bn-events);
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+
+.bn-post-card__event-day {
+	font-family: var(--bn-font-display);
+	font-size: var(--bn-text-2xl);
+	font-weight: var(--bn-fw-semibold);
+	line-height: 1;
+	color: var(--bn-ink);
+}
+
+.bn-post-card__event-date--tbd .bn-post-card__event-icon {
+	display: inline-flex;
+	color: var(--bn-events);
+}
+
+.bn-post-card__event-info {
+	flex: 1;
+	min-width: 0;
+}
+
+.bn-post-card__event-title {
+	font-size: var(--bn-text-base);
+	font-weight: var(--bn-fw-semibold);
+	line-height: 1.3;
+	color: var(--bn-ink);
+}
+
+.bn-post-card__event-meta {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s1);
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+	margin-top: 2px;
+}
+
+.bn-post-card__event-meta-icon {
+	display: inline-flex;
+	flex-shrink: 0;
+}
+
+.bn-post-card__event-meta-icon svg {
+	width: 13px;
+	height: 13px;
+}
+
+.bn-post-card__bridge-icon svg {
+	width: 20px;
+	height: 20px;
+}
+
+.bn-post-card__bridge-source {
+	font-size: var(--bn-text-xs);
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	color: var(--bn-ink-3);
+	display: block;
+	margin-block-end: 3px;
+}
+
+.bn-post-card__bridge-title {
+	display: block;
+	font-size: var(--bn-text-base);
+	font-weight: 600;
+	color: var(--bn-ink);
+	line-height: 1.35;
+	text-decoration: none;
+}
+a.bn-post-card__bridge-title:hover { color: var(--bn-accent); }
+
+.bn-post-card__bridge-text {
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink-2);
+	margin: var(--bn-s1) 0 0;
+	line-height: 1.5;
+}
+
+/* Reaction summary chips — sits above the action row. */
+.bn-post-card__reactions,
+.bn-post-card__reaction-summary {
+	display: flex;
+	gap: var(--bn-s1);
+	flex-wrap: wrap;
+}
+
+.bn-post-card__summary-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-s1);
+	height: 26px;
+	padding: 0 var(--bn-s2);
+	border-radius: var(--bn-r-full);
+	background: var(--bn-sunken);
+	font-size: var(--bn-text-xs);
+	font-weight: 600;
+	color: var(--bn-ink-2);
+	border: 1px solid transparent;
+	transition: background-color var(--bn-dur-fast, 120ms) var(--bn-ease, ease), border-color var(--bn-dur-fast, 120ms) var(--bn-ease, ease);
+}
+
+.bn-post-card__summary-chip svg {
+	width: 14px;
+	height: 14px;
+}
+
+/* Action row (v2 .post-actions): flat, gap, hover bg. */
+.bn-post-card__actions {
+	display: flex;
+	gap: var(--bn-s1);
+	padding-block-start: var(--bn-s3);
+	border-block-start: 1px solid var(--bn-line-faint);
+	align-items: center;
+	flex-wrap: nowrap; /* one row always — never break actions onto two rows. */
+}
+
+.bn-post-card__action-btn {
+	/* Compact, content-width pill actions — sit together at the start of the
+	   row instead of stretching to equal full-width columns (which left large
+	   dead gaps between the icon+label). */
+	flex: 0 0 auto;
+	min-width: 0;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	padding: 6px 14px;
+	font-size: var(--bn-text-sm);
+	font-family: var(--bn-font-ui);
+	color: var(--bn-ink-3);
+	cursor: pointer;
+	background: transparent;
+	border: 0;
+	border-radius: var(--bn-r-full);
+	white-space: nowrap;
+	transition: color var(--bn-dur-fast, 120ms) var(--bn-ease, ease), background var(--bn-dur-fast, 120ms) var(--bn-ease, ease);
+}
+
+/* Narrow cards (explore grid, mobile) — drop the text label to icon + count so
+   all actions stay on one row. The comment count is its own span, so it
+   survives; reaction/share counts live in the summary row above. */
+@media ( max-width: 480px ) {
+	.bn-post-card__action-label { display: none; }
+}
+
+.bn-post-card__action-btn svg,
+.bn-post-card__action-btn img {
+	width: 16px;
+	height: 16px;
+	stroke-width: 1.75;
+}
+
+.bn-post-card__action-btn:hover,
+.bn-post-card__action-btn:focus {
+	color: var(--bn-accent);
+	background: var(--bn-sunken);
+	/* Geometry (padding/border) is locked once in bn-base.css under .bn-app
+	   (theme-proof interactive controls) — base == hover, so no per-state lock. */
+}
+
+.bn-post-card__action-btn:focus-visible {
+	outline: 2px solid var(--bn-accent);
+	outline-offset: 2px;
+}
+
+.bn-post-card__action-btn.is-reacted { color: var(--bn-danger); }
+.bn-post-card__action-btn.is-bookmarked { color: var(--bn-warn); }
+.bn-post-card__action-btn.is-shared { color: var(--bn-accent); }
+
+/* Bookmarked = the Lucide bookmark filled solid, not just recoloured. The icon
+   ships fill="none"; painting the path with currentColor (the amber above)
+   gives the standard filled-bookmark affordance without a second SVG asset. */
+.bn-post-card__action-btn.is-bookmarked svg {
+	fill: currentColor;
+}
+
+/* Count beside the Comment / Share icon. Distinct from __action-label, so it
+   stays visible in the icon-only narrow layout (explore grid / mobile). */
+.bn-post-card__action-count { font-size: var(--bn-text-sm); font-weight: 600; color: var(--bn-ink-2); }
+.bn-post-card__action-count[hidden] { display: none; }
+
+.bn-post-card__action-label {
+	font-size: var(--bn-text-sm);
+	font-weight: 500;
+	color: inherit;
+}
+
+/* Share label cycles between "Share" / "Share · N" / "Shared" / "Shared · N"
+   (~38px → 75px range). Reserve the worst-case width so clicking Share
+   doesn't reflow the entire action row. */
+.bn-post-card__action-label[data-wp-text="state.shareLabel"] {
+	display: inline-block;
+	min-inline-size: 70px;
+	text-align: start;
+}
+
+/* Reaction picker wrapper + dropdown panel. */
+.bn-post-card__react-wrap { position: relative; }
+
+.bn-post-card__emoji-picker {
+	position: absolute;
+	inset-block-end: calc(100% + 8px);
+	inset-inline-start: 50%;
+	transform: translateX(-50%);
+	display: flex;
+	gap: var(--bn-s1);
+	background: var(--bn-surface);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-full);
+	padding: 6px 10px;
+	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+	z-index: 1000;
+	white-space: nowrap;
+}
+
+/* Flip downward when the React trigger sits near the top of the viewport, so
+   the upward-opening picker never paints over the sticky header (the JS adds
+   this modifier on open via collision detection). */
+.bn-post-card__emoji-picker--below {
+	inset-block-end: auto;
+	inset-block-start: calc(100% + 8px);
+}
+
+.bn-post-card__emoji-picker[hidden] { display: none; }
+
+/* Each picker button — Facebook-style: hover lifts and scales the
+   emoji 1.4× with a 200ms cubic-bezier bounce; the neighbours subtly
+   compress. Click triggers a quick pop animation before the picker
+   closes. */
+.bn-post-card__emoji-btn {
+	background: transparent;
+	border: 0;
+	cursor: pointer;
+	line-height: 1;
+	padding: var(--bn-s1);
+	border-radius: 50%;
+	transition: transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1);
+	transform-origin: center bottom;
+}
+.bn-post-card__emoji-btn:hover {
+	transform: scale(1.4) translateY(-4px);
+}
+.bn-post-card__emoji-btn:active {
+	animation: bn-react-pop 240ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.bn-post-card__emoji-btn:focus-visible {
+	outline: 2px solid var(--bn-accent);
+	outline-offset: 2px;
+}
+@keyframes bn-react-pop {
+	0%   { transform: scale(1); }
+	50%  { transform: scale(1.6) translateY(-6px); }
+	100% { transform: scale(1.4) translateY(-4px); }
+}
+
+/* Emoji image inside picker buttons. */
+.bn-reaction-icon {
+	display: inline-flex;
+	width: 28px;
+	height: 28px;
+	/* Never let the flex picker compress the emoji to 0. */
+	flex: 0 0 auto;
+}
+.bn-reaction-icon img,
+.bn-reaction-icon svg {
+	width: 28px;
+	height: 28px;
+	display: block;
+	/* Defend against host themes whose global `img { max-width: 100% }`
+	   collapses the emoji inside the flex picker — BN owns its own sizing. */
+	max-width: none;
+	flex-shrink: 0;
+}
+
+/* Letter-glyph fallback for custom (Pro) reactions that ship no SVG — the
+   reaction's accent colour is set inline on .bn-reaction-icon. Render it as a
+   filled circular badge that fills the 28px slot so it sits cleanly among the
+   SVG emoji instead of as misaligned bare text. */
+.bn-reaction-glyph {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 100%;
+	height: 100%;
+	border-radius: 50%;
+	background: color-mix(in oklab, currentColor 18%, transparent);
+	color: inherit;
+	font-size: 0.8125rem;
+	font-weight: 700;
+	line-height: 1;
+}
+
+/* React trigger button — shows a Lucide heart outline when idle. Once
+   the user has reacted, CSS replaces the icon with the colored Fluent
+   Emoji matching their reaction via background-image + masking the
+   underlying SVG. The colored emoji and the trigger label give the
+   Facebook-style "you reacted with X" affordance. */
+.bn-post-card__react-icon {
+	display: inline-flex;
+	width: 18px;
+	height: 18px;
+	align-items: center;
+	justify-content: center;
+	transition: transform 180ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.bn-post-card__react-icon svg { width: 18px; height: 18px; }
+
+/* Reacted states — hide the Lucide SVG and paint the colored emoji as
+   a background image. The Fluent Emoji vendor lives at
+   /assets/emoji/{slug}.svg (registered via IconService::emoji_url). */
+.bn-post-card__react-icon--like,
+.bn-post-card__react-icon--love,
+.bn-post-card__react-icon--haha,
+.bn-post-card__react-icon--wow,
+.bn-post-card__react-icon--sad,
+.bn-post-card__react-icon--angry {
+	background-position: center;
+	background-repeat: no-repeat;
+	background-size: contain;
+	transform: scale(1.05);
+}
+.bn-post-card__react-icon--like  svg,
+.bn-post-card__react-icon--love  svg,
+.bn-post-card__react-icon--haha  svg,
+.bn-post-card__react-icon--wow   svg,
+.bn-post-card__react-icon--sad   svg,
+.bn-post-card__react-icon--angry svg {
+	display: none;
+}
+.bn-post-card__react-icon--like  { background-image: url("../emoji/like.svg"); }
+.bn-post-card__react-icon--love  { background-image: url("../emoji/love.svg"); }
+.bn-post-card__react-icon--haha  { background-image: url("../emoji/haha.svg"); }
+.bn-post-card__react-icon--wow   { background-image: url("../emoji/wow.svg"); }
+.bn-post-card__react-icon--sad   { background-image: url("../emoji/sad.svg"); }
+.bn-post-card__react-icon--angry { background-image: url("../emoji/angry.svg"); }
+
+/* React button label colour-matches the reacted state for an extra
+   FB-style affordance ("Like" turns blue when you've liked, etc.). */
+.bn-post-card__action-btn--react.is-reacted .bn-post-card__action-label { color: var(--bn-accent); font-weight: 600; }
+
+/* ── Feed tabs ──────────────────────────────────────────────────────────────
+   Feed tabs use the .bn-tabs + .bn-tab primitives from bn-base.css. The
+   inner feed-stack layout (.bn-feed-stack) owns the vertical spacing
+   between the composer, tabs, announcement, and post list — no margin
+   needed here. */
+.bn-feed-tabs {
+	margin: 0;
+}
+
+/* ── Sidebar row helpers ────────────────────────────────────────────────
+   The shell's right column auto-wraps everything in .bn-app__right; this
+   block adds widget-local affordances missing from the bn-sbar-row base
+   primitive in bn-base.css (gap, info slot, link variant). */
+.bn-sbar-row {
+	gap: var(--bn-s3);
+	justify-content: space-between;
+}
+.bn-sbar-row__info {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+.bn-sbar-row__info .bn-sbar-row__name { display: block; }
+.bn-sbar-row__info .bn-sbar-row__meta { display: block; }
+.bn-sbar-row--link {
+	text-decoration: none;
+	color: inherit;
+}
+.bn-sbar-row--link:hover .bn-sbar-row__name { color: var(--bn-brand); }
+
+/* ── Empty state ────────────────────────────────────────────────────────────── */
+.bn-feed-empty {
+	text-align: center;
+	padding: var(--bn-s10) var(--bn-s6);
+	background: var(--bn-surface);
+	border: 1px solid var(--bn-border);
+	border-radius: var(--bn-r-xl);
+	color: var(--bn-text-3);
+}
+
+.bn-feed-empty__icon { font-size: var(--text-4xl); margin-bottom: var(--bn-s3); }
+
+.bn-feed-empty__title {
+	font-family: var(--bn-font-display);
+	font-size: var(--bn-text-lg);
+	font-weight: var(--fw-bold);
+	color: var(--bn-text-2);
+	margin: 0 0 var(--bn-s2);
+}
+
+.bn-feed-empty__text {
+	font-size: var(--bn-text-sm);
+	line-height: var(--leading-body);
+	margin: 0 0 var(--bn-s4);
+}
+
+/* .bn-feed-empty__cta uses the .bn-btn[data-variant="primary"] primitive. */
+
+
+/* ── Skeleton loader ────────────────────────────────────────────────────────── */
+@keyframes bn-shimmer {
+	0%   { background-position: -600px 0; }
+	100% { background-position: 600px 0; }
+}
+
+.bn-skeleton {
+	background: var(--bn-surface);
+	border-radius: var(--bn-r-xl);
+}
+
+.bn-skeleton-line {
+	height: 14px;
+	border-radius: var(--bn-r-sm);
+	background: linear-gradient(
+		90deg,
+		var(--bn-bg-subtle) 25%,
+		var(--bn-bg-hover)  50%,
+		var(--bn-bg-subtle) 75%
+	);
+	background-size: 1200px 100%;
+	animation: bn-shimmer 1.4s ease-in-out infinite;
+	margin-bottom: var(--bn-s2);
+}
+
+.bn-skeleton-avatar {
+	width: 40px;
+	height: 40px;
+	border-radius: 50%;
+	background: linear-gradient(
+		90deg,
+		var(--bn-bg-subtle) 25%,
+		var(--bn-bg-hover)  50%,
+		var(--bn-bg-subtle) 75%
+	);
+	background-size: 1200px 100%;
+	animation: bn-shimmer 1.4s ease-in-out infinite;
+}
+
+.bn-skeleton-header {
+	display: flex;
+	gap: var(--bn-s3);
+	align-items: center;
+	margin-bottom: var(--bn-s3);
+}
+
+.bn-skeleton-meta { flex: 1; }
+
+.bn-skeleton-line--short { width: 40%; }
+.bn-skeleton-line--medium { width: 70%; }
+.bn-skeleton-line--full { width: 100%; }
+.bn-skeleton-line--small { height: 10px; }
+
+/* ── Pagination ─────────────────────────────────────────────────────────────── */
+.bn-feed-pagination {
+	display: flex;
+	justify-content: center;
+	gap: var(--bn-s2);
+	margin-top: var(--bn-s5);
+	flex-wrap: wrap;
+}
+
+.bn-feed-page-btn {
+	padding: var(--bn-s2) var(--bn-s3);
+	border: 1.5px solid var(--bn-border);
+	border-radius: var(--bn-r-sm);
+	font-size: var(--bn-text-sm);
+	font-weight: var(--fw-medium);
+	color: var(--bn-text-2);
+	background: var(--bn-surface);
+	text-decoration: none;
+	transition: border-color var(--bn-transition), color var(--bn-transition), background var(--bn-transition);
+}
+
+.bn-feed-page-btn:hover {
+	border-color: var(--bn-brand);
+	color: var(--bn-brand);
+}
+
+.bn-feed-page-btn.current {
+	background: var(--bn-brand);
+	border-color: var(--bn-brand);
+	color: var(--text-on-brand);
+	font-weight: var(--fw-bold);
+}
+
+.bn-feed-page-btn[disabled] {
+	opacity: 0.4;
+	pointer-events: none;
+}
+
+/* ── Shared avatar utility ──────────────────────────────────────────────────── */
+.bn-avatar {
+	border-radius: 50%;
+	color: var(--text-on-brand);
+	font-weight: var(--fw-bold);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+	letter-spacing: var(--ls-wide);
+	overflow: hidden;
+}
+
+.bn-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+.bn-avatar.sm { width: 34px; height: 34px; font-size: var(--bn-text-xs); }
+.bn-avatar.xs { width: 26px; height: 26px; font-size: var(--text-xs); }
+
+/* ── Dark mode overrides ──────────────────────────────────────────────────────
+   Every dark rule must list the canonical trio BuddyNext supports:
+   [data-bn-theme="dark"] (BN toggle), [data-theme="dark"] (legacy alias) and
+   [data-bx-mode="dark"] (bridges the BuddyX / Reign colour-mode toggle).
+   Listing only one leaves the feed light when the host theme goes dark. */
+
+/* Raised surfaces (cards, composer, tabs, menus, skeletons, empty state). */
+[data-bn-theme="dark"] .bn-post-card,
+[data-theme="dark"] .bn-post-card,
+[data-bx-mode="dark"] .bn-post-card,
+[data-bn-theme="dark"] .bn-composer,
+[data-theme="dark"] .bn-composer,
+[data-bx-mode="dark"] .bn-composer,
+[data-bn-theme="dark"] .bn-feed-tabs,
+[data-theme="dark"] .bn-feed-tabs,
+[data-bx-mode="dark"] .bn-feed-tabs,
+[data-bn-theme="dark"] .bn-feed-tab,
+[data-theme="dark"] .bn-feed-tab,
+[data-bx-mode="dark"] .bn-feed-tab,
+[data-bn-theme="dark"] .bn-post-card__options-menu,
+[data-theme="dark"] .bn-post-card__options-menu,
+[data-bx-mode="dark"] .bn-post-card__options-menu,
+[data-bn-theme="dark"] .bn-post-card__emoji-picker,
+[data-theme="dark"] .bn-post-card__emoji-picker,
+[data-bx-mode="dark"] .bn-post-card__emoji-picker,
+[data-bn-theme="dark"] .bn-skeleton,
+[data-theme="dark"] .bn-skeleton,
+[data-bx-mode="dark"] .bn-skeleton,
+[data-bn-theme="dark"] .bn-feed-empty,
+[data-theme="dark"] .bn-feed-empty,
+[data-bx-mode="dark"] .bn-feed-empty {
+	background: var(--bn-surface);
+	border-color: var(--bn-border);
+}
+
+/* Inset surfaces (chips, previews, bridge cards, content-warning overlay). */
+[data-bn-theme="dark"] .bn-post-card__summary-chip,
+[data-theme="dark"] .bn-post-card__summary-chip,
+[data-bx-mode="dark"] .bn-post-card__summary-chip,
+[data-bn-theme="dark"] .bn-post-card__link-preview,
+[data-theme="dark"] .bn-post-card__link-preview,
+[data-bx-mode="dark"] .bn-post-card__link-preview,
+[data-bn-theme="dark"] .bn-post-card__bridge-card,
+[data-theme="dark"] .bn-post-card__bridge-card,
+[data-bx-mode="dark"] .bn-post-card__bridge-card,
+[data-bn-theme="dark"] .bn-post-card__cw-overlay,
+[data-theme="dark"] .bn-post-card__cw-overlay,
+[data-bx-mode="dark"] .bn-post-card__cw-overlay {
+	background: var(--bn-bg-hover);
+	border-color: var(--bn-border);
+}
+
+[data-bn-theme="dark"] .bn-post-card__poll-option,
+[data-theme="dark"] .bn-post-card__poll-option,
+[data-bx-mode="dark"] .bn-post-card__poll-option {
+	border-color: var(--bn-border);
+	color: var(--bn-text-1);
+}
+
+[data-bn-theme="dark"] .bn-post-card__poll-fill,
+[data-theme="dark"] .bn-post-card__poll-fill,
+[data-bx-mode="dark"] .bn-post-card__poll-fill,
+[data-bn-theme="dark"] .bn-post-card__announcement-bar,
+[data-theme="dark"] .bn-post-card__announcement-bar,
+[data-bx-mode="dark"] .bn-post-card__announcement-bar {
+	background: var(--bn-brand-light);
+}
+
+/* ── Responsive — mobile (≤640px) ──────────────────────────────────────────────
+   The shell (bn-shell.css) owns the rail + right-sidebar collapse breakpoints;
+   inner-template overrides here only tweak content rhythm at small widths. */
+/* Pin the reaction picker to the start edge once the shell drops its rail.
+	The picker is centred on its trigger (inset-inline-start: 50% + translateX(-50%)),
+	which puts it off the viewport whenever the trigger sits near the start edge.
+
+	This pin already existed but lived in the 640px block, while the layout that
+	CAUSES the clip switches at 768px — bn-shell.css:542 hides the rail and drops
+	the main gutter to --bn-s3. That left the 641-768px band (an iPad mini in
+	portrait, which is exactly what the bug report screenshotted) with the trigger
+	at x=75 and the 258px picker rendering at left: -54px, cutting the first two
+	emoji off-screen entirely. Matching the breakpoint to the layout is the fix.
+
+	Pinning alone is position-based, so it stops the START edge clipping but says
+	nothing about the END edge: Pro can register custom reaction slugs
+	(post-actions.php consumes ReactionService::reaction_types()) and a set well
+	above the default 6 runs straight off the right of a 375px screen. The width
+	cap below is the other half — it bounds the picker to the viewport whatever
+	the reaction count is, and lets the row wrap instead of extending off-screen.
+	Wrapping is why `white-space: nowrap` is cleared here: it is set on the base
+	rule to keep a single row on desktop, where there is room for one. */
+@media (max-width: 768px) {
+	.bn-post-card__emoji-picker {
+		inset-inline-start: 0;
+		inset-inline-end: auto;
+		transform: none;
+		/* width:max-content is load-bearing. The picker is absolutely positioned
+		   inside the narrow reaction-button wrapper, so its shrink-to-fit width
+		   resolves against THAT (~58px) rather than the screen: capping
+		   max-width alone made a 20-emoji set wrap into a one-per-row column.
+		   max-content asks for the full row it wants, and the cap below then
+		   clamps it to the screen, so it wraps into a tidy grid instead. */
+		width: max-content;
+		max-width: calc(100vw - (2 * var(--bn-s3)));
+		flex-wrap: wrap;
+		white-space: normal;
+		/* A very large custom set still cannot grow taller than the viewport. */
+		max-height: 40vh;
+		overflow-y: auto;
+	}
+}
+
+@media (max-width: 640px) {
+	.bn-feed-stack { gap: var(--bn-s3); }
+	.bn-pf-tab-content > .bn-composer { margin-block-end: var(--bn-s3); }
+
+	.bn-post-card__head { flex-wrap: wrap; }
+	/* Hide the inline per-post Follow on mobile. Repeated on every card it eats a
+	   full row each and clutters a dense feed (Facebook doesn't surface Follow on
+	   every feed post); the action stays available via the post's overflow (···)
+	   menu and the author's profile. Desktop has the width, so it keeps the
+	   inline Follow pill (see .bn-post-card__follow base rule). */
+	.bn-post-card__follow { display: none; }
+
+	/* ...and the menu item that replaces it becomes available here. Above this
+	   breakpoint the inline pill is showing, so the menu must NOT duplicate it. */
+	.bn-post-card__menu-item--follow { display: block; }
+
+	/* Facebook-style compact byline on narrow cards: author name on row 1, then
+	   ONE meta line — "Space · time · audience-icon" — on row 2 (never a 3rd
+	   row). The @handle (Facebook has no handles; it just repeats the name above)
+	   and the privacy WORD (the lock icon + aria-label convey it) are dropped on
+	   mobile only — desktop is unchanged. The meta stays on one line: if the
+	   space name is long it truncates with an ellipsis while the dot separators,
+	   time, and privacy icon stay fully pinned. */
+	.bn-post-card__meta .bn-post-card__handle,
+	.bn-post-card__meta .bn-post-card__handle + .bn-post-card__sep {
+		display: none;
+	}
+	.bn-post-card__privacy > span { display: none; }
+	.bn-post-card__meta { flex-wrap: nowrap; min-width: 0; gap: 3px; }
+	.bn-post-card__meta > * { flex-shrink: 0; }
+	.bn-post-card__space-link { min-width: 0; flex-shrink: 1; }
+	.bn-post-card__space-link .bn-icon { flex-shrink: 0; }
+	.bn-post-card__space-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+	.bn-composer { padding: var(--bn-s3); }
+
+	.bn-post-card {
+		padding: var(--bn-s4);
+		gap: var(--bn-s3);
+	}
+
+	.bn-post-card__actions {
+		gap: var(--bn-s3);
+	}
+
+	.bn-post-card__action-btn {
+		font-size: var(--bn-text-xs);
+		gap: var(--bn-s1);
+		padding: 6px;
+	}
+
+	.bn-post-card__action-label {
+		font-size: var(--bn-text-xs);
+	}
+
+	.bn-post-card__link-thumb {
+		width: 56px;
+		height: 56px;
+	}
+
+	.bn-feed-tab {
+		font-size: var(--bn-text-xs);
+		padding: var(--bn-s2);
+	}
+
+	.bn-post-card__options-menu {
+		inset-inline-end: 0;
+		min-width: 140px;
+	}
+}
+
+/* ── Comments expand region ────────────────────────────────────────────────── */
+
+.bn-post-card__comments {
+	border-block-start: 1px solid var(--bn-line-faint);
+	padding-block-start: var(--bn-s3);
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s3);
+}
+
+.bn-comment-list {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s3);
+}
+
+.bn-comment {
+	display: flex;
+	gap: var(--bn-s3);
+}
+
+.bn-comment--reply {
+	margin-inline-start: var(--bn-s8);
+}
+
+.bn-comment__avatar {
+	width: 32px;
+	height: 32px;
+	border-radius: var(--bn-r-full);
+	background: var(--bn-accent);
+	color: var(--bn-surface);
+	font-size: var(--bn-text-xs);
+	font-weight: 600;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+	overflow: hidden;
+}
+
+/* When the commenter has a real avatar, the image fills the circle; the accent
+   background + initials remain the fallback when no image is rendered. */
+.bn-comment__avatar img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+}
+
+.bn-comment__body {
+	flex: 1;
+	min-width: 0;
+}
+
+.bn-comment__header {
+	display: flex;
+	align-items: baseline;
+	gap: var(--bn-s2);
+	margin-block-end: var(--bn-s1);
+}
+
+.bn-comment__author {
+	font-size: var(--bn-text-sm);
+	font-weight: 600;
+	color: var(--bn-ink);
+}
+
+.bn-comment__time {
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+}
+
+.bn-comment__content {
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink);
+	line-height: 1.6;
+	margin: 0 0 var(--bn-s1);
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
+.bn-comment__actions {
+	display: flex;
+	gap: var(--bn-s3);
+}
+
+.bn-comment__reply-btn,
+.bn-comment__delete-btn,
+.bn-comment__reply-cancel {
+	background: transparent;
+	border: 0;
+	padding: 0;
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-2);
+	cursor: pointer;
+	font-weight: 500;
+}
+
+.bn-comment__reply-btn:hover { color: var(--bn-accent); }
+.bn-comment__delete-btn:hover { color: var(--bn-danger); }
+.bn-comment__reply-cancel:hover { color: var(--bn-ink); }
+
+.bn-comment__reply-form {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	margin-block-start: var(--bn-s2);
+}
+
+/* Per-selector [hidden] guard so a collapsed reply form is actually hidden,
+   rather than relying solely on the global [hidden]{display:none!important}
+   reset (which a theme/specificity override could defeat). The display:flex
+   above only applies to the visible state. */
+.bn-comment__reply-form[hidden] {
+	display: none;
+}
+
+.bn-comment__replies {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s3);
+	margin-block-start: var(--bn-s3);
+}
+
+.bn-comment-form {
+	display: flex;
+	align-items: flex-end;
+	gap: var(--bn-s2);
+}
+
+.bn-comment-form__avatar { flex-shrink: 0; }
+
+.bn-comment-form__input,
+.bn-comment__reply-input {
+	flex: 1;
+	min-width: 0;
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-md);
+	padding: var(--bn-s2) var(--bn-s3);
+	font-size: var(--bn-text-sm);
+	font-family: var(--bn-font-ui);
+	color: var(--bn-ink);
+	background: var(--bn-sunken);
+	resize: none;
+	line-height: 1.5;
+	transition: border-color var(--bn-dur-fast, 120ms) var(--bn-ease, ease), background var(--bn-dur-fast, 120ms) var(--bn-ease, ease);
+}
+
+.bn-comment-form__input:focus,
+.bn-comment__reply-input:focus {
+	outline: 2px solid transparent;
+	outline-offset: 2px;
+	border-color: var(--bn-accent);
+	background: var(--bn-surface);
+}
+
+/* Icon-only circular submit — overrides .bn-btn[data-variant="primary"] sizing. */
+.bn-comment-form__submit.bn-btn,
+.bn-comment-form__submit {
+	width: 40px;
+	height: 40px;
+	min-height: 40px;
+	--bn-btn-py: 0;
+	--bn-btn-px: 0;
+	border-radius: var(--bn-r-full);
+	flex-shrink: 0;
+}
+
+.bn-comment-form__submit svg {
+	width: 16px;
+	height: 16px;
+	stroke: currentColor;
+	fill: none;
+	stroke-width: 2;
+}
+
+.bn-comment-count {
+	display: inline-block;
+	min-inline-size: 22px;
+	font-size: var(--bn-text-xs);
+	font-weight: 600;
+	color: inherit;
+	text-align: end;
+}
+
+/* Reserve space when the count is 0 so the badge appearing on first
+   comment doesn't grow the button (~14-22px CLS otherwise). The
+   literal `hidden` attribute is enforced by a global
+   `[hidden] { display: none !important; }` reset, so the override
+   here must also be !important to keep the badge in flow. */
+.bn-comment-count[hidden] {
+	display: inline-block !important;
+	visibility: hidden;
+}
+
+/* Comments mobile */
+@media (max-width: 640px) {
+	.bn-comment--reply { margin-inline-start: var(--bn-s4); }
+}
+
+/* ── Threaded comments (wave 2) ────────────────────────────────────────────
+ * .bn-comment-card is the wave-2 node built by buildCommentNode in
+ * store.js. It supersedes .bn-comment for new code paths but inherits
+ * most styles. Depth is exposed via data-depth so indentation can be
+ * computed without spawning N classes.
+ */
+.bn-comment-card {
+	display: flex;
+	gap: var(--bn-s3);
+}
+
+.bn-comment-card[data-depth="1"] {
+	margin-inline-start: var(--bn-comment-indent, 32px);
+}
+
+.bn-comment-card[data-depth="2"] {
+	margin-inline-start: calc(var(--bn-comment-indent, 32px) * 2);
+}
+
+.bn-comment-card--pinned {
+	background: var(--bn-sunken);
+	border-radius: var(--bn-r-md);
+	padding: var(--bn-s2);
+}
+
+.bn-comment-card--deleted .bn-comment__content {
+	color: var(--bn-ink-3);
+	font-style: italic;
+}
+
+.bn-comment__pinned-badge {
+	font-size: var(--bn-text-xs);
+	font-weight: 600;
+	color: var(--bn-accent);
+	background: var(--bn-accent-soft, rgba(0, 0, 0, 0.05));
+	padding: 0 var(--bn-s2);
+	border-radius: var(--bn-r-sm);
+}
+
+.bn-comment__edited {
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+	font-style: italic;
+}
+
+.bn-comment__like-btn,
+.bn-comment__edit-btn,
+.bn-comment__pin-btn,
+.bn-comment__report-btn {
+	background: transparent;
+	border: 0;
+	padding: 0;
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-2);
+	cursor: pointer;
+	font-weight: 500;
+	min-height: var(--bn-tap, 40px);
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-s1);
+}
+
+.bn-comment__like-btn:hover { color: var(--bn-danger); }
+.bn-comment__edit-btn:hover { color: var(--bn-accent); }
+.bn-comment__pin-btn:hover { color: var(--bn-accent); }
+.bn-comment__report-btn:hover { color: var(--bn-danger); }
+
+/* Only style the reacted state when data-reaction holds an actual emoji —
+   the JS sets data-reaction="" (empty but present) on un-reacted comments,
+   which a bare [data-reaction] would wrongly match. */
+.bn-comment__like-btn[data-reaction]:not([data-reaction=""]) {
+	color: var(--bn-accent);
+	font-weight: 600;
+}
+.bn-comment__like-btn[data-reaction="love"]  { color: var(--bn-danger); }
+.bn-comment__like-btn[data-reaction="angry"] { color: var(--bn-danger); }
+.bn-comment__like-btn[data-reaction="haha"]  { color: var(--bn-warn); }
+.bn-comment__like-btn[data-reaction="wow"]   { color: var(--bn-warn); }
+.bn-comment__like-btn[data-reaction="sad"]   { color: var(--bn-accent); }
+
+.bn-comment__like-icon {
+	font-size: var(--bn-text-base);
+	line-height: 1;
+	display: inline-flex;
+	align-items: center;
+}
+.bn-comment__like-icon img {
+	width: 16px;
+	height: 16px;
+	display: block;
+}
+
+/* Comment reaction picker — mirrors the post-card picker but smaller
+   (24px emoji vs 28px). Hover-reveals on the .bn-comment__react-wrap
+   container with the same FB-style bounce on each emoji button. */
+.bn-comment__react-wrap {
+	position: relative;
+	display: inline-flex;
+}
+.bn-comment__react-picker {
+	position: absolute;
+	inset-block-end: calc(100% + 6px);
+	inset-inline-start: 0;
+	display: flex;
+	gap: 2px;
+	background: var(--bn-surface);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-full);
+	padding: var(--bn-s1) var(--bn-s2);
+	box-shadow: 0 6px 18px rgba(0, 0, 0, 0.14);
+	z-index: 1000;
+	white-space: nowrap;
+}
+.bn-comment__react-picker[hidden] { display: none; }
+.bn-comment__react-option {
+	background: transparent;
+	border: 0;
+	cursor: pointer;
+	line-height: 0;
+	padding: 3px;
+	border-radius: 50%;
+	transition: transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1);
+	transform-origin: center bottom;
+}
+.bn-comment__react-option:hover {
+	transform: scale(1.4) translateY(-3px);
+}
+.bn-comment__react-option:focus-visible {
+	outline: 2px solid var(--bn-accent);
+	outline-offset: 2px;
+}
+.bn-comment__react-option img {
+	width: 24px;
+	height: 24px;
+	display: block;
+	/* Same theme-proofing as the post reaction picker. */
+	max-width: none;
+	flex-shrink: 0;
+}
+
+.bn-comment__edit-form {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s2);
+	margin-block-end: var(--bn-s2);
+}
+
+.bn-comment__edit-form .bn-comment-form__submit {
+	align-self: flex-start;
+	width: auto;
+	height: auto;
+	min-height: var(--bn-tap, 40px);
+	border-radius: var(--bn-r-md);
+	padding: var(--bn-s1) var(--bn-s3);
+}
+
+/* Footer row for the edit form so emoji + Save + Cancel align on one line
+   instead of stretching full-width in the column layout. */
+.bn-comment__edit-actions {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2);
+}
+
+.bn-comment__edit-actions .bn-comment-form__submit {
+	align-self: center;
+}
+
+/* Reply-form submit reuses .bn-comment-form__submit (the circular icon button)
+   but carries a text label ("Reply"), which the 40x40 icon sizing clipped and
+   left misaligned next to the text Cancel link. Match the edit-form override so
+   it renders as a normal text button aligned with Cancel. */
+.bn-comment__reply-form .bn-comment-form__submit {
+	align-self: center;
+	width: auto;
+	height: auto;
+	min-height: var(--bn-tap, 40px);
+	border-radius: var(--bn-r-md);
+	padding: var(--bn-s1) var(--bn-s3);
+}
+
+/* Inline post editor — opened from the post card kebab → Edit. Pre-filled
+   textarea + Save/Cancel, replacing the rendered content in place. */
+.bn-post-card__edit-form {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s2);
+	margin-block: var(--bn-s2);
+}
+
+.bn-post-card__edit-input {
+	width: 100%;
+	box-sizing: border-box;
+	resize: vertical;
+	min-height: calc(var(--bn-tap, 40px) * 2);
+	padding: var(--bn-s2) var(--bn-s3);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-md);
+	background: var(--bn-surface);
+	color: var(--bn-ink);
+	font: inherit;
+	line-height: 1.5;
+}
+
+.bn-post-card__edit-input:focus-visible {
+	outline: 2px solid var(--bn-accent);
+	outline-offset: 1px;
+}
+
+.bn-post-card__edit-actions {
+	display: flex;
+	gap: var(--bn-s2);
+	flex-wrap: wrap;
+}
+
+/* Reschedule control — only rendered while the post is still `scheduled`.
+   Mirrors .bn-composer__schedule-input so the edit form and the composer offer the
+   same control; theme-mapped tokens, not raw hex. */
+.bn-post-card__edit-schedule {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	flex-wrap: wrap;
+	margin-block: var(--bn-s2);
+}
+
+.bn-post-card__edit-schedule-label {
+	font-family: var(--font-body);
+	font-size: var(--text-sm);
+	color: var(--text-2);
+}
+
+.bn-post-card__edit-schedule-input {
+	flex: 1 1 auto;
+	min-width: 0;
+	background: var(--bg-subtle);
+	border: 1px solid var(--border);
+	border-radius: var(--bn-r-md);
+	padding: var(--bn-s2) var(--bn-s3);
+	font-family: var(--font-body);
+	font-size: var(--text-sm);
+	color: var(--text-1);
+}
+
+.bn-post-card__edit-schedule-input:focus {
+	outline: 2px solid transparent;
+	outline-offset: 2px;
+	border-color: var(--brand);
+}
+
+@media (max-width: 480px) {
+	.bn-post-card__edit-schedule {
+		align-items: stretch;
+		flex-direction: column;
+		gap: var(--bn-s1);
+	}
+
+	.bn-post-card__edit-schedule-input {
+		width: 100%;
+	}
+}
+
+.bn-post-card__edited {
+	color: var(--bn-text-subtle, var(--bn-muted, inherit));
+	font-size: 0.85em;
+}
+
+/* Comment loading skeleton (three rows while the thread fetches). */
+.bn-comment-skeleton {
+	display: flex;
+	gap: var(--bn-s3);
+	align-items: center;
+	padding: var(--bn-s2) 0;
+}
+
+.bn-comment-skeleton__avatar {
+	width: 32px;
+	height: 32px;
+	border-radius: var(--bn-r-full);
+	flex-shrink: 0;
+}
+
+.bn-comment-skeleton__line {
+	flex: 1;
+	height: 14px;
+	border-radius: var(--bn-r-sm);
+}
+
+/* Comment thread load failure. */
+.bn-comment-error {
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink-2);
+	padding: var(--bn-s3);
+	background: var(--bn-sunken);
+	border-radius: var(--bn-r-md);
+	display: flex;
+	gap: var(--bn-s2);
+	align-items: center;
+	flex-wrap: wrap;
+}
+
+.bn-comment-error__retry {
+	background: transparent;
+	border: 0;
+	padding: 0;
+	color: var(--bn-accent);
+	cursor: pointer;
+	font-weight: 600;
+	text-decoration: underline;
+	min-height: var(--bn-tap, 40px);
+}
+
+/* "View more comments" load-more control for long threads. */
+.bn-comment-loadmore {
+	display: block;
+	width: 100%;
+	margin-block-start: var(--bn-s2);
+	padding: var(--bn-s2) var(--bn-s3);
+	background: var(--bn-sunken);
+	border: 0;
+	border-radius: var(--bn-r-md);
+	color: var(--bn-accent);
+	font-size: var(--bn-text-sm);
+	font-weight: 600;
+	cursor: pointer;
+	min-height: var(--bn-tap, 40px);
+}
+
+.bn-comment-loadmore:hover {
+	background: var(--bn-hover, var(--bn-sunken));
+}
+
+.bn-comment-loadmore:disabled {
+	color: var(--bn-ink-2);
+	cursor: default;
+}
+
+/* Inline comment-submit error rail above the textarea. */
+.bn-comment-submit-error {
+	display: flex;
+	gap: var(--bn-s2);
+	align-items: center;
+	padding: var(--bn-s2) var(--bn-s3);
+	background: var(--bn-danger-bg);
+	color: var(--bn-danger);
+	border-radius: var(--bn-r-md);
+	font-size: var(--bn-text-sm);
+	margin-block-end: var(--bn-s2);
+}
+
+.bn-comment-submit-error__retry {
+	background: transparent;
+	border: 0;
+	padding: 0;
+	color: var(--bn-danger);
+	cursor: pointer;
+	font-weight: 600;
+	text-decoration: underline;
+	min-height: var(--bn-tap, 40px);
+	margin-inline-start: auto;
+}
+
+/* Threaded comments — mobile collapse */
+@media (max-width: 480px) {
+	.bn-comment-card[data-depth="1"],
+	.bn-comment-card[data-depth="2"] {
+		/* Flatten deeper threads at mobile: only 16px indent at depth 1,
+		   no further indent for depth 2 to avoid horizontal scroll. */
+		margin-inline-start: 16px;
+	}
+	.bn-comment__actions {
+		flex-wrap: wrap;
+		gap: var(--bn-s2);
+	}
+}
+
+/* ── Shared-post embed (v2 .post-card__shared blockquote) ──────────────────── */
+.bn-post-card__shared,
+.bn-post-card__shared-embed {
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-md);
+	padding: var(--bn-s4);
+	background: var(--bn-sunken);
+	margin: 0;
+}
+
+.bn-post-card__shared-header {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	margin-block-end: var(--bn-s3);
+}
+
+.bn-post-card__shared-avatar-link {
+	display: inline-flex;
+	flex-shrink: 0;
+}
+
+.bn-post-card__shared-meta {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+}
+
+.bn-post-card__shared-name {
+	font-size: var(--bn-text-sm);
+	font-weight: 600;
+	color: var(--bn-ink);
+	text-decoration: none;
+}
+
+.bn-post-card__shared-name:hover { text-decoration: underline; }
+
+.bn-post-card__shared-sub {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-s1);
+	flex-wrap: wrap;
+}
+
+.bn-post-card__shared-username,
+.bn-post-card__shared-time {
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+}
+
+.bn-post-card__shared-content-link {
+	display: block;
+	text-decoration: none;
+	color: inherit;
+}
+.bn-post-card__shared-content-link:hover .bn-post-card__shared-content {
+	color: var(--brand);
+}
+
+.bn-post-card__shared-content {
+	display: block;
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink);
+	line-height: 1.6;
+}
+
+.bn-post-card__shared-viewlink {
+	display: inline-block;
+	margin-top: var(--bn-s2);
+	font-size: var(--bn-text-xs);
+	font-weight: var(--fw-semibold);
+	color: var(--brand);
+}
+.bn-post-card__shared-content-link:hover .bn-post-card__shared-viewlink {
+	text-decoration: underline;
+}
+
+/* Media / link-video preview inside a reshare embed. Without this a reshared
+   photo or YouTube post showed only "[No text content]" — a blank quote. */
+.bn-post-card__shared-thumb {
+	position: relative;
+	display: block;
+	margin-top: var(--bn-s2);
+	border-radius: var(--bn-r-md);
+	overflow: hidden;
+	background: var(--bn-surface-2, var(--bn-elev-1));
+	aspect-ratio: 16 / 9;
+	/* Same height cap the direct oembed and single-image media use: 32rem tall
+		at 16/9 => this max width. Without it, a reshare card on a wide content
+		column (full-width single-post layouts) rendered its image/video preview
+		taller than the viewport. */
+	max-width: calc( 32rem * 16 / 9 );
+}
+.bn-post-card__shared-thumb img {
+	display: block;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+.bn-post-card__shared-play {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: #fff;
+	background: rgba(0, 0, 0, 0.28);
+	pointer-events: none;
+}
+.bn-post-card__shared-play .bn-icon {
+	width: 44px;
+	height: 44px;
+	padding: 10px;
+	border-radius: 50%;
+	background: rgba(0, 0, 0, 0.55);
+}
+.bn-post-card__shared-linktitle {
+	display: block;
+	margin-top: var(--bn-s2);
+	font-size: var(--bn-text-sm);
+	font-weight: var(--fw-semibold);
+	color: var(--bn-ink);
+	line-height: 1.4;
+}
+.bn-post-card__shared-content-link:hover .bn-post-card__shared-linktitle {
+	color: var(--brand);
+}
+
+.bn-post-card__shared-empty,
+.bn-post-card__shared-missing {
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink-2);
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   COMPOSER (partials/composer.php) — single-state v2 markup
+   Matches docs/v2 Plans/v2/home-feed.html `.composer`. Avatar +
+   textarea + tools row (icons + spacer + privacy + Share). No collapsed
+   pill — always visible.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.bn-composer {
+	position: relative;
+	background: var(--bn-surface);
+	border: 1px solid var(--border);
+	border-radius: var(--bn-r-lg);
+	padding: var(--bn-s4) var(--bn-s5) var(--bn-s3);
+	display: flex;
+	gap: var(--bn-s3);
+	align-items: flex-start;
+}
+
+.bn-composer__avatar {
+	width: 36px;
+	height: 36px;
+	border-radius: 50%;
+	background: var(--brand);
+	color: var(--text-on-brand);
+	font-size: var(--text-sm);
+	font-weight: 700;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+	overflow: hidden;
+}
+.bn-composer__avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+.bn-composer__input {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s3);
+}
+
+.bn-composer__prompt {
+	width: 100%;
+	border: none;
+	background: transparent;
+	font-family: var(--font-body);
+	font-size: var(--text-base);
+	color: var(--text-1);
+	resize: none;
+	/* Horizontal padding so the cursor/text don't sit flush against the
+	   left edge — matches the composer's --s4 visual rhythm. */
+	padding: 6px var(--bn-s4);
+	line-height: 1.5;
+	outline: none;
+	/* Auto-grow: JS (feed/store.js autoResizeTextarea) sets height to the
+	   content's scrollHeight on input; box-sizing keeps that math correct, the
+	   min holds a ~2-row floor, and the max caps growth so a long draft scrolls
+	   inside the field instead of pushing the whole composer down the page. */
+	box-sizing: border-box;
+	min-height: 48px;
+	max-height: 40vh;
+	overflow-y: auto;
+}
+.bn-composer__prompt::placeholder { color: var(--text-3); }
+.bn-composer__prompt:focus-visible { outline: 2px solid transparent; outline-offset: 2px; }
+
+/*
+ * Char counter — populated by JS into a template-owned slot
+ * (.bn-composer__char-counter-slot on the composer,
+ * .bn-comment-form__char-counter-slot on comment forms).
+ *
+ * The fallback branch injects a bare <span> as a SIBLING of the textarea. Both
+ * of those parents are display:flex, so the span becomes a flex ITEM: it does
+ * not stack under the field as the old comment here claimed, it takes width
+ * away from it. On the comment form that cost 40px and wrapped the placeholder
+ * at 375px. Every form that uses this counter should own a slot.
+ */
+.bn-composer__char-counter,
+.bn-composer__char-counter-slot,
+.bn-comment-form__char-counter-slot {
+	font-size: var(--text-2xs, 11px);
+	color: var(--text-3);
+	font-variant-numeric: tabular-nums;
+}
+
+/* Empty until the member types — must take no space at all until then, or it
+	reintroduces the width theft it exists to avoid. */
+.bn-comment-form__char-counter-slot {
+	display: inline-flex;
+	align-items: center;
+	flex: 0 0 auto;
+}
+.bn-comment-form__char-counter-slot:empty { display: none; }
+.bn-comment-form__char-counter-slot[data-state="near"] { color: var(--bn-warn, #b45309); }
+.bn-comment-form__char-counter-slot[data-state="over"] { color: var(--bn-danger, #dc2626); font-weight: 600; }
+.bn-composer__char-counter {
+	display: block;
+	margin-block-start: 4px;
+}
+.bn-composer__char-counter-slot { display: inline-flex; align-items: center; }
+.bn-composer__char-counter-slot:empty { display: none; }
+.bn-composer__char-counter[data-state="near"],
+.bn-composer__char-counter-slot[data-state="near"] { color: var(--bn-warn, #b45309); }
+.bn-composer__char-counter[data-state="over"],
+.bn-composer__char-counter-slot[data-state="over"] { color: var(--bn-danger, #dc2626); font-weight: 600; }
+
+/* Active tool (e.g. Poll button when poll panel is open). */
+.bn-composer__tool[aria-pressed="true"] {
+	background: var(--bn-accent-100);
+	color: var(--bn-accent);
+}
+
+/* Drag-drop overlay state — outline + faint accent wash when the user
+   is dragging files over the composer. */
+.bn-composer--dragover {
+	outline: 2px dashed var(--bn-accent);
+	outline-offset: -2px;
+	background: color-mix(in oklab, var(--bn-accent) 6%, transparent);
+}
+
+/* @ / # typeahead dropdown — appears under the textarea, scoped to the
+   composer wrap so it doesn't bleed into other modules. */
+.bn-composer__typeahead {
+	position: absolute;
+	z-index: 50;
+	margin-top: var(--bn-s1);
+	min-width: 220px;
+	max-width: 320px;
+	background: var(--surface, #fff);
+	border: 1px solid var(--border, #e5e7eb);
+	border-radius: var(--bn-r-md, 8px);
+	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+	/* Bound the results list so a large match set scrolls inside the dropdown
+	   (showing ~7-8 members at once) instead of ballooning the page. */
+	max-height: 320px;
+	overflow-x: hidden;
+	overflow-y: auto;
+}
+/* The invite-member modal's body is overflow-y:auto, which would clip this
+   absolutely-positioned dropdown (it sits below the input). The body content
+   is short, so let the dropdown extend past it instead of being cut off. */
+[data-bn-modal="invite-member"] .bn-modal__body {
+	overflow: visible;
+}
+.bn-composer__typeahead-item {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2, 8px);
+	width: 100%;
+	padding: var(--bn-s2) var(--bn-s3);
+	background: transparent;
+	border: 0;
+	text-align: start;
+	font-size: var(--text-sm);
+	color: var(--text-1);
+	cursor: pointer;
+}
+.bn-composer__typeahead-item:hover,
+.bn-composer__typeahead-item[aria-selected="true"] {
+	background: var(--bn-sunken, #f3f4f6);
+	color: var(--bn-accent);
+}
+.bn-composer__typeahead-prefix {
+	color: var(--bn-accent);
+	font-weight: 600;
+	margin-inline-end: 2px;
+}
+.bn-composer__typeahead-avatar {
+	flex: 0 0 auto;
+	width: 28px;
+	height: 28px;
+	border-radius: var(--bn-r-full, 9999px);
+	object-fit: cover;
+}
+.bn-composer__typeahead-text {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	line-height: var(--leading-tight, 1.2);
+}
+.bn-composer__typeahead-name {
+	/* Normal weight: the BOLD in this row marks the part not yet typed, so the
+	   label itself must not compete with it. */
+	font-weight: var(--bn-fw-normal, 400);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+/* The completion - what the member gains by picking this row. Same colour, so
+   the row still reads as one continuous word rather than two fragments. */
+.bn-composer__typeahead-match {
+	font-weight: var(--bn-fw-bold, 700);
+	color: inherit;
+}
+.bn-composer__typeahead-handle {
+	font-size: var(--text-xs);
+	color: var(--text-2);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.bn-composer__typeahead-item:hover .bn-composer__typeahead-handle,
+.bn-composer__typeahead-item[aria-selected="true"] .bn-composer__typeahead-handle {
+	color: inherit;
+}
+
+/* Markdown inline code rendered by buddynext_format_content. */
+.bn-code {
+	font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+	font-size: 0.92em;
+	padding: 1px 6px;
+	background: var(--bn-sunken, color-mix(in oklab, var(--bn-accent) 6%, transparent));
+	border-radius: var(--bn-r-sm, 4px);
+}
+.bn-md-link,
+.bn-autolink {
+	color: var(--bn-accent);
+	text-decoration: underline;
+	text-underline-offset: 2px;
+}
+
+/* Long pasted URLs must wrap inside the post/comment body instead of
+   overflowing the card or clamping mid-glyph. */
+.bn-autolink {
+	word-break: break-word;
+	overflow-wrap: anywhere;
+}
+
+/* Reactor list popover — opens when a user clicks the per-emoji
+   summary chip on a post card. FB-style stacked list of avatars +
+   names + emoji badges. The popover is SSR-present per card and
+   anchored under its trigger via the relative .reactors-wrap; its
+   visibility is reactive (data-wp-bind--hidden from the post-card store). */
+.bn-post-card__reactors-wrap {
+	position: relative;
+	display: inline-flex;
+}
+.bn-reactors-popover {
+	position: absolute;
+	inset-block-start: calc(100% + 6px);
+	inset-inline-start: 0;
+	z-index: 1000;
+	min-inline-size: 260px;
+	max-inline-size: 340px;
+	max-block-size: 380px;
+	overflow: auto;
+	background: var(--bn-surface, #fff);
+	border: 1px solid var(--bn-line, #e5e7eb);
+	border-radius: var(--bn-r-md, 8px);
+	box-shadow: 0 10px 28px rgba(0, 0, 0, 0.16);
+}
+.bn-reactors-popover[hidden] { display: none; }
+.bn-reactors-popover__head {
+	padding: 10px 12px;
+	border-block-end: 1px solid var(--bn-line);
+	font-size: var(--bn-text-sm);
+	font-weight: 600;
+	color: var(--bn-ink-2);
+}
+.bn-reactors-popover__list {
+	list-style: none;
+	margin: 0;
+	padding: var(--bn-s1) 0;
+}
+.bn-reactors-popover__item {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	padding: var(--bn-s2) var(--bn-s3);
+}
+.bn-reactors-popover__avatar {
+	width: 32px;
+	height: 32px;
+	border-radius: 50%;
+	flex-shrink: 0;
+}
+.bn-reactors-popover__name {
+	flex: 1;
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink);
+}
+.bn-reactors-popover__emoji {
+	width: 18px;
+	height: 18px;
+	flex-shrink: 0;
+}
+.bn-reactors-popover__loading,
+.bn-reactors-popover__error {
+	padding: var(--bn-s4);
+	text-align: center;
+	color: var(--bn-ink-3);
+	font-size: var(--bn-text-sm);
+}
+
+/* Summary trigger button — looks just like the existing chips group
+   but adds cursor:pointer + hover wash so it feels clickable. */
+.bn-post-card__reactors-trigger {
+	background: transparent;
+	border: 0;
+	padding: 0;
+	display: inline-flex;
+	gap: var(--bn-s2, 6px);
+	align-items: center;
+	cursor: pointer;
+	border-radius: var(--bn-r-md, 8px);
+	transition: background var(--bn-dur-fast, 120ms) var(--bn-ease, ease);
+}
+.bn-post-card__reactors-trigger:hover {
+	background: var(--bn-sunken, color-mix(in oklab, var(--bn-accent) 6%, transparent));
+}
+/* On hover the trigger shows one unified pill: dissolve each chip's own
+   background + border so they merge cleanly instead of stacking a grey blob
+   behind bordered chips (the previous double hover effect). */
+.bn-post-card__reactors-trigger:hover .bn-post-card__summary-chip {
+	background: transparent;
+	border-color: transparent;
+}
+.bn-post-card__reactors-trigger:focus-visible {
+	outline: 2px solid var(--bn-accent);
+	outline-offset: 2px;
+}
+
+/* Realtime "new comment" pill — appears above an open comment thread
+   when Pro Soketi delivers comment.added events from other users.
+   Smaller and inline (not sticky) since it lives inside a card. */
+.bn-comment-new-pill {
+	display: block;
+	margin: 0 0 var(--bn-s2);
+	padding: 6px 12px;
+	background: color-mix(in oklab, var(--bn-accent) 12%, transparent);
+	color: var(--bn-accent);
+	border: 0;
+	border-radius: var(--bn-r-md, 8px);
+	font-size: var(--text-sm);
+	font-weight: 500;
+	cursor: pointer;
+	text-align: start;
+	width: 100%;
+}
+.bn-comment-new-pill:hover {
+	background: color-mix(in oklab, var(--bn-accent) 20%, transparent);
+}
+.bn-comment-new-pill:focus-visible {
+	outline: 2px solid var(--bn-accent);
+	outline-offset: 2px;
+}
+
+/* Realtime "new posts" pill — appears above the feed when Pro Soketi
+   delivers post.new events from other users. Click reloads the feed.
+   Position: sticky so it stays visible as the user scrolls within the
+   list. */
+.bn-feed-new-pill {
+	position: sticky;
+	top: 8px;
+	z-index: 10;
+	display: block;
+	margin: 0 auto var(--bn-s3);
+	padding: var(--bn-s2) var(--bn-s4);
+	background: var(--bn-accent, #3b82f6);
+	color: var( --bn-accent-fg, #fff );
+	border: 0;
+	border-radius: var(--bn-r-full, 999px);
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+	font-size: var(--text-sm);
+	font-weight: 500;
+	cursor: pointer;
+	transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.bn-feed-new-pill:hover {
+	transform: translateY(-1px);
+	box-shadow: 0 6px 16px rgba(0, 0, 0, 0.16);
+}
+.bn-feed-new-pill:focus-visible {
+	outline: 2px solid var(--bn-accent);
+	outline-offset: 2px;
+}
+
+.bn-composer__tools {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	padding-top: var(--bn-s3);
+	border-top: 1px solid var(--bn-line-faint);
+	flex-wrap: wrap;
+}
+
+.bn-composer__tool {
+	width: 32px;
+	height: 32px;
+	border: none;
+	background: transparent;
+	border-radius: var(--bn-r-md);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	color: var(--text-3);
+	cursor: pointer;
+	transition: background 0.12s, color 0.12s;
+}
+.bn-composer__tool:hover {
+	background: var(--bg-hover);
+	color: var(--brand);
+	/* Geometry (size/padding/border) is locked once in bn-base.css under .bn-app
+	   (theme-proof interactive controls) — base == hover, so no per-state lock. */
+}
+.bn-composer__tool:focus-visible { outline: 2px solid transparent; outline-offset: 2px; box-shadow: var(--bn-ring); }
+.bn-composer__tool .bn-icon,
+.bn-composer__tool svg { width: 18px; height: 18px; }
+
+
+.bn-composer__spacer { flex: 1; }
+
+.bn-composer__privacy {
+	display: inline-flex;
+	width: auto;
+	max-width: 200px;
+	height: 32px;
+	padding: 0 var(--bn-s6) 0 var(--bn-s3);
+	background: var(--bn-sunken);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-md);
+	font-family: var(--bn-font-ui);
+	font-size: var(--bn-text-xs);
+	font-weight: 600;
+	color: var(--bn-ink-2);
+	cursor: pointer;
+	flex-shrink: 0;
+}
+.bn-composer__privacy:focus-visible {
+	outline: 2px solid transparent;
+	outline-offset: 2px;
+	border-color: var(--brand);
+}
+
+.bn-composer__submit:disabled,
+.bn-composer__submit[disabled] {
+	opacity: 0.55;
+	cursor: not-allowed;
+}
+
+/* Composer drafts — tiny status sitting just before the Share button, inside
+ * the .bn-composer__tools flex row (align-items: center). The draft cluster
+ * MUST match the toolbar control height (32px). If it is taller, the centered
+ * row grows when the draft appears/disappears and the whole composer + feed
+ * below it jumps 8px on every draft save/clear — reads as "shaking" while
+ * typing in bursts. Keep this height locked to the toolbar baseline. */
+.bn-composer__draft {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	min-height: 32px;
+	font-size: var(--bn-text-xs);
+	color: var(--bn-ink-3);
+	margin-inline-end: var(--bn-s2);
+}
+
+.bn-composer__draft[hidden] { display: none; }
+
+.bn-composer__draft-status {
+	font-style: italic;
+}
+
+.bn-composer__draft-discard {
+	/* Icon button, matching the toolbar tools (32px square) instead of a text
+	 * link — consistent with the other composer controls, with a tooltip via
+	 * the title/aria-label. (border reserved by the geometry-stability rule.) */
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 32px;
+	height: 32px;
+	padding: 0;
+	background: transparent;
+	color: var(--text-3);
+	cursor: pointer;
+	border-radius: var(--bn-r-md);
+	transition: background 0.12s, color 0.12s;
+}
+.bn-composer__draft-discard .bn-icon,
+.bn-composer__draft-discard svg { width: 18px; height: 18px; }
+.bn-composer__draft-discard:hover { background: var(--bg-hover); color: var(--bn-danger); }
+.bn-composer__draft-discard[hidden] { display: none; }
+
+.bn-composer__media-preview {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--bn-s2);
+}
+.bn-composer__media-thumb {
+	position: relative;
+	width: 80px;
+	height: 80px;
+	border-radius: var(--bn-r-md);
+	overflow: hidden;
+	border: 1px solid var(--border);
+}
+.bn-composer__media-thumb img { width: 100%; height: 100%; object-fit: cover; }
+
+/*
+ * Kind placeholder for media with no visual frame — audio, or a video whose poster
+ * could not be captured. A centered play/music icon on a sunken surface, never a
+ * broken <img>. A video that DOES have a captured poster keeps its <img> and gets a
+ * small play badge so it still reads as a video.
+ */
+.bn-composer__media-kind {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: var(--bn-sunken);
+	color: var(--bn-ink-3);
+}
+.bn-composer__media-thumb.is-uploading .bn-composer__media-kind { opacity: 0.5; }
+
+/* A video that HAS a captured poster keeps its <img>; add a small play badge so it
+ * still reads as a video. Videos without a poster already show the play kind-icon,
+ * so the badge is scoped to tiles that contain an <img>. */
+.bn-composer__media-thumb--video:has( img )::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	margin: auto;
+	width: 0;
+	height: 0;
+	border-style: solid;
+	border-width: 8px 0 8px 13px;
+	border-color: transparent transparent transparent rgba(255, 255, 255, 0.95);
+	filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.4));
+	pointer-events: none;
+}
+
+/*
+ * Per-tile upload spinner. The composer builds media tiles imperatively; while a
+ * file is in flight the tile carries .is-uploading and a centered spinner over
+ * the dimmed local thumbnail, so each image reads as "uploading" until its id
+ * lands (the remove button is withheld until then). Reuses the global bn-spin
+ * keyframes from bn-base.css.
+ */
+.bn-composer__media-thumb.is-uploading img { opacity: 0.5; }
+.bn-composer__media-spinner {
+	position: absolute;
+	inset: 0;
+	margin: auto;
+	width: 22px;
+	height: 22px;
+	border: 2px solid var(--bn-line);
+	border-top-color: var(--bn-accent);
+	border-radius: var(--bn-r-full);
+	animation: bn-spin 0.6s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+	.bn-composer__media-spinner { animation: none; }
+}
+.bn-composer__media-remove {
+	position: absolute;
+	top: 2px;
+	inset-inline-end: 2px;
+	width: 20px;
+	height: 20px;
+	border: none;
+	border-radius: var(--bn-r-full);
+	background: var(--bn-overlay);
+	color: var(--text-on-brand);
+	font-size: 14px;
+	line-height: 1;
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+.bn-composer__media-remove:hover { background: var(--red); }
+
+/* Composer link preview — live OG card shown while typing a URL. Mirrors the
+   in-feed post link card, with a dismiss affordance. */
+.bn-composer__link-preview {
+	position: relative;
+	display: flex;
+	align-items: stretch;
+	gap: var(--bn-s2);
+	border: 1px solid var(--border);
+	border-radius: var(--bn-r-md);
+	overflow: hidden;
+	background: var(--bg-subtle, var(--surface));
+}
+.bn-composer__link-card {
+	display: flex;
+	gap: var(--bn-s2);
+	align-items: stretch;
+	flex: 1;
+	min-width: 0;
+	text-decoration: none;
+	color: inherit;
+}
+.bn-composer__link-thumb {
+	flex-shrink: 0;
+	width: 96px;
+	min-height: 72px;
+	overflow: hidden;
+	background: var(--border);
+}
+.bn-composer__link-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.bn-composer__link-info {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding: var(--bn-s2);
+	min-width: 0;
+}
+.bn-composer__link-title {
+	font-weight: 600;
+	line-height: 1.3;
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+.bn-composer__link-desc {
+	color: var(--text-muted, var(--muted));
+	line-height: 1.4;
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+.bn-composer__link-domain {
+	color: var(--text-muted, var(--muted));
+	font-size: 0.8em;
+}
+.bn-composer__link-remove {
+	flex-shrink: 0;
+	align-self: flex-start;
+	margin: var(--bn-s1);
+	width: 24px;
+	height: 24px;
+	border: none;
+	border-radius: var(--bn-r-full);
+	background: var(--bn-overlay);
+	color: var(--text-on-brand);
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+.bn-composer__link-remove:hover { background: var(--red); }
+.bn-composer__link-remove svg { width: 14px; height: 14px; }
+
+@media (max-width: 640px) {
+	.bn-composer__link-thumb { width: 72px; }
+}
+
+/* Emoji insert picker — popover of bundled glyph buttons, appended to
+   <body> and positioned under the trigger by initEmojiPicker(). */
+.bn-emoji-popover {
+	display: grid;
+	grid-template-columns: repeat(8, 1fr);
+	gap: 2px;
+	max-width: 320px;
+	max-height: 260px;
+	overflow-y: auto;
+	padding: var(--bn-s2);
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: var(--bn-r-md);
+	box-shadow: 0 6px 18px rgba(0, 0, 0, 0.14);
+	z-index: 1100;
+}
+.bn-emoji-popover[hidden] { display: none; }
+.bn-emoji-popover__option {
+	background: transparent;
+	border: 0;
+	cursor: pointer;
+	line-height: 0;
+	padding: var(--bn-s1);
+	border-radius: var(--bn-r-md);
+	min-width: 32px;
+	min-height: 32px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	transition: transform 150ms ease, background 150ms ease;
+}
+.bn-emoji-popover__option:hover { transform: scale(1.2); background: var(--bg-hover, rgba(0,0,0,0.05)); }
+.bn-emoji-popover__option:focus-visible { outline: 2px solid transparent; box-shadow: inset 0 0 0 2px var(--bn-accent); }
+.bn-emoji-popover__option img { width: 22px; height: 22px; display: block; max-width: none; }
+.bn-comment__emoji-trigger {
+	background: transparent;
+	border: 0;
+	/* Explicit color so the currentColor SVG icon stays visible on themes (Reign)
+	   whose global button color resolves to the button background. */
+	color: var(--bn-ink-3);
+	cursor: pointer;
+	/* Match the 40px circular submit button box so the emoji trigger bottom-aligns
+	   with the send button and textarea baseline (the form is align-items:flex-end)
+	   and meets the 40px minimum tap target. The icon stays 18px via the rule below. */
+	width: 40px;
+	height: 40px;
+	min-height: 40px;
+	padding: 0;
+	flex-shrink: 0;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	line-height: 0;
+}
+.bn-comment__emoji-trigger img,
+.bn-comment__emoji-trigger svg { width: 18px; height: 18px; display: block; }
+
+@media (max-width: 640px) {
+	.bn-emoji-popover { grid-template-columns: repeat(6, 1fr); max-width: 260px; }
+}
+
+.bn-composer__poll-options {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s2);
+}
+.bn-composer__poll-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--bn-s2);
+}
+.bn-composer__poll-question {
+	font-size: var(--text-sm);
+	font-weight: 600;
+	color: var(--text-2);
+	margin: 0;
+}
+/* Poll-cancel reuses the canonical .bn-modal__close primitive (bn-base.css) so
+   every composer close button shares one size, token set, and hover state. */
+.bn-composer__poll-option {
+	width: 100%;
+	background: var(--bg-subtle);
+	border: 1px solid var(--border);
+	border-radius: var(--bn-r-md);
+	padding: var(--bn-s2) var(--bn-s3);
+	font-family: var(--font-body);
+	font-size: var(--text-sm);
+	color: var(--text-1);
+}
+.bn-composer__poll-option:focus { outline: 2px solid transparent; outline-offset: 2px; border-color: var(--brand); }
+.bn-composer__poll-option::placeholder { color: var(--text-3); }
+
+.bn-composer__schedule {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s2);
+	/* WRAPS, and the input carries a real flex-basis. The row used to be single-line with a
+	   non-shrinking label, which made it correct only while the label happened to be short:
+	   at 390px "Publish at (Asia/Kolkata)" already crushed the datetime input to 32px, and the
+	   longer announcement label pushed both the input and the × clear button entirely outside
+	   the row — unreachable, not merely cramped. A row whose correctness depends on the length
+	   of a translatable string is a bug in the row. The label now drops to its own line when it
+	   cannot share one, and the input keeps a usable width instead of absorbing the shortfall. */
+	flex-wrap: wrap;
+}
+.bn-composer__schedule-label {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--bn-s1);
+	font-size: var(--text-sm);
+	font-weight: 600;
+	color: var(--text-2);
+	/* May shrink and wrap its own text; it no longer wins the row outright. */
+	min-width: 0;
+}
+.bn-composer__schedule-label svg { width: 16px; height: 16px; flex-shrink: 0; }
+.bn-composer__schedule-input {
+	/* Basis ~= the intrinsic width of a rendered "mm/dd/yyyy --:--", so the row wraps
+	   before the control becomes too narrow to read the value it holds. */
+	flex: 1 1 11rem;
+	min-width: 0;
+	background: var(--bg-subtle);
+	border: 1px solid var(--border);
+	border-radius: var(--bn-r-md);
+	padding: var(--bn-s2) var(--bn-s3);
+	font-family: var(--font-body);
+	font-size: var(--text-sm);
+	color: var(--text-1);
+}
+.bn-composer__schedule-input:focus { outline: 2px solid transparent; outline-offset: 2px; border-color: var(--brand); }
+.bn-composer__schedule-clear {
+	background: transparent;
+	border: 0;
+	padding: 2px;
+	border-radius: var(--bn-r-sm);
+	color: var(--text-3);
+	cursor: pointer;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+}
+.bn-composer__schedule-clear:hover { color: var(--text-1); background: var(--bg-subtle); }
+.bn-composer__schedule-clear svg { width: 16px; height: 16px; }
+
+[data-bn-theme="dark"] .bn-composer__prompt,
+[data-theme="dark"] .bn-composer__prompt,
+[data-bx-mode="dark"] .bn-composer__prompt {
+	color: var(--text-1);
+}
+
+[data-bn-theme="dark"] .bn-composer__privacy,
+[data-theme="dark"] .bn-composer__privacy,
+[data-bx-mode="dark"] .bn-composer__privacy {
+	background: var(--bg-subtle);
+	border-color: var(--border);
+	color: var(--text-2);
+}
+
+[data-bn-theme="dark"] .bn-composer__poll-option,
+[data-theme="dark"] .bn-composer__poll-option,
+[data-bx-mode="dark"] .bn-composer__poll-option {
+	background: var(--bg-subtle);
+	border-color: var(--border);
+	color: var(--text-1);
+}
+
+/* ── Chip-style privacy selector ─────────────────────────────────────────── */
+.bn-composer__tool[data-tone="ai"] { color: var(--bn-accent, var(--brand)); }
+.bn-composer__privacy-wrap { position: relative; flex-shrink: 0; }
+.bn-composer__privacy-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	background: var(--bn-sunken);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-full, 999px);
+	color: var(--bn-ink-3);
+	font-family: var(--bn-font-ui);
+	font-size: var(--bn-text-xs);
+	font-weight: 500;
+	padding: 6px 12px;
+	cursor: pointer;
+	transition: background var(--bn-dur-fast) var(--bn-ease), color var(--bn-dur-fast) var(--bn-ease);
+}
+.bn-composer__privacy-chip:hover { background: var(--bg-hover); color: var(--bn-ink); }
+/* Reserve worst-case width for the variable label ("Everyone" /
+   "Followers" / "Just me" / "Space members") so selecting a different
+   audience doesn't reflow the composer footer (~48px shift otherwise). */
+.bn-composer__privacy-chip strong {
+	display: inline-block;
+	min-inline-size: 100px;
+	color: var(--bn-ink-2);
+	font-weight: 600;
+	text-align: start;
+}
+.bn-composer__privacy-caret { display: inline-flex; }
+.bn-composer__privacy-caret .bn-icon { width: 12px; height: 12px; }
+.bn-composer__privacy-pop {
+	position: absolute;
+	/* Open downward (below the chip, into the feed) rather than upward: the
+	   composer sits at the top of the feed, so an upward popup slid behind the
+	   theme's sticky header (higher stacking context) and clipped the options.
+	   Downward keeps the full menu in the content area, clear of the header. */
+	top: calc(100% + 6px);
+	inset-inline-end: 0;
+	z-index: 60;
+	min-width: 260px;
+	margin: 0;
+	padding: 6px;
+	list-style: none;
+	background: var(--bn-surface);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-md);
+	box-shadow: var(--bn-shadow-md);
+}
+.bn-composer__privacy-pop[hidden] { display: none; }
+.bn-composer__privacy-pop li { list-style: none; margin: 0; padding: 0; }
+.bn-composer__privacy-opt {
+	display: flex;
+	align-items: flex-start;
+	gap: 10px;
+	width: 100%;
+	padding: 8px 10px;
+	border: 0;
+	background: transparent;
+	border-radius: var(--bn-r-sm);
+	text-align: start;
+	cursor: pointer;
+	color: var(--bn-ink-2);
+	transition: background var(--bn-dur-fast) var(--bn-ease);
+}
+.bn-composer__privacy-opt:hover { background: var(--bg-hover); }
+.bn-composer__privacy-opt .bn-icon { width: 16px; height: 16px; flex-shrink: 0; margin-top: 2px; }
+.bn-composer__privacy-opt-label { display: flex; flex-direction: column; gap: 1px; }
+.bn-composer__privacy-opt-label strong { font-size: var(--bn-text-sm); font-weight: 600; color: var(--bn-ink); }
+.bn-composer__privacy-opt-label small { font-size: 11px; color: var(--bn-ink-3); }
+/* The privacy popover is kept inside the viewport by the shared JS clamp
+   (bnClampPopoverToViewport, called from the composer's togglePrivacy) rather
+   than a fixed CSS alignment: the "Posting to" chip's position shifts with the
+   action-row layout, so no static inset works at every width. Cap the width so a
+   very narrow screen still leaves the clamp room to fit it. */
+.bn-composer__privacy-pop { max-width: calc(100vw - 1.5rem); }
+li[aria-selected="true"] > .bn-composer__privacy-opt { background: var(--bg-hover); }
+
+/* ── Composer error band ─────────────────────────────────────────────────── */
+.bn-composer__error {
+	display: flex;
+	align-items: center;
+	/* Wrap so the "Resend verification email" action drops to its own line on
+	   narrow screens instead of squeezing the message into a one-word column
+	   (the .bn-composer__error-retry link holds its ~158px natural width). Same
+	   treatment the sibling .bn-composer--blocked banner already has. */
+	flex-wrap: wrap;
+	gap: var(--bn-s2);
+	padding: var(--bn-s2) var(--bn-s3);
+	background: color-mix(in oklch, var(--bn-danger) 12%, var(--bn-surface));
+	border: 1px solid color-mix(in oklch, var(--bn-danger) 30%, var(--bn-line));
+	border-radius: var(--bn-r-sm);
+	color: var(--bn-danger);
+	font-size: var(--bn-text-sm);
+}
+.bn-composer__error[hidden] { display: none; }
+/* flex-basis floor (matching .bn-composer__blocked-text) so the message keeps a
+   readable minimum width and the retry link wraps to its own line instead of
+   the text shrinking to a one-word column. Plain `flex: 1` only shrinks. */
+.bn-composer__error-text { flex: 1 1 16rem; }
+.bn-composer__error-retry {
+	border: 0;
+	background: transparent;
+	color: var(--bn-danger);
+	font-weight: 600;
+	cursor: pointer;
+	text-decoration: underline;
+}
+/* The appeal affordance is an anchor, not a button, so it needs the reset the
+   button gets for free. [hidden] is restated because `display: inline-flex`
+   below would otherwise beat the UA hidden rule. */
+a.bn-composer__error-retry { display: inline-flex; align-items: center; }
+a.bn-composer__error-retry[hidden] { display: none; }
+
+/* ── Composer replaced by a suspension notice ───────────────────────────── */
+.bn-composer--blocked {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--bn-s3);
+	padding: var(--bn-s4);
+}
+.bn-composer__blocked-text {
+	flex: 1 1 16rem;
+	margin: 0;
+	color: var(--bn-ink-2);
+	font-size: var(--bn-text-sm);
+	line-height: var(--bn-leading-body);
+}
+/* Styled here rather than with .bn-btn--secondary: that modifier is defined in
+   bn-profile.css, which the feed does not enqueue, so the link rendered as bare
+   text. .bn-btn (bn-base.css) supplies the shape; the surface is set locally. */
+.bn-composer__blocked-action {
+	flex: 0 0 auto;
+	background: var(--bn-surface);
+	border-color: var(--bn-line-strong);
+	color: var(--bn-ink);
+	font-weight: var(--bn-fw-semibold);
+	text-decoration: none;
+}
+.bn-composer__blocked-action:hover,
+.bn-composer__blocked-action:focus-visible {
+	background: var(--bn-sunken);
+	border-color: var(--bn-accent);
+	color: var(--bn-ink);
+}
+
+@media (max-width: 640px) {
+	.bn-composer--blocked { flex-direction: column; align-items: stretch; }
+	/* Stack the verify-email error banner too: message on its own line, the
+	   "Resend verification email" link beneath it, both left-aligned. */
+	.bn-composer__error { flex-direction: column; align-items: flex-start; }
+	.bn-composer__error-text { flex: 0 0 auto; }
+	/* flex-basis is a HEIGHT once the axis turns vertical, so the 16rem that
+	   sets a sensible minimum column width on desktop would otherwise reserve
+	   16rem of empty space under two lines of text. */
+	.bn-composer__blocked-text { flex: 0 0 auto; }
+	.bn-composer__blocked-action { width: 100%; justify-content: center; }
+}
+
+/* ── Composer modals (event / voice / AI) ───────────────────────────────── */
+.bn-composer-modal[hidden] { display: none !important; }
+.bn-composer-modal__body { display: flex; flex-direction: column; gap: var(--bn-s4); }
+.bn-composer-modal__field { display: flex; flex-direction: column; gap: 6px; }
+.bn-composer-modal__field-label {
+	font-size: var(--bn-text-xs);
+	font-weight: 600;
+	color: var(--bn-ink-3);
+	text-transform: uppercase;
+	letter-spacing: 0.02em;
+}
+.bn-composer-modal__row {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: var(--bn-s3);
+}
+.bn-composer-modal__input,
+.bn-composer-modal__textarea {
+	width: 100%;
+	padding: var(--bn-s2) var(--bn-s3);
+	background: var(--bn-sunken);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-md);
+	color: var(--bn-ink);
+	font: inherit;
+}
+.bn-composer-modal__input:focus,
+.bn-composer-modal__textarea:focus {
+	outline: 2px solid var(--bn-accent, var(--brand));
+	outline-offset: 2px;
+}
+.bn-composer-modal__error {
+	margin: 0;
+	color: var(--bn-danger);
+	font-size: var(--bn-text-sm);
+}
+.bn-composer-modal__error[hidden] { display: none; }
+
+.bn-composer-modal__upsell { text-align: center; padding: var(--bn-s5) var(--bn-s4); }
+.bn-composer-modal__upsell-icon {
+	display: inline-flex;
+	width: 48px;
+	height: 48px;
+	align-items: center;
+	justify-content: center;
+	border-radius: 50%;
+	background: color-mix(in oklch, var(--bn-accent, var(--brand)) 12%, var(--bn-surface));
+	color: var(--bn-accent, var(--brand));
+	margin-bottom: var(--bn-s3);
+}
+.bn-composer-modal__upsell-icon .bn-icon { width: 24px; height: 24px; }
+.bn-composer-modal__upsell-title {
+	margin: 0 0 6px;
+	font-size: var(--bn-text-base);
+	font-weight: 600;
+	color: var(--bn-ink);
+}
+.bn-composer-modal__upsell-text { margin: 0 0 var(--bn-s4); color: var(--bn-ink-3); }
+
+/* ── Home feed filter tabs ───────────────────────────────────────────────── */
+/* The home feed filter tabs now use the shared .bn-tabs/.bn-tab primitive
+   (see templates/feed/home.php) so they match the Home/Explore row and every
+   other tab bar - font, focus ring, active state and overflow scroll-fade are
+   all inherited. The former bespoke .bn-feed-filter-tab* styles were removed to
+   end the duplicate tab language; the .bn-feed-filter-tab class is retained on
+   the element only as a JS hook for the feed-tabs store. */
+
+/* ── Feed skeleton + inline error ─────────────────────────────────────────── */
+.bn-feed-skeleton[hidden] { display: none; }
+.bn-feed-error {
+	display: flex;
+	align-items: center;
+	gap: var(--bn-s3);
+	padding: var(--bn-s4);
+	background: color-mix(in oklch, var(--bn-danger) 8%, var(--bn-surface));
+	border: 1px solid color-mix(in oklch, var(--bn-danger) 25%, var(--bn-line));
+	border-radius: var(--bn-r-md);
+	color: var(--bn-danger);
+	font-size: var(--bn-text-sm);
+}
+.bn-feed-error[hidden] { display: none; }
+.bn-feed-error__icon { display: inline-flex; }
+.bn-feed-error__text { flex: 1; }
+
+/* ── Share modal ─────────────────────────────────────────────────────────── */
+.bn-share-modal__body { display: flex; flex-direction: column; gap: var(--bn-s3); }
+.bn-share-modal__preview {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s1);
+	padding: var(--bn-s3);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-md);
+	background: var(--bn-sunken);
+}
+.bn-share-modal__preview[hidden] { display: none; }
+.bn-share-modal__preview-author { font-size: var(--bn-text-sm); font-weight: 600; color: var(--bn-ink); }
+.bn-share-modal__preview-excerpt { font-size: var(--bn-text-sm); color: var(--bn-ink-2); line-height: var(--leading-snug); }
+.bn-share-modal__note {
+	width: 100%;
+	min-height: 72px;
+	padding: var(--bn-s3);
+	border: 1px solid var(--bn-line);
+	border-radius: var(--bn-r-md);
+	background: var(--bn-surface);
+	color: var(--bn-ink);
+	font-family: var(--font-body);
+	font-size: var(--bn-text-sm);
+	line-height: var(--leading-normal);
+	resize: vertical;
+	transition: border-color var(--bn-dur-fast) var(--bn-ease);
+}
+.bn-share-modal__note:focus { outline: 2px solid transparent; outline-offset: 2px; border-color: var(--brand); }
+.bn-share-modal__note:disabled { opacity: 0.55; cursor: not-allowed; }
+.bn-share-modal__actions { display: flex; align-items: center; gap: var(--bn-s2); }
+.bn-share-modal__repost { flex: 1; justify-content: center; }
+/* Ghost variant rests at a muted ink; lift the Copy-link label to full ink for AA contrast. */
+.bn-share-modal__copy { color: var(--bn-ink); }
+.bn-share-modal__error { margin: var(--bn-s2) 0 0; color: var(--bn-danger); font-size: var(--bn-text-sm); }
+.bn-share-modal__error[hidden] { display: none; }
+
+/* ── Sidebar polish ──────────────────────────────────────────────────────── */
+.bn-sidebar-card__header {
+	display: flex;
+	align-items: baseline;
+	gap: 6px;
+}
+.bn-sidebar-card__caption {
+	margin-inline-start: auto;
+	font-size: 10px;
+	font-weight: 600;
+	color: var(--bn-ink-3);
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+.bn-sidebar-card__empty {
+	margin: 0;
+	padding: var(--bn-s3) 0;
+	font-size: var(--bn-text-sm);
+	color: var(--bn-ink-3);
+}
+.bn-sbar-row__unread {
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	background: var(--bn-accent, var(--brand));
+	flex-shrink: 0;
+	align-self: center;
+}
+
+/* ── Skeleton loading ────────────────────────────────────────────────── */
+.bn-skeleton {
+	position: relative;
+	overflow: hidden;
+	background: var(--bn-bg-subtle);
+	border-radius: var(--bn-r-md);
+}
+.bn-skeleton::after {
+	content: '';
+	position: absolute;
+	top: 0;
+	inset-inline-start: -100%;
+	width: 100%;
+	height: 100%;
+	background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+	animation: bn-shimmer-slide 1.5s infinite;
+}
+/* Sweeps start → end, so it follows the reading direction under RTL too. The
+   gradient itself is symmetric, so its fixed 90deg angle needs no mirror. */
+@keyframes bn-shimmer-slide { to { inset-inline-start: 100%; } }
+.bn-skeleton-card {
+	padding: var(--bn-s4);
+	margin-bottom: var(--bn-s3);
+	background: var(--bn-surface);
+	border: 1px solid var(--bn-border);
+	border-radius: var(--bn-r-lg);
+}
+.bn-skeleton-avatar { width: 40px; height: 40px; border-radius: 50%; }
+.bn-skeleton-line { height: 12px; border-radius: 6px; margin-bottom: 8px; }
+.bn-skeleton-line--title { width: 40%; height: 14px; }
+.bn-skeleton-line--subtitle { width: 25%; }
+.bn-skeleton-line--body { width: 90%; }
+.bn-skeleton-line--body-short { width: 60%; }
+[data-bn-theme="dark"] .bn-skeleton::after,
+[data-theme="dark"] .bn-skeleton::after,
+[data-bx-mode="dark"] .bn-skeleton::after {
+	/* --bn-text-1 is near-white in dark mode, so this is the same 5% light
+	   sweep as before, expressed through the token instead of a raw rgba(). */
+	background: linear-gradient(90deg, transparent, color-mix(in oklab, var(--bn-text-1) 5%, transparent), transparent);
+}
+
+/* ── Announcement banner ─────────────────────────────────────────────── */
+.bn-announcement {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--bn-s3);
+	background: var(--brand-light);
+	border: 1px solid var(--brand);
+	border-radius: var(--bn-r-md);
+	padding: var(--bn-s4);
+	font-size: var(--text-sm);
+	color: var(--text-1);
+}
+.bn-announcement__icon { flex-shrink: 0; }
+.bn-announcement__body { flex: 1; min-width: 0; }
+.bn-announcement__dismiss {
+	background: none;
+	border: none;
+	cursor: pointer;
+	color: var(--text-3);
+	padding: 0;
+	font-size: var(--text-lg);
+	line-height: 1;
+	flex-shrink: 0;
+}
+.bn-announcement__dismiss:hover { color: var(--text-1); }
+
+/* ── Feed list ──────────────────────────────────────────────────────────── */
+.bn-feed-list { display: flex; flex-direction: column; gap: var(--bn-s4); }
+
+/* ── Load-more wrapper ─────────────────────────────────────────────────────
+   The visible control uses .bn-btn[data-variant="secondary"]; this rule just
+   centres the button + sized spacing. */
+.bn-load-more {
+	text-align: center;
+	padding: var(--bn-s5) 0;
+}
+/* "Load more" affordance — a centered pill that reads as a deliberate feed
+   action rather than a generic secondary button. Covers the bookmarks pager,
+   the no-JS fallback link, and the JS retry control (all .bn-load-more__btn).
+   The descendant + [data-variant] selector outranks the .bn-btn[data-variant]
+   primitive so the pill height/radius win regardless of stylesheet order. */
+.bn-load-more .bn-load-more__btn[data-variant] {
+	min-width: 200px;
+	height: 44px;
+	border-radius: var(--bn-r-full, 999px);
+	font-weight: var(--bn-fw-semibold);
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+	transition: background var(--bn-dur) var(--bn-ease),
+				border-color var(--bn-dur) var(--bn-ease),
+				color var(--bn-dur) var(--bn-ease),
+				box-shadow var(--bn-dur) var(--bn-ease),
+				transform var(--bn-dur-fast) var(--bn-ease);
+}
+.bn-load-more .bn-load-more__btn[data-variant]:hover {
+	border-color: var(--bn-accent);
+	color: var(--bn-accent);
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+	transform: translateY(-1px);
+}
+.bn-load-more__spinner {
+	display: flex;
+	justify-content: center;
+}
+.bn-load-more__spinner-line {
+	display: block;
+	width: 120px;
+	height: 14px;
+	border-radius: var(--bn-r-sm);
+}
+
+/* ── Inner-template mobile (≤640px) ─────────────────────────────────────────
+   Shell handles rail + right-sidebar collapse; inner overrides only tighten
+   composer padding + tools wrapping at small widths. */
+@media (max-width: 640px) {
+	.bn-composer { padding: var(--bn-s3) var(--bn-s3) var(--bn-s2); }
+	.bn-composer__tools { gap: var(--bn-s1); }
+	.bn-composer__privacy { font-size: 10px; padding: 0 var(--bn-s2); }
+	/* The desktop worst-case label reservation (100px) is too wide to share a
+	   row with the Post button on mobile and pushes the audience chip onto its
+	   own line. Let the label size to its content here. */
+	.bn-composer__privacy-chip strong { min-inline-size: auto; }
+}
+
+/* ── End-of-feed marker ────────────────────────────────────────────────────
+   Rendered in place of the infinite-scroll sentinel once the API returns no
+   next_cursor. Quiet, single line — not a CTA. */
+.bn-feed-end {
+	text-align: center;
+	padding: var(--bn-s5) 0 var(--bn-s6);
+	color: var(--bn-ink-3);
+	font-size: var(--text-sm);
+}
+.bn-feed-end__text {
+	display: inline-block;
+	padding: var(--bn-s2) var(--bn-s4);
+	border-radius: var(--bn-r-md);
+	background: var(--bn-surface-2, var(--surface));
+	border: 1px solid var(--bn-border, var(--border));
+}
+.bn-load-more__spinner-text {
+	display: block;
+	margin-top: var(--bn-s2);
+	color: var(--bn-ink-3);
+	font-size: var(--text-sm);
+}
+
+/* ── Post-card timestamp link ─────────────────────────────────────────────
+   The relative-time becomes a permalink to /p/{id}/. Visual style stays
+   identical to the bare <time> — no underline, inherit color — until hover. */
+.bn-post-card__time-link {
+	color: inherit;
+	text-decoration: none;
+}
+.bn-post-card__time-link:hover .bn-post-card__time,
+.bn-post-card__time-link:focus-visible .bn-post-card__time {
+	color: var(--bn-text-1, var(--text-1));
+	text-decoration: underline;
+	text-underline-offset: 2px;
+}
+
+/* ── Single-post permalink page ───────────────────────────────────────────
+   Renders inside the shell main column. Breadcrumb sits flush with the post
+   card; thread heading separates the comment region. */
+.bn-single-post {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s4);
+}
+.bn-single-post__breadcrumb {
+	font-size: var(--text-sm);
+	color: var(--bn-ink-3);
+}
+.bn-single-post__crumbs {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--bn-s2);
+	list-style: none;
+	padding: 0;
+	margin: 0;
+	align-items: center;
+}
+.bn-single-post__crumbs a {
+	color: var(--bn-ink-3);
+	text-decoration: none;
+}
+.bn-single-post__crumbs a:hover,
+.bn-single-post__crumbs a:focus-visible {
+	color: var(--bn-brand, var(--brand));
+	text-decoration: underline;
+	text-underline-offset: 2px;
+}
+.bn-single-post__crumb-sep {
+	color: var(--bn-border-strong, var(--border));
+}
+.bn-single-post__thread {
+	margin-top: var(--bn-s4);
+}
+.bn-single-post__thread-heading {
+	font-size: var(--text-lg);
+	font-weight: 600;
+	margin: 0 0 var(--bn-s2);
+}
+.bn-single-post__thread-hint {
+	color: var(--bn-ink-3);
+	font-size: var(--text-sm);
+	margin: 0 0 var(--bn-s4);
+}
+.bn-single-post--missing { padding: var(--bn-s6) 0; }
+
+/* ── Bookmarks hub ─────────────────────────────────────────────────────────
+   Header block introduces the surface and is the only structural difference
+   from the home feed — cards reuse the canonical .bn-feed-list grid. */
+.bn-bookmarks__header {
+	margin-bottom: var(--bn-s4);
+}
+.bn-bookmarks__title {
+	font-size: var(--text-2xl);
+	font-weight: 700;
+	margin: 0 0 var(--bn-s2);
+	color: var(--bn-text-1, var(--text-1));
+}
+.bn-bookmarks__lead {
+	color: var(--bn-ink-3);
+	margin: 0;
+	font-size: var(--text-sm);
+}
+.bn-bookmarks__list {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bn-s4);
+}
+
+/* ── Mobile (≤640px) ── */
+@media (max-width: 640px) {
+	.bn-single-post__crumbs { font-size: var(--text-xs); }
+	.bn-bookmarks__title    { font-size: var(--text-xl); }
+}
+
+/* ── 390px mobile pass (Wave 2 E) ──────────────────────────────────────────
+ * The wave-1 surfaces (/p/{id}/, /me/bookmarks/, composer modals) all need
+ * to remain usable on a 390px viewport without horizontal scroll and
+ * without burying primary CTAs below the fold. Each rule here exists to
+ * fix a real bug spotted during the wave-2 mobile walk.
+ */
+@media (max-width: 480px) {
+	/* Single post: tighter padding + stacked breadcrumb so the post card
+	   reaches edge-to-edge. */
+	.bn-single-post {
+		padding: var(--bn-s3) var(--bn-s2);
+	}
+	.bn-single-post__breadcrumb {
+		font-size: var(--bn-text-xs);
+	}
+	.bn-single-post__thread-heading {
+		font-size: var(--bn-text-base);
+	}
+
+	/* Bookmarks: cards already stack via the existing list layout but the
+	   wrapper padding needs a 16px gutter and the header label can wrap. */
+	.bn-bookmarks {
+		padding: var(--bn-s3) var(--bn-s2);
+	}
+	.bn-bookmarks__title {
+		font-size: var(--bn-text-lg);
+		line-height: 1.3;
+	}
+	.bn-bookmarks__lead {
+		font-size: var(--bn-text-sm);
+	}
+
+	/* Composer modals: full-width minus 16px gutter so the panel is not
+	   trapped inside the desktop max-width. Buttons stack and the submit
+	   stays sticky so users do not lose it below the keyboard. */
+	.bn-modal__panel,
+	.bn-modal__panel[data-size="lg"],
+	.bn-modal__panel[data-size="xl"] {
+		max-width: calc(100vw - 16px);
+		width: calc(100vw - 16px);
+		max-height: calc(100vh - 32px);
+		margin: var(--bn-s4) var(--bn-s2);
+	}
+	.bn-composer-modal__body {
+		gap: var(--bn-s3);
+	}
+	.bn-composer-modal__row {
+		flex-direction: column;
+		align-items: stretch;
+		gap: var(--bn-s2);
+	}
+	.bn-modal__foot,
+	.bn-composer-modal__foot {
+		position: sticky;
+		bottom: 0;
+		background: var(--bn-surface);
+		padding-block: var(--bn-s2);
+	}
+	.bn-modal__foot .bn-btn,
+	.bn-composer-modal__foot .bn-btn {
+		width: 100%;
+	}
+}

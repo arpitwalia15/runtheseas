@@ -1,0 +1,66 @@
+/* Final panel colour and auto-sizing comment-frame layer. */
+.rts-luxury-survey__form .fluentform-step .rts-luxury-survey__numbered-question {
+	border: 1px solid transparent !important;
+	background:
+		linear-gradient(#010913, #010913) padding-box,
+		linear-gradient(115deg, #8c5a0d, #f0bd4f 45%, #80500a) border-box !important;
+}
+
+.rts-luxury-survey__form .fluentform-step .rts-luxury-survey__numbered-question::before {
+	display: none !important;
+}
+
+.rts-luxury-survey__form .fluentform-step .rts-luxury-survey__numbered-question::after {
+	inset: 7px;
+	border-color: rgba(216, 154, 37, .14);
+}
+
+.rts-luxury-survey__form .fluentform-step .ff-el-group:has(textarea):not(.rts-luxury-survey__numbered-question) {
+	isolation: isolate;
+	width: 100% !important;
+	max-width: none !important;
+	min-height: 150px;
+	padding: 18px 24px 22px !important;
+	border: 1px solid transparent !important;
+	margin: 18px 0 22px !important;
+	background:
+		linear-gradient(#010913, #010913) padding-box,
+		linear-gradient(115deg, #8c5a0d, #f0bd4f 45%, #80500a) border-box !important;
+	box-shadow: 0 7px 18px rgba(0, 0, 0, .24);
+	box-sizing: border-box;
+	clip-path: polygon(10px 0, calc(100% - 10px) 0, 100% 10px, 100% calc(100% - 10px), calc(100% - 10px) 100%, 10px 100%, 0 calc(100% - 10px), 0 10px);
+}
+
+.rts-luxury-survey__form .fluentform-step .ff-el-group:has(textarea):not(.rts-luxury-survey__numbered-question)::after {
+	position: absolute;
+	inset: 7px;
+	z-index: 0;
+	border-top: 1px solid rgba(216, 154, 37, .14);
+	border-bottom: 1px solid rgba(216, 154, 37, .14);
+	content: "";
+	pointer-events: none;
+}
+
+.rts-luxury-survey__form .fluentform-step .ff-el-group:has(textarea):not(.rts-luxury-survey__numbered-question) > .ff-el-input--label,
+.rts-luxury-survey__form .fluentform-step .ff-el-group:has(textarea):not(.rts-luxury-survey__numbered-question) > .ff-el-input--content {
+	position: relative;
+	z-index: 1;
+	width: 100% !important;
+	max-width: none !important;
+}
+
+.rts-luxury-survey__form .fluentform-step .ff-el-group:has(textarea):not(.rts-luxury-survey__numbered-question) textarea {
+	display: block;
+	width: 100% !important;
+	max-width: none !important;
+	min-height: 110px;
+	box-sizing: border-box;
+	resize: vertical;
+}
+
+@media (max-width: 520px) {
+	.rts-luxury-survey__form .fluentform-step .ff-el-group:has(textarea):not(.rts-luxury-survey__numbered-question) {
+		min-height: 130px;
+		padding: 16px 14px 18px !important;
+	}
+}

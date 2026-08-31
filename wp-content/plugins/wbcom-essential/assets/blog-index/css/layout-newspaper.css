@@ -1,0 +1,53 @@
+/**
+ * Newspaper Layout Styles
+ *
+ * Breaking news style with ticker, hero slider, and dual-column sections.
+ *
+ * @package Wbcom_Essential
+ * @since   4.3.0
+ */
+
+.wbcom-blog--newspaper .wbcom-blog__container {
+	max-width: 1280px;
+}
+
+/* Dual section: two columns side by side */
+.wbcom-blog__dual-section {
+	display: grid;
+	grid-template-columns: 3fr 2fr;
+	gap: 32px;
+	margin-bottom: 48px;
+}
+
+.wbcom-blog__dual-main,
+.wbcom-blog__dual-sidebar {
+	min-width: 0;
+}
+
+/* Section dividers */
+.wbcom-blog--newspaper .wbcom-blog__section {
+	padding-bottom: 40px;
+	border-bottom: 1px solid #e5e7eb;
+}
+
+.wbcom-blog--newspaper .wbcom-blog__section:last-child {
+	border-bottom: none;
+	padding-bottom: 0;
+}
+
+@media (max-width: 900px) {
+	.wbcom-blog__dual-section {
+		grid-template-columns: 1fr;
+		gap: 32px;
+	}
+}
+
+@media (max-width: 782px) {
+	.wbcom-blog__dual-section {
+		margin-bottom: 32px;
+	}
+
+	.wbcom-blog--newspaper .wbcom-blog__section {
+		padding-bottom: 24px;
+	}
+}

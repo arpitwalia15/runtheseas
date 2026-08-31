@@ -1,0 +1,356 @@
+<?php // phpcs:disable WordPress.Files.FileName.NotHyphenatedLowercase,WordPress.Files.FileName.InvalidClassFileName -- PSR-4 naming used throughout this plugin.
+/**
+ * BuddyNext companion installer.
+ *
+ * Installs a companion plugin by reusing the EDD delivery channel the companions
+ * already speak: POST the store with `edd_action=get_version` + item_id + key,
+ * take the signed package URL it returns, and hand it to WP core's
+ * Plugin_Upgrader. Free companions install with the baked-in free distribution
+ * key (the same key in the companion's own main file); the store only authorizes
+ * the download once the license is activated for this domain.
+ *
+ * Security: install_plugins capability required; only catalog slugs are
+ * installable; the download URL is resolved through EDD, never client input; the
+ * store host is locked to wbcomdesigns.com. BuddyNext's job ends at activation —
+ * the companion's own bundled SDK then manages its updates.
+ *
+ * @package BuddyNext\Integrations
+ */
+
+declare( strict_types=1 );
+
+namespace BuddyNext\Integrations;
+
+use WP_Error;
+
+/**
+ * One-click free install + activate for catalog companions.
+ */
+final class CompanionInstaller {
+
+	/**
+	 * The only host the installer will ever talk to or download from.
+	 */
+	private const STORE_URL = 'https://wbcomdesigns.com';
+
+	/**
+	 * HTTP timeout (seconds) for store calls.
+	 */
+	private const TIMEOUT = 20;
+
+	/**
+	 * Install (and activate) a companion.
+	 *
+	 * @param string $slug Companion slug (must be in the registry).
+	 * @return true|WP_Error True on success (installed + active), WP_Error otherwise.
+	 */
+	public static function install( string $slug ) {
+		if ( ! current_user_can( 'install_plugins' ) ) {
+			return new WP_Error( 'buddynext_cap', __( 'You do not have permission to install plugins.', 'buddynext' ), array( 'status' => 403 ) );
+		}
+
+		$entry = CompanionRegistry::get( $slug );
+		if ( null === $entry ) {
+			return new WP_Error( 'buddynext_unknown_companion', __( 'Unknown integration.', 'buddynext' ), array( 'status' => 404 ) );
+		}
+
+		// Already live — nothing to do.
+		if ( CompanionRegistry::is_active( $slug ) ) {
+			return true;
+		}
+
+		$config  = is_array( $entry['free'] ?? null ) ? $entry['free'] : array();
+		$item_id = (int) ( $config['item_id'] ?? 0 );
+		$key     = (string) ( $config['key'] ?? '' );
+		if ( $item_id <= 0 || '' === $key ) {
+			return new WP_Error( 'buddynext_no_item', __( 'This integration cannot be installed automatically. Visit the store.', 'buddynext' ) );
+		}
+
+		// Installed but inactive → just activate it (idempotent, never re-download).
+		$basename = (string) ( $config['basename'] ?? '' );
+		if ( '' !== $basename && file_exists( trailingslashit( WP_PLUGIN_DIR ) . $basename ) ) {
+			return self::activate( $basename );
+		}
+
+		// EDD Software Licensing only authorizes the download once the license is
+		// activated for this domain. Activate first, then surface the store's real
+		// reason if it refuses, so a failure is diagnosable.
+		$activation = self::activate_license( $item_id, $key );
+		if ( is_wp_error( $activation ) ) {
+			return $activation;
+		}
+
+		$package = self::resolve_package_url( $item_id, $key );
+		if ( is_wp_error( $package ) ) {
+			return $package;
+		}
+
+		$installed = self::install_package( $package );
+		if ( is_wp_error( $installed ) ) {
+			return $installed;
+		}
+
+		return self::activate( '' !== $basename ? $basename : (string) $installed );
+	}
+
+	/**
+	 * POST the store with one short retry on transient failures.
+	 *
+	 * The setup wizard installs companions back-to-back, so the store sees a
+	 * burst of license/version calls in seconds. A single throttled or
+	 * slow-to-respond call would otherwise fail the whole install with "couldn't
+	 * reach the store" — typically the LAST plugin in the run. Retrying once
+	 * after a brief pause clears a transient timeout (WP_Error), a rate-limit
+	 * (429), or a momentary 5xx; a genuine outage still surfaces as a WP_Error
+	 * so the caller's own messaging is unchanged.
+	 *
+	 * @param array<string, mixed> $body Request body (edd_action + params).
+	 * @return array|WP_Error The HTTP response array, or WP_Error after retries.
+	 */
+	private static function store_post( array $body ) {
+		$attempts = 2;
+		$last     = null;
+
+		for ( $attempt = 1; $attempt <= $attempts; $attempt++ ) {
+			if ( $attempt > 1 ) {
+				// Brief backoff so a throttle window passes before retrying.
+				sleep( 1 );
+			}
+
+			$response = wp_remote_post(
+				self::STORE_URL,
+				array(
+					'timeout' => self::TIMEOUT,
+					'body'    => $body,
+				)
+			);
+
+			if ( is_wp_error( $response ) ) {
+				$last = $response;
+				continue;
+			}
+
+			// 429 (throttle) and 5xx (transient server) are worth one more try;
+			// anything else (2xx success, or a 4xx the retry won't change) returns.
+			$code = (int) wp_remote_retrieve_response_code( $response );
+			if ( 429 !== $code && $code < 500 ) {
+				return $response;
+			}
+			$last = $response;
+		}
+
+		return is_wp_error( $last )
+			? $last
+			: new WP_Error( 'buddynext_store_unreachable', __( 'The store did not respond after a retry. Please try again.', 'buddynext' ) );
+	}
+
+	/**
+	 * Activate the free license for this domain (EDD authorizes the download only
+	 * after this). Returns true on valid/active; a WP_Error carrying the store's
+	 * own reason otherwise.
+	 *
+	 * @param int    $item_id Store product id.
+	 * @param string $key     Free distribution key.
+	 * @return true|WP_Error
+	 */
+	private static function activate_license( int $item_id, string $key ) {
+		$response = self::store_post(
+			array(
+				'edd_action'  => 'activate_license',
+				'item_id'     => $item_id,
+				'license'     => $key,
+				'url'         => home_url(),
+				'environment' => function_exists( 'wp_get_environment_type' ) ? wp_get_environment_type() : 'production',
+			)
+		);
+
+		if ( is_wp_error( $response ) ) {
+			return new WP_Error( 'buddynext_store_unreachable', __( 'Could not reach the store to activate the license. Please try again.', 'buddynext' ) );
+		}
+
+		$body = json_decode( (string) wp_remote_retrieve_body( $response ), true );
+		if ( ! is_array( $body ) ) {
+			return new WP_Error( 'buddynext_store_bad_response', __( 'The store returned an unexpected response while activating the license.', 'buddynext' ) );
+		}
+
+		$status = (string) ( $body['license'] ?? '' );
+		if ( in_array( $status, array( 'valid', 'active' ), true ) ) {
+			return true;
+		}
+		if ( 'invalid' === $status && ! empty( $body['success'] ) ) {
+			return true;
+		}
+
+		$reason = (string) ( $body['error'] ?? ( '' !== $status ? $status : 'unknown' ) );
+		return new WP_Error(
+			'buddynext_license_activation_failed',
+			sprintf(
+				/* translators: %s: the store's activation error reason. */
+				__( 'The store would not activate this free license for your site (reason: %s). This is a store-side license configuration issue, not a site error.', 'buddynext' ),
+				$reason
+			)
+		);
+	}
+
+	/**
+	 * Ask the store for the signed package URL for an item.
+	 *
+	 * @param int    $item_id Store product id.
+	 * @param string $key     Free distribution key.
+	 * @return string|WP_Error Package URL, or WP_Error.
+	 */
+	private static function resolve_package_url( int $item_id, string $key ) {
+		$response = self::store_post(
+			array(
+				'edd_action' => 'get_version',
+				'item_id'    => $item_id,
+				'license'    => $key,
+				'url'        => home_url(),
+			)
+		);
+
+		if ( is_wp_error( $response ) ) {
+			return new WP_Error( 'buddynext_store_unreachable', __( 'Could not reach the store. Please try again.', 'buddynext' ) );
+		}
+
+		$body = json_decode( (string) wp_remote_retrieve_body( $response ), true );
+		if ( ! is_array( $body ) ) {
+			return new WP_Error( 'buddynext_store_bad_response', __( 'The store returned an unexpected response.', 'buddynext' ) );
+		}
+
+		$package = (string) ( $body['download_link'] ?? ( $body['package'] ?? '' ) );
+		if ( '' === $package ) {
+			return new WP_Error( 'buddynext_no_package', __( 'The store did not return a download for this plugin.', 'buddynext' ) );
+		}
+
+		// Lock the download to the store host — never follow a redirect off-domain.
+		$host = (string) wp_parse_url( $package, PHP_URL_HOST );
+		if ( '' === $host || ! ( 'wbcomdesigns.com' === $host || str_ends_with( $host, '.wbcomdesigns.com' ) ) ) {
+			return new WP_Error( 'buddynext_bad_package_host', __( 'The download URL was not on the trusted store host.', 'buddynext' ) );
+		}
+
+		return $package;
+	}
+
+	/**
+	 * Download + unpack a plugin zip via WP core's Plugin_Upgrader.
+	 *
+	 * @param string $package Signed package URL.
+	 * @return string|WP_Error Installed plugin basename/destination, or WP_Error.
+	 */
+	private static function install_package( string $package ) {
+		require_once ABSPATH . 'wp-admin/includes/file.php';
+		require_once ABSPATH . 'wp-admin/includes/misc.php';
+		require_once ABSPATH . 'wp-admin/includes/plugin.php';
+		require_once ABSPATH . 'wp-admin/includes/class-wp-upgrader.php';
+
+		$creds = request_filesystem_credentials( '', '', false, false, null );
+		if ( false === $creds || ! WP_Filesystem( $creds ) ) {
+			return new WP_Error( 'buddynext_fs', __( 'WordPress needs filesystem access to install plugins. Configure direct file access or install from the Plugins screen.', 'buddynext' ) );
+		}
+
+		$skin     = new \WP_Ajax_Upgrader_Skin();
+		$upgrader = new \Plugin_Upgrader( $skin );
+		$result   = $upgrader->install( $package );
+
+		if ( is_wp_error( $result ) ) {
+			// WP's generic "download_failed" hides WHY. Probe the package URL once so
+			// the message carries the store's real reason (e.g. a 401 "Invalid
+			// license supplied"), which is what makes this diagnosable.
+			if ( 'download_failed' === $result->get_error_code() ) {
+				$probe  = wp_remote_get( $package, array( 'timeout' => self::TIMEOUT ) );
+				$code   = is_wp_error( $probe ) ? 0 : (int) wp_remote_retrieve_response_code( $probe );
+				$reason = is_wp_error( $probe ) ? $probe->get_error_message() : trim( wp_strip_all_tags( (string) wp_remote_retrieve_body( $probe ) ) );
+				if ( $code >= 400 ) {
+					return new WP_Error(
+						'buddynext_download_rejected',
+						sprintf(
+							/* translators: 1: HTTP status, 2: store reason text. */
+							__( 'The store rejected the download (HTTP %1$d: %2$s). This is a store-side license/entitlement issue.', 'buddynext' ),
+							$code,
+							'' !== $reason ? mb_substr( $reason, 0, 120 ) : __( 'no reason given', 'buddynext' )
+						)
+					);
+				}
+			}
+			return $result;
+		}
+		if ( true !== $result ) {
+			$errors = $skin->get_errors();
+			if ( is_wp_error( $errors ) && $errors->has_errors() ) {
+				return $errors;
+			}
+			return new WP_Error( 'buddynext_install_failed', __( 'The plugin could not be installed.', 'buddynext' ) );
+		}
+
+		return (string) $upgrader->plugin_info();
+	}
+
+	/**
+	 * Activate an installed plugin by basename.
+	 *
+	 * @param string $basename e.g. "jetonomy/jetonomy.php".
+	 * @return true|WP_Error
+	 */
+	private static function activate( string $basename ) {
+		if ( '' === $basename ) {
+			return new WP_Error( 'buddynext_activate', __( 'Installed, but the plugin could not be activated automatically. Activate it from the Plugins screen.', 'buddynext' ) );
+		}
+		require_once ABSPATH . 'wp-admin/includes/plugin.php';
+		$activated = activate_plugin( $basename );
+		if ( is_wp_error( $activated ) ) {
+			return $activated;
+		}
+
+		self::defuse_activation_redirect( $basename );
+
+		return true;
+	}
+
+	/**
+	 * Stop a freshly-activated companion from hijacking the setup wizard.
+	 *
+	 * Every plugin in this family sets a short-lived "just activated" transient
+	 * and redirects to its OWN wizard on the next admin page load. That is
+	 * correct when an owner activates it from the Plugins screen, and wrong when
+	 * WE activated it on their behalf from inside step 7 of our wizard: the
+	 * owner gets a wizard inside a wizard and never reaches step 8.
+	 *
+	 * Clearing the flag rather than passing $silent = true to activate_plugin()
+	 * is deliberate. Silent activation ALSO skips the plugin's own activation
+	 * hook, so its tables would never be created - a far worse bug than the one
+	 * being fixed. The plugin activates completely; only its redirect is
+	 * dropped.
+	 *
+	 * The map covers the companions this installer offers, since those are the
+	 * only plugins it activates. The filter lets a companion that changes its
+	 * key - or a site owner with their own - keep working.
+	 *
+	 * @param string $basename Plugin basename that was just activated.
+	 * @return void
+	 */
+	private static function defuse_activation_redirect( string $basename ): void {
+		$slug = strtok( $basename, '/' );
+
+		$map = array(
+			'jetonomy'        => array( 'jetonomy_activation_redirect' ),
+			'wpmediaverse'    => array( 'mvs_activation_redirect' ),
+			'wp-career-board' => array( 'wcb_activation_redirect' ),
+			'eventonomy'      => array( 'evnm_show_wizard_redirect' ),
+			'learnomy'        => array( 'learnomy_activation_redirect' ),
+		);
+
+		/**
+		 * Filter the "just activated, redirect me" transients cleared after the
+		 * setup wizard activates a companion.
+		 *
+		 * @param array<string, string[]> $map      Plugin slug => transient keys.
+		 * @param string                  $basename Plugin basename activated.
+		 */
+		$map = (array) apply_filters( 'buddynext_companion_activation_redirect_keys', $map, $basename );
+
+		foreach ( (array) ( $map[ $slug ] ?? array() ) as $transient ) {
+			delete_transient( (string) $transient );
+		}
+	}
+}

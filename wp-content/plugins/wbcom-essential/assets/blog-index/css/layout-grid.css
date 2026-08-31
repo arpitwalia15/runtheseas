@@ -1,0 +1,12 @@
+/**
+ * Grid Layout Styles
+ *
+ * Simple card grid layout.
+ *
+ * @package Wbcom_Essential
+ * @since   4.3.0
+ */
+
+.wbcom-blog--grid .wbcom-blog__container {
+	max-width: 1200px;
+}

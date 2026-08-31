@@ -1,0 +1,351 @@
+<?php
+/**
+ * BuddyNext — Nav item.
+ *
+ * One declarative navigation item (a tab, a stat, a rail link, a sub-nav child)
+ * plus its validation and per-context resolution. The single contract every
+ * surface + every integration uses, so an item can never render inconsistently.
+ *
+ * @package BuddyNext\Nav
+ */
+
+declare( strict_types=1 );
+
+namespace BuddyNext\Nav;
+
+/**
+ * Value object + tree node for a single nav item.
+ *
+ * Declared fields are read-only (the contract). `children` and `count_value`
+ * are populated during registry resolution (nesting + lazy count).
+ */
+final class NavItem {
+
+	public const LAYERS   = array( 'primary', 'metric', 'rail', 'context' );
+	public const SURFACES = array( 'global', 'profile', 'space' );
+
+	/**
+	 * Resolved sub-nav children (primary items only).
+	 *
+	 * @var NavItem[]
+	 */
+	public array $children = array();
+
+	/**
+	 * Resolved count for the current context (null = no count).
+	 *
+	 * @var int|null
+	 */
+	public ?int $count_value = null;
+
+	/**
+	 * Resolved URL for the current context (null = no URL). Mirrors count_value:
+	 * `url` may be a string OR a callable(NavContext):string, resolved lazily so a
+	 * per-subject route (e.g. a space's ?bn_tab= link) is computed against the
+	 * live context. Renderers read THIS, never the raw `url`.
+	 *
+	 * @var string|null
+	 */
+	public ?string $url_value = null;
+
+	/**
+	 * Count-aware display label resolved for the current context (null = use the
+	 * static `label`). When `count_label` is supplied, this holds the grammatically
+	 * correct form for the resolved count — e.g. "Follower" vs "Followers" — so a
+	 * "1 Followers" never renders. Renderers read THIS with `label` as the fallback.
+	 *
+	 * @var string|null
+	 */
+	public ?string $label_value = null;
+
+	/**
+	 * Construct an item. Use NavItem::from_array() for validated creation.
+	 *
+	 * @param string            $id         Unique within (surface, layer).
+	 * @param string            $surface    global | profile | space.
+	 * @param string            $layer      primary | metric | rail | context.
+	 * @param string            $label      Display label (already translated).
+	 * @param string|null       $parent     Parent primary item id (sub-nav), else null.
+	 * @param string|null       $icon       Lucide icon slug.
+	 * @param string|null       $url        Clean route for the tab/list (every surface is url+render now).
+	 * @param string|null       $capability Capability gate (buddynext_can), null = public.
+	 * @param callable|null     $condition  callable(NavContext):bool extra visibility gate.
+	 * @param bool              $hide_empty Omit when the resolved count is 0 (only
+	 *                                      honoured when a `count` is supplied).
+	 * @param int               $priority   Default order (lower = earlier).
+	 * @param string|null       $before     Order anchor: place before this item id.
+	 * @param string|null       $after      Order anchor: place after this item id.
+	 * @param string|null       $delta      Metric-only week-over-week chip text.
+	 * @param string|null       $trend      Metric-only: up|down|flat.
+	 * @param int|callable|null $count   Badge/metric value, int or callable(NavContext):int.
+	 * @param callable|null     $active     callable(NavContext):bool active-state override.
+	 * @param int               $seq        Registration order (stable tiebreak).
+	 * @param callable|null     $count_label callable(int $count):string returning the
+	 *                                      pluralized label for the resolved count
+	 *                                      (use _n() inside). Overrides `label` when set.
+	 * @param callable|null     $render     callable(NavContext):void that ECHOES this item's
+	 *                                      panel HTML (the item's screen). The single content
+	 *                                      seam — core, Pro, and integrations all supply this
+	 *                                      and the surface renders the active panel through it.
+	 *                                      The callable owns its own escaping (same contract as
+	 *                                      a template part). Null = no panel of its own.
+	 * @param bool              $full_load  This tab is a drill-in page (rich editor / its own
+	 *                                      router region), so the client-nav transport must
+	 *                                      FULL-LOAD it instead of swapping. The shared nav
+	 *                                      renderer emits it as `data-bn-full-load` and the
+	 *                                      transport reads that per-link — no hardcoded route
+	 *                                      regex in the JS. Default false = client-navigable.
+	 * @param bool              $lightweight_count This tab's count is inexpensive to compute (a denormalized
+	 *                                      column or a small, indexed people-count like members /
+	 *                                      followers) AND meaningful to show, so the resolver
+	 *                                      runs it even though per-tab badges are off by default.
+	 *                                      Use ONLY for counts that stay fast at large-community
+	 *                                      scale — never for per-user content COUNT(*) scans.
+	 */
+	public function __construct(
+		public string $id,
+		public string $surface,
+		public string $layer,
+		public string $label,
+		public ?string $parent = null, // phpcs:ignore Universal.NamingConventions.NoReservedKeywordParameterNames.parentFound -- Established public promoted property of this value object; read as $item->parent and passed as the named arg parent: across Nav/. Renaming is a breaking API change.
+		public ?string $icon = null,
+		public mixed $url = null,
+		public ?string $capability = null,
+		public mixed $condition = null,
+		public bool $hide_empty = false,
+		public int $priority = 50,
+		public ?string $before = null,
+		public ?string $after = null,
+		public ?string $delta = null,
+		public ?string $trend = null,
+		public mixed $count = null,
+		public mixed $active = null,
+		public int $seq = 0,
+		public mixed $count_label = null,
+		public mixed $render = null,
+		public bool $full_load = false,
+		public bool $lightweight_count = false
+	) {}
+
+	/**
+	 * Build + validate an item from a registration array. Returns null when the
+	 * array is malformed (missing id/surface/layer/label, bad layer-specific
+	 * requirements) — invalid items are dropped, never rendered.
+	 *
+	 * @param array<string,mixed> $a   Registration array.
+	 * @param int                 $seq Registration order.
+	 * @return self|null
+	 */
+	public static function from_array( array $a, int $seq = 0 ): ?self {
+		$id      = isset( $a['id'] ) ? sanitize_key( (string) $a['id'] ) : '';
+		$surface = isset( $a['surface'] ) ? sanitize_key( (string) $a['surface'] ) : '';
+		$layer   = isset( $a['layer'] ) ? sanitize_key( (string) $a['layer'] ) : '';
+		$label   = isset( $a['label'] ) ? (string) $a['label'] : '';
+
+		if ( '' === $id || '' === $label
+			|| ! in_array( $surface, self::SURFACES, true )
+			|| ! in_array( $layer, self::LAYERS, true )
+		) {
+			return null;
+		}
+
+		// URL may be a string (escaped now) OR a callable(NavContext):string
+		// (resolved lazily at resolve time, then escaped) — see resolve_url().
+		$url = null;
+		if ( isset( $a['url'] ) ) {
+			if ( is_callable( $a['url'] ) ) {
+				$url = $a['url'];
+			} elseif ( '' !== (string) $a['url'] ) {
+				$url = esc_url_raw( (string) $a['url'] );
+			}
+		}
+
+		$parent = isset( $a['parent'] ) && '' !== (string) $a['parent'] ? sanitize_key( (string) $a['parent'] ) : null;
+		$icon   = isset( $a['icon'] ) && '' !== (string) $a['icon'] ? sanitize_key( (string) $a['icon'] ) : null;
+
+		// A render callable echoes the item's panel HTML (its screen) — the content
+		// seam. An item may carry it alongside a tab/url, or a primary item can be
+		// reachable purely by carrying render (the surface derives the URL from the id).
+		$render = ( isset( $a['render'] ) && is_callable( $a['render'] ) ) ? $a['render'] : null;
+
+		// Layer-specific minimums.
+		switch ( $layer ) {
+			case 'primary':
+				// A primary tab must be reachable: a clean route (url) and/or a
+				// render panel (registry-driven content).
+				if ( null === $url && null === $render ) {
+					return null;
+				}
+				break;
+			case 'rail':
+			case 'context':
+				if ( null === $url ) {
+					return null; // rail/context items are real links.
+				}
+				break;
+			case 'metric':
+				// `parent` is meaningless for a metric; drop it.
+				$parent = null;
+				break;
+		}
+
+		$condition   = ( isset( $a['condition'] ) && is_callable( $a['condition'] ) ) ? $a['condition'] : null;
+		$active      = ( isset( $a['active'] ) && is_callable( $a['active'] ) ) ? $a['active'] : null;
+		$count_label = ( isset( $a['count_label'] ) && is_callable( $a['count_label'] ) ) ? $a['count_label'] : null;
+		$count       = $a['count'] ?? null;
+		if ( null !== $count && ! is_int( $count ) && ! is_callable( $count ) ) {
+			$count = (int) $count;
+		}
+
+		$trend = isset( $a['trend'] ) && in_array( (string) $a['trend'], array( 'up', 'down', 'flat' ), true )
+			? (string) $a['trend']
+			: null;
+
+		// Anchors: `after` wins when both are supplied, so the stored state is never
+		// ambiguous — order() honours only one anchor per item, and a hand-built
+		// array that sets both no longer silently drops one at sort time.
+		$after  = isset( $a['after'] ) && '' !== (string) $a['after'] ? sanitize_key( (string) $a['after'] ) : null;
+		$before = ( null === $after && isset( $a['before'] ) && '' !== (string) $a['before'] )
+			? sanitize_key( (string) $a['before'] )
+			: null;
+
+		return new self(
+			id: $id,
+			surface: $surface,
+			layer: $layer,
+			label: $label,
+			parent: $parent,
+			icon: $icon,
+			url: $url,
+			capability: isset( $a['capability'] ) && '' !== (string) $a['capability'] ? (string) $a['capability'] : null,
+			condition: $condition,
+			// Only honour hide_empty when a count is actually supplied — otherwise a
+			// count-less item with hide_empty would resolve to a null count and be
+			// hidden forever (a silent foot-gun), which is never the intent.
+			hide_empty: ! empty( $a['hide_empty'] ) && null !== $count,
+			priority: isset( $a['priority'] ) ? (int) $a['priority'] : 50,
+			before: $before,
+			after: $after,
+			delta: isset( $a['delta'] ) && '' !== (string) $a['delta'] ? (string) $a['delta'] : null,
+			trend: $trend,
+			count: $count,
+			active: $active,
+			seq: $seq,
+			count_label: $count_label,
+			render: $render,
+			full_load: ! empty( $a['full_load'] ),
+			lightweight_count: ! empty( $a['lightweight_count'] ),
+		);
+	}
+
+	/**
+	 * Whether the item is visible in this context — BOTH the capability gate and
+	 * the condition callable must pass (a missing gate passes).
+	 *
+	 * @param NavContext $ctx Resolution context.
+	 */
+	public function passes( NavContext $ctx ): bool {
+		if ( null !== $this->capability ) {
+			$cap_ctx = $ctx->subject_id > 0 && 'space' === $ctx->surface
+				? array( 'space_id' => $ctx->subject_id )
+				: array();
+			if ( ! buddynext_can( $ctx->viewer_id, $this->capability, $cap_ctx ) ) {
+				return false;
+			}
+		}
+		if ( null !== $this->condition && ! (bool) call_user_func( $this->condition, $ctx ) ) {
+			return false;
+		}
+		return true;
+	}
+
+	/**
+	 * Resolve the count for this context (runs the callable lazily). Null when
+	 * the item has no count.
+	 *
+	 * @param NavContext $ctx Resolution context.
+	 * @return int|null
+	 */
+	public function resolve_count( NavContext $ctx ): ?int {
+		if ( null === $this->count ) {
+			return null;
+		}
+		$value = is_callable( $this->count ) ? (int) call_user_func( $this->count, $ctx ) : (int) $this->count;
+		// A count is a badge — never negative. Clamp so a callable returning a
+		// stray -1 can't render as a "-1" pill or dodge the hide_empty zero check.
+		return max( 0, $value );
+	}
+
+	/**
+	 * Resolve the count-aware display label for a resolved count. Returns null when
+	 * the item has no `count_label` (renderers then fall back to the static `label`),
+	 * so "1 Followers" becomes "1 Follower" without each surface duplicating _n().
+	 *
+	 * @param int|null $count Already-resolved count for this context.
+	 * @return string|null
+	 */
+	public function resolve_count_label( ?int $count ): ?string {
+		if ( null === $this->count_label || null === $count ) {
+			return null;
+		}
+		return (string) call_user_func( $this->count_label, $count );
+	}
+
+	/**
+	 * Resolve the URL for this context (runs the callable lazily, then escapes).
+	 * Null when the item has no URL. A static string was already escaped in
+	 * from_array(); a callable result is escaped here.
+	 *
+	 * @param NavContext $ctx Resolution context.
+	 * @return string|null
+	 */
+	public function resolve_url( NavContext $ctx ): ?string {
+		if ( null === $this->url ) {
+			return null;
+		}
+		if ( is_callable( $this->url ) ) {
+			$resolved = (string) call_user_func( $this->url, $ctx );
+			return '' !== $resolved ? esc_url_raw( $resolved ) : null;
+		}
+		return (string) $this->url;
+	}
+
+	/**
+	 * Whether this item is the active one in this context. Uses the `active`
+	 * override when supplied; otherwise false — active state is a render/consumer
+	 * concern, not a contract value.
+	 *
+	 * Active state is intentionally NOT resolved here because it depends on the
+	 * live tab/route, which the registry has no business knowing. Every consumer
+	 * (the web renderer AND any REST/app client) computes it the same way from the
+	 * resolved tree + the current tab: a leaf is active when its `tab` matches the
+	 * current tab; a PARENT is "active" (branch-active) when ANY of its `children`
+	 * is the active tab. Compute it from `tab` + `children`, not from this method.
+	 *
+	 * @param NavContext $ctx Resolution context.
+	 */
+	public function is_active( NavContext $ctx ): bool {
+		return null !== $this->active && (bool) call_user_func( $this->active, $ctx );
+	}
+
+	/**
+	 * Whether this item carries its own panel (a render callable).
+	 */
+	public function has_render(): bool {
+		return is_callable( $this->render );
+	}
+
+	/**
+	 * Echo this item's panel for the given context. No-op when the item has no
+	 * render. The callable owns its own escaping (same contract as a template
+	 * part), so output is emitted as-is — never re-wrapped or double-escaped.
+	 *
+	 * @param NavContext $ctx Resolution context (carries the active sub-tab on ->sub).
+	 * @return void
+	 */
+	public function render_panel( NavContext $ctx ): void {
+		if ( is_callable( $this->render ) ) {
+			call_user_func( $this->render, $ctx );
+		}
+	}
+}

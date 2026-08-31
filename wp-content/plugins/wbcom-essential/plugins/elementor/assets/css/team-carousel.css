@@ -1,0 +1,288 @@
+.wbcom-team-carousel {
+    padding-bottom: 0 !important;
+    opacity: 0;
+    -webkit-transition: opacity .15s ease-in-out;
+    transition: opacity .15s ease-in-out;
+    overflow: hidden;
+    position: relative
+}
+
+.wbcom-team-carousel .elementor-swiper-button-next,
+.wbcom-team-carousel .elementor-swiper-button-prev {
+    position: absolute;
+    top: 50%;
+    bottom: 10px;
+    color: #fff;
+    width: 45px;
+    height: 45px;
+    border-radius: 0;
+    margin: 0;
+    -webkit-transform: translateY(-50%);
+    transform: translateY(-50%);
+    z-index: 9;
+    opacity: 1;
+    font-size: 30px;
+    line-height: 1;
+    border: 0;
+    -webkit-transition: all .2s ease-in-out;
+    transition: all .2s ease-in-out;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer
+}
+
+.wbcom-team-carousel .elementor-swiper-button-prev {
+    left: 0
+}
+
+.wbcom-team-carousel .elementor-swiper-button-next {
+    right: 0
+}
+
+.wbcom-team-carousel .elementor-swiper-button-prev svg,
+.wbcom-team-carousel .elementor-swiper-button-next svg {
+    width: 1em;
+    height: 1em;
+    fill: currentColor
+}
+
+.wbcom-team-carousel .swiper-pagination {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 10;
+    text-align: center
+}
+
+.wbcom-team-carousel .swiper-pagination-bullet {
+    margin: 0 1px !important;
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    background: #000;
+    opacity: 0.25;
+    border-radius: 50%;
+    cursor: pointer
+}
+
+.wbcom-team-carousel .swiper-pagination-bullet-active {
+    opacity: 1
+}
+
+.wbcom-team-carousel .swiper-slide {
+    opacity: 0;
+    -webkit-transition-delay: 0s;
+    transition-delay: 0s;
+    -webkit-transition-duration: .2s;
+    transition-duration: .2s;
+    -webkit-transition-property: all;
+    transition-property: all;
+    -webkit-transition-timing-function: ease-out;
+    transition-timing-function: ease-out;
+    -webkit-transform: scale(0.9, .9);
+    transform: scale(0.9, .9)
+}
+
+.wbcom-team-carousel .swiper-slide.swiper-slide-active,
+.wbcom-team-carousel .swiper-slide.swiper-slide-visible {
+    opacity: 1;
+    -webkit-transition-delay: .3s;
+    transition-delay: .3s;
+    -webkit-transition-duration: .2s;
+    transition-duration: .2s;
+    -webkit-transition-property: all;
+    transition-property: all;
+    -webkit-transition-timing-function: ease-in;
+    transition-timing-function: ease-in;
+    -webkit-transform: scale(1, 1);
+    transform: scale(1, 1)
+}
+
+.wbcom-team-carousel.noanim {
+    opacity: 1 !important;
+}
+
+.wbcom-team-carousel.noanim .swiper-slide {
+    opacity: 1;
+    -webkit-transform: none;
+    transform: none
+}
+
+.wbcom-team-carousel .elementor-swiper-button-next:before,
+.wbcom-team-carousel .elementor-swiper-button-prev:before {
+    display: none
+}
+
+.wbcom-team-member-wrapper {
+    display: -webkit-box;
+    display: -ms-flexbox;
+    display: flex;
+    -webkit-box-orient: vertical;
+    -webkit-box-direction: normal;
+    -ms-flex-direction: column;
+    flex-direction: column
+}
+
+.wbcom-team-member {
+    position: relative
+}
+
+.wbcom-team-member a {
+    position: relative;
+    display: block
+}
+
+.wbcom-team-member a.no-overlay {
+    overflow: hidden
+}
+
+.wbcom-team-member img {
+    -webkit-transition-property: all;
+    transition-property: all;
+    -webkit-transition-timing-function: ease-in-out;
+    transition-timing-function: ease-in-out;
+    vertical-align: bottom
+}
+
+.wbcom-team-overlay {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    display: -webkit-box;
+    display: -ms-flexbox;
+    display: flex;
+    z-index: 9;
+    -webkit-transition: all .2s ease-in-out;
+    transition: all .2s ease-in-out
+}
+
+.wbcom-team-overlay .wbcom-team-icon {
+    opacity: 0;
+    -webkit-transition: opacity .2s ease-in-out;
+    transition: opacity .2s ease-in-out;
+    text-align: center
+}
+
+.wbcom-team-overlay:hover .wbcom-team-icon {
+    opacity: 1
+}
+
+.wbcom-team-overlay.no-overlay {
+    overflow: hidden
+}
+
+.wbcom-team-member.below-img .wbcom-team-overlay {
+    position: relative;
+    top: auto;
+    bottom: auto;
+    left: auto;
+    right: auto
+}
+
+.wbcom-team-member.below-img .wbcom-team-texts {
+    width: 100%
+}
+
+.wbcom-team-subtitle span,
+.wbcom-team-title span {
+    vertical-align: inherit;
+    position: relative;
+    display: -webkit-inline-box;
+    display: -ms-inline-flexbox;
+    display: inline-flex
+}
+
+.wbcom-team-title {
+    font-size: 120%;
+    font-weight: 700
+}
+
+.wbcom-lightbox-oembed {
+    display: none
+}
+
+.wbcom-lightbox-iframe embed,
+.wbcom-lightbox-iframe iframe,
+.wbcom-lightbox-iframe object,
+.wbcom-lightbox-iframe video {
+    max-width: 100%;
+    vertical-align: bottom
+}
+
+.wbcom-lightbox-content img,
+.wbcom-lightbox-image img {
+    vertical-align: bottom;
+    width: 100%;
+    height: auto
+}
+
+.wbcom-hide {
+    visibility: hidden !important
+}
+
+.wbcom-lightbox-content {
+    padding: 40px
+}
+
+.wbcom-lightbox-content hr {
+    background-color: rgba(0, 0, 0, .1);
+    height: 1px;
+    border: none;
+    margin-top: 30px;
+    margin-bottom: 30px
+}
+
+.wbcom-lightbox-content ul {
+    margin: 0;
+    padding: 0;
+    list-style: none
+}
+
+.wbcom-lightbox-content li {
+    display: inline-block;
+    padding: 0;
+    margin: 0
+}
+
+.wbcom-lightbox-content li:after {
+    content: '-';
+    padding: 0 5px;
+    color: rgba(0, 0, 0, .2)
+}
+
+.wbcom-lightbox-content li:last-of-type:after {
+    display: none
+}
+
+.wbcom-lightbox-content img {
+    margin-bottom: 30px
+}
+
+.wbcom-lightbox-content h1,
+.wbcom-lightbox-content h2,
+.wbcom-lightbox-content h3,
+.wbcom-lightbox-content h4,
+.wbcom-lightbox-content h5,
+.wbcom-lightbox-content h6,
+.wbcom-lightbox-content p {
+    margin: 0 0 20px;
+    padding: 0
+}
+
+@media only screen and (max-width:1024px) {
+    .wbcom-lightbox-content {
+        padding: 20px
+    }
+}
+
+.wbcom-overflow-hidden {
+    overflow: hidden !important
+}
+
+.wbcom-carousel-item {
+    vertical-align: bottom
+}

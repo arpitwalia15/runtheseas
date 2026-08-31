@@ -1,0 +1,480 @@
+<?php
+/**
+ * Points Redemption Engine
+ *
+ * Allows members to spend earned points on defined reward items.
+ * Smile.io / loyalty program model — integrates with WooCommerce coupons
+ * when WooCommerce is active, falls back to custom reward items otherwise.
+ *
+ * Reward types:
+ *   discount_pct   — % off WooCommerce order (requires WooCommerce)
+ *   discount_fixed — Fixed amount off WooCommerce order (requires WooCommerce)
+ *   free_shipping  — Free-shipping WooCommerce coupon (requires WooCommerce)
+ *   free_product   — 100%-off coupon scoped to a specific product (requires WooCommerce)
+ *   wbcom_credits  — Top up balance in a Wbcom Credits SDK slug
+ *                    (requires the wbcom-credits-sdk to be loaded by another plugin)
+ *   custom         — Admin-defined reward, fulfillment handled via hook
+ *
+ * Reward config (JSON in reward_config column) per type:
+ *   discount_pct/discount_fixed: { "amount": 10 }
+ *   free_product:                { "product_id": 42 }
+ *   wbcom_credits:               { "slug": "mp", "amount": 100 }
+ *   free_shipping / custom:      {}
+ *
+ * Flow:
+ *   1. Admin defines reward items in wp_gam_redemption_items via admin UI
+ *      or POST /redemptions/items (admin only).
+ *   2. Member redeems: POST /redemptions with { item_id }.
+ *   3. Engine validates member has sufficient points, deducts them,
+ *      creates a redemption record, dispatches per-type fulfillment.
+ *   4. WooCommerce types create a coupon; wbcom_credits tops up an SDK ledger;
+ *      custom defers to the wb_gam_points_redeemed action.
+ *
+ * @package WB_Gamification
+ * @since   0.1.0
+ */
+
+namespace WBGam\Engine;
+
+defined( 'ABSPATH' ) || exit;
+// Silencing convention-driven false positives so Plugin Check signal stays clean:
+// - PrefixAllGlobals.NonPrefixedHooknameFound — plugin uses `wb_gam_*` as its
+// established hook prefix (documented in CLAUDE.md, declared in .phpcs.xml).
+// Plugin Check auto-detects `wb_gamification` from the text-domain header
+// and doesn't share the .phpcs.xml prefix list; hooks like
+// `wb_gam_points_redeemed` are part of the public 1.0 API and can't rename.
+// - PrefixAllGlobals.NonPrefixedFunctionFound — same convention. Helper
+// functions exported under `wb_gam_*` are documented in `src/Extensions/`.
+// - PluginCheck.Security.DirectDB.UnescapedDBParameter +
+// WordPress.DB.PreparedSQL.InterpolatedNotPrepared — this file does custom-
+// table work. Table names are interpolated from `{$wpdb->prefix}` plus
+// literal constants (no user input); user-supplied values pass through
+// `$wpdb->prepare()`. MySQL doesn't allow placeholder table names, so the
+// interpolation is unavoidable.
+// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound
+
+/**
+ * Allows members to spend earned points on defined reward items.
+ *
+ * @package WB_Gamification
+ */
+final class RedemptionEngine {
+
+	/**
+	 * Side-channel used by the closure passed to Transaction::run() to
+	 * communicate the specific failure reason back to the public redeem()
+	 * method. Transaction::run can only signal "pass/fail" via its return
+	 * value (truthy/false), so a small static carrier translates the
+	 * closure's internal failure mode into the public error code the
+	 * controller maps to a REST error.
+	 *
+	 * Set inside the closure; consumed + cleared after Transaction::run
+	 * returns. Never inspect across requests.
+	 *
+	 * @var string|null
+	 */
+	private static ?string $last_failure_reason = null;
+
+	/**
+	 * Map an internal failure-reason slug to a localised error message.
+	 *
+	 * @param string   $reason       Failure reason — one of
+	 *                               `insufficient` | `out_of_stock` |
+	 *                               `ledger_write_failed` | `record_write_failed` |
+	 *                               `redemption_failed`.
+	 * @param int      $cost         Reward cost in points (for the insufficient message).
+	 * @param int|null $balance_hint Current user balance (for the insufficient message).
+	 * @return string                Translated error string for the API response.
+	 */
+	private static function error_message_for( string $reason, int $cost, ?int $balance_hint ): string {
+		switch ( $reason ) {
+			case 'insufficient':
+				return sprintf(
+					/* translators: 1: cost, 2: current balance */
+					__( 'Insufficient points. This reward costs %1$d pts; you have %2$d.', 'wb-gamification' ),
+					$cost,
+					(int) $balance_hint
+				);
+			case 'out_of_stock':
+				return __( 'This reward is out of stock.', 'wb-gamification' );
+			case 'ledger_write_failed':
+				return __( 'Could not record the redemption. Please try again - your points have not been deducted.', 'wb-gamification' );
+			case 'record_write_failed':
+				return __( 'Redemption could not be saved. Please try again - your points have not been deducted.', 'wb-gamification' );
+			default:
+				return __( 'Redemption failed. Please try again.', 'wb-gamification' );
+		}
+	}
+
+
+	// ── Public API ───────────────────────────────────────────────────────────
+
+	/**
+	 * Get all active redemption items.
+	 *
+	 * @return array<int, array>
+	 */
+	public static function get_items(): array {
+		global $wpdb;
+
+		return $wpdb->get_results(
+			"SELECT id, title, description, points_cost, point_type, reward_type, reward_config, stock, is_active
+			   FROM {$wpdb->prefix}wb_gam_redemption_items
+			  WHERE is_active = 1
+			  ORDER BY points_cost ASC",
+			ARRAY_A
+		) ?: array();
+	}
+
+	/**
+	 * Get a single redemption item by ID.
+	 *
+	 * @param int $item_id Redemption item ID.
+	 * @return array|null Item data array or null if not found.
+	 */
+	public static function get_item( int $item_id ): ?array {
+		global $wpdb;
+
+		$row = $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT id, title, description, points_cost, point_type, reward_type, reward_config, stock, is_active
+				   FROM {$wpdb->prefix}wb_gam_redemption_items WHERE id = %d",
+				$item_id
+			),
+			ARRAY_A
+		);
+
+		return $row ?: null;
+	}
+
+	/**
+	 * Redeem an item for a user.
+	 *
+	 * @param int $user_id  User redeeming.
+	 * @param int $item_id  Redemption item ID.
+	 * @return array{ success: bool, redemption_id: int|null, coupon_code: string|null, error: string|null }
+	 */
+	public static function redeem( int $user_id, int $item_id ): array {
+		global $wpdb;
+
+		$item = self::get_item( $item_id );
+
+		if ( ! $item ) {
+			return array(
+				'success'       => false,
+				'reason'        => 'not_found',
+				'error'         => __( 'Reward item not found.', 'wb-gamification' ),
+				'redemption_id' => null,
+				'coupon_code'   => null,
+			);
+		}
+
+		if ( ! $item['is_active'] ) {
+			return array(
+				'success'       => false,
+				'reason'        => 'inactive',
+				'error'         => __( 'This reward is not currently active.', 'wb-gamification' ),
+				'redemption_id' => null,
+				'coupon_code'   => null,
+			);
+		}
+
+		$cost = (int) $item['points_cost'];
+		$type = ( new \WBGam\Services\PointTypeService() )->resolve( (string) ( $item['point_type'] ?? '' ) );
+
+		// Stock semantics — NULL or 0 means unlimited stock (the admin form
+		// description has always said "Set to 0 for unlimited stock"; the
+		// engine now honours that contract). Only positive finite stock is
+		// enforced. See Basecamp #9925383280.
+		$enforced_stock = is_null( $item['stock'] ?? null ) ? null : (int) $item['stock'];
+
+		// Build the canonical redemption event up-front so PointsEngine::debit
+		// can audit-log it, and the redemption record can later reference the
+		// same event_id (the prior implementation generated the event inside
+		// debit() then dropped the reference — events and redemptions were
+		// disconnected on the analytics side).
+		$event = new Event(
+			array(
+				'action_id' => 'points_redeemed',
+				'user_id'   => $user_id,
+				'metadata'  => array(
+					'item_id'     => $item_id,
+					'points_cost' => -$cost,
+					'point_type'  => $type,
+				),
+			)
+		);
+
+		// ── Single atomic transaction: debit + stock decrement + record ──────
+		// PRE-REFACTOR (commit f877744): debit ran in a transaction that
+		// committed BEFORE the redemption row INSERT. A crash between COMMIT
+		// and the INSERT would burn the user's points with no audit record
+		// of what they bought. The refactor wraps all three writes in a
+		// single Transaction::run frame so either everything commits or
+		// nothing does. The audit-log invariant (every wb_gam_points row
+		// has a matching wb_gam_events row) also now holds for debit, since
+		// PointsEngine::debit goes through the unified Engine::persist_event
+		// → PointsEngine::insert_point_row path.
+		$redemption_id = Transaction::run(
+			function () use ( $user_id, $item_id, $cost, $type, $event, $enforced_stock ) {
+				global $wpdb;
+
+				// Step 1 — debit (FOR UPDATE balance lock, audit-logged).
+				$debit = PointsEngine::debit( $user_id, $cost, 'redemption', $event, $type );
+				if ( ! $debit['success'] ) {
+					self::$last_failure_reason = ( 'insufficient_balance' === ( $debit['reason'] ?? '' ) )
+						? 'insufficient'
+						: 'ledger_write_failed';
+					return false;
+				}
+
+				// Step 2 — atomic stock decrement when finite stock is enforced.
+				// NULL or 0 stock means unlimited.
+				if ( null !== $enforced_stock && $enforced_stock > 0 ) {
+					$decremented = $wpdb->query(
+						$wpdb->prepare(
+							"UPDATE {$wpdb->prefix}wb_gam_redemption_items SET stock = stock - 1 WHERE id = %d AND stock > 0",
+							$item_id
+						)
+					);
+					if ( ! $decremented ) {
+						self::$last_failure_reason = 'out_of_stock';
+						return false;
+					}
+				}
+
+				// Step 3 — record the redemption inside the same transaction.
+				// Rolled back together with the debit if the record write fails.
+				$inserted = $wpdb->insert(
+					$wpdb->prefix . 'wb_gam_redemptions',
+					array(
+						'user_id'     => $user_id,
+						'item_id'     => $item_id,
+						'points_cost' => $cost,
+						'status'      => 'pending',
+					),
+					array( '%d', '%d', '%d', '%s' )
+				);
+				if ( ! $inserted ) {
+					self::$last_failure_reason = 'record_write_failed';
+					return false;
+				}
+
+				return (int) $wpdb->insert_id;
+			}
+		);
+
+		// Translate transaction-level failure into the documented public shape.
+		if ( false === $redemption_id || null === $redemption_id ) {
+			$reason                    = self::$last_failure_reason ?: 'redemption_failed';
+			self::$last_failure_reason = null;
+			$balance_hint              = ( 'insufficient' === $reason )
+				? PointsEngine::get_total( $user_id, $type )
+				: null;
+			return array(
+				'success'       => false,
+				'reason'        => $reason,
+				'error'         => self::error_message_for( $reason, $cost, $balance_hint ),
+				'redemption_id' => null,
+				'coupon_code'   => null,
+			);
+		}
+
+		// Fulfillment.
+		$coupon_code = null;
+		$config      = json_decode( $item['reward_config'] ?? '{}', true ) ?: array();
+
+		$woo_types = array( 'discount_pct', 'discount_fixed', 'free_shipping', 'free_product' );
+
+		if ( in_array( $item['reward_type'], $woo_types, true ) ) {
+			$coupon_code = self::create_woo_coupon( $user_id, $item, $config, $redemption_id );
+			$wpdb->update(
+				$wpdb->prefix . 'wb_gam_redemptions',
+				array(
+					'status'      => $coupon_code ? 'fulfilled' : 'failed',
+					'coupon_code' => $coupon_code,
+				),
+				array( 'id' => $redemption_id )
+			);
+		} elseif ( 'wbcom_credits' === $item['reward_type'] ) {
+			$ok = self::topup_wbcom_credits( $user_id, $item, $config );
+			$wpdb->update(
+				$wpdb->prefix . 'wb_gam_redemptions',
+				array( 'status' => $ok ? 'fulfilled' : 'failed' ),
+				array( 'id' => $redemption_id )
+			);
+		} else {
+			// Custom — fire hook for third-party fulfillment.
+			$wpdb->update( $wpdb->prefix . 'wb_gam_redemptions', array( 'status' => 'pending_fulfillment' ), array( 'id' => $redemption_id ) );
+		}
+
+		// PointsEngine::debit (called above) already busts the per-type total
+		// cache, so no follow-up cache_delete is needed here.
+
+		/**
+		 * Fires after a redemption is created.
+		 *
+		 * @param int    $redemption_id Redemption record ID.
+		 * @param int    $user_id       User who redeemed.
+		 * @param array  $item          Reward item data.
+		 * @param string|null $coupon_code WooCommerce coupon code, or null.
+		 */
+		do_action( 'wb_gam_points_redeemed', $redemption_id, $user_id, $item, $coupon_code );
+
+		return array(
+			'success'       => true,
+			'redemption_id' => $redemption_id,
+			'coupon_code'   => $coupon_code,
+			'error'         => null,
+		);
+	}
+
+	// ── WooCommerce coupon creation ──────────────────────────────────────────
+
+	/**
+	 * Create a WooCommerce coupon code for a discount reward.
+	 *
+	 * @param int   $user_id       User redeeming the reward.
+	 * @param array $item          Redemption item data.
+	 * @param array $config        Decoded reward_config JSON.
+	 * @param int   $redemption_id Redemption record ID used to seed the coupon code.
+	 * @return string|null Generated coupon code or null on failure.
+	 */
+	private static function create_woo_coupon( int $user_id, array $item, array $config, int $redemption_id ): ?string {
+		if ( ! class_exists( '\WC_Coupon' ) ) {
+			return null;
+		}
+
+		$user = get_userdata( $user_id );
+		if ( ! $user ) {
+			return null;
+		}
+
+		$code   = strtoupper( 'WBG-' . substr( md5( $redemption_id . $user_id . microtime( true ) ), 0, 8 ) );
+		$type   = $item['reward_type'];
+		$amount = (float) ( $config['amount'] ?? 10 );
+
+		$coupon = new \WC_Coupon();
+		$coupon->set_code( $code );
+
+		switch ( $type ) {
+			case 'discount_pct':
+				$coupon->set_discount_type( 'percent' );
+				$coupon->set_amount( $amount );
+				break;
+			case 'discount_fixed':
+				$coupon->set_discount_type( 'fixed_cart' );
+				$coupon->set_amount( $amount );
+				break;
+			case 'free_shipping':
+				$coupon->set_discount_type( 'percent' );
+				$coupon->set_amount( 0 );
+				$coupon->set_free_shipping( true );
+				break;
+			case 'free_product':
+				$product_id = (int) ( $config['product_id'] ?? 0 );
+				if ( $product_id <= 0 ) {
+					Log::warning( 'redemption: free_product missing product_id', array( 'item_id' => $item['id'] ?? 0 ) );
+					return null;
+				}
+				$coupon->set_discount_type( 'percent' );
+				$coupon->set_amount( 100 );
+				$coupon->set_product_ids( array( $product_id ) );
+				break;
+			default:
+				return null;
+		}
+
+		$coupon->set_usage_limit( 1 );
+		$coupon->set_usage_limit_per_user( 1 );
+		$coupon->set_email_restrictions( array( $user->user_email ) );
+		$coupon->set_individual_use( true );
+		$coupon->set_date_expires( strtotime( '+30 days' ) );
+		$coupon->set_description( sprintf( 'Redeemed via WB Gamification — %s', $item['title'] ) );
+		$coupon->save();
+
+		return $code;
+	}
+
+	/**
+	 * Top up a Wbcom Credits SDK ledger when the reward type is `wbcom_credits`.
+	 *
+	 * Uses the SDK's static API; safe no-op if the SDK is not loaded on this
+	 * install (e.g. the issuing plugin was deactivated). Logs the failure so
+	 * the admin can see why the redemption sits as `failed`.
+	 *
+	 * @param int   $user_id User receiving the credits.
+	 * @param array $item    Reward item row.
+	 * @param array $config  Decoded reward_config: { slug: string, amount: int }.
+	 * @return bool True on successful topup.
+	 */
+	private static function topup_wbcom_credits( int $user_id, array $item, array $config ): bool {
+		if ( ! class_exists( '\Wbcom\Credits\Credits' ) ) {
+			Log::warning(
+				'redemption: wbcom_credits reward attempted but SDK not loaded',
+				array( 'item_id' => $item['id'] ?? 0 )
+			);
+			return false;
+		}
+
+		$slug   = isset( $config['slug'] ) ? sanitize_key( (string) $config['slug'] ) : '';
+		$amount = isset( $config['amount'] ) ? (int) $config['amount'] : 0;
+
+		if ( '' === $slug || $amount <= 0 ) {
+			Log::warning(
+				'redemption: wbcom_credits reward has invalid config',
+				array(
+					'item_id' => $item['id'] ?? 0,
+					'slug'    => $slug,
+					'amount'  => $amount,
+				)
+			);
+			return false;
+		}
+
+		$note   = sprintf( 'WB Gamification redemption — %s', $item['title'] );
+		$result = \Wbcom\Credits\Credits::topup( $slug, $user_id, $amount, $note );
+
+		if ( false === $result ) {
+			Log::error(
+				'redemption: wbcom_credits topup returned false',
+				array(
+					'user_id' => $user_id,
+					'slug'    => $slug,
+					'amount'  => $amount,
+				)
+			);
+			return false;
+		}
+
+		return true;
+	}
+
+	// ── User redemption history ──────────────────────────────────────────────
+
+	/**
+	 * Get a user's redemption history.
+	 *
+	 * @param int $user_id User ID to retrieve history for.
+	 * @param int $limit   Maximum number of records to return.
+	 * @return array Array of redemption history rows.
+	 */
+	public static function get_user_redemptions( int $user_id, int $limit = 20 ): array {
+		global $wpdb;
+
+		return $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT r.id, r.points_cost, r.status, r.coupon_code, r.created_at,
+				        i.title, i.reward_type
+				   FROM {$wpdb->prefix}wb_gam_redemptions r
+				   JOIN {$wpdb->prefix}wb_gam_redemption_items i ON i.id = r.item_id
+				  WHERE r.user_id = %d
+				  ORDER BY r.created_at DESC
+				  LIMIT %d",
+				$user_id,
+				$limit
+			),
+			ARRAY_A
+		) ?: array();
+	}
+}

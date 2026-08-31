@@ -1,0 +1,106 @@
+
+/*--------------------------------------------------------------
+# Elements
+--------------------------------------------------------------*/
+/* stylelint-disable */
+html {
+	box-sizing: border-box;
+}
+/* stylelint-enable */
+
+/**
+ * Inherit box-sizing to make it easier to change the property for
+ * components that leverage other behavior; see
+ * http://css-tricks.com/inheriting-box-sizing-probably-slightly-better-best-practice/
+ */
+*,
+*::before,
+*::after {
+	box-sizing: inherit;
+}
+
+/* stylelint-disable */
+body {
+	background: var(--color-theme-body);
+	/* Fallback for when there is no custom background color defined. */
+}
+/* stylelint-enable */
+
+/* stylelint-disable */
+hr {
+	background-color: var(--bx-color-border, #e8e8e8);
+	border: 0;
+	height: 1px;
+	margin-bottom: 1.5em;
+}
+/* stylelint-enable */
+
+/*
+ * Single source of truth for list-marker indentation, site-wide (theme
+ * templates AND any plugin/editor output that renders a bare ul/ol - e.g.
+ * course/LMS descriptions). list-style-position stays "outside" (UA
+ * default), so the padding below IS the marker's box - dropping it to 0
+ * here left every un-styled ul/ol with nowhere for its marker to sit,
+ * pushing numbers/bullets out past the text column. UI lists that want no
+ * marker/no indent (nav, breadcrumbs, tab lists, comment-thread nesting,
+ * etc.) already pair `list-style: none` with their own explicit
+ * `padding-inline-start: 0` - do the same for any new one rather than
+ * lowering this default.
+ */
+ul,
+ol {
+	margin: 0 0 1.5em 0;
+	padding-inline-start: 1.5em;
+}
+
+ul {
+	list-style: disc;
+}
+
+ol {
+	list-style: decimal;
+}
+
+li > ul,
+li > ol {
+	margin-bottom: 0;
+}
+
+ol ol {
+	list-style-type: lower-alpha;
+}
+
+/* Further nesting can adjust list styles as needed */
+ul ul ul {
+	list-style-type: square;
+}
+
+ol ol ol {
+	list-style-type: lower-roman;
+}
+
+dt {
+	font-weight: 700;
+}
+
+dd {
+	margin: 0 1.5em 1.5em;
+}
+
+/* stylelint-disable */
+img {
+	display: block;
+	height: auto;
+	max-width: 100%;
+}
+/* stylelint-enable */
+
+/* Extra wide images within figure tags don't overflow the content area. */
+figure {
+	margin: 0.5em 0;
+}
+
+table {
+	margin: 0 0 1.5em;
+	width: 100%;
+}

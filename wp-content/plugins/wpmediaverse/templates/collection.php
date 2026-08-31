@@ -1,0 +1,189 @@
+<?php
+/**
+ * Template: Single Collection.
+ *
+ * Displays a collection's matched media items in a grid.
+ * Override by copying to your-theme/wpmediaverse/collection.php
+ *
+ * @package WPMediaVerse
+ */
+
+defined( 'ABSPATH' ) || exit;
+
+\WPMediaVerse\Core\TemplateHelpers::site_header();
+
+do_action( 'mvs_before_content' );
+
+require MVS_PLUGIN_DIR . 'templates/partials/router-region-open.php';
+?>
+<div class="mvs-single-collection">
+	<?php
+	while ( have_posts() ) :
+		the_post();
+
+		$collection_id   = get_the_ID();
+		$collection_type = get_post_meta( $collection_id, '_mvs_collection_type', true ) ?: 'manual';
+		$is_owner        = is_user_logged_in() && (int) get_the_author_meta( 'ID' ) === get_current_user_id();
+
+		// Privacy gate for the whole collection — mirror album.php. Without this a
+		// members/private collection's title, counts, and item layout rendered to
+		// anyone (individual thumbnails still sign per-viewer, but the structure
+		// leaked). A viewer who can't see the collection gets the branded 404,
+		// nothing else. Basecamp 10073499554.
+		if ( ! \WPMediaVerse\Core\Plugin::container()->get( 'privacy' )->can_view( $collection_id, get_current_user_id() ) ) {
+			status_header( 404 );
+			echo '<div class="mvs-empty-state"><p>' . esc_html__( 'Collection not found.', 'wpmediaverse' ) . '</p></div>';
+			echo '</div>';
+			include MVS_PLUGIN_DIR . 'templates/partials/router-region-close.php';
+			do_action( 'mvs_after_content' );
+			\WPMediaVerse\Core\TemplateHelpers::site_footer();
+			return;
+		}
+
+		// Resolve items.
+		$container = \WPMediaVerse\Core\Plugin::container();
+		$service   = $container->get( 'collections' );
+		$items     = array();
+
+		if ( 'smart' === $collection_type ) {
+			$resolved = $service->resolve( $collection_id, 100, 1 );
+			$items    = array_column( $resolved['items'], 'media_id' );
+		} else {
+			$items = $container->get( 'favorites' )->get_collection_media_ids( $collection_id, 100 );
+		}
+
+		$rules = $service->get_rules( $collection_id );
+
+		// Resolve rule values to human-readable names.
+		foreach ( $rules as &$rule ) {
+			if ( 'tag' === $rule['key'] ) {
+				$term = get_term( (int) $rule['value'], 'mvs_tag' );
+				if ( $term && ! is_wp_error( $term ) ) {
+					$rule['value'] = $term->name;
+				}
+			} elseif ( 'category' === $rule['key'] ) {
+				$term = get_term( (int) $rule['value'], 'mvs_category' );
+				if ( $term && ! is_wp_error( $term ) ) {
+					$rule['value'] = $term->name;
+				}
+			} elseif ( 'author' === $rule['key'] ) {
+				$user = get_userdata( (int) $rule['value'] );
+				if ( $user ) {
+					$rule['value'] = $user->display_name;
+				}
+			}
+		}
+		unset( $rule );
+		?>
+
+		<article id="mvs-collection-<?php the_ID(); ?>" <?php post_class( 'mvs-collection-article' ); ?>>
+			<!-- Info Card -->
+			<div class="mvs-collection-card-info">
+				<h1 class="mvs-collection-card-title"><?php the_title(); ?></h1>
+				<div class="mvs-collection-card-meta">
+					<span class="mvs-collection-meta-author">
+						<?php
+						$mvs_author_id = (int) get_the_author_meta( 'ID' );
+						// Platform-agnostic profile URL (BP / BuddyNext override via filter).
+						$mvs_author_url    = \WPMediaVerse\Core\Plugin::container()->get( 'template_helpers' )->get_user_profile_url( $mvs_author_id );
+						$mvs_author_avatar = get_avatar( $mvs_author_id, 24, '', '', array( 'class' => 'mvs-collection-avatar' ) );
+
+						if ( $mvs_author_url ) :
+							?>
+						<a href="<?php echo esc_url( $mvs_author_url ); ?>" class="mvs-collection-author-link"><?php echo $mvs_author_avatar; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- get_avatar() returns safe markup ?><?php echo esc_html( get_the_author() ); ?></a>
+						<?php else : ?>
+							<?php echo $mvs_author_avatar; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- get_avatar() returns safe markup ?><span><?php echo esc_html( get_the_author() ); ?></span>
+						<?php endif; ?>
+					</span>
+					<span class="mvs-collection-meta-text">
+						<?php
+						printf(
+							/* translators: %d: number of items */
+							esc_html( _n( '%d item', '%d items', count( $items ), 'wpmediaverse' ) ),
+							count( $items )
+						);
+						?>
+					</span>
+					<span class="mvs-collection-type-badge"><?php echo esc_html( $collection_type ); ?></span>
+					<?php if ( 'smart' === $collection_type && ! empty( $rules ) ) : ?>
+						<?php foreach ( $rules as $rule ) : ?>
+							<span class="mvs-rule-pill"><?php echo esc_html( $rule['key'] . ': ' . $rule['value'] ); ?></span>
+						<?php endforeach; ?>
+					<?php endif; ?>
+				</div>
+				<?php if ( get_the_content() ) : ?>
+					<div class="mvs-collection-card-desc"><?php the_content(); ?></div>
+				<?php endif; ?>
+			</div>
+
+			<!-- Search within collection -->
+			<?php if ( ! empty( $items ) ) : ?>
+			<div class="mvs-explore-search mvs-collection-search">
+				<form class="mvs-collection-search-form">
+					<input type="text" class="mvs-collection-search-input" placeholder="<?php esc_attr_e( 'Search in this collection...', 'wpmediaverse' ); ?>" />
+					<button type="button" class="mvs-collection-search-btn"><?php esc_html_e( 'Search', 'wpmediaverse' ); ?></button>
+				</form>
+			</div>
+			<?php endif; ?>
+
+			<!-- Media Grid -->
+			<?php if ( ! empty( $items ) ) : ?>
+				<?php
+				$mvs_ids = array_map( 'intval', $items );
+				\WPMediaVerse\Core\Plugin::container()->get( 'media_repository' )->prefetch( $mvs_ids );
+				\WPMediaVerse\Core\Plugin::container()->get( 'access_rules' )->prefetch_active_rules( $mvs_ids );
+				/* Batch index+meta for the page (1.7.0). */ $stats_map = \WPMediaVerse\Core\Plugin::container()->get( 'template_helpers' )->bulk_get_stats( $mvs_ids );
+				?>
+				<?php $mvs_grid_cols = max( 2, min( 5, (int) get_option( 'mvs_grid_columns', 3 ) ) ); ?>
+				<div class="mvs-media-grid mvs-cols-<?php echo (int) $mvs_grid_cols; ?> mvs-feed">
+					<?php
+					foreach ( $items as $media_id ) :
+						$media_id     = (int) $media_id;
+						$media_title  = \WPMediaVerse\Core\Plugin::container()->get( 'media_repository' )->get( $media_id, 'title' );
+						$media_status = \WPMediaVerse\Core\Plugin::container()->get( 'media_repository' )->get( $media_id, 'status' );
+						if ( ! $media_title || 'publish' !== $media_status ) {
+							continue;
+						}
+						\WPMediaVerse\Core\Plugin::container()->get( 'template_helpers' )->render_grid_item(
+							$media_id,
+							$stats_map[ $media_id ] ?? array(),
+							array(
+								'show_author' => true,
+								'data_attrs'  => array( 'title' => strtolower( $media_title ) ),
+							)
+						);
+					endforeach;
+					?>
+				</div>
+			<?php else : ?>
+				<p class="mvs-no-media">
+					<?php
+					if ( 'smart' === $collection_type ) {
+						esc_html_e( 'No media matches the current rules.', 'wpmediaverse' );
+					} else {
+						esc_html_e( 'This collection is empty.', 'wpmediaverse' );
+					}
+					?>
+				</p>
+			<?php endif; ?>
+		</article>
+
+	<?php endwhile; ?>
+</div>
+<?php
+// @deprecated 2.3.0 Not the enqueue site any more — Core\Plugin::enqueue_frontend_assets()
+// enqueues this handle for every MVS-owned page. Enqueuing from a template body only
+// ever worked on a hard page load: the <script> tag prints in wp_footer, OUTSIDE
+// [data-wp-router-region="mvs/main"], so a client-side navigation swapped in the markup
+// without ever delivering the script (Basecamp #10148246386, #10134243697). Left as an
+// idempotent no-op because themes may override this template — Production Rule #5.
+?>
+<?php wp_enqueue_script( 'mvs-collection-filter' ); ?>
+<?php
+wp_enqueue_style( 'mvs-frontend' );
+
+require MVS_PLUGIN_DIR . 'templates/partials/router-region-close.php';
+
+do_action( 'mvs_after_content' );
+
+\WPMediaVerse\Core\TemplateHelpers::site_footer();

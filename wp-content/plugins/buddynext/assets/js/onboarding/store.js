@@ -1,0 +1,701 @@
+/* BuddyNext — Onboarding Interactivity API store (5-step wizard).
+ *
+ * Provides reactive state for the wizard, action handlers for every
+ * affordance in templates/onboarding/index.php, and REST integration
+ * for joining spaces, following users, saving interests, and completing
+ * the wizard. Step positions are server-decided (the Interests step is
+ * dropped when the owner has no categories), so `context.totalSteps` is
+ * 4 or 5 and every getter works off the context, never a hardcoded map.
+ */
+import { store, getContext } from '@wordpress/interactivity';
+import { restFetch } from '@buddynext/rest-client';
+
+/* -- i18n -------------------------------------------------------------- */
+/* Translated strings are injected server-side into the Interactivity state
+ * (AssetService::i18n_onboarding) because Script Modules cannot use
+ * wp_set_script_translations(). The dictionary is read once from the
+ * buddynext/onboarding namespace below; each lookup keeps the English literal
+ * as a fallback so the UI never breaks if the state is absent. fmt() fills
+ * sprintf-style '%s'/'%d' placeholders. */
+let I18N = {};
+function t( k, fb ) { return ( I18N && I18N[ k ] ) || fb; }
+
+/* Upload limits, read from the same server state as the strings above. The
+ * fallbacks match ProfileController::validate_image_upload()'s own defaults, so
+ * an absent state degrades to the real rule rather than to the 1024x1024 cap
+ * that made a phone photo unusable here. */
+let UPLOAD_LIMITS = { maxMegapixels: 50, maxDimension: 10000, maxBytes: 4 * 1024 * 1024 };
+function fmt( tpl, ...vals ) { let i = 0; return String( null == tpl ? '' : tpl ).replace( /%(?:(\d+)\$)?[sd]/g, ( m, pos ) => String( vals[ pos ? pos - 1 : i++ ] ?? '' ) ); }
+
+// Holds the pending username-availability check timer so a fresh
+// keystroke can cancel the in-flight check before it fires.
+let usernameCheckTimer = null;
+
+function ctx() {
+	try {
+		return getContext();
+	} catch ( _e ) {
+		return {};
+	}
+}
+
+/* On phones a step is taller than the viewport, so the action row sits at a
+ * scroll offset the NEXT step does not reach — without this, advancing lands
+ * the member on blank canvas below the new step's content. */
+function scrollToStepTop() {
+	const form = document.querySelector( '.bn-ob-form' );
+	if ( form ) {
+		form.scrollIntoView( { block: 'start' } );
+	} else {
+		window.scrollTo( 0, 0 );
+	}
+	// Keep the active step's label visible in the (horizontally scrollable)
+	// stepper - on phones a six-step strip overflows and the last step's own
+	// label would otherwise sit clipped at the edge. Deferred a frame because
+	// the reactive .is-active class lands AFTER the action that called us;
+	// horizontal-only on the strip itself so it cannot fight the vertical
+	// scroll above.
+	requestAnimationFrame( function () {
+		const strip  = document.querySelector( '.bn-ob-stepper' );
+		const active = strip ? strip.querySelector( '.is-active' ) : null;
+		if ( strip && active ) {
+			strip.scrollLeft = Math.max( 0, active.offsetLeft - ( strip.clientWidth - active.offsetWidth ) / 2 );
+		}
+	} );
+}
+
+function toast( message, tone ) {
+	if ( typeof window.bnToast === 'function' ) {
+		window.bnToast( message, tone || 'info' );
+		return;
+	}
+	if ( typeof window.buddynext_toast === 'function' ) {
+		window.buddynext_toast( message, tone || 'info' );
+	}
+}
+
+function rest( c, path, opts ) {
+	opts = opts || {};
+	const init = {
+		base: c.restUrl || '/wp-json/buddynext/v1/',
+		nonce: c.restNonce || '',
+		method: opts.method,
+		toastOnError: false,
+	};
+	if ( typeof opts.body !== 'undefined' ) {
+		init.body = opts.body;
+	}
+	return restFetch( '/' + String( path ).replace( /^\//, '' ), init );
+}
+
+const onboardingStore = store( 'buddynext/onboarding', {
+	state: {
+		get currentStep() {
+			return ctx().step || 1;
+		},
+		get progressPercent() {
+			const c = ctx();
+			const total = c.totalSteps || 5;
+			const step  = c.step || 1;
+			return Math.round( ( step / total ) * 100 );
+		},
+		get progressWidth() {
+			return ( this.progressPercent || 0 ) + '%';
+		},
+		get stepLabel() {
+			const c = ctx();
+			const total = c.totalSteps || 5;
+			const step  = c.step || 1;
+			return fmt( t( 'stepLabel', 'Step %1$s of %2$s' ), step, total );
+		},
+		/* Step 6 exists when an addon appends a step via the
+		   buddynext_onboarding_steps filter (e.g. Pro's membership plan step);
+		   the done-checks are uniform because with 6 steps the wizard really
+		   can move past step 5. */
+		get isStep1() { return ( ctx().step || 1 ) === 1; },
+		get isStep2() { return ( ctx().step || 1 ) === 2; },
+		get isStep3() { return ( ctx().step || 1 ) === 3; },
+		get isStep4() { return ( ctx().step || 1 ) === 4; },
+		get isStep5() { return ( ctx().step || 1 ) === 5; },
+		get isStep6() { return ( ctx().step || 1 ) === 6; },
+		get isStepActive1() { return ( ctx().step || 1 ) === 1; },
+		get isStepActive2() { return ( ctx().step || 1 ) === 2; },
+		get isStepActive3() { return ( ctx().step || 1 ) === 3; },
+		get isStepActive4() { return ( ctx().step || 1 ) === 4; },
+		get isStepActive5() { return ( ctx().step || 1 ) === 5; },
+		get isStepActive6() { return ( ctx().step || 1 ) === 6; },
+		get isStepDone1() { return ( ctx().step || 1 ) > 1; },
+		get isStepDone2() { return ( ctx().step || 1 ) > 2; },
+		get isStepDone3() { return ( ctx().step || 1 ) > 3; },
+		get isStepDone4() { return ( ctx().step || 1 ) > 4; },
+		get isStepDone5() { return ( ctx().step || 1 ) > 5; },
+		get isStepDone6() { return false; },
+		// Soft interests hint — visible until the member has picked at least
+		// three topics (never blocking; Continue works with any count).
+		get interestsHintVisible() {
+			const picked = ctx().interestIds;
+			return ( Array.isArray( picked ) ? picked.length : 0 ) < 3;
+		},
+		get displayNameError() {
+			const c = ctx();
+			if ( ! c.displayNameDirty ) { return ''; }
+			const dn = String( c.displayName || '' ).trim();
+			return dn.length < 2 ? t( 'displayNameError', 'Display name must be at least 2 characters.' ) : '';
+		},
+		get continueDisabledStep1() {
+			const c = ctx();
+			const dn = String( c.displayName || '' ).trim();
+			return dn.length < 2;
+		},
+		get saving() { return !! ctx().saving; },
+		get error() { return ctx().error || ''; },
+		// Live profile-preview helpers consumed by the onboarding canvas
+		// (right column). They reflect whatever the user has typed on the
+		// left so the preview card updates as they fill the form.
+		get previewName() {
+			return String( ctx().displayName || '' ).trim() || t( 'previewName', 'Your name' );
+		},
+		get previewHandle() {
+			const u = String( ctx().userLogin || '' ).trim();
+			return u ? '@' + u : t( 'previewHandle', '@username' );
+		},
+		get previewBio() {
+			return String( ctx().bio || '' ).trim() || t( 'previewBio', "Add a short bio so people know what you're into." );
+		},
+		get previewInitial() {
+			const dn = String( ctx().displayName || '' ).trim();
+			return dn ? dn.charAt( 0 ).toUpperCase() : '?';
+		},
+		get previewAvatar() {
+			return String( ctx().avatarUrl || '' );
+		},
+	},
+	actions: {
+		nextStep() {
+			const c = ctx();
+			const total = c.totalSteps || 5;
+			if ( ( c.step || 1 ) < total ) {
+				c.step = ( c.step || 1 ) + 1;
+				scrollToStepTop();
+				// Persist step server-side (best-effort).
+				rest( c, 'me/onboarding/step', {
+					method: 'POST',
+					body:   { step: c.step - 1, data: {
+						display_name: c.displayName || '',
+						description:  c.bio || '',
+					} },
+				} ).catch( () => {} );
+			}
+		},
+		prevStep() {
+			const c = ctx();
+			if ( ( c.step || 1 ) > 1 ) {
+				c.step = c.step - 1;
+				scrollToStepTop();
+			}
+		},
+		skipStep() {
+			const c = ctx();
+			const total = c.totalSteps || 5;
+			if ( ( c.step || 1 ) < total ) {
+				c.step = ( c.step || 1 ) + 1;
+				scrollToStepTop();
+				// Skipping IS progress, and it has to be remembered.
+				//
+				// This used to advance the local step and stop there, so a member
+				// who skipped three steps and came back later - closed tab, new
+				// session, or just a reload - was dropped at step 1 and had to skip
+				// the same steps again. "Continue" persisted; "Skip for now" did
+				// not, which made the wizard feel broken for exactly the members
+				// least interested in it.
+				//
+				// No `data` is sent: a skip means the member chose not to fill this
+				// step in, so only the pointer moves. save_step() writes profile
+				// fields on step 1 only, and ignores empty values, so nothing they
+				// already have can be blanked by skipping past it.
+				rest( c, 'me/onboarding/step', {
+					method: 'POST',
+					body:   { step: c.step - 1 },
+				} ).catch( () => {} );
+				return;
+			}
+			// Last-step skip — finalize skip.
+			rest( c, 'me/onboarding/skip', { method: 'POST' } )
+				.then( () => {
+					// Says what is true. This used to promise "you can complete
+					// onboarding any time from settings" — there is no settings entry
+					// point back into the wizard. skip() marks it complete and
+					// PageRouter bounces anyone who tries; the only way back in is an
+					// undocumented ?redo=1 that appears in no UI. Members can still
+					// fill their profile in normally, which is what they actually care
+					// about, so say that instead of pointing them at a door that is
+					// not there.
+					toast( t( 'toastSkipped', 'Skipped. You can fill in your profile any time.' ), 'info' );
+					window.location.href = c.redirectUrl || '/activity/';
+				} )
+				.catch( () => {
+					window.location.href = c.redirectUrl || '/activity/';
+				} );
+		},
+		toggleInterest( event ) {
+			const c = ctx();
+			const btn = event && event.target ? event.target.closest( '[data-cat-id]' ) : null;
+			if ( ! btn ) { return; }
+			const catId = parseInt( btn.getAttribute( 'data-cat-id' ), 10 );
+			if ( ! catId ) { return; }
+			const picked = Array.isArray( c.interestIds ) ? c.interestIds.slice() : [];
+			const idx = picked.indexOf( catId );
+			if ( idx === -1 ) {
+				picked.push( catId );
+				btn.setAttribute( 'aria-pressed', 'true' );
+				btn.classList.add( 'is-selected' );
+			} else {
+				picked.splice( idx, 1 );
+				btn.setAttribute( 'aria-pressed', 'false' );
+				btn.classList.remove( 'is-selected' );
+			}
+			c.interestIds = picked;
+		},
+		continueInterests() {
+			// Persist the picks BEFORE advancing (cold-start contract: the
+			// picks are stored by the time the Spaces / People steps show).
+			// Zero picks is a valid save (clears any stale picks from a redo
+			// run). The Spaces / People suggestion steps are server-rendered
+			// at page load, so after persisting the step pointer this
+			// RELOADS instead of swapping client-side — the re-render is what
+			// makes the just-saved picks actually rank those steps; the
+			// pointer lands the member on the next step.
+			const c = ctx();
+			if ( c.saving ) { return; }
+			c.saving = true;
+			c.error  = '';
+			rest( c, 'me/interests', {
+				method: 'POST',
+				body:   { interests: Array.isArray( c.interestIds ) ? c.interestIds : [] },
+			} )
+				.then( ( r ) => {
+					if ( ! r.ok ) { throw new Error( 'Failed' ); }
+					// Persist the completed-step pointer (save_step stores
+					// step + 1 as the current step), then reload. `saving`
+					// stays true so the button keeps its busy state until
+					// the fresh page paints.
+					const total = c.totalSteps || 5;
+					if ( ( c.step || 1 ) < total ) {
+						rest( c, 'me/onboarding/step', {
+							method: 'POST',
+							body:   { step: c.step || 1, data: {} },
+						} )
+							.catch( () => {} )
+							.then( () => { window.location.reload(); } );
+					} else {
+						c.saving = false;
+					}
+				} )
+				.catch( () => {
+					c.saving = false;
+					c.error  = t( 'toastInterestsSaveFailed', 'Could not save your interests. Please try again.' );
+					toast( t( 'toastInterestsSaveFailed', 'Could not save your interests. Please try again.' ), 'danger' );
+				} );
+		},
+		setDisplayName( event ) {
+			const c = ctx();
+			c.displayName = event && event.target ? String( event.target.value || '' ) : '';
+			c.displayNameDirty = true;
+		},
+		setBio( event ) {
+			const c = ctx();
+			c.bio = event && event.target ? String( event.target.value || '' ) : '';
+		},
+		checkUsername( event ) {
+			const c = ctx();
+			c.userLogin = event && event.target ? String( event.target.value || '' ) : '';
+			const captured = c.userLogin;
+
+			// Too short — clear feedback, no network call.
+			if ( captured.length < 3 ) {
+				c.usernameChecking = false;
+				c.usernameStatusLabel = '';
+				return;
+			}
+
+			// Show "Checking…" immediately while we wait for the debounce
+			// window to close and the REST call to return.
+			c.usernameChecking = true;
+			c.usernameStatusLabel = t( 'usernameChecking', 'Checking…' );
+
+			if ( usernameCheckTimer ) { clearTimeout( usernameCheckTimer ); }
+			usernameCheckTimer = setTimeout( () => {
+				rest( c, 'profile-slug/check?slug=' + encodeURIComponent( captured ), {
+					method: 'GET',
+				} )
+					.then( ( r ) => r.data )
+					.then( ( data ) => {
+						// Discard stale responses if the user kept typing.
+						if ( c.userLogin !== captured ) { return; }
+						const ok = !! ( data && data.available );
+						c.usernameAvailable  = ok;
+						c.usernameChecking   = false;
+						c.usernameStatusLabel = ok ? t( 'usernameAvailable', 'Available' ) : t( 'usernameTaken', 'Taken' );
+					} )
+					.catch( () => {
+						c.usernameChecking    = false;
+						c.usernameStatusLabel = '';
+					} );
+			}, 350 );
+		},
+		toggleChannel( event ) {
+			const c = ctx();
+			const input = event && event.target ? event.target : null;
+			if ( ! input ) { return; }
+			const channel = input.getAttribute( 'data-channel' );
+			const value   = !! input.checked;
+			if ( 'email'  === channel ) { c.channelEmail = value; }
+			if ( 'in_app' === channel ) { c.channelInApp = value; }
+			if ( 'push'   === channel ) { c.channelPush  = value; }
+			if ( 'sound'  === channel ) { c.channelSound = value; }
+		},
+		joinSuggestedSpace( event ) {
+			const c = ctx();
+			const btn = event && event.target ? event.target.closest( '[data-space-id]' ) : null;
+			if ( ! btn ) { return; }
+			const spaceId = parseInt( btn.getAttribute( 'data-space-id' ), 10 );
+			if ( ! spaceId ) { return; }
+			const joined  = Array.isArray( c.joinedSpaces ) ? c.joinedSpaces.slice() : [];
+			const idx     = joined.indexOf( spaceId );
+			const isJoining = idx === -1;
+			// Optimistic UI.
+			if ( isJoining ) {
+				joined.push( spaceId );
+				btn.textContent = t( 'btnJoined', 'Joined' );
+				btn.setAttribute( 'data-variant', 'secondary' );
+				btn.setAttribute( 'aria-pressed', 'true' );
+			} else {
+				joined.splice( idx, 1 );
+				btn.textContent = t( 'btnJoin', 'Join' );
+				btn.setAttribute( 'data-variant', 'primary' );
+				btn.setAttribute( 'aria-pressed', 'false' );
+			}
+			c.joinedSpaces = joined;
+			// Membership lives on /spaces/{id}/join: POST joins, DELETE leaves
+			// (both wired on that route in SpaceController). The /members route
+			// is GET-only and cannot accept the join/leave write.
+			rest( c, 'spaces/' + spaceId + '/join', {
+				method: isJoining ? 'POST' : 'DELETE',
+			} )
+				.then( ( r ) => {
+					if ( ! r.ok ) { throw new Error( 'Failed' ); }
+					toast( isJoining ? t( 'toastJoinedSpace', 'Joined the space.' ) : t( 'toastLeftSpace', 'Left the space.' ), 'success' );
+				} )
+				.catch( () => {
+					// Rollback.
+					const rollback = Array.isArray( c.joinedSpaces ) ? c.joinedSpaces.slice() : [];
+					const ridx = rollback.indexOf( spaceId );
+					if ( isJoining && ridx !== -1 ) {
+						rollback.splice( ridx, 1 );
+						btn.textContent = t( 'btnJoin', 'Join' );
+						btn.setAttribute( 'data-variant', 'primary' );
+						btn.setAttribute( 'aria-pressed', 'false' );
+					} else if ( ! isJoining ) {
+						rollback.push( spaceId );
+						btn.textContent = t( 'btnJoined', 'Joined' );
+						btn.setAttribute( 'data-variant', 'secondary' );
+						btn.setAttribute( 'aria-pressed', 'true' );
+					}
+					c.joinedSpaces = rollback;
+					toast( t( 'toastSpaceUpdateFailed', 'Could not update space. Please try again.' ), 'danger' );
+				} );
+		},
+		followSuggestedUser( event ) {
+			const c = ctx();
+			const btn = event && event.target ? event.target.closest( '[data-user-id]' ) : null;
+			if ( ! btn ) { return; }
+			const userId = parseInt( btn.getAttribute( 'data-user-id' ), 10 );
+			if ( ! userId ) { return; }
+			const list = Array.isArray( c.followingUsers ) ? c.followingUsers.slice() : [];
+			const idx = list.indexOf( userId );
+			const isFollowing = idx === -1;
+			if ( isFollowing ) {
+				list.push( userId );
+				btn.textContent = t( 'btnFollowing', 'Following' );
+				btn.setAttribute( 'data-variant', 'secondary' );
+				btn.setAttribute( 'aria-pressed', 'true' );
+				btn.classList.add( 'is-following' );
+			} else {
+				list.splice( idx, 1 );
+				btn.textContent = t( 'btnFollow', 'Follow' );
+				btn.setAttribute( 'data-variant', 'primary' );
+				btn.setAttribute( 'aria-pressed', 'false' );
+				btn.classList.remove( 'is-following' );
+			}
+			c.followingUsers = list;
+			rest( c, 'users/' + userId + '/follow', {
+				method: isFollowing ? 'POST' : 'DELETE',
+			} )
+				.then( ( r ) => {
+					if ( ! r.ok ) { throw new Error( 'Failed' ); }
+					toast( isFollowing ? t( 'toastFollowing', 'Following.' ) : t( 'toastUnfollowed', 'Unfollowed.' ), 'success' );
+				} )
+				.catch( () => {
+					const rollback = Array.isArray( c.followingUsers ) ? c.followingUsers.slice() : [];
+					const ridx = rollback.indexOf( userId );
+					if ( isFollowing && ridx !== -1 ) {
+						rollback.splice( ridx, 1 );
+						btn.textContent = t( 'btnFollow', 'Follow' );
+						btn.setAttribute( 'data-variant', 'primary' );
+						btn.setAttribute( 'aria-pressed', 'false' );
+						btn.classList.remove( 'is-following' );
+					} else if ( ! isFollowing ) {
+						rollback.push( userId );
+						btn.textContent = t( 'btnFollowing', 'Following' );
+						btn.setAttribute( 'data-variant', 'secondary' );
+						btn.setAttribute( 'aria-pressed', 'true' );
+						btn.classList.add( 'is-following' );
+					}
+					c.followingUsers = rollback;
+					toast( t( 'toastFollowUpdateFailed', 'Could not update follow. Please try again.' ), 'danger' );
+				} );
+		},
+		triggerAvatarUpload() {
+			const input = document.querySelector( '.bn-ob-avatar-input' );
+			if ( input ) { input.click(); }
+		},
+		handleAvatarUpload( event ) {
+			const c = ctx();
+			const file = event && event.target && event.target.files ? event.target.files[ 0 ] : null;
+			if ( ! file ) { return; }
+			// Size cap read from the server, for the same reason as the pixel check
+			// below: hardcoding it here matched the server's DEFAULT but was
+			// unreachable by buddynext_upload_max_bytes, so an owner who raised the
+			// limit got a browser that still refused the file.
+			if ( file.size > UPLOAD_LIMITS.maxBytes ) {
+				toast(
+					fmt(
+						t( 'toastImageTooLarge', 'Image too large. Max %sMB.' ),
+						Math.round( UPLOAD_LIMITS.maxBytes / ( 1024 * 1024 ) )
+					),
+					'danger'
+				);
+				return;
+			}
+
+			// Send the file once dimensions are known — runs only after the pixel
+			// pre-check below passes.
+			const doUpload = () => {
+				// Reactive busy flag: drives the spinner overlay on the avatar and
+				// disables both upload triggers so the fire-and-forget picker can no
+				// longer be double-submitted while the POST is in flight.
+				c.avatarUploading = true;
+				const form = new FormData();
+				form.append( 'avatar', file );
+				restFetch( '/me/avatar', {
+					base:  c.restUrl || '/wp-json/buddynext/v1/',
+					nonce: c.restNonce || '',
+					method: 'POST',
+					body:  form,
+					toastOnError: false,
+				} )
+					.then( ( r ) => {
+						if ( ! r.ok ) {
+							// Surface the server's specific reason (avatar_too_large /
+							// avatar_dimensions / avatar_invalid_type) instead of a
+							// generic failure, so the user knows what to change.
+							const msg = r.data && r.data.message ? r.data.message : t( 'toastPhotoUploadFailed', 'Could not upload photo. Please try again.' );
+							throw new Error( msg );
+						}
+						return r.data;
+					} )
+					.then( ( data ) => {
+						if ( data && data.avatar_url ) {
+							const img = document.querySelector( '.bn-ob-avatar img' );
+							if ( img ) { img.setAttribute( 'src', data.avatar_url ); }
+							// Drive the live preview card avatar reactively (state.previewAvatar).
+							c.avatarUrl = data.avatar_url;
+						}
+						toast( t( 'toastPhotoUpdated', 'Profile photo updated.' ), 'success' );
+					} )
+					.catch( ( err ) => {
+						toast( err && err.message ? err.message : t( 'toastPhotoUploadFailed', 'Could not upload photo. Please try again.' ), 'danger' );
+					} )
+					.finally( () => {
+						c.avatarUploading = false;
+					} );
+			};
+
+			// Pre-check pixel dimensions so the member gets an immediate, specific
+			// message rather than a 422 after a wasted upload.
+			//
+			// The limits come from the SERVER (state.uploadLimits), resolved through
+			// the same buddynext_upload_max_* filters the endpoint enforces. This used
+			// to hardcode 1024x1024 — correct when written, then silently wrong once
+			// the server moved to a megapixel budget. The result was that onboarding,
+			// the very first thing a new member does, refused an ordinary phone photo
+			// (4032x3024) in the browser and never sent the request, so the server
+			// never got the chance to accept it and an owner's filter could not reach
+			// the surface that needed it most.
+			//
+			// Reading the values instead of repeating the rule is the point: the next
+			// change to the limits moves both sides at once.
+			const objectUrl = URL.createObjectURL( file );
+			const probe = new Image();
+			probe.onload = () => {
+				const megapixels = ( probe.naturalWidth * probe.naturalHeight ) / 1000000;
+				const tooBig =
+					megapixels > UPLOAD_LIMITS.maxMegapixels ||
+					probe.naturalWidth > UPLOAD_LIMITS.maxDimension ||
+					probe.naturalHeight > UPLOAD_LIMITS.maxDimension;
+				URL.revokeObjectURL( objectUrl );
+				if ( tooBig ) {
+					toast(
+						fmt(
+							t(
+								'toastImageDimensions',
+								'That image is too large to process (over %1$s megapixels or %2$s pixels on a side). Please choose a smaller photo.'
+							),
+							UPLOAD_LIMITS.maxMegapixels,
+							UPLOAD_LIMITS.maxDimension
+						),
+						'danger'
+					);
+					return;
+				}
+				doUpload();
+			};
+			probe.onerror = () => {
+				URL.revokeObjectURL( objectUrl );
+				// Dimensions unreadable client-side; let the server decide.
+				doUpload();
+			};
+			probe.src = objectUrl;
+		},
+		/* Finish the wizard.
+		 *
+		 * Every save is AWAITED and its result inspected before the member is told
+		 * they are done. The previous fire-and-forget version dispatched the profile,
+		 * handle and channel writes with `.catch(() => {})` and then declared success
+		 * off the completion call alone — so a handle collision (a race the live
+		 * availability badge cannot close) or a server-rejected display name lost the
+		 * member's data behind a "You are all set" toast and a redirect.
+		 *
+		 * On any failure the wizard STAYS on the wizard: it hops back to the step that
+		 * owns the rejected data, paints the server's own reason in the step error
+		 * region (state.error, role="alert"), and does not mark onboarding complete —
+		 * so the member can fix it and press Finish again.
+		 */
+		async finish() {
+			const c = ctx();
+			if ( c.saving ) { return; }
+			c.saving = true;
+			c.error  = '';
+
+			// Keep the member on the wizard with a real, fixable reason.
+			const stop = ( step, message ) => {
+				c.saving = false;
+				if ( step ) { c.step = step; }
+				c.error = message;
+				toast( message, 'danger' );
+			};
+
+			// Pull the most specific reason the server gave us: a field error map
+			// (422 from PUT /me/profile), then the WP_Error/REST message, then a
+			// caller-supplied fallback.
+			const reason = ( res, fallback ) => {
+				const d = ( res && res.data ) || {};
+				if ( d.errors && typeof d.errors === 'object' ) {
+					const first = Object.keys( d.errors )[ 0 ];
+					if ( first && d.errors[ first ] ) { return String( d.errors[ first ] ); }
+				}
+				return d.message ? String( d.message ) : fallback;
+			};
+
+			try {
+				// 1. Step-1 profile fields (display_name + bio). A rejected display name
+				//    (empty, moderated) comes back 422 with a field error map.
+				const profileRes = await rest( c, 'me/profile', {
+					method: 'PUT',
+					body:   {
+						display_name: c.displayName || '',
+						bio:          c.bio || '',
+					},
+				} );
+				if ( ! profileRes.ok ) {
+					stop( 1, reason( profileRes, t( 'errorProfileSaveFailed', 'Your profile could not be saved. Please check your details and try again.' ) ) );
+					return;
+				}
+
+				// 2. The chosen handle. The live availability badge is a hint, not a
+				//    reservation — someone can claim the same handle between the check
+				//    and this write, and the server 409s. That must not be swallowed.
+				const slug = String( c.userLogin || '' ).trim();
+				if ( slug.length >= 3 ) {
+					const slugRes = await rest( c, 'me/profile-slug', {
+						method: 'PUT',
+						body:   { slug },
+					} );
+					if ( ! slugRes.ok ) {
+						c.usernameAvailable   = false;
+						c.usernameStatusLabel = t( 'usernameTaken', 'Taken' );
+						stop( 1, reason( slugRes, t( 'errorHandleTaken', 'That username is already taken. Please choose another.' ) ) );
+						return;
+					}
+				}
+
+				// 3. Channel preferences (email / in-app / push / sound). The per-event
+				//    toggles inside each channel stay at their server defaults — the
+				//    member refines those from /notifications/preferences/.
+				const channelRes = await rest( c, 'me/notification-channels', {
+					method: 'PUT',
+					body:   {
+						email:  !! c.channelEmail,
+						in_app: !! c.channelInApp,
+						push:   !! c.channelPush,
+						sound:  !! c.channelSound,
+					},
+				} );
+				if ( ! channelRes.ok ) {
+					// Channel prefs live on the last step — leave the member where they
+					// are rather than bouncing them backwards for an unrelated failure.
+					stop( 0, reason( channelRes, t( 'errorChannelsSaveFailed', 'Your notification settings could not be saved. Please try again.' ) ) );
+					return;
+				}
+
+				// 4. Only now is it true that everything landed — mark onboarding complete.
+				const doneRes = await rest( c, 'me/onboarding/complete', {
+					method: 'POST',
+					body:   {
+						spaces:   c.joinedSpaces || [],
+						user_ids: c.followingUsers || [],
+					},
+				} );
+				if ( ! doneRes.ok ) {
+					stop( 0, reason( doneRes, t( 'toastFinishFailed', 'Could not finish onboarding. Please try again.' ) ) );
+					return;
+				}
+
+				c.saving = false;
+				toast( t( 'toastAllSet', 'You are all set. Welcome aboard!' ), 'success' );
+				window.location.href = ( doneRes.data && doneRes.data.redirect_to ) || c.redirectUrl || '/activity/';
+			} catch ( _e ) {
+				// Network/transport failure — restFetch resolves rather than throws, so
+				// this is the truly unexpected path.
+				stop( 0, t( 'errorGeneric', 'Something went wrong. Please try again.' ) );
+			}
+		},
+	},
+} );
+
+I18N = ( onboardingStore.state && onboardingStore.state.i18n ) || {};
+
+if ( onboardingStore.state && onboardingStore.state.uploadLimits ) {
+	const limits = onboardingStore.state.uploadLimits;
+	// Guard each value independently: a partial or malformed state must fall back
+	// to the real server rule, never to zero — which would reject every photo.
+	if ( Number( limits.maxMegapixels ) > 0 ) {
+		UPLOAD_LIMITS.maxMegapixels = Number( limits.maxMegapixels );
+	}
+	if ( Number( limits.maxDimension ) > 0 ) {
+		UPLOAD_LIMITS.maxDimension = Number( limits.maxDimension );
+	}
+	if ( Number( limits.maxBytes ) > 0 ) {
+		UPLOAD_LIMITS.maxBytes = Number( limits.maxBytes );
+	}
+}
