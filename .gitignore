@@ -20,6 +20,10 @@
 *.tar
 *.tar.gz
 
+# Allow structure-only SQL files
+!/database-structure/
+!/database-structure/*.sql
+
 # Cache
 /wp-content/cache/
 /wp-content/litespeed/
