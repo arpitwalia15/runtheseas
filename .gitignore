@@ -24,6 +24,9 @@
 !/database-structure/
 !/database-structure/*.sql
 
+!/rts-settings/
+!/rts-settings/*.sql
+
 # Cache
 /wp-content/cache/
 /wp-content/litespeed/
