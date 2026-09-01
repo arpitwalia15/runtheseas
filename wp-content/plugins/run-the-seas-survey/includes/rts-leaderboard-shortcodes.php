@@ -103,12 +103,12 @@ add_shortcode('rts_captains_leaderboard', 'rts_captains_leaderboard_shortcode');
 /** A standalone live title/subtitle block for an Elementor leaderboard hero. */
 function rts_leaderboard_header_shortcode($atts)
 {
-    $atts = shortcode_atts(array('target' => 42200), $atts, 'rts_leaderboard_header');
-    $target = max(1, absint($atts['target']));
+    $atts = shortcode_atts(array('target' => 42000), $atts, 'rts_leaderboard_header');
+    $target = rts_normalize_marathon_target($atts['target']);
 
     return '<div class="rts-leaderboard-header"><p class="rts-leaderboard-header__live"><span></span>'
         . esc_html__('Live Leaderboard', 'run-the-seas') . '</p><h2>'
-        . esc_html__('The', 'run-the-seas') . ' <strong>' . esc_html(rts_format_miles($target)) . '</strong> '
+        . esc_html__('The', 'run-the-seas') . ' <strong>' . esc_html(42000 === $target ? rts_format_trophy_miles($target, '42k') : rts_format_miles($target)) . '</strong> '
         . esc_html__('Referral Marathon Challenge', 'run-the-seas') . '</h2><p>'
         . esc_html__('Every verified referral moves you 1K closer to the finish line.', 'run-the-seas') . '</p><small>'
         . esc_html(sprintf(__('Last updated: %s', 'run-the-seas'), current_time(get_option('time_format')))) . '</small></div>';
@@ -223,11 +223,11 @@ function rts_leaderboard_winner_trophy_label($trophy)
         '10k' => '10K',
         '15k' => '15K',
         '20k' => '20K',
-        '21k' => '21K',
+        '21k' => '21.1K',
         '25k' => '25K',
         '30k' => '30K',
         '35k' => '35K',
-        '42k' => '42K',
+        '42k' => '42.2K',
     );
     if (isset($labels[$key])) {
         return $labels[$key];
@@ -348,12 +348,12 @@ add_shortcode('rts_leaderboard_third', 'rts_leaderboard_third_shortcode');
 function rts_leaderboard_progress_shortcode($atts)
 {
     $atts = shortcode_atts(array(
-        'target' => 42200,
+        'target' => 42000,
         'source' => 'earned',
         'value'  => '',
         'show_milestones' => 'yes',
     ), $atts, 'rts_leaderboard_progress');
-    $target = max(1, absint($atts['target']));
+    $target = rts_normalize_marathon_target($atts['target']);
     $miles = is_numeric($atts['value']) ? max(0, (int) $atts['value']) : rts_get_current_member_miles($atts['source']);
     $percent = min(100, round($miles / $target * 100, 1));
     $milestones = array();
@@ -365,7 +365,7 @@ function rts_leaderboard_progress_shortcode($atts)
             'name'     => $milestone['name'],
             'position' => min(100, $milestone['miles'] / $target * 100),
             'earned'   => $miles >= $milestone['miles'],
-            'label'    => rts_format_miles($milestone['miles']),
+            'label'    => rts_format_trophy_miles($milestone['miles'], $milestone['key'] ?? ''),
         );
     }
 
@@ -391,7 +391,7 @@ function rts_leaderboard_progress_shortcode($atts)
     return $output . '</div><span class="rts-leaderboard-progress__caption">' . esc_html(sprintf(
         __('%1$s of %2$s', 'run-the-seas'),
         rts_format_miles($miles),
-        rts_format_miles($target)
+        42000 === $target ? rts_format_trophy_miles($target, '42k') : rts_format_miles($target)
     )) . '</span></div>';
 }
 add_shortcode('rts_leaderboard_progress', 'rts_leaderboard_progress_shortcode');
@@ -399,9 +399,9 @@ add_shortcode('rts_leaderboard_progress', 'rts_leaderboard_progress_shortcode');
 /** Flagged, avatar-led standings rows for the central Elementor section. */
 function rts_leaderboard_standings_shortcode($atts)
 {
-    $atts = shortcode_atts(array('limit' => 10, 'target' => 42200), $atts, 'rts_leaderboard_standings');
+    $atts = shortcode_atts(array('limit' => 10, 'target' => 42000), $atts, 'rts_leaderboard_standings');
     $limit = min(50, max(1, absint($atts['limit'])));
-    $target = max(1, absint($atts['target']));
+    $target = rts_normalize_marathon_target($atts['target']);
     global $wpdb;
     $table = $wpdb->prefix . 'rts_participants';
     $leaders = $wpdb->get_results($wpdb->prepare(
@@ -499,7 +499,7 @@ function rts_leaderboard_standings_shortcode($atts)
         }
         $position = min(100, $milestone['miles'] / $target * 100);
         $milestone_header .= '<i style="left:' . esc_attr($position) . '%">'
-            . esc_html(rts_format_miles($milestone['miles'])) . '</i>';
+            . esc_html(rts_format_trophy_miles($milestone['miles'], $milestone['key'] ?? '')) . '</i>';
     }
     $milestone_header .= '</span>';
 
@@ -549,7 +549,7 @@ function rts_trophy_milestones_shortcode()
         $output .= '<article class="rts-trophy-milestones__item rts-trophy-milestones__item--' . esc_attr($milestone['key'])
             . esc_attr($earned) . '">' . '🏆'
             . '<span class="rts-trophy-milestones__rank"></span><span class="rts-trophy-milestones__title">' . esc_html($milestone['name'])
-            . '</span><strong>' . esc_html(0 === $milestone['miles'] ? __('Founder', 'run-the-seas') : rts_format_miles($milestone['miles']))
+            . '</span><strong>' . esc_html(0 === $milestone['miles'] ? __('Founder', 'run-the-seas') : rts_format_trophy_miles($milestone['miles'], $milestone['key'] ?? ''))
             . '</strong></article>';
             
     
@@ -613,10 +613,10 @@ function rts_live_leaderboard_shortcode($atts)
 {
     $atts = shortcode_atts(array(
         'limit'  => 10,
-        'target' => 42200,
+        'target' => 42000,
     ), $atts, 'rts_live_leaderboard');
     $limit = min(50, max(3, absint($atts['limit'])));
-    $target = max(1, absint($atts['target']));
+    $target = rts_normalize_marathon_target($atts['target']);
     global $wpdb;
     $table = $wpdb->prefix . 'rts_participants';
     $leaders = $wpdb->get_results($wpdb->prepare(
@@ -655,7 +655,7 @@ function rts_live_leaderboard_shortcode($atts)
     <section class="rts-live-leaderboard" aria-label="<?php esc_attr_e('Live leaderboard', 'run-the-seas'); ?>">
         <header class="rts-live-leaderboard__hero">
             <p class="rts-live-leaderboard__live"><span aria-hidden="true"></span><?php esc_html_e('Live Leaderboard', 'run-the-seas'); ?></p>
-            <h1><?php esc_html_e('The', 'run-the-seas'); ?> <strong><?php echo esc_html(rts_format_miles($target)); ?></strong> <?php esc_html_e('Referral Marathon Challenge', 'run-the-seas'); ?></h1>
+            <h1><?php esc_html_e('The', 'run-the-seas'); ?> <strong><?php echo esc_html(42000 === $target ? rts_format_trophy_miles($target, '42k') : rts_format_miles($target)); ?></strong> <?php esc_html_e('Referral Marathon Challenge', 'run-the-seas'); ?></h1>
             <p><?php esc_html_e('Every verified referral moves you 1K closer to the finish line.', 'run-the-seas'); ?></p>
             <small><?php echo esc_html(sprintf(__('Last updated: %s', 'run-the-seas'), $updated)); ?></small>
         </header>
@@ -722,7 +722,7 @@ function rts_live_leaderboard_shortcode($atts)
                 <h2><?php esc_html_e('Trophy milestones', 'run-the-seas'); ?></h2>
                 <ul>
                     <?php foreach (rts_get_captains_milestones() as $milestone) : ?>
-                        <li><span>🏆 <?php echo esc_html($milestone['name']); ?></span><strong><?php echo esc_html(rts_format_miles($milestone['miles'])); ?></strong></li>
+                        <li><span>🏆 <?php echo esc_html($milestone['name']); ?></span><strong><?php echo esc_html(rts_format_trophy_miles($milestone['miles'], $milestone['key'] ?? '')); ?></strong></li>
                     <?php endforeach; ?>
                 </ul>
             </aside>

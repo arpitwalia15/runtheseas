@@ -255,7 +255,7 @@ class RTS_DB {
 			PRIMARY KEY (id)
 		) $charset_collate;" );
 
-		// ===== EMAIL TEMPLATES (Batch 2) — version history is NEVER destroyed =====
+		// ===== EMAIL TEMPLATES =====
 		dbDelta( "CREATE TABLE {$prefix}email_templates (
 			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
 			template_key VARCHAR(64) NULL,
@@ -266,24 +266,11 @@ class RTS_DB {
 			html_body LONGTEXT,
 			plain_text_body LONGTEXT,
 			status VARCHAR(20) DEFAULT 'draft',
-			version INT DEFAULT 1,
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			PRIMARY KEY (id),
 			UNIQUE KEY template_key (template_key),
 			UNIQUE KEY action_key (action_key)
-		) $charset_collate;" );
-
-		dbDelta( "CREATE TABLE {$prefix}email_template_versions (
-			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-			template_id BIGINT UNSIGNED NOT NULL,
-			version INT NOT NULL,
-			subject VARCHAR(255),
-			html_body LONGTEXT,
-			plain_text_body LONGTEXT,
-			saved_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			PRIMARY KEY (id),
-			KEY template_id (template_id)
 		) $charset_collate;" );
 
 		// ===== DRAWS (Batch 3 — Draw A / Draw B execution log, seed stored for reproducibility) =====
@@ -353,12 +340,16 @@ class RTS_DB {
 			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
 			name VARCHAR(255) NOT NULL,
 			template_id BIGINT UNSIGNED NULL,
+			delivery_mode VARCHAR(20) DEFAULT 'automation',
 			trigger_type VARCHAR(40) DEFAULT 'days_after_registration',
 			trigger_days INT DEFAULT 3,
 			audience_filter VARCHAR(30) DEFAULT 'all',
 			category VARCHAR(20) DEFAULT 'general',
+			scheduled_at DATETIME NULL,
+			sent_at DATETIME NULL,
 			status VARCHAR(20) DEFAULT 'draft',
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			PRIMARY KEY (id)
 		) $charset_collate;" );
 
@@ -557,7 +548,7 @@ class RTS_DB {
 		) $charset_collate;" );
 
 		self::ensure_email_template_columns( "{$prefix}email_templates" );
-		self::seed_transactional_email_templates( "{$prefix}email_templates", "{$prefix}email_template_versions" );
+		self::seed_transactional_email_templates( "{$prefix}email_templates" );
 
 		update_option( 'rts_admin_platform_db_version', RTSAP_DB_VERSION );
 	}
@@ -642,7 +633,7 @@ class RTS_DB {
 	}
 
 	/** Seed editable action templates while preserving every existing template. */
-	private static function seed_transactional_email_templates( $templates_table, $versions_table ) {
+	private static function seed_transactional_email_templates( $templates_table ) {
 		global $wpdb;
 
 		$defaults = self::default_transactional_email_templates();
@@ -653,9 +644,7 @@ class RTS_DB {
 			$existing = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM `$templates_table` WHERE template_key = %s", $default['template_key'] ) );
 			if ( $existing ) {
 				if ( $upgrade_empty_defaults && '' === trim( (string) $existing->html_body ) ) {
-					$version = (int) $existing->version + 1;
-					$wpdb->update( $templates_table, array( 'html_body' => $default['html_body'], 'version' => $version, 'updated_at' => current_time( 'mysql' ) ), array( 'id' => $existing->id ) );
-					$wpdb->insert( $versions_table, array( 'template_id' => $existing->id, 'version' => $version, 'subject' => $existing->subject, 'html_body' => $default['html_body'], 'plain_text_body' => $existing->plain_text_body ) );
+					$wpdb->update( $templates_table, array( 'html_body' => $default['html_body'], 'updated_at' => current_time( 'mysql' ) ), array( 'id' => $existing->id ) );
 				}
 				continue;
 			}
@@ -670,22 +659,9 @@ class RTS_DB {
 					'subject'      => $default['subject'],
 					'html_body'    => $default['html_body'],
 					'status'       => 'active',
-					'version'      => 1,
 				)
 			);
-			if ( ! $inserted ) {
-				continue;
-			}
-
-			$wpdb->insert(
-				$versions_table,
-				array(
-					'template_id' => (int) $wpdb->insert_id,
-					'version'     => 1,
-					'subject'     => $default['subject'],
-					'html_body'   => $default['html_body'],
-				)
-			);
+			if ( ! $inserted ) { continue; }
 		}
 
 		update_option( 'rts_default_email_template_content_version', $content_version, false );
@@ -727,13 +703,7 @@ HTML;
 		);
 	}
 
-	/**
-	 * Import exact copies from the survey plugin.
-	 *
-	 * This migration normalises the three automatically seeded templates to a
-	 * clean v1. The removed revisions were bootstrap/import copies, not admin edits.
-	 * Once this migration has run, later admin edits continue at v2 normally.
-	 */
+	/** Import exact editable copies from the survey plugin. */
 	public static function sync_production_transactional_email_templates() {
 		global $wpdb;
 		$content_version = '4.0';
@@ -743,19 +713,16 @@ HTML;
 		$defaults = rts_get_production_transactional_email_templates();
 		if ( 3 !== count( $defaults ) ) { return; }
 		$templates_table = self::table( 'email_templates' );
-		$versions_table = self::table( 'email_template_versions' );
-		if ( ! self::table_exists( $templates_table ) || ! self::table_exists( $versions_table ) ) { return; }
+		if ( ! self::table_exists( $templates_table ) ) { return; }
 
 		foreach ( $defaults as $default ) {
 			$template = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM `$templates_table` WHERE template_key = %s", $default['template_key'] ) );
 			if ( $template ) {
 				$wpdb->update(
 					$templates_table,
-					array( 'subject' => $default['subject'], 'html_body' => $default['html_body'], 'version' => 1, 'updated_at' => current_time( 'mysql' ) ),
+					array( 'subject' => $default['subject'], 'html_body' => $default['html_body'], 'updated_at' => current_time( 'mysql' ) ),
 					array( 'id' => $template->id )
 				);
-				$wpdb->delete( $versions_table, array( 'template_id' => $template->id ), array( '%d' ) );
-				$wpdb->insert( $versions_table, array( 'template_id' => $template->id, 'version' => 1, 'subject' => $default['subject'], 'html_body' => $default['html_body'], 'plain_text_body' => $template->plain_text_body ) );
 				continue;
 			}
 
@@ -770,12 +737,8 @@ HTML;
 					'subject' => $default['subject'],
 					'html_body' => $default['html_body'],
 					'status' => 'active',
-					'version' => 1,
 				)
 			);
-			if ( $wpdb->insert_id ) {
-				$wpdb->insert( $versions_table, array( 'template_id' => $wpdb->insert_id, 'version' => 1, 'subject' => $default['subject'], 'html_body' => $default['html_body'] ) );
-			}
 		}
 
 		update_option( 'rts_production_email_template_content_version', $content_version, false );

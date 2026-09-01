@@ -385,6 +385,9 @@ class RTS_Participant_Operations
 
             case 'verify':
                 $wpdb->update($participants_table, array('email_verified' => 1, 'email_verification_date' => current_time('mysql'), 'updated_at' => current_time('mysql')), array('id' => $participant_id), array('%d', '%s', '%s'), array('%d'));
+                if (!empty($participant->user_id)) {
+                    update_user_meta((int) $participant->user_id, 'rts_email_verified', '1');
+                }
                 $this->registration->log_timeline($participant_id, 'manual_email_verified', 'Email verified manually by Run The Seas Admin', array('admin_id' => get_current_user_id()));
                 do_action('rts_participant_verified', $participant_id);
                 $benefits = $this->registration->activate_verified_benefits($participant_id, get_current_user_id(), true);

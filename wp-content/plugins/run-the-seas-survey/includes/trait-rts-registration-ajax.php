@@ -635,10 +635,7 @@ trait RTS_Registration_Ajax
             }
         }
 
-        $headers = array(
-            'Content-Type: text/html; charset=UTF-8',
-            'From: Run The Seas <' . get_option('admin_email') . '>'
-        );
+        $headers = rts_mail_headers();
 
         $sent = wp_mail($email, $subject, $message, $headers);
 
@@ -1131,10 +1128,7 @@ trait RTS_Registration_Ajax
         /*
         * Email headers.
         */
-        $headers = array(
-            'Content-Type: text/html; charset=UTF-8',
-            'From: Run The Seas <' . get_option('admin_email') . '>',
-        );
+        $headers = rts_mail_headers();
 
         $email_template = rts_resolve_transactional_email_template(
             'password_reset',

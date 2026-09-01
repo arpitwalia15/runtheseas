@@ -6,7 +6,7 @@ class RTS_Admin_Menu_2 {
 	public static function init() {
 		add_action( 'admin_menu', array( __CLASS__, 'register_menu' ), 20 );
 		// WordPress-native form handling: admin_post_{action} with nonce verification.
-		foreach ( array( 'clone_survey','survey_status','participant_status','participant_edit','participant_note','participant_email','suspend','reinstate','merge','manual_verify','reset_passcode','create_template','update_template','assign_template','rollback_template' ) as $a ) {
+		foreach ( array( 'clone_survey','survey_status','participant_status','participant_edit','participant_note','participant_email','suspend','reinstate','merge','manual_verify','reset_passcode','create_template','update_template','assign_template' ) as $a ) {
 			add_action( "admin_post_rts_$a", array( __CLASS__, "handle_$a" ) );
 		}
 	}
@@ -449,7 +449,9 @@ class RTS_Admin_Menu_2 {
 			'overview' => 'Overview', 'survey-response' => 'Survey Response', 'referrals' => 'Referrals',
 			'cabin-credit' => 'Cabin Credit', 'trophies' => 'Trophies', 'activity-log' => 'Activity Log', 'admin-notes' => 'Admin Notes',
 		);
-	
+		// $tabs = array(
+		// 	'overview' => 'Overview', 'survey-response' => 'Survey Response', 'referrals' => 'Referrals',			
+		// );
 		if ( ! isset( $tabs[ $tab ] ) ) { $tab = 'overview'; }
 
 		echo '<div class="rtsap-profile-identity"><span class="rtsap-profile-avatar">' . esc_html( $initials ) . '</span><div><div class="rtsap-profile-name"><h2>' . esc_html( $name ) . '</h2><span class="rtsap-directory-badge ' . esc_attr( $status_class ) . '">' . esc_html( $status ) . '</span>';
@@ -985,7 +987,25 @@ class RTS_Admin_Menu_2 {
 			return;
 		}
 		echo '<div class="wrap"><h1>Email Template Library</h1>'; self::notice();
-
+		$rows = $wpdb->get_results( "SELECT * FROM " . RTS_DB::table( 'email_templates' ) . " ORDER BY updated_at DESC" );
+		$actions = RTS_Business_Logic_2::email_template_actions();
+		$action_options = '<option value="">Use survey plugin default</option>';
+		foreach ( $actions as $key => $label ) { $action_options .= '<option value="' . esc_attr( $key ) . '">' . esc_html( $label ) . '</option>'; }
+		echo '<p>Assign one template to each transactional action. Reassigning an action automatically unassigns its previous template. If no template is assigned, the original email defined in the Run The Seas Survey plugin is used automatically. Every template can be edited with WordPress Visual or HTML/Text mode.</p>';
+		echo '<p><strong>Available merge fields:</strong> <code>{first_name}</code> <code>{last_name}</code> <code>{full_name}</code> <code>{email}</code> <code>{password_reset_url}</code> <code>{verification_url}</code> <code>{certificate_number}</code> <code>{founding_runner_number}</code> <code>{certificate_preview_url}</code> <code>{captains_suite_url}</code> <code>{login_url}</code> <code>{account_url}</code> <code>{logo_url}</code> <code>{support_email}</code> <code>{site_name}</code> <code>{site_url}</code></p>';
+		echo '<h3>New Template</h3>' . self::form( 'create_template',
+			'<input type="text" name="name" placeholder="Name" required> <input type="text" name="subject" placeholder="Subject" required> <select name="category"><option>onboarding</option><option>acquisition</option><option>engagement</option><option>transactional</option><option>milestone</option></select> <select name="action_key" aria-label="Email action">' . $action_options . '</select> <input type="hidden" name="html_body" value=""> ', 'Create, then edit visually' );
+		echo '<h3>Templates (' . count( $rows ) . ')</h3><table class="wp-list-table widefat fixed striped"><thead><tr><th>Name</th><th>Subject</th><th>Category</th><th>Assigned action</th><th>Template content</th></tr></thead><tbody>';
+		foreach ( $rows as $t ) {
+			$selected_options = '<option value="">Use survey plugin default</option>';
+			foreach ( $actions as $key => $label ) { $selected_options .= '<option value="' . esc_attr( $key ) . '"' . selected( $t->action_key, $key, false ) . '>' . esc_html( $label ) . '</option>'; }
+			$assignment = self::form( 'assign_template', '<select name="action_key" aria-label="Assigned email action">' . $selected_options . '</select> ', 'Apply', array( 'id' => $t->id ) );
+			$edit_url = RTSAP_Frontend_Dashboard::screen_url( 'rts-email-templates', array( 'template_id' => (int) $t->id ) );
+			$content_excerpt = wp_trim_words( wp_strip_all_tags( (string) $t->html_body ), 18, '…' );
+			$editor = '<a class="button button-primary" href="' . esc_url( $edit_url ) . '">Visual / HTML Editor</a><small style="display:block;margin-top:7px;line-height:1.35;">' . esc_html( $content_excerpt ) . '</small>';
+			echo '<tr><td>' . esc_html( $t->name ) . '</td><td>' . esc_html( $t->subject ) . '</td><td>' . esc_html( $t->category ) . '</td><td>' . $assignment . '</td><td>' . $editor . '</td></tr>';
+		}
+		echo '</tbody></table></div>';
 	}
 
 	private static function render_template_editor( $template_id ) {
@@ -1000,7 +1020,7 @@ class RTS_Admin_Menu_2 {
 		$list_url = RTSAP_Frontend_Dashboard::screen_url( 'rts-email-templates' );
 		echo '<div class="wrap"><h1>Edit Email Template</h1>'; self::notice();
 		echo '<p><a class="button" href="' . esc_url( $list_url ) . '">&larr; Back to Template Library</a></p>';
-		echo '<p>Use the <strong>Visual</strong> tab for normal editing or the <strong>Code</strong> tab for complete HTML control. Saving creates a new version and keeps all previous versions.</p>';
+		echo '<p>Use the <strong>Visual</strong> tab for normal editing or the <strong>Code</strong> tab for complete HTML control. Saving updates this template directly.</p>';
 		echo '<p><em>The logo and certificate shown in this editor are previews. Their saved merge fields are restored automatically so sent emails use the current logo and each participant&rsquo;s personalised certificate.</em></p>';
 		echo '<p><strong>Merge fields:</strong> <code>{first_name}</code> <code>{last_name}</code> <code>{full_name}</code> <code>{email}</code> <code>{password_reset_url}</code> <code>{verification_url}</code> <code>{certificate_number}</code> <code>{founding_runner_number}</code> <code>{certificate_preview_url}</code> <code>{captains_suite_url}</code> <code>{login_url}</code> <code>{account_url}</code> <code>{logo_url}</code> <code>{support_email}</code> <code>{site_name}</code> <code>{site_url}</code></p>';
 		echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
@@ -1026,8 +1046,36 @@ class RTS_Admin_Menu_2 {
 				'tinymce' => array( 'wpautop' => false ),
 			)
 		);
-		submit_button( 'Save New Version' );
+		$layout_json = wp_json_encode( self::email_layout_snippets(), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT );
+		echo '<script>(function(){var layouts=' . $layout_json . ';function insertLayout(html){var editor=window.tinymce&&tinymce.get("rts_email_template_body");if(editor&&!editor.isHidden()){editor.focus();editor.execCommand("mceInsertContent",false,html);return;}var field=document.getElementById("rts_email_template_body");if(!field){return;}if(typeof field.setRangeText==="function"){field.setRangeText(html,field.selectionStart,field.selectionEnd,"end");field.dispatchEvent(new Event("input",{bubbles:true}));}else{field.value+=html;}}document.addEventListener("click",function(event){var button=event.target.closest(".rts-insert-email-layout");if(!button||!layouts[button.dataset.layout]){return;}insertLayout(layouts[button.dataset.layout]);});})();</script>';
+		submit_button( 'Save Template' );
 		echo '</form></div>';
+	}
+
+	/** Starter markup for new marketing templates: email-client-safe tables and inline styles. */
+	private static function default_email_template_html( $subject = '' ) {
+		$heading = trim( (string) $subject ) ?: 'Run The Seas Update';
+		return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;margin:0;background-color:#f4f5f7;">'
+			. '<tr><td align="center" style="padding:30px 12px;">'
+			. '<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background-color:#ffffff;border-collapse:collapse;">'
+			. '<tr><td align="center" style="padding:22px 30px;background-color:#0b1420;color:#e4c77a;font-family:Georgia,Times New Roman,serif;font-size:18px;letter-spacing:1px;">RUN THE SEAS</td></tr>'
+			. '<tr><td style="padding:36px 34px;font-family:Arial,Helvetica,sans-serif;color:#1b2430;">'
+			. '<h1 style="margin:0 0 18px;font-family:Georgia,Times New Roman,serif;font-size:28px;line-height:1.25;color:#0b1420;">' . esc_html( $heading ) . '</h1>'
+			. '<p style="margin:0 0 20px;font-size:16px;line-height:1.6;">Hi {first_name},</p>'
+			. '<p style="margin:0 0 24px;font-size:16px;line-height:1.6;">Add your email message here.</p>'
+			. '<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td style="border-radius:24px;background-color:#c9a24b;"><a href="{site_url}" style="display:inline-block;padding:13px 24px;color:#0b1420;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:bold;text-decoration:none;">Call to Action</a></td></tr></table>'
+			. '</td></tr><tr><td align="center" style="padding:20px 30px;background-color:#eef0f3;color:#6b7686;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.5;">Run The Seas<br><a href="{unsubscribe_url}" style="color:#6b7686;text-decoration:underline;">Manage email preferences</a></td></tr>'
+			. '</table></td></tr></table>';
+	}
+
+	/** Reusable blocks inserted by the email layout toolbar. */
+	private static function email_layout_snippets() {
+		return array(
+			'frame' => self::default_email_template_html( 'Email heading' ),
+			'one_column' => '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;"><tr><td style="padding:24px;font-family:Arial,Helvetica,sans-serif;color:#1b2430;"><h2 style="margin:0 0 12px;font-family:Georgia,Times New Roman,serif;font-size:22px;line-height:1.3;color:#0b1420;">Section heading</h2><p style="margin:0;font-size:15px;line-height:1.6;">Add section content here.</p></td></tr></table><p>&nbsp;</p>',
+			'two_columns' => '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;"><tr><td width="50%" valign="top" style="width:50%;padding:20px 12px 20px 0;font-family:Arial,Helvetica,sans-serif;color:#1b2430;"><h3 style="margin:0 0 10px;font-size:18px;color:#0b1420;">Left column</h3><p style="margin:0;font-size:14px;line-height:1.6;">Add content here.</p></td><td width="50%" valign="top" style="width:50%;padding:20px 0 20px 12px;font-family:Arial,Helvetica,sans-serif;color:#1b2430;"><h3 style="margin:0 0 10px;font-size:18px;color:#0b1420;">Right column</h3><p style="margin:0;font-size:14px;line-height:1.6;">Add content here.</p></td></tr></table><p>&nbsp;</p>',
+			'button' => '<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:20px 0;"><tr><td style="border-radius:24px;background-color:#c9a24b;"><a href="{site_url}" style="display:inline-block;padding:13px 24px;color:#0b1420;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:bold;text-decoration:none;">Button text</a></td></tr></table>',
+		);
 	}
 
 	/** Return each unique image source used by img, background, or CSS url(). */
@@ -1075,7 +1123,7 @@ class RTS_Admin_Menu_2 {
 	private static function render_template_image_controls( $template ) {
 		$sources = self::template_image_sources( $template->html_body );
 		echo '<h2>Template Images</h2>';
-		echo '<p>Images marked <strong>from email design</strong> follow the Survey plugin&rsquo;s email-design settings. Replacing one here creates an override for this template only. Use version rollback if you later want to restore the prior design-linked image. New images added in the Visual editor appear here after the template is saved and reopened.</p>';
+		echo '<p>Images marked <strong>from email design</strong> follow the Survey plugin&rsquo;s email-design settings. Replacing one here creates an override for this template only. New images added in the Visual editor appear here after the template is saved and reopened.</p>';
 		if ( ! $sources ) { echo '<p><em>No images were detected in this template.</em></p>'; return; }
 		echo '<div class="rts-template-image-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin:14px 0 24px;">';
 		foreach ( $sources as $index => $source ) {
@@ -1131,8 +1179,7 @@ class RTS_Admin_Menu_2 {
 		}
 		return $body;
 	}
-	public static function handle_create_template()   { self::guard( 'create_template' );   $r = RTS_Business_Logic_2::create_template( array( 'name' => sanitize_text_field( $_POST['name'] ), 'subject' => sanitize_text_field( $_POST['subject'] ), 'category' => sanitize_text_field( $_POST['category'] ?? 'general' ), 'action_key' => sanitize_key( $_POST['action_key'] ?? '' ), 'html_body' => wp_kses_post( wp_unslash( $_POST['html_body'] ?? '' ) ), 'created_by' => self::admin() ) ); self::back( 'rts-email-templates', $r['error'] ? 'Error: ' . $r['error'] : 'Template created.' ); }
-	public static function handle_update_template()   { self::guard( 'update_template' );   $id = (int) $_POST['id']; $html_body = self::restore_template_image_merge_fields( $id, wp_kses_post( wp_unslash( $_POST['html_body'] ?? '' ) ) ); $html_body = self::apply_template_image_replacements( $id, $html_body, $_POST['template_image_replacement'] ?? array() ); $r = RTS_Business_Logic_2::update_template( $id, array( 'name' => sanitize_text_field( $_POST['name'] ?? '' ), 'subject' => sanitize_text_field( $_POST['subject'] ), 'category' => sanitize_text_field( $_POST['category'] ?? '' ), 'html_body' => $html_body, 'updated_by' => self::admin() ) ); self::back( 'rts-email-templates', $r['error'] ? 'Error: ' . $r['error'] : 'Saved as v' . $r['new_version'] . ' — prior versions kept.', array( 'template_id' => $id ) ); }
+	public static function handle_create_template()   { self::guard( 'create_template' ); $subject = sanitize_text_field( $_POST['subject'] ); $body = wp_kses_post( wp_unslash( $_POST['html_body'] ?? '' ) ); if ( '' === trim( $body ) ) { $body = self::default_email_template_html( $subject ); } $r = RTS_Business_Logic_2::create_template( array( 'name' => sanitize_text_field( $_POST['name'] ), 'subject' => $subject, 'category' => sanitize_text_field( $_POST['category'] ?? 'general' ), 'action_key' => sanitize_key( $_POST['action_key'] ?? '' ), 'html_body' => $body, 'created_by' => self::admin() ) ); self::back( 'rts-email-templates', $r['error'] ? 'Error: ' . $r['error'] : 'Template created with an email-safe table layout. Open the Visual / HTML Editor to customise it.' ); }
+	public static function handle_update_template()   { self::guard( 'update_template' );   $id = (int) $_POST['id']; $html_body = self::restore_template_image_merge_fields( $id, wp_kses_post( wp_unslash( $_POST['html_body'] ?? '' ) ) ); $html_body = self::apply_template_image_replacements( $id, $html_body, $_POST['template_image_replacement'] ?? array() ); $r = RTS_Business_Logic_2::update_template( $id, array( 'name' => sanitize_text_field( $_POST['name'] ?? '' ), 'subject' => sanitize_text_field( $_POST['subject'] ), 'category' => sanitize_text_field( $_POST['category'] ?? '' ), 'html_body' => $html_body, 'updated_by' => self::admin() ) ); self::back( 'rts-email-templates', $r['error'] ? 'Error: ' . $r['error'] : 'Template saved.', array( 'template_id' => $id ) ); }
 	public static function handle_assign_template()   { self::guard( 'assign_template' );   $r = RTS_Business_Logic_2::assign_template_action( (int) $_POST['id'], sanitize_key( $_POST['action_key'] ?? '' ), self::admin() ); self::back( 'rts-email-templates', $r['error'] ? 'Error: ' . $r['error'] : ( $r['action_key'] ? 'Template assigned. Any previous template for this action was unassigned.' : 'Template unassigned; the survey plugin default will be used.' ) ); }
-	public static function handle_rollback_template() { self::guard( 'rollback_template' ); $r = RTS_Business_Logic_2::rollback_template( (int) $_POST['id'], (int) $_POST['to_version'], self::admin() ); self::back( 'rts-email-templates', $r['error'] ? 'Error: ' . $r['error'] : 'Rolled back — created v' . $r['new_version'] . ' with the old content; history untouched.' ); }
 }

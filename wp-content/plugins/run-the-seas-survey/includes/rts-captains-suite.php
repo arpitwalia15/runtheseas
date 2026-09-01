@@ -15,7 +15,7 @@ function rts_captains_suite_navigation_shortcode($atts)
         'log_page'          => 'captains-log',
         'certificates_page' => 'certificates',
         'member_lounge' => 'member-lounge',
-        'profile_settings' => 'Profile-settings',
+        'profile_settings' => 'profile-settings',
         'support' => 'support'
     ), $atts, 'rts_captains_suite_navigation');
 
@@ -42,9 +42,14 @@ function rts_captains_suite_navigation_shortcode($atts)
             'label' => __('Member Lounge', 'run-the-seas'),
             'icon'  => $icon_url . 'member1.svg',
         ),
-        array(
-            'page'  => $atts['profile_settings'],
-            'url'   => rts_get_buddynext_profile_edit_url(),
+        // array(
+        //     'page'  => $atts['profile_settings'],
+        //     'url'   => rts_get_buddynext_profile_edit_url(),
+        //     'label' => __('Profile & Settings', 'run-the-seas'),
+        //     'icon'  => $icon_url . 'settings1.svg',
+        // ),
+         array(
+            'page'  => $atts['profile_settings'],            
             'label' => __('Profile & Settings', 'run-the-seas'),
             'icon'  => $icon_url . 'settings1.svg',
         ),

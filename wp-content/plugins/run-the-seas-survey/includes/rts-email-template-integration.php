@@ -5,6 +5,66 @@ if (!defined('ABSPATH')) {
 }
 
 /**
+ * Add solid-color fallbacks to the password reset button for Outlook.
+ *
+ * Outlook's Word-based renderer ignores CSS gradients. Older password-reset
+ * templates saved in the admin platform therefore rendered dark button text
+ * directly on the dark email card until external content was enabled. This is
+ * applied at send time so existing stored templates are fixed immediately.
+ */
+function rts_make_transactional_email_outlook_safe($html, $action_key = '')
+{
+    if ('password_reset' !== sanitize_key((string) $action_key) || false === stripos($html, 'Reset My Passcode')) {
+        return $html;
+    }
+
+    return preg_replace_callback(
+        '/<td\b([^>]*)>(?=\s*<a\b[^>]*>[^<]*Reset\s+My\s+Passcode)/i',
+        function ($matches) {
+            $attributes = $matches[1];
+
+            if (preg_match('/\bbgcolor\s*=\s*(["\']).*?\1/i', $attributes)) {
+                $attributes = preg_replace(
+                    '/\bbgcolor\s*=\s*(["\']).*?\1/i',
+                    'bgcolor="#E4C77A"',
+                    $attributes,
+                    1
+                );
+            } else {
+                $attributes .= ' bgcolor="#E4C77A"';
+            }
+
+            $outlook_styles = 'background-color:#E4C77A;background-image:linear-gradient(180deg,#E4C77A 0%,#C9A24B 100%);border:1px solid #C9A24B;mso-padding-alt:15px 42px;';
+            if (preg_match('/\bstyle\s*=\s*(["\'])(.*?)\1/i', $attributes)) {
+                $attributes = preg_replace_callback(
+                    '/\bstyle\s*=\s*(["\'])(.*?)\1/i',
+                    function ($style_matches) use ($outlook_styles) {
+                        // Remove the old background shorthand because clients
+                        // that block CSS images also discard its color layer.
+                        $style = preg_replace(
+                            '/(?:background(?:-color|-image)?|border|mso-padding-alt)\s*:[^;]*;?/i',
+                            '',
+                            $style_matches[2]
+                        );
+                        $style = $outlook_styles . ltrim($style);
+
+                        return 'style=' . $style_matches[1] . $style . $style_matches[1];
+                    },
+                    $attributes,
+                    1
+                );
+            } else {
+                $attributes .= ' style="' . $outlook_styles . '"';
+            }
+
+            return '<td' . $attributes . '>';
+        },
+        (string) $html,
+        1
+    );
+}
+
+/**
  * Resolve an assigned admin-platform template for a transactional email.
  *
  * An assigned template may leave its body empty to inherit the complete
@@ -104,7 +164,10 @@ function rts_resolve_transactional_email_template($action_key, $default_subject,
 
     $resolved = array(
         'subject' => sanitize_text_field(strtr($subject, $subject_replacements)),
-        'html_body' => strtr($html, $html_replacements),
+        'html_body' => rts_make_transactional_email_outlook_safe(
+            strtr($html, $html_replacements),
+            $action_key
+        ),
         'template_id' => $template ? (int) $template->id : 0,
         'action_key' => sanitize_key($action_key),
         'uses_builtin_body' => !$template || trim((string) $template->html_body) === '',

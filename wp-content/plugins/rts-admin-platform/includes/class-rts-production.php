@@ -53,6 +53,7 @@ class RTS_Production {
 		// Cron
 		add_filter( 'cron_schedules', array( __CLASS__, 'cron_schedules' ) );
 		add_action( 'rts_cron_campaign_triggers', array( __CLASS__, 'cron_campaign_triggers' ) );
+		add_action( 'rts_run_scheduled_campaign', array( __CLASS__, 'run_scheduled_campaign' ) );
 		add_action( 'rts_cron_scheduled_reports', array( __CLASS__, 'cron_scheduled_reports' ) );
 		add_action( 'rts_cron_action_items', array( __CLASS__, 'cron_action_items' ) );
 		add_action( 'rts_cron_fr_sync', array( __CLASS__, 'cron_fr_sync' ) );
@@ -69,7 +70,7 @@ class RTS_Production {
 			if ( ! wp_next_scheduled( $hook ) ) { wp_schedule_event( time() + 60, $rec, $hook ); }
 		}
 	}
-	public static function unschedule_cron() { foreach ( array( 'rts_cron_campaign_triggers', 'rts_cron_scheduled_reports', 'rts_cron_action_items', 'rts_cron_fr_sync' ) as $h ) { wp_clear_scheduled_hook( $h ); } }
+	public static function unschedule_cron() { foreach ( array( 'rts_cron_campaign_triggers', 'rts_run_scheduled_campaign', 'rts_cron_scheduled_reports', 'rts_cron_action_items', 'rts_cron_fr_sync' ) as $h ) { wp_clear_scheduled_hook( $h ); } }
 	public static function cron_schedules( $s ) { $s['rts_every_15_minutes'] = array( 'interval' => 900, 'display' => 'Every 15 minutes (RTS)' ); return $s; }
 
 	// =========================================================================================
@@ -187,6 +188,7 @@ class RTS_Production {
 		foreach ( $wpdb->get_col( "SELECT id FROM " . RTS_DB::table( 'email_campaigns' ) . " WHERE status = 'active'" ) as $id ) { RTS_Business_Logic_5::run_trigger_check( (int) $id, 'cron' ); $n++; }
 		update_option( 'rts_cron_last_campaign_triggers', current_time( 'mysql' ) ); return $n;
 	}
+	public static function run_scheduled_campaign( $campaign_id ) { return RTS_Business_Logic_5::run_trigger_check( absint( $campaign_id ), 'cron' ); }
 	public static function cron_scheduled_reports() {
 		global $wpdb; $n = 0;
 		foreach ( $wpdb->get_results( "SELECT r.*, (SELECT MAX(run_at) FROM " . RTS_DB::table( 'report_runs' ) . " x WHERE x.report_id = r.id) AS last_run FROM " . RTS_DB::table( 'report_definitions' ) . " r WHERE r.schedule_frequency IN ('daily','weekly','monthly')" ) as $r ) {

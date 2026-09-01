@@ -17,8 +17,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 define( 'RTSAP_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'RTSAP_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
-define( 'RTSAP_VERSION', '1.19.4' );
-define( 'RTSAP_DB_VERSION', '1.13.2' );
+define( 'RTSAP_VERSION', '1.20.2' );
+define( 'RTSAP_DB_VERSION', '1.15.0' );
 
 require_once RTSAP_PLUGIN_DIR . 'includes/class-rts-db.php';
 require_once RTSAP_PLUGIN_DIR . 'includes/class-rts-data-mapper.php';

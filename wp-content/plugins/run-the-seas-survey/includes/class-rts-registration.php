@@ -948,7 +948,7 @@ class RTS_Registration {
         );
         $subject = $email_template['subject'];
         $message = $email_template['html_body'];
-        $sent = wp_mail($participant->email, $subject, $message, array('Content-Type: text/html; charset=UTF-8'), array($attachment));
+        $sent = wp_mail($participant->email, $subject, $message, rts_mail_headers(), array($attachment));
         if (!$sent) {
             return new WP_Error('rts_certificate_email', __('The certificate email could not be sent. Check the mail configuration.', 'run-the-seas'));
         }
@@ -1109,20 +1109,20 @@ class RTS_Registration {
             10000 => '10K Trophy',
             15000 => '15K Trophy',
             20000 => '20K Trophy',
-            21000 => '21K Trophy',
+            21000 => '21.1K Trophy',
             25000 => '25K Trophy',
             30000 => '30K Trophy',
             35000 => '35K Trophy',
-            42200 => '42.2K Trophy',
-            47200 => 'Marathon 2 — 5K Trophy',
-            52200 => 'Marathon 2 — 10K Trophy',
-            57200 => 'Marathon 2 — 15K Trophy',
-            62200 => 'Marathon 2 — 20K Trophy',
-            63200 => 'Marathon 2 — 21K Trophy',
-            67200 => 'Marathon 2 — 25K Trophy',
-            72200 => 'Marathon 2 — 30K Trophy',
-            77200 => 'Marathon 2 — 35K Trophy',
-            84400 => 'Marathon 2 — 42.2K Trophy',
+            42000 => '42.2K Trophy',
+            47000 => 'Marathon 2 — 5K Trophy',
+            52000 => 'Marathon 2 — 10K Trophy',
+            57000 => 'Marathon 2 — 15K Trophy',
+            62000 => 'Marathon 2 — 20K Trophy',
+            63000 => 'Marathon 2 — 21.1K Trophy',
+            67000 => 'Marathon 2 — 25K Trophy',
+            72000 => 'Marathon 2 — 30K Trophy',
+            77000 => 'Marathon 2 — 35K Trophy',
+            84000 => 'Marathon 2 — 42.2K Trophy',
         );
         $next_milestone = null;
         foreach ($milestones as $required_miles => $milestone_name) {
@@ -1149,7 +1149,7 @@ class RTS_Registration {
             $referrer->email,
             'You earned 1K Captain\'s Miles!',
             $message,
-            array('Content-Type: text/html; charset=UTF-8')
+            rts_mail_headers()
         );
         if ($sent) {
             $this->log_timeline($referrer_id, 'referral_progress_email_sent', 'Referral progress email sent after a referred participant verified.', array('miles' => 1000, 'successful_referrals' => $successful_referrals));
@@ -1413,7 +1413,7 @@ class RTS_Registration {
         );
         $subject = $email_template['subject'];
         $message = $email_template['html_body'];
-        $headers = array('Content-Type: text/html; charset=UTF-8');
+        $headers = rts_mail_headers();
         
         $sent = wp_mail($participant->email, $subject, $message, $headers);
         
@@ -1945,7 +1945,7 @@ class RTS_Registration {
         
         $message .= "Best regards,\nThe Run The Seas Team";
         
-        $headers = array('Content-Type: text/plain; charset=UTF-8');
+        $headers = rts_mail_headers('text/plain; charset=UTF-8');
         
         return wp_mail($email, $subject, $message, $headers);
     }
@@ -1968,7 +1968,7 @@ class RTS_Registration {
         $message .= "You will receive a confirmation once your Cabin Credit is approved.\n\n";
         $message .= "Best regards,\nThe Run The Seas Team";
         
-        $headers = array('Content-Type: text/plain; charset=UTF-8');
+        $headers = rts_mail_headers('text/plain; charset=UTF-8');
         
         return wp_mail($participant->email, $subject, $message, $headers);
     }    
@@ -2047,7 +2047,7 @@ class RTS_Registration {
                     );
                     return;
                 }
-                
+
                 // If this participant was referred by someone, update the referral
                 if ($participant->referred_by > 0) {
                     // Check if referral already completed (prevent double processing)
@@ -2114,6 +2114,10 @@ class RTS_Registration {
                 }
                 
                 $this->db->query('COMMIT');
+
+                if (!empty($participant->user_id)) {
+                    update_user_meta((int) $participant->user_id, 'rts_email_verified', '1');
+                }
 
                 if ($referrer_notification_id) {
                     $this->send_referral_progress_notification($referrer_notification_id);
@@ -2207,6 +2211,43 @@ class RTS_Registration {
                 $email
             )
         );
+    }
+
+    /** Get the participant linked to a WordPress user ID. */
+    public function get_participant_by_user_id($user_id) {
+        $user_id = absint($user_id);
+        if (!$user_id) {
+            return null;
+        }
+
+        return $this->db->get_row(
+            $this->db->prepare(
+                "SELECT * FROM {$this->db->prefix}rts_participants WHERE user_id = %d LIMIT 1",
+                $user_id
+            )
+        );
+    }
+
+    /**
+     * Resolve a member by their permanent user link before trying email.
+     * Email is editable; user_id is the stable account relationship.
+     */
+    public function get_participant_for_user($user) {
+        if (is_numeric($user)) {
+            $user = get_userdata(absint($user));
+        }
+        if (!$user instanceof WP_User) {
+            return null;
+        }
+
+        $participant = $this->get_participant_by_user_id($user->ID);
+        if ($participant) {
+            return $participant;
+        }
+
+        return !empty($user->user_email)
+            ? $this->get_participant_by_email($user->user_email)
+            : null;
     }
 
     /** Keep the member's changed email consistent across Run The Seas records. */

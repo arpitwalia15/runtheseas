@@ -8,10 +8,45 @@ class RTS_Business_Logic_5 {
 	// ---- Email Campaign Builder: automated, triggered (NOT immediate like Broadcast) ----
 
 	public static function create_campaign( $d ) {
+		$d['status'] = 'draft';
+		return self::save_campaign( $d );
+	}
+
+	/** Create or update a campaign while keeping its reusable email template separate. */
+	public static function save_campaign( $d ) {
 		global $wpdb;
-		$wpdb->insert( RTS_DB::table( 'email_campaigns' ), array( 'name' => $d['name'], 'template_id' => $d['template_id'] ?? null, 'trigger_type' => $d['trigger_type'] ?? 'days_after_registration', 'trigger_days' => (int) ( $d['trigger_days'] ?? 3 ), 'audience_filter' => $d['audience_filter'] ?? 'all', 'category' => $d['category'] ?? 'general', 'status' => 'draft' ) );
-		$id = (int) $wpdb->insert_id; // BEFORE audit()
-		self::audit( $d['created_by'] ?? null, "Email campaign created: \"{$d['name']}\"", 'Email Campaign Builder', "campaign_id=$id" );
+		$name = trim( (string) ( $d['name'] ?? '' ) );
+		$template_id = absint( $d['template_id'] ?? 0 );
+		$delivery_mode = in_array( $d['delivery_mode'] ?? '', array( 'automation', 'scheduled' ), true ) ? $d['delivery_mode'] : 'automation';
+		$trigger_type = in_array( $d['trigger_type'] ?? '', array( 'days_after_registration', 'days_after_verification' ), true ) ? $d['trigger_type'] : 'days_after_registration';
+		$audience_filter = in_array( $d['audience_filter'] ?? '', array( 'all', 'runners_only', 'non_runners_only', 'verified_only' ), true ) ? $d['audience_filter'] : 'all';
+		$category = in_array( $d['category'] ?? '', array( 'general', 'survey', 'referral', 'trophy' ), true ) ? $d['category'] : 'general';
+		$status = in_array( $d['status'] ?? '', array( 'draft', 'active', 'paused', 'completed' ), true ) ? $d['status'] : 'draft';
+		if ( '' === $name ) { return array( 'error' => 'NAME_REQUIRED' ); }
+		if ( $template_id && ! $wpdb->get_var( $wpdb->prepare( "SELECT id FROM " . RTS_DB::table( 'email_templates' ) . " WHERE id = %d", $template_id ) ) ) {
+			return array( 'error' => 'TEMPLATE_NOT_FOUND' );
+		}
+		if ( 'scheduled' === $delivery_mode && 'active' === $status && empty( $d['scheduled_at'] ) ) { return array( 'error' => 'SCHEDULE_REQUIRED' ); }
+
+		$row = array(
+			'name' => $name, 'template_id' => $template_id, 'delivery_mode' => $delivery_mode,
+			'trigger_type' => $trigger_type, 'trigger_days' => max( 0, (int) ( $d['trigger_days'] ?? 0 ) ),
+			'audience_filter' => $audience_filter, 'category' => $category,
+			'scheduled_at' => ! empty( $d['scheduled_at'] ) ? $d['scheduled_at'] : null,
+			'status' => $status, 'updated_at' => current_time( 'mysql' ),
+		);
+		$id = absint( $d['id'] ?? 0 );
+		if ( $id ) {
+			if ( ! $wpdb->get_var( $wpdb->prepare( "SELECT id FROM " . RTS_DB::table( 'email_campaigns' ) . " WHERE id = %d", $id ) ) ) { return array( 'error' => 'NOT_FOUND' ); }
+			$wpdb->update( RTS_DB::table( 'email_campaigns' ), $row, array( 'id' => $id ) );
+			$verb = 'updated';
+		} else {
+			$wpdb->insert( RTS_DB::table( 'email_campaigns' ), $row );
+			$id = (int) $wpdb->insert_id; // BEFORE audit(), which also inserts.
+			$verb = 'created';
+		}
+		if ( ! $id ) { return array( 'error' => 'SAVE_FAILED' ); }
+		self::audit( $d['created_by'] ?? null, "Email campaign $verb: \"$name\"", 'Email Campaign Builder', "campaign_id=$id; status=$status; delivery=$delivery_mode" );
 		return array( 'error' => null, 'campaign_id' => $id );
 	}
 
@@ -22,8 +57,10 @@ class RTS_Business_Logic_5 {
 
 	public static function set_campaign_status( $id, $status, $by ) {
 		global $wpdb;
-		if ( ! in_array( $status, array( 'draft', 'active', 'paused' ), true ) ) { return array( 'error' => 'INVALID_STATUS' ); }
-		if ( ! $wpdb->get_row( $wpdb->prepare( "SELECT id FROM " . RTS_DB::table( 'email_campaigns' ) . " WHERE id = %d", $id ) ) ) { return array( 'error' => 'NOT_FOUND' ); }
+		if ( ! in_array( $status, array( 'draft', 'active', 'paused', 'completed' ), true ) ) { return array( 'error' => 'INVALID_STATUS' ); }
+		$campaign = $wpdb->get_row( $wpdb->prepare( "SELECT id, delivery_mode, scheduled_at FROM " . RTS_DB::table( 'email_campaigns' ) . " WHERE id = %d", $id ) );
+		if ( ! $campaign ) { return array( 'error' => 'NOT_FOUND' ); }
+		if ( 'active' === $status && 'scheduled' === ( $campaign->delivery_mode ?? 'automation' ) && empty( $campaign->scheduled_at ) ) { return array( 'error' => 'SCHEDULE_REQUIRED' ); }
 		$wpdb->update( RTS_DB::table( 'email_campaigns' ), array( 'status' => $status ), array( 'id' => $id ) );
 		self::audit( $by, "Email campaign status -> $status", 'Email Campaign Builder', "campaign_id=$id" );
 		return array( 'error' => null );
@@ -32,14 +69,25 @@ class RTS_Business_Logic_5 {
 	// THE REAL TRIGGER: find everyone newly eligible, send (respecting subscriptions via the SAME
 	// audience function as Broadcast), log each send so re-running never double-sends.
 	// In production this is what a WP-Cron job (wp_schedule_event) would call.
-	public static function run_trigger_check( $id, $by ) {
+	public static function run_trigger_check( $id, $by, $force_immediate = false ) {
 		global $wpdb; $ct = RTS_DB::table( 'email_campaigns' ); $st = RTS_DB::table( 'campaign_sends' ); $pt = RTS_DB::table( 'participants' );
 		$c = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM $ct WHERE id = %d", $id ) );
 		if ( ! $c ) { return array( 'error' => 'NOT_FOUND' ); }
 		if ( 'active' !== $c->status ) { return array( 'error' => 'CAMPAIGN_NOT_ACTIVE', 'message' => 'Campaign must be status=active to run trigger checks.' ); }
-		$field = 'days_after_verification' === $c->trigger_type ? 'verified_at' : 'registered_at';
-		$eligible = $wpdb->get_col( $wpdb->prepare( "SELECT p.id FROM $pt p WHERE p.$field IS NOT NULL AND p.$field <= DATE_SUB(NOW(), INTERVAL %d DAY) AND p.id NOT IN (SELECT participant_id FROM $st WHERE campaign_id = %d)", (int) $c->trigger_days, $id ) );
-		if ( ! $eligible ) { return array( 'error' => null, 'eligible_count' => 0, 'newly_sent' => 0, 'excluded_unsubscribed' => 0, 'message' => 'No newly-eligible participants this run.' ); }
+		$is_scheduled = 'scheduled' === ( $c->delivery_mode ?? 'automation' );
+		if ( $is_scheduled && ! $force_immediate && ( empty( $c->scheduled_at ) || $c->scheduled_at > current_time( 'mysql' ) ) ) {
+			return array( 'error' => null, 'eligible_count' => 0, 'newly_sent' => 0, 'excluded_unsubscribed' => 0, 'message' => 'Scheduled time has not arrived.' );
+		}
+		if ( $is_scheduled || $force_immediate ) {
+			$eligible = $wpdb->get_col( $wpdb->prepare( "SELECT p.id FROM $pt p WHERE p.id NOT IN (SELECT participant_id FROM $st WHERE campaign_id = %d)", $id ) );
+		} else {
+			$field = 'days_after_verification' === $c->trigger_type ? 'verified_at' : 'registered_at';
+			$eligible = $wpdb->get_col( $wpdb->prepare( "SELECT p.id FROM $pt p WHERE p.$field IS NOT NULL AND p.$field <= DATE_SUB(NOW(), INTERVAL %d DAY) AND p.id NOT IN (SELECT participant_id FROM $st WHERE campaign_id = %d)", (int) $c->trigger_days, $id ) );
+		}
+		if ( ! $eligible ) {
+			if ( $is_scheduled || $force_immediate ) { $wpdb->update( $ct, array( 'status' => 'completed', 'sent_at' => current_time( 'mysql' ), 'updated_at' => current_time( 'mysql' ) ), array( 'id' => $id ) ); }
+			return array( 'error' => null, 'eligible_count' => 0, 'newly_sent' => 0, 'excluded_unsubscribed' => 0, 'message' => 'No newly-eligible participants this run.' );
+		}
 		$ph = implode( ',', array_fill( 0, count( $eligible ), '%d' ) );
 		list( $fsql, $fparams ) = RTS_Business_Logic_3::audience_where( $c->audience_filter );
 		$a = RTS_Business_Logic::get_bulk_email_audience( $c->category, " AND p.id IN ($ph)" . $fsql, array_merge( array_map( 'intval', $eligible ), $fparams ) );
@@ -49,8 +97,23 @@ class RTS_Business_Logic_5 {
 			$ins = $wpdb->query( $wpdb->prepare( "INSERT IGNORE INTO $st (campaign_id, participant_id) VALUES (%d, %d)", $id, $r->id ) );
 			if ( $ins ) { RTS_Production::send( $r->email, RTS_Production::merge( $subject, $r ), RTS_Production::merge( $body, $r ), 'marketing', array( 'campaign_id' => $id, 'participant_id' => $r->id, 'unsubscribe_url' => RTS_Production::unsubscribe_url( $r->unsubscribe_token ) ) ); }
 		}
+		if ( $is_scheduled || $force_immediate ) {
+			$wpdb->update( $ct, array( 'status' => 'completed', 'sent_at' => current_time( 'mysql' ), 'updated_at' => current_time( 'mysql' ) ), array( 'id' => $id ) );
+		}
 		self::audit( $by ?: 'system', "Campaign trigger check run: \"{$c->name}\"", 'Email Campaign Builder', "campaign_id=$id; eligible=" . count( $eligible ) . "; sent={$a['final_recipient_count']}; excluded_unsubscribed={$a['excluded_unsubscribed']}" );
 		return array( 'error' => null, 'eligible_count' => count( $eligible ), 'newly_sent' => $a['final_recipient_count'], 'excluded_unsubscribed' => $a['excluded_unsubscribed'] );
+	}
+
+	/** Send a representative merged copy without consuming a real campaign recipient. */
+	public static function send_campaign_test( $id, $email, $by ) {
+		global $wpdb;
+		if ( ! is_email( $email ) ) { return array( 'error' => 'VALID_TEST_EMAIL_REQUIRED' ); }
+		$c = $wpdb->get_row( $wpdb->prepare( "SELECT ec.*, et.subject, et.html_body FROM " . RTS_DB::table( 'email_campaigns' ) . " ec LEFT JOIN " . RTS_DB::table( 'email_templates' ) . " et ON et.id = ec.template_id WHERE ec.id = %d", $id ) );
+		if ( ! $c || null === $c->subject ) { return array( 'error' => 'TEMPLATE_NOT_FOUND' ); }
+		$sample = (object) array( 'id' => 0, 'name' => 'Sample Runner', 'email' => $email, 'founding_runner_number' => 'FR-0000', 'referral_code' => 'SAMPLE', 'unsubscribe_token' => 'sample' );
+		$result = RTS_Production::send( $email, '[TEST] ' . RTS_Production::merge( $c->subject, $sample ), RTS_Production::merge( $c->html_body, $sample ), 'transactional', array( 'campaign_id' => $id, 'test' => true ) );
+		self::audit( $by, "Campaign test sent: \"{$c->name}\"", 'Email Campaign Builder', "campaign_id=$id; email=$email" );
+		return array( 'error' => $result['error'] ?: null, 'delivery' => $result );
 	}
 
 	// ---- Email Reporting — honest about what's unavailable ----

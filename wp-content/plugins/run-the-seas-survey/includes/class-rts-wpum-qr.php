@@ -180,44 +180,54 @@ class RTS_BuddyPress_QR
         check_admin_referer('rts_profile_update', 'rts_profile_nonce');
 
         $user = wp_get_current_user();
-        $participant = $this->registration->get_participant_by_email($user->user_email);
+        $participant = $this->registration->get_participant_for_user($user);
         if (!$participant || (int) $participant->user_id !== (int) $user->ID) {
-            wp_die(esc_html__('You do not have permission to update this record.', 'run-the-seas'), 403);
+            wp_die(esc_html__('You do not have permission to update this record.', 'run-the-seas'), '', array('response' => 403, 'back_link' => true));
         }
 
         $email = sanitize_email(wp_unslash($_POST['email'] ?? ''));
         if (!is_email($email)) {
-            wp_die(esc_html__('Please provide a valid email address.', 'run-the-seas'), 400);
+            wp_die(esc_html__('Please provide a valid email address.', 'run-the-seas'), '', array('response' => 400, 'back_link' => true));
         }
         $other_participant = $this->registration->get_participant_by_email($email);
         if ($other_participant && (int) $other_participant->id !== (int) $participant->id) {
-            wp_die(esc_html__('That email address is already linked to another participant.', 'run-the-seas'), 400);
+            wp_die(esc_html__('That email address is already linked to another participant.', 'run-the-seas'), '', array('response' => 400, 'back_link' => true));
         }
         $other_user = get_user_by('email', $email);
         if ($other_user && (int) $other_user->ID !== (int) $user->ID) {
-            wp_die(esc_html__('That email address is already in use.', 'run-the-seas'), 400);
+            wp_die(esc_html__('That email address is already in use.', 'run-the-seas'), '', array('response' => 400, 'back_link' => true));
         }
 
         $first_name = sanitize_text_field(wp_unslash($_POST['first_name'] ?? ''));
         $last_name = sanitize_text_field(wp_unslash($_POST['last_name'] ?? ''));
+        if ('' === $first_name || '' === $last_name) {
+            wp_die(esc_html__('Please provide both your first and last name.', 'run-the-seas'), '', array('response' => 400, 'back_link' => true));
+        }
+
+        $current_password = (string) wp_unslash($_POST['current_password'] ?? '');
         $new_password = (string) wp_unslash($_POST['new_password'] ?? '');
         $confirm_password = (string) wp_unslash($_POST['confirm_password'] ?? '');
-        if ($new_password !== '' && $new_password !== $confirm_password) {
-            wp_die(esc_html__('The new passwords do not match.', 'run-the-seas'), 400);
+        $password_requested = '' !== $current_password || '' !== $new_password || '' !== $confirm_password;
+        if ($password_requested) {
+            if ('' === $current_password || !wp_check_password($current_password, $user->user_pass, $user->ID)) {
+                wp_die(esc_html__('Your current passcode is incorrect.', 'run-the-seas'), '', array('response' => 400, 'back_link' => true));
+            }
+            if (strlen($new_password) < 8) {
+                wp_die(esc_html__('Your new passcode must contain at least 8 characters.', 'run-the-seas'), '', array('response' => 400, 'back_link' => true));
+            }
+            if ($new_password !== $confirm_password) {
+                wp_die(esc_html__('The new passcodes do not match.', 'run-the-seas'), '', array('response' => 400, 'back_link' => true));
+            }
+            if (wp_check_password($new_password, $user->user_pass, $user->ID)) {
+                wp_die(esc_html__('Your new passcode must be different from your current passcode.', 'run-the-seas'), '', array('response' => 400, 'back_link' => true));
+            }
         }
+
         $email_changed = strtolower($email) !== strtolower($participant->email);
         $update = array(
             'email' => $email,
             'first_name' => $first_name,
             'last_name' => $last_name,
-            'phone' => sanitize_text_field(wp_unslash($_POST['phone'] ?? '')),
-            'country' => sanitize_text_field(wp_unslash($_POST['country'] ?? '')),
-            'city' => sanitize_text_field(wp_unslash($_POST['city'] ?? '')),
-            'address' => sanitize_textarea_field(wp_unslash($_POST['address'] ?? '')),
-            'date_of_birth' => sanitize_text_field(wp_unslash($_POST['date_of_birth'] ?? '')),
-            'gender' => sanitize_text_field(wp_unslash($_POST['gender'] ?? '')),
-            'emergency_contact_name' => sanitize_text_field(wp_unslash($_POST['emergency_contact_name'] ?? '')),
-            'emergency_contact_phone' => sanitize_text_field(wp_unslash($_POST['emergency_contact_phone'] ?? '')),
             'updated_at' => current_time('mysql'),
         );
         if ($email_changed) {
@@ -227,21 +237,45 @@ class RTS_BuddyPress_QR
             $update['captain_suite_status'] = 'inactive';
         }
 
+        // Process the photo before account data so an invalid image cannot
+        // leave the email/name partly saved while the request reports failure.
+        $profile_photo = isset($_FILES['profile_photo']) && is_array($_FILES['profile_photo'])
+            ? $_FILES['profile_photo']
+            : array();
+        $has_new_photo = !empty($profile_photo)
+            && UPLOAD_ERR_NO_FILE !== (int) ($profile_photo['error'] ?? UPLOAD_ERR_NO_FILE);
+        if ($has_new_photo) {
+            if (!function_exists('rts_child_save_buddynext_profile_photo')) {
+                wp_die(esc_html__('Profile photo support is temporarily unavailable.', 'run-the-seas'), '', array('response' => 500, 'back_link' => true));
+            }
+            $photo_result = rts_child_save_buddynext_profile_photo($user->ID, $profile_photo);
+            if (is_wp_error($photo_result)) {
+                wp_die(esc_html($photo_result->get_error_message()), '', array('response' => 400, 'back_link' => true));
+            }
+        } elseif (!empty($_POST['remove_profile_photo'])) {
+            if (function_exists('rts_child_remove_buddynext_profile_photo')) {
+                rts_child_remove_buddynext_profile_photo($user->ID);
+            } else {
+                delete_user_meta($user->ID, 'bn_avatar');
+            }
+        }
+
         global $wpdb;
         $saved = $wpdb->update($wpdb->prefix . 'rts_participants', $update, array('id' => $participant->id));
         if ($saved === false) {
-            wp_die(esc_html__('Your details could not be saved. Please try again.', 'run-the-seas'), 500);
+            wp_die(esc_html__('Your details could not be saved. Please try again.', 'run-the-seas'), '', array('response' => 500, 'back_link' => true));
         }
         if ($email_changed) {
+            update_user_meta($user->ID, 'rts_email_verified', '0');
             $this->registration->sync_participant_email($participant->id, $participant->email, $email);
         }
         $user_update = array('ID' => $user->ID, 'user_email' => $email, 'first_name' => $first_name, 'last_name' => $last_name, 'display_name' => trim($first_name . ' ' . $last_name));
-        if ($new_password !== '') {
+        if ($password_requested) {
             $user_update['user_pass'] = $new_password;
         }
         $user_result = wp_update_user($user_update);
         if (is_wp_error($user_result)) {
-            wp_die(esc_html($user_result->get_error_message()), 400);
+            wp_die(esc_html($user_result->get_error_message()), '', array('response' => 400, 'back_link' => true));
         }
         if (function_exists('xprofile_set_field_data')) {
             xprofile_set_field_data('Name', $user->ID, trim($first_name . ' ' . $last_name));
@@ -251,6 +285,7 @@ class RTS_BuddyPress_QR
             'rts_referral_progress_notifications',
             !empty($_POST['rts_referral_progress_notifications']) ? 'on' : 'off'
         );
+
         $this->registration->log_timeline($participant->id, 'profile_updated', 'Participant updated their account details');
         if ($email_changed) {
             $this->registration->send_verification_email($participant->id, true);
@@ -264,35 +299,81 @@ class RTS_BuddyPress_QR
     public function render_profile_content()
     {
         $user = wp_get_current_user();
-        $participant = $this->registration->get_participant_by_email($user->user_email);
+        $participant = $this->registration->get_participant_for_user($user);
         if (!$participant) {
             echo '<p>' . esc_html__('No Run The Seas registration was found for this account.', 'run-the-seas') . '</p>';
             return;
         }
         $referral_progress_notifications = get_user_meta($user->ID, 'rts_referral_progress_notifications', true) !== 'off';
+        $custom_profile_photo = (string) get_user_meta($user->ID, 'bn_avatar', true);
         ?>
         <div class="rts-member-profile">
-            <h2><?php esc_html_e('My Run The Seas Details', 'run-the-seas'); ?></h2>
-            <p><?php esc_html_e('Keep your registration and contact information up to date.', 'run-the-seas'); ?></p>
-            <?php if (isset($_GET['updated'])) : ?><div class="rts-profile-notice">Your details have been updated.<?php echo (int) $participant->email_verified ? '' : ' Please verify your email to activate your Captain\'s Suite.'; ?></div><?php endif; ?>
-            <form method="post" class="rts-member-profile-form">
+            <div class="rts-profile-heading">
+                <h2><?php esc_html_e('Profile Edit', 'run-the-seas'); ?></h2>
+            </div>
+            <?php if (isset($_GET['updated'])) : ?>
+                <div class="rts-profile-notice" role="status"><?php esc_html_e('Your details have been updated.', 'run-the-seas'); ?><?php echo (int) $participant->email_verified ? '' : ' ' . esc_html__('Please verify your email to activate your Captain’s Suite.', 'run-the-seas'); ?></div>
+            <?php endif; ?>
+            <form method="post" enctype="multipart/form-data" class="rts-member-profile-form">
                 <?php wp_nonce_field('rts_profile_update', 'rts_profile_nonce'); ?>
                 <input type="hidden" name="rts_profile_update" value="1">
-                <div><label>First name <input required name="first_name" value="<?php echo esc_attr($participant->first_name); ?>"></label></div>
-                <div><label>Last name <input required name="last_name" value="<?php echo esc_attr($participant->last_name); ?>"></label></div>
-                <div><label>Email <input required type="email" name="email" value="<?php echo esc_attr($participant->email); ?>"></label></div>
-                <div><label>Phone <input name="phone" value="<?php echo esc_attr($participant->phone); ?>"></label></div>
-                <div><label>Country <input name="country" value="<?php echo esc_attr($participant->country); ?>"></label></div>
-                <div><label>City <input name="city" value="<?php echo esc_attr($participant->city); ?>"></label></div>
-                <div><label>Date of birth <input type="date" name="date_of_birth" value="<?php echo esc_attr($participant->date_of_birth); ?>"></label></div>
-                <div><label>Gender <input name="gender" value="<?php echo esc_attr($participant->gender); ?>"></label></div>
-                <div class="rts-profile-full"><label>Address <textarea name="address" rows="3"><?php echo esc_textarea($participant->address); ?></textarea></label></div>
-                <div><label>Emergency contact name <input name="emergency_contact_name" value="<?php echo esc_attr($participant->emergency_contact_name); ?>"></label></div>
-                <div><label>Emergency contact phone <input name="emergency_contact_phone" value="<?php echo esc_attr($participant->emergency_contact_phone); ?>"></label></div>
-                <div><label>New password <input type="password" name="new_password" autocomplete="new-password"></label></div>
-                <div><label>Confirm new password <input type="password" name="confirm_password" autocomplete="new-password"></label></div>
-                <div class="rts-profile-full"><label><input type="checkbox" name="rts_referral_progress_notifications" value="1" <?php checked($referral_progress_notifications); ?>> <strong>Referral progress emails</strong><br><small>Send me an email when a referral verifies and I earn Captain's Miles.</small></label></div>
-                <div class="rts-profile-full"><button type="submit">Save my details</button></div>
+
+                <section class="rts-profile-section rts-profile-photo-section" aria-labelledby="rts-profile-photo-heading">
+                    <div>
+                        <h3 id="rts-profile-photo-heading"><?php esc_html_e('Profile photo', 'run-the-seas'); ?></h3>
+                        <p><?php esc_html_e('This photo will be used across your member account.', 'run-the-seas'); ?></p>
+                    </div>
+                    <div class="rts-profile-photo-editor">
+                        <?php echo get_avatar($user->ID, 128, '', esc_attr__('Your profile photo', 'run-the-seas'), array('class' => 'rts-profile-avatar')); ?>
+                        <div class="rts-profile-photo-controls">
+                            <label for="rts-profile-photo"><?php esc_html_e('Choose a new photo', 'run-the-seas'); ?></label>
+                            <input id="rts-profile-photo" type="file" name="profile_photo" accept="image/jpeg,image/png,image/gif,image/webp">
+                            <small><?php esc_html_e('JPEG, PNG, GIF or WebP. Maximum 2 MB.', 'run-the-seas'); ?></small>
+                            <?php if ('' !== $custom_profile_photo) : ?>
+                                <label class="rts-profile-check rts-profile-remove-photo">
+                                    <input type="checkbox" name="remove_profile_photo" value="1">
+                                    <span><?php esc_html_e('Remove my current photo', 'run-the-seas'); ?></span>
+                                </label>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="rts-profile-section" aria-labelledby="rts-profile-account-heading">
+                    <div class="rts-profile-section-heading">
+                        <h3 id="rts-profile-account-heading"><?php esc_html_e('Account details', 'run-the-seas'); ?></h3>
+                        <p><?php esc_html_e('Keep your name and account email current.', 'run-the-seas'); ?></p>
+                    </div>
+                    <div class="rts-profile-grid">
+                        <label><?php esc_html_e('First name', 'run-the-seas'); ?><input required autocomplete="given-name" name="first_name" value="<?php echo esc_attr($participant->first_name); ?>"></label>
+                        <label><?php esc_html_e('Last name', 'run-the-seas'); ?><input required autocomplete="family-name" name="last_name" value="<?php echo esc_attr($participant->last_name); ?>"></label>
+                        <label class="rts-profile-full"><?php esc_html_e('Email', 'run-the-seas'); ?><input required type="email" autocomplete="email" name="email" value="<?php echo esc_attr($participant->email); ?>"><small><?php esc_html_e('Changing this address requires email verification.', 'run-the-seas'); ?></small></label>
+                    </div>
+                </section>
+
+                <section class="rts-profile-section" aria-labelledby="rts-profile-passcode-heading">
+                    <div class="rts-profile-section-heading">
+                        <h3 id="rts-profile-passcode-heading"><?php esc_html_e('Change passcode', 'run-the-seas'); ?></h3>
+                        <p><?php esc_html_e('Leave these fields blank to keep your current passcode.', 'run-the-seas'); ?></p>
+                    </div>
+                    <div class="rts-profile-grid rts-profile-password-grid">
+                        <label class="rts-profile-full"><?php esc_html_e('Current passcode', 'run-the-seas'); ?><input type="password" name="current_password" autocomplete="current-password"></label>
+                        <label><?php esc_html_e('New passcode', 'run-the-seas'); ?><input type="password" name="new_password" autocomplete="new-password" minlength="8"></label>
+                        <label><?php esc_html_e('Confirm new passcode', 'run-the-seas'); ?><input type="password" name="confirm_password" autocomplete="new-password" minlength="8"></label>
+                    </div>
+                </section>
+
+                <section class="rts-profile-section" aria-labelledby="rts-profile-email-heading">
+                    <div class="rts-profile-section-heading">
+                        <h3 id="rts-profile-email-heading"><?php esc_html_e('Email preferences', 'run-the-seas'); ?></h3>
+                    </div>
+                    <label class="rts-profile-check">
+                        <input type="checkbox" name="rts_referral_progress_notifications" value="1" <?php checked($referral_progress_notifications); ?>>
+                        <span><strong><?php esc_html_e('Referral progress emails', 'run-the-seas'); ?></strong><small><?php esc_html_e('Email me when a referral verifies and I earn Captain’s Miles.', 'run-the-seas'); ?></small></span>
+                    </label>
+                </section>
+
+                <div class="rts-profile-actions"><button type="submit"><?php esc_html_e('Save my details', 'run-the-seas'); ?></button></div>
             </form>
         </div>
         <?php
@@ -1515,7 +1596,7 @@ class RTS_BuddyPress_QR
         }
 
         $user = wp_get_current_user();
-        $participant = $this->registration->get_participant_by_email($user->user_email);
+        $participant = $this->registration->get_participant_for_user($user);
 
         if (!$participant) {
             echo '<p>No registration found. Please complete your registration.</p>';

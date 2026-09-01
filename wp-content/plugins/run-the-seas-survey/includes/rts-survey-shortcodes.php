@@ -252,12 +252,12 @@ function rts_virtual_marathon_shortcode($atts)
 {
     $atts = shortcode_atts(array(
         'limit'     => 12,
-        'target'    => 42200,
+        'target'    => 42000,
         'map_image' => '',
     ), $atts, 'rts_virtual_marathon');
 
     $limit = min(12, max(3, absint($atts['limit'])));
-    $target = max(1, absint($atts['target']));
+    $target = rts_normalize_marathon_target($atts['target']);
     $map_url = $atts['map_image']
         ? esc_url($atts['map_image'])
         : RTS_PLUGIN_URL . 'assets/images/virtual-marathon-island.png';
@@ -342,7 +342,7 @@ function rts_virtual_marathon_shortcode($atts)
                         <?php foreach (rts_get_captains_milestones() as $milestone) : ?>
                             <?php if (empty($milestone['miles'])) { continue; } ?>
                             <li class="<?php echo $current_miles >= $milestone['miles'] ? 'is-earned' : ''; ?>">
-                                <span aria-hidden="true">&#127942;</span><strong><?php echo esc_html(rts_format_miles($milestone['miles'])); ?></strong>
+                                <span aria-hidden="true">&#127942;</span><strong><?php echo esc_html(rts_format_trophy_miles($milestone['miles'], $milestone['key'] ?? '')); ?></strong>
                                 <small><?php echo esc_html(preg_replace('/\s+trophy$/i', '', $milestone['name'])); ?></small>
                             </li>
                         <?php endforeach; ?>

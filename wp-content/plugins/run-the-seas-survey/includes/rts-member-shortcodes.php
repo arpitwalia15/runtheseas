@@ -283,7 +283,7 @@ function rts_last_referral_time_shortcode($atts)
 add_shortcode('rts_last_referral_time', 'rts_last_referral_time_shortcode');
 
 /**
- * Display current Captain's Miles. Use target="42200" format="progress"
+ * Display current Captain's Miles. Use target="42000" format="progress"
  * for a status such as "27K of 42.2K".
  */
 function rts_member_distance_shortcode($atts)
@@ -307,7 +307,12 @@ function rts_member_distance_shortcode($atts)
 
     if ('progress' === sanitize_key($atts['format']) && is_numeric($atts['target'])) {
         $target = max(0, (int) $atts['target']);
-        $target_value = function_exists('rts_format_miles') ? rts_format_miles($target) : number_format_i18n($target);
+        if (42200 === $target) {
+            $target = 42000;
+        }
+        $target_value = function_exists('rts_format_trophy_miles') && 42000 === $target
+            ? rts_format_trophy_miles($target, '42k')
+            : (function_exists('rts_format_miles') ? rts_format_miles($target) : number_format_i18n($target));
         $output .= ' <span class="rts-member-distance__of">' . esc_html__('of', 'run-the-seas') . '</span> '
             . esc_html($target_value);
     }
@@ -329,11 +334,11 @@ function rts_get_captains_milestones()
         array('key' => '10k', 'name' => __('10K Trophy', 'run-the-seas'), 'miles' => 10000, 'rank' => 2, 'icon' => '🏆'),
         array('key' => '15k', 'name' => __('15K Trophy', 'run-the-seas'), 'miles' => 15000, 'rank' => 3, 'icon' => '🏆'),
         array('key' => '20k', 'name' => __('20K Trophy', 'run-the-seas'), 'miles' => 20000, 'rank' => 4, 'icon' => '🏆'),
-        array('key' => '21k', 'name' => __('Half Marathon Trophy', 'run-the-seas'), 'miles' => 21000, 'rank' => 5, 'icon' => '🏆'),
+        array('key' => '21k', 'name' => __('21.1K Half Marathon Trophy', 'run-the-seas'), 'miles' => 21000, 'rank' => 5, 'icon' => '🏆'),
         array('key' => '25k', 'name' => __('25K Trophy', 'run-the-seas'), 'miles' => 25000, 'rank' => 6, 'icon' => '🏆'),
         array('key' => '30k', 'name' => __('30K Trophy', 'run-the-seas'), 'miles' => 30000, 'rank' => 7, 'icon' => '🏆'),
         array('key' => '35k', 'name' => __('35K Trophy', 'run-the-seas'), 'miles' => 35000, 'rank' => 8, 'icon' => '🏆'),
-        array('key' => '42k', 'name' => __('Marathon Trophy', 'run-the-seas'), 'miles' => 42200, 'rank' => 9, 'icon' => '🏆'),
+        array('key' => '42k', 'name' => __('42.2K Marathon Trophy', 'run-the-seas'), 'miles' => 42000, 'rank' => 9, 'icon' => '🏆'),
     );
 
     // Keep Captain's Suite displays aligned with the actual trophy-award
@@ -405,16 +410,18 @@ function rts_get_current_member_miles($source = 'earned')
 function rts_member_progress_shortcode($atts)
 {
     $atts = shortcode_atts(array(
-        'target'       => 42200,
+        'target'       => 42000,
         'source'       => 'earned',
         'show_caption' => 'yes',
     ), $atts, 'rts_member_progress');
 
-    $target = max(1, (int) $atts['target']);
+    $target = rts_normalize_marathon_target($atts['target']);
     $miles = rts_get_current_member_miles($atts['source']);
     $percent = min(100, round(($miles / $target) * 100, 1));
     $current = rts_format_miles($miles);
-    $goal = rts_format_miles($target);
+    $goal = 42000 === $target
+        ? rts_format_trophy_miles($target, '42k')
+        : rts_format_miles($target);
 
     $output = '<div class="rts-member-progress" role="progressbar" aria-valuemin="0" aria-valuemax="'
         . esc_attr($target) . '" aria-valuenow="' . esc_attr($miles) . '" aria-label="'
@@ -439,13 +446,13 @@ add_shortcode('rts_member_progress', 'rts_member_progress_shortcode');
 function rts_member_distance_to_trophy_shortcode($atts)
 {
     $atts = shortcode_atts(array(
-        'target'  => 42200,
+        'target'  => 42000,
         'source'  => 'earned',
         'suffix'  => __('to go', 'run-the-seas'),
         'complete' => __('Marathon Trophy earned!', 'run-the-seas'),
     ), $atts, 'rts_member_distance_to_trophy');
 
-    $target = max(1, (int) $atts['target']);
+    $target = rts_normalize_marathon_target($atts['target']);
     $remaining = max(0, $target - rts_get_current_member_miles($atts['source']));
 
     if (0 === $remaining) {
@@ -785,7 +792,7 @@ function rts_member_account_menu_shortcode($atts)
     $participant = rts_get_current_member_participant();
     $name = $participant ? trim($participant->first_name . ' ' . $participant->last_name) : $user->display_name;
     $name = $name ?: __('Captain', 'run-the-seas');
-    $profile_url = rts_get_buddynext_profile_edit_url();
+    $profile_url = rts_get_member_page_url('profile-settings');
 
     return '<details class="rts-member-account-menu"><summary>' . get_avatar($user->ID, 56, '', '', array('class' => 'rts-member-account-menu__avatar'))
         . '<span><strong>' . esc_html($name) . '</strong><p>' . esc_html($atts['role']) . '</p></span><b aria-hidden="true">⌄</b></summary>'

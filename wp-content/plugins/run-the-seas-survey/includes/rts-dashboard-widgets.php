@@ -67,15 +67,15 @@ function rts_dashboard_card_icon($asset_key, $fallback, $class)
  * The four-card member status strip marked in the supplied dashboard artwork.
  *
  * Usage: [rts_captain_status]
- * Optional: [rts_captain_status target="42200" class="my-class"]
+ * Optional: [rts_captain_status target="42000" class="my-class"]
  */
 function rts_captain_status_shortcode($atts)
 {
     $atts = shortcode_atts(array(
-        'target' => 42200,
+        'target' => 42000,
         'class'  => '',
     ), $atts, 'rts_captain_status');
-    $target = max(1, absint($atts['target']));
+    $target = rts_normalize_marathon_target($atts['target']);
     $participant = function_exists('rts_get_current_member_participant')
         ? rts_get_current_member_participant()
         : null;
@@ -109,7 +109,7 @@ function rts_captain_status_shortcode($atts)
         </article>
         <article class="rts-captain-status__card rts-captain-status__card--progress">
             <?php echo rts_dashboard_card_icon('progress_icon_image', '🏃', 'rts-captain-status__icon'); ?>
-            <div><span><?php esc_html_e('Your Progress', 'run-the-seas'); ?></span><strong><?php echo esc_html(rts_format_miles($miles)); ?> <em>/ <?php echo esc_html(rts_format_miles($target)); ?></em></strong><i class="rts-captain-status__progress" role="progressbar" aria-valuemin="0" aria-valuemax="<?php echo esc_attr($target); ?>" aria-valuenow="<?php echo esc_attr($miles); ?>"><b style="width:<?php echo esc_attr($percent); ?>%"></b></i><small><?php echo esc_html(sprintf(__('%s%% to the Marathon', 'run-the-seas'), $percent)); ?></small></div>
+            <div><span><?php esc_html_e('Your Progress', 'run-the-seas'); ?></span><strong><?php echo esc_html(rts_format_miles($miles)); ?> <em>/ <?php echo esc_html(42000 === $target ? rts_format_trophy_miles($target, '42k') : rts_format_miles($target)); ?></em></strong><i class="rts-captain-status__progress" role="progressbar" aria-valuemin="0" aria-valuemax="<?php echo esc_attr($target); ?>" aria-valuenow="<?php echo esc_attr($miles); ?>"><b style="width:<?php echo esc_attr($percent); ?>%"></b></i><small><?php echo esc_html(sprintf(__('%s%% to the Marathon', 'run-the-seas'), $percent)); ?></small></div>
         </article>
         <article class="rts-captain-status__card rts-captain-status__card--trophies">
             <?php echo rts_dashboard_card_icon('trophies_icon_image', '🏆', 'rts-captain-status__icon'); ?>

@@ -653,11 +653,11 @@ class RTS_Admin {
             '10k'             => __('10K Trophy', 'run-the-seas'),
             '15k'             => __('15K Trophy', 'run-the-seas'),
             '20k'             => __('20K Trophy', 'run-the-seas'),
-            '21k'             => __('21K Trophy', 'run-the-seas'),
+            '21k'             => __('21.1K Trophy', 'run-the-seas'),
             '25k'             => __('25K Trophy', 'run-the-seas'),
             '30k'             => __('30K Trophy', 'run-the-seas'),
             '35k'             => __('35K Trophy', 'run-the-seas'),
-            '42k'             => __('42K Trophy', 'run-the-seas'),
+            '42k'             => __('42.2K Trophy', 'run-the-seas'),
         );
     }
 

@@ -591,20 +591,71 @@
 }
 
 .rts-member-profile {
-    max-width: 780px;
-    margin: 20px auto;
-    padding: 28px;
-    background: #f6f8fb;
-    border: 1px solid #d0d5dd;
+    max-width: 900px;
+    margin: 28px auto;
+    padding: 32px;
+    background: #f7f9fc;
+    border: 1px solid #d6dde7;
     border-radius: 12px;
     color: #1d2939;
 }
 
+.rts-profile-heading h2,
+.rts-profile-section h3,
+.rts-profile-heading p,
+.rts-profile-section p {
+    margin-top: 0;
+}
+
+.rts-profile-heading h2 {
+    margin-bottom: 8px;
+    color: #071a35;
+    font-size: 30px;
+}
+
+.rts-profile-heading > p:last-child,
+.rts-profile-section-heading p,
+.rts-profile-photo-section > div:first-child p {
+    margin-bottom: 0;
+    color: #667085;
+}
+
+.rts-profile-eyebrow {
+    margin-bottom: 5px;
+    color: #a77716 !important;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+}
+
 .rts-member-profile-form {
+    display: block;
+    margin-top: 24px;
+}
+
+.rts-profile-section {
+    margin-top: 18px;
+    padding: 24px;
+    background: #fff;
+    border: 1px solid #dfe5ed;
+    border-radius: 10px;
+}
+
+.rts-profile-section h3 {
+    margin-bottom: 5px;
+    color: #071a35;
+    font-size: 19px;
+}
+
+.rts-profile-section-heading {
+    margin-bottom: 18px;
+}
+
+.rts-profile-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 16px;
-    margin-top: 22px;
+    gap: 18px;
 }
 
 .rts-member-profile-form label {
@@ -625,18 +676,105 @@
     border-radius: 6px;
 }
 
+.rts-member-profile-form input:focus {
+    border-color: #b78b2f;
+    box-shadow: 0 0 0 3px rgba(183, 139, 47, .15);
+    outline: none;
+}
+
+.rts-member-profile-form small {
+    display: block;
+    color: #667085;
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1.45;
+}
+
+.rts-profile-photo-section {
+    display: grid;
+    grid-template-columns: minmax(190px, .8fr) minmax(320px, 1.2fr);
+    gap: 28px;
+    align-items: center;
+}
+
+.rts-profile-photo-editor {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+}
+
+.rts-profile-avatar {
+    width: 112px !important;
+    height: 112px !important;
+    flex: 0 0 112px;
+    margin: 0 !important;
+    border: 3px solid #d3ac55;
+    border-radius: 50% !important;
+    object-fit: cover;
+    box-shadow: 0 4px 18px rgba(7, 26, 53, .14);
+}
+
+.rts-profile-photo-controls {
+    min-width: 0;
+}
+
+.rts-profile-photo-controls input[type="file"] {
+    margin: 7px 0 5px;
+    padding: 8px;
+}
+
+.rts-profile-check {
+    display: flex !important;
+    grid-template-columns: none !important;
+    gap: 10px !important;
+    align-items: flex-start;
+    cursor: pointer;
+}
+
+.rts-member-profile-form .rts-profile-check input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    flex: 0 0 18px;
+    margin: 2px 0 0;
+    accent-color: #a77716;
+}
+
+.rts-profile-check span,
+.rts-profile-check strong {
+    display: block;
+}
+
+.rts-profile-remove-photo {
+    margin-top: 10px;
+    color: #475467 !important;
+    font-size: 13px;
+    font-weight: 500 !important;
+}
+
+.rts-profile-actions {
+    display: flex;
+    justify-content: flex-end;
+    padding-top: 22px;
+}
+
 .rts-member-profile-form button {
-    padding: 11px 18px;
-    color: #fff;
-    background: #0b63ce;
-    border: 1px solid #084fa4;
+    min-width: 180px;
+    padding: 12px 20px;
+    color: #071426;
+    background: #d3ac55;
+    border: 1px solid #b78b2f;
     border-radius: 6px;
     font-weight: 700;
     cursor: pointer;
 }
 
+.rts-member-profile-form button:hover,
+.rts-member-profile-form button:focus {
+    background: #e2bf6d;
+}
+
 .rts-profile-full { grid-column: 1 / -1; }
-.rts-profile-notice { padding: 12px 14px; background: #e8f5e9; border-left: 4px solid #2e7d32; border-radius: 4px; }
+.rts-profile-notice { margin-top: 18px; padding: 12px 14px; background: #e8f5e9; border-left: 4px solid #2e7d32; border-radius: 4px; }
 
 .rts-customer-account-links {
     display: flex;
@@ -660,5 +798,64 @@
 .rts-customer-account-links a:hover { background: #084fa4; color: #fff !important; }
 
 @media (max-width: 640px) {
-    .rts-member-profile-form { grid-template-columns: 1fr; }
+    .rts-member-profile {
+        margin: 12px;
+        padding: 18px;
+    }
+
+    .rts-profile-heading h2 {
+        font-size: 26px;
+    }
+
+    .rts-profile-section {
+        margin-top: 14px;
+        padding: 18px;
+    }
+
+    .rts-profile-grid,
+    .rts-profile-photo-section {
+        grid-template-columns: 1fr;
+        gap: 15px;
+    }
+
+    .rts-profile-photo-editor {
+        align-items: flex-start;
+    }
+
+    .rts-profile-photo-controls {
+        width: 100%;
+    }
+
+    .rts-profile-photo-controls input[type="file"] {
+        max-width: 100%;
+    }
+
+    .rts-profile-actions button {
+        width: 100%;
+    }
+}
+
+@media (max-width: 420px) {
+    .rts-member-profile {
+        margin: 8px;
+        padding: 14px;
+    }
+
+    .rts-profile-section {
+        padding: 15px;
+    }
+
+    .rts-profile-photo-editor {
+        flex-direction: column;
+    }
+
+    .rts-profile-avatar {
+        width: 96px !important;
+        height: 96px !important;
+        flex-basis: 96px;
+    }
+
+    .rts-member-profile-form input {
+        font-size: 16px;
+    }
 }

@@ -388,7 +388,7 @@ class RTS_Race_Manager {
         }
         
         $user = wp_get_current_user();
-        $participant = $this->registration->get_participant_by_email($user->user_email);
+        $participant = $this->registration->get_participant_for_user($user);
         
         if (!$participant) {
             wp_send_json_error('Participant not found. Please complete registration first.');
@@ -419,7 +419,7 @@ class RTS_Race_Manager {
         }
         
         $user = wp_get_current_user();
-        $participant = $this->registration->get_participant_by_email($user->user_email);
+        $participant = $this->registration->get_participant_for_user($user);
         
         if (!$participant) {
             wp_send_json_error('Participant not found');
@@ -471,7 +471,7 @@ class RTS_Race_Manager {
         }
         
         $user = wp_get_current_user();
-        $participant = $this->registration->get_participant_by_email($user->user_email);
+        $participant = $this->registration->get_participant_for_user($user);
         
         if (!$participant) {
             return '<p>Please complete your registration to participate in races.</p>';

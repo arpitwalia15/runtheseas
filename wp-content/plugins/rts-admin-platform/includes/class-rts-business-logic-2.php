@@ -643,7 +643,7 @@ class RTS_Business_Logic_2 {
 		return RTS_Business_Logic::verify_email( $p->verification_token );
 	}
 
-	// ---- Email Templates (version history is never destroyed; rollback creates a NEW version) ----
+	// ---- Email Templates ----
 	public static function email_template_actions() {
 		$actions = array(
 			'password_reset'             => 'Password Reset',
@@ -657,12 +657,11 @@ class RTS_Business_Logic_2 {
 		global $wpdb;
 		if ( empty( $d['name'] ) || empty( $d['subject'] ) ) { return array( 'error' => 'NAME_AND_SUBJECT_REQUIRED' ); }
 		if ( ! empty( $d['action_key'] ) && ! isset( self::email_template_actions()[ sanitize_key( $d['action_key'] ) ] ) ) { return array( 'error' => 'INVALID_ACTION' ); }
-		$tt = RTS_DB::table( 'email_templates' ); $vt = RTS_DB::table( 'email_template_versions' );
+		$tt = RTS_DB::table( 'email_templates' );
 		$wpdb->insert( $tt, array( 'name' => $d['name'], 'category' => $d['category'] ?? 'general', 'subject' => $d['subject'],
-			'html_body' => $d['html_body'] ?? '', 'plain_text_body' => $d['plain_text_body'] ?? '', 'status' => 'draft', 'version' => 1 ) );
+			'html_body' => $d['html_body'] ?? '', 'plain_text_body' => $d['plain_text_body'] ?? '', 'status' => 'draft' ) );
 		if ( ! $wpdb->insert_id ) { return array( 'error' => 'DATABASE_ERROR' ); }
 		$id = $wpdb->insert_id;
-		$wpdb->insert( $vt, array( 'template_id' => $id, 'version' => 1, 'subject' => $d['subject'], 'html_body' => $d['html_body'] ?? '', 'plain_text_body' => $d['plain_text_body'] ?? '' ) );
 		if ( ! empty( $d['action_key'] ) ) {
 			$assigned = self::assign_template_action( $id, $d['action_key'], $d['created_by'] ?? 'admin' );
 			if ( $assigned['error'] ) { return $assigned + array( 'template_id' => $id ); }
@@ -673,18 +672,16 @@ class RTS_Business_Logic_2 {
 
 	public static function update_template( $id, $d ) {
 		global $wpdb;
-		$tt = RTS_DB::table( 'email_templates' ); $vt = RTS_DB::table( 'email_template_versions' );
+		$tt = RTS_DB::table( 'email_templates' );
 		$t = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM $tt WHERE id = %d", $id ) );
 		if ( ! $t ) { return array( 'error' => 'NOT_FOUND' ); }
-		$v = (int) $t->version + 1;
 		$subject = $d['subject'] ?? $t->subject; $html = $d['html_body'] ?? $t->html_body; $plain = $d['plain_text_body'] ?? $t->plain_text_body;
-		$update = array( 'subject' => $subject, 'html_body' => $html, 'plain_text_body' => $plain, 'version' => $v, 'updated_at' => current_time( 'mysql' ) );
+		$update = array( 'subject' => $subject, 'html_body' => $html, 'plain_text_body' => $plain, 'updated_at' => current_time( 'mysql' ) );
 		if ( isset( $d['name'] ) && '' !== $d['name'] ) { $update['name'] = $d['name']; }
 		if ( isset( $d['category'] ) && '' !== $d['category'] ) { $update['category'] = $d['category']; }
 		$wpdb->update( $tt, $update, array( 'id' => $id ) );
-		$wpdb->insert( $vt, array( 'template_id' => $id, 'version' => $v, 'subject' => $subject, 'html_body' => $html, 'plain_text_body' => $plain ) );
-		RTS_Business_Logic::log_audit( $d['updated_by'] ?? 'admin', "Email template updated (v$v): \"{$t->name}\"", 'Email Templates', 'success', "template_id=$id" );
-		return array( 'error' => null, 'new_version' => $v );
+		RTS_Business_Logic::log_audit( $d['updated_by'] ?? 'admin', "Email template updated: \"{$t->name}\"", 'Email Templates', 'success', "template_id=$id" );
+		return array( 'error' => null );
 	}
 
 	/** Assign at most one template to an action; moving a template clears its prior action. */
@@ -716,21 +713,4 @@ class RTS_Business_Logic_2 {
 		return array( 'error' => null, 'action_key' => $action_key );
 	}
 
-	public static function template_versions( $id ) {
-		global $wpdb;
-		return $wpdb->get_results( $wpdb->prepare( "SELECT * FROM " . RTS_DB::table( 'email_template_versions' ) . " WHERE template_id = %d ORDER BY version DESC", $id ) );
-	}
-
-	public static function rollback_template( $id, $to_version, $admin ) {
-		global $wpdb;
-		$tt = RTS_DB::table( 'email_templates' ); $vt = RTS_DB::table( 'email_template_versions' );
-		$vr = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM $vt WHERE template_id = %d AND version = %d", $id, $to_version ) );
-		if ( ! $vr ) { return array( 'error' => 'VERSION_NOT_FOUND' ); }
-		$t = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM $tt WHERE id = %d", $id ) );
-		$v = (int) $t->version + 1; // rollback = NEW version with old content; history is append-only
-		$wpdb->update( $tt, array( 'subject' => $vr->subject, 'html_body' => $vr->html_body, 'plain_text_body' => $vr->plain_text_body, 'version' => $v, 'updated_at' => current_time( 'mysql' ) ), array( 'id' => $id ) );
-		$wpdb->insert( $vt, array( 'template_id' => $id, 'version' => $v, 'subject' => $vr->subject, 'html_body' => $vr->html_body, 'plain_text_body' => $vr->plain_text_body ) );
-		RTS_Business_Logic::log_audit( $admin ?: 'admin', "Email template rolled back to v$to_version (now v$v): \"{$t->name}\"", 'Email Templates', 'success', "template_id=$id" );
-		return array( 'error' => null, 'new_version' => $v );
-	}
 }

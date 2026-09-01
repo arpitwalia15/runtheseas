@@ -33,8 +33,6 @@ class RTS_REST_API_2 {
 		$r( '/email-templates/(?P<id>\d+)',             'GET',  'get_template', 'rts_view' );
 		$r( '/email-templates/(?P<id>\d+)/update',      'POST', 'update_template', 'rts_manage' );
 		$r( '/email-templates/(?P<id>\d+)/assign',      'POST', 'assign_template', 'rts_manage' );
-		$r( '/email-templates/(?P<id>\d+)/versions',    'GET',  'template_versions', 'rts_view' );
-		$r( '/email-templates/(?P<id>\d+)/rollback',    'POST', 'rollback_template', 'rts_manage' );
 	}
 
 	public static function list_surveys( $req )  { return rest_ensure_response( RTS_Business_Logic_2::list_surveys() ); }
@@ -63,6 +61,4 @@ class RTS_REST_API_2 {
 	}
 	public static function update_template( $req )    { return self::out( RTS_Business_Logic_2::update_template( $req['id'], self::body( $req ) ) ); }
 	public static function assign_template( $req )    { $b = self::body( $req ); return self::out( RTS_Business_Logic_2::assign_template_action( $req['id'], $b['action_key'] ?? '', $b['admin'] ?? null ) ); }
-	public static function template_versions( $req )  { return rest_ensure_response( RTS_Business_Logic_2::template_versions( $req['id'] ) ); }
-	public static function rollback_template( $req )  { $b = self::body( $req ); return self::out( RTS_Business_Logic_2::rollback_template( $req['id'], (int) ( $b['to_version'] ?? 0 ), $b['admin'] ?? null ) ); }
 }

@@ -17,14 +17,14 @@ if (!defined('ABSPATH')) {
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#070D16;padding:40px 16px;">
         <tr>
             <td align="center">
-                <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:linear-gradient(180deg,#0E1A2B 0%,#0B1420 100%);border:1px solid #C9A24B;border-radius:6px;box-shadow:0 20px 60px rgba(0,0,0,0.6);">
+                <table role="presentation" width="600" cellpadding="0" cellspacing="0" bgcolor="#0E1A2B" style="max-width:600px;width:100%;background-color:#0E1A2B;background-image:linear-gradient(180deg,#0E1A2B 0%,#0B1420 100%);border:1px solid #C9A24B;border-radius:6px;box-shadow:0 20px 60px rgba(0,0,0,0.6);">
                     <tr>
                         <td style="padding:2px;">
                             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid rgba(201,162,75,0.35);border-radius:5px;">
                                 <tr>
                                     <td align="center" style="padding:44px 30px 20px;">
                                         <?php if (!empty($logo_url)) : ?>
-                                            <img src="<?php echo esc_url($logo_url); ?>" alt="<?php echo esc_attr__('Run The Seas Logo', 'run-the-seas'); ?>" width="220" style="display:block;margin:0 auto 15px;width:220px;height:auto;max-width:100%;background:transparent;border:none;outline:none;object-fit:contain;">
+                                            <img src="<?php echo esc_url($logo_url); ?>" alt="<?php echo esc_attr__('Run The Seas Logo', 'run-the-seas'); ?>" width="220" height="147" style="display:block;margin:0 auto 15px;width:220px;height:147px;max-width:100%;background:transparent;border:none;outline:none;object-fit:contain;">
                                         <?php endif; ?>
                                         <div style="margin-top:20px;width:60px;border-top:1px solid #C9A24B;"></div>
                                         <div style="margin-top:16px;font-size:13px;letter-spacing:3px;color:#C9A24B;text-transform:uppercase;">Captain&rsquo;s Suite &middot; Private Access</div>
@@ -45,8 +45,8 @@ if (!defined('ABSPATH')) {
                                     <td align="center" style="padding:14px 40px 8px;">
                                         <table role="presentation" cellpadding="0" cellspacing="0">
                                             <tr>
-                                                <td align="center" style="border-radius:4px;background:linear-gradient(180deg,#E4C77A 0%,#C9A24B 100%);">
-                                                    <a href="<?php echo esc_url($reset_link); ?>" target="_blank" style="display:inline-block;padding:15px 42px;font-family:Georgia,serif;font-size:14px;letter-spacing:2px;text-transform:uppercase;color:#1A1204;text-decoration:none;font-weight:bold;">&#10022;&nbsp; Reset My Passcode</a>
+                                                <td align="center" bgcolor="#E4C77A" style="border-radius:4px;background-color:#E4C77A;background-image:linear-gradient(180deg,#E4C77A 0%,#C9A24B 100%);border:1px solid #C9A24B;mso-padding-alt:15px 42px;">
+                                                    <a href="<?php echo esc_url($reset_link); ?>" target="_blank" style="display:inline-block;padding:15px 42px;font-family:Georgia,serif;font-size:14px;line-height:18px;letter-spacing:2px;text-transform:uppercase;color:#1A1204 !important;text-decoration:none;font-weight:bold;">&#10022;&nbsp; Reset My Passcode</a>
                                                 </td>
                                             </tr>
                                         </table>

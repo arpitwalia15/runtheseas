@@ -98,18 +98,18 @@ class RTS_Trophy {
                 'icon' => '🏅'
             ),
             '21k' => array(
-                'name' => '21K TROPHY',
+                'name' => '21.1K TROPHY',
                 'miles_required' => 21000,
                 'crew_members' => 2,
                 'trophy_type' => 'half_marathon',
                 'rank' => 8,
-                'description' => 'Half Marathon - 21K',
+                'description' => 'Half Marathon - 21.1K',
                 'image_url' => RTS_PLUGIN_URL . 'assets/images/trophies/21k.png',
                 'icon' => '🏃'
             ),
             '42k' => array(
                 'name' => '42.2K TROPHY',
-                'miles_required' => 42200,
+                'miles_required' => 42000,
                 'crew_members' => 42,
                 'trophy_type' => 'marathon',
                 'rank' => 9,
@@ -118,10 +118,12 @@ class RTS_Trophy {
                 'icon' => '🏆'
             )
         );
-        // Marathon 2 repeats the same milestones after the first 42.2K, but
+        // Marathon 2 repeats the same milestones after the first 42K unlock
+        // threshold. Public labels retain the recognised 42.2K race name, but
+        // the referral-based award remains reachable in whole 1K increments.
         // each award has its own stable key and record. This lets a participant
         // hold both Marathon 1's 5K trophy and Marathon 2's different 5K trophy.
-        $marathon_two_base = 42200;
+        $marathon_two_base = 42000;
         foreach (array('5k', '10k', '15k', '20k', '21k', '25k', '30k', '35k', '42k') as $milestone_key) {
             $source = $this->trophy_definitions[$milestone_key];
             $second_key = 'm2-' . $milestone_key;
@@ -328,7 +330,7 @@ class RTS_Trophy {
 
     /** Run the new eligibility model once for records created by older versions. */
     public function maybe_reconcile_historical_trophies() {
-        $migration_version = '2';
+        $migration_version = '3';
         if (get_option('rts_trophy_reconciliation_version') === $migration_version) {
             return;
         }
@@ -341,12 +343,17 @@ class RTS_Trophy {
             $this->reconcile_participant_trophies($participant_id, false);
         }
 
-        // Repair legacy records that were saved with the old, non-existent
-        // assets/images/trophy-*.png paths while the definitions are available.
+        // Keep existing awards aligned with current labels, whole-1K unlock
+        // thresholds, and artwork. This upgrades old 21K/42.2K records and
+        // removes the former .2K offset from Marathon 2 requirements.
         foreach ($this->trophy_definitions as $key => $definition) {
             $this->db->update(
                 $this->db->prefix . 'rts_user_trophies',
-                array('trophy_image_url' => $definition['image_url']),
+                array(
+                    'trophy_name' => $definition['name'],
+                    'miles_required' => $definition['miles_required'],
+                    'trophy_image_url' => $definition['image_url'],
+                ),
                 array('trophy_key' => $key)
             );
         }
@@ -747,7 +754,7 @@ class RTS_Trophy {
         $message .= "Keep going, Captain! 🚀\n\n";
         $message .= "Best regards,\nThe Run The Seas Team";
         
-        $headers = array('Content-Type: text/plain; charset=UTF-8');
+        $headers = rts_mail_headers('text/plain; charset=UTF-8');
         
         wp_mail($participant->email, $subject, $message, $headers);
     }
@@ -761,7 +768,7 @@ class RTS_Trophy {
         }
         
         $user = wp_get_current_user();
-        $participant = $this->registration->get_participant_by_email($user->user_email);
+        $participant = $this->registration->get_participant_for_user($user);
         
         if (!$participant) {
             wp_send_json_error('Participant not found');
@@ -809,7 +816,7 @@ class RTS_Trophy {
         }
         
         $user = wp_get_current_user();
-        $participant = $this->registration->get_participant_by_email($user->user_email);
+        $participant = $this->registration->get_participant_for_user($user);
         
         if (!$participant) {
             return '<p>Please complete your registration to view your trophy room.</p>';
@@ -858,14 +865,14 @@ class RTS_Trophy {
                                     🏅
                                 <?php endif; ?>
                             </div>
-                            <h4><?php echo esc_html($trophy->trophy_name); ?></h4>
+                            <h4><?php echo esc_html($def['name'] ?? $trophy->trophy_name); ?></h4>
                             <div class="trophy-details">
                                 <span class="trophy-crew"><?php echo $this->get_crew_members_count($trophy->trophy_key); ?> Crew Members</span>
                             </div>
                             <div class="trophy-date">
                                 Earned: <?php echo date('M j, Y', strtotime($trophy->earned_date)); ?>
                             </div>
-                            <div class="trophy-points">🏅 <?php echo rts_format_miles($trophy->miles_required); ?></div>
+                            <div class="trophy-points">🏅 <?php echo esc_html(rts_format_trophy_miles($trophy->miles_required, $trophy->trophy_key)); ?></div>
                         </div>
                     <?php endforeach; ?>
                 </div>
@@ -968,7 +975,7 @@ class RTS_Trophy {
         }
 
         $user = wp_get_current_user();
-        $participant = $this->registration->get_participant_by_email($user->user_email);
+        $participant = $this->registration->get_participant_for_user($user);
         if (!$participant) {
             return '<p>Please complete your registration to view your trophy case.</p>';
         }
@@ -1050,7 +1057,7 @@ class RTS_Trophy {
         $email_verified = (int) $participant->email_verified === 1;
         $registration_complete = !empty($participant->registration_date) && !empty($participant->age_consent_confirmed_at);
         $trophy_unlock_eligible = $email_verified && $registration_complete;
-        $marathon_base_miles = $is_marathon_one ? 0 : 42200;
+        $marathon_base_miles = $is_marathon_one ? 0 : 42000;
         $marathon_progress_miles = max(0, $total_miles - $marathon_base_miles);
         $member_name = trim((string) $participant->first_name . ' ' . (string) $participant->last_name);
         if ('' === $member_name) {
@@ -1070,7 +1077,8 @@ class RTS_Trophy {
             : '';
         $founding_number = '#' . str_pad((string) absint($participant->id), 3, '0', STR_PAD_LEFT);
 
-        // Marathon 1 uses the participant's first 42.2K. Marathon 2 retains its
+        // Marathon 1 unlocks at 42K while retaining its 42.2K display label.
+        // Marathon 2 uses the next clean 42K block.
         // existing cumulative offset and starts only after Marathon 1 is complete.
         $case_items = array(
             'founding-runner' => array(
@@ -1104,7 +1112,7 @@ class RTS_Trophy {
                 }
             }
         }
-        $progress_percent = min(100, max(0, ($marathon_progress_miles / 42200) * 100));
+        $progress_percent = min(100, max(0, ($marathon_progress_miles / 42000) * 100));
         $crew_members = min(42, max(
             absint($participant->successful_referrals ?? 0),
             absint($participant->referral_count ?? 0),
@@ -1195,6 +1203,13 @@ class RTS_Trophy {
                         $has_complete_locked_artwork = !$earned && ($uploaded_image_url || $bundled_state_url);
                         $remaining = max(0, $required - $total_miles);
                         $item_classes = 'rts-trophy-case__item rts-trophy-case__item--' . sanitize_html_class($key) . ' ' . ($earned ? 'is-earned' : 'is-locked');
+                        // Marathon 2 keeps its distinct m2-* key for records and
+                        // links, but shares the cabinet slots named 5k, 10k,
+                        // etc. Without this layout class the absolutely
+                        // positioned item has no dimensions and is invisible.
+                        if ($key !== $milestone_key) {
+                            $item_classes .= ' rts-trophy-case__item--' . sanitize_html_class($milestone_key);
+                        }
                         if ($uploaded_image_url || $bundled_state_url) {
                             $item_classes .= ' has-complete-artwork';
                         }
@@ -1282,7 +1297,7 @@ class RTS_Trophy {
                             <strong><?php esc_html_e('Half Marathon', 'run-the-seas'); ?></strong>
                             <span class="rts-trophy-case__ornamented-line">
                                 <i class="rts-trophy-case__ornament rts-trophy-case__ornament--left"><?php if ($left_ornament_url) : ?><img src="<?php echo esc_url($left_ornament_url); ?>" alt="" loading="lazy" decoding="async"><?php endif; ?></i>
-                                <b>21K</b>
+                                <b>21.1K</b>
                                 <i class="rts-trophy-case__ornament rts-trophy-case__ornament--right"><?php if ($right_ornament_url) : ?><img src="<?php echo esc_url($right_ornament_url); ?>" alt="" loading="lazy" decoding="async"><?php endif; ?></i>
                             </span>
                             <em class="rts-trophy-case__script-copy"><?php esc_html_e('At Sea', 'run-the-seas'); ?></em>
@@ -1295,7 +1310,7 @@ class RTS_Trophy {
                             <strong><?php esc_html_e('Marathon', 'run-the-seas'); ?></strong>
                             <span class="rts-trophy-case__ornamented-line">
                                 <i class="rts-trophy-case__ornament rts-trophy-case__ornament--left"><?php if ($left_ornament_url) : ?><img src="<?php echo esc_url($left_ornament_url); ?>" alt="" loading="lazy" decoding="async"><?php endif; ?></i>
-                                <b>42K</b>
+                                <b>42.2K</b>
                                 <i class="rts-trophy-case__ornament rts-trophy-case__ornament--right"><?php if ($right_ornament_url) : ?><img src="<?php echo esc_url($right_ornament_url); ?>" alt="" loading="lazy" decoding="async"><?php endif; ?></i>
                             </span>
                             <em class="rts-trophy-case__script-copy"><?php esc_html_e('At Sea', 'run-the-seas'); ?></em>
@@ -1372,7 +1387,7 @@ class RTS_Trophy {
         }
         
         $user = wp_get_current_user();
-        $participant = $this->registration->get_participant_by_email($user->user_email);
+        $participant = $this->registration->get_participant_for_user($user);
         
         if (!$participant) {
             return '<p>Please complete your registration to view your trophy case.</p>';
@@ -1538,7 +1553,7 @@ class RTS_Trophy {
                         ">
                             <div style="
                                 height: 100%;
-                                width: <?php echo min(($total_miles / 42200) * 100, 100); ?>%;
+                                width: <?php echo min(($total_miles / 42000) * 100, 100); ?>%;
                                 background: linear-gradient(90deg, #1a7efb, #28a745);
                                 border-radius: 4px;
                                 transition: width 0.5s ease;
@@ -1546,7 +1561,7 @@ class RTS_Trophy {
                         </div>
                     </div>
                     <div style="font-size: 12px; color: #666;">
-                        <?php echo round(($total_miles / 42200) * 100, 1); ?>% Complete
+                        <?php echo round(($total_miles / 42000) * 100, 1); ?>% Complete
                     </div>
                 </div>
                 <div style="font-size: 12px; color: #999; margin-top: 5px;">
@@ -1567,7 +1582,7 @@ class RTS_Trophy {
         }
         
         $user = wp_get_current_user();
-        $participant = $this->registration->get_participant_by_email($user->user_email);
+        $participant = $this->registration->get_participant_for_user($user);
         
         if (!$participant) {
             return '<p>Please complete your registration.</p>';
@@ -1667,7 +1682,7 @@ class RTS_Trophy {
                         <?php echo $crew_count; ?> CREW MEMBERS
                     </p>
                     <p style="margin: 5px 0; font-size: 13px; color: #666;">
-                        <?php echo rts_format_miles($trophy_data->miles_required); ?> REQUIRED
+                        <?php echo esc_html(rts_format_trophy_miles($trophy_data->miles_required, $trophy_key)); ?> REQUIRED
                     </p>
                 </div>
                 

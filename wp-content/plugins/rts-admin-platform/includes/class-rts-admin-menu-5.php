@@ -5,7 +5,7 @@ class RTS_Admin_Menu_5 {
 
 	public static function init() {
 		add_action( 'admin_menu', array( __CLASS__, 'register_menu' ), 50 );
-		foreach ( array( 'ec_create','ec_status','ec_trigger','ad_create','dup_review','reject_ref' ) as $a ) { add_action( "admin_post_rts_$a", array( __CLASS__, "handle_$a" ) ); }
+		foreach ( array( 'ec_create','ec_save','ec_status','ec_trigger','ad_create','dup_review','reject_ref' ) as $a ) { add_action( "admin_post_rts_$a", array( __CLASS__, "handle_$a" ) ); }
 	}
 	public static function register_menu() {
 		RTS_Auth::page( 'rts-admin', 'Email Campaigns', 'Email Campaigns', 'rts_view', 'rts-email-campaigns', array( __CLASS__, 'render_campaigns' ) );
@@ -20,7 +20,7 @@ class RTS_Admin_Menu_5 {
 		return $h . $fields . '<button class="' . esc_attr( $class ) . '">' . esc_html( $button ) . '</button></form>';
 	}
 	private static function guard( $a ) { if ( ! current_user_can( RTS_Auth::action_cap( $a ) ) || ! isset( $_POST['_rts_nonce'] ) || ! wp_verify_nonce( $_POST['_rts_nonce'], 'rts_' . $a ) ) { wp_die( 'Not allowed.', 'Forbidden', array( 'response' => 403 ) ); } }
-	private static function back( $page, $msg = '' ) { $args = array(); if ( $msg ) { $args['rts_msg'] = rawurlencode( $msg ); } wp_safe_redirect( RTSAP_Frontend_Dashboard::screen_url( $page, $args ) ); exit; }
+	private static function back( $page, $msg = '', $extra = array() ) { $args = $extra; if ( $msg ) { $args['rts_msg'] = rawurlencode( $msg ); } wp_safe_redirect( RTSAP_Frontend_Dashboard::screen_url( $page, $args ) ); exit; }
 	private static function notice() { if ( ! empty( $_GET['rts_msg'] ) ) { $m = rawurldecode( $_GET['rts_msg'] ); $cls = str_starts_with( $m, 'Error' ) ? 'notice-error' : 'notice-success'; echo "<div class=\"notice $cls is-dismissible\"><p>" . esc_html( $m ) . '</p></div>'; } }
 	private static function admin() { $u = wp_get_current_user(); return $u ? $u->user_login : 'admin'; }
 	private static function kpi( $l, $v, $sub = '' ) { return '<div style="background:#fff;border:1px solid #ccd0d4;border-top:3px solid #C9A24B;border-radius:4px;padding:12px 16px;min-width:170px;"><div style="font-size:11px;text-transform:uppercase;color:#666;font-weight:600;">' . esc_html( $l ) . '</div><div style="font-size:24px;font-weight:700;margin-top:4px;color:#0B1420;">' . esc_html( $v ) . '</div>' . ( $sub ? '<div style="font-size:11px;color:#888">' . esc_html( $sub ) . '</div>' : '' ) . '</div>'; }
@@ -28,20 +28,66 @@ class RTS_Admin_Menu_5 {
 
 	// ---- Email Campaigns ----
 	public static function render_campaigns() {
-		echo '<div class="wrap"><h1>Email Campaign Builder</h1>'; self::notice();
-		echo '<p style="color:#666;font-size:12px;max-width:820px">Automated, <b>triggered</b> sends — distinct from Broadcast (immediate). "Run trigger check" is what a WP-Cron job would call on a schedule; it finds newly-eligible people, sends (respecting unsubscribes via the same audience function as Broadcast), and logs each send so re-running never double-sends.</p>';
-		echo '<h3>New campaign</h3>' . self::form( 'ec_create', '<input type="text" name="name" placeholder="Name" required> <select name="trigger_type"><option value="days_after_registration">days after registration</option><option value="days_after_verification">days after verification</option></select> <input type="number" name="trigger_days" value="3" min="0" style="width:70px"> days <select name="audience_filter"><option value="all">all</option><option value="runners_only">runners</option><option value="non_runners_only">non-runners</option></select> <select name="category"><option>general</option><option>survey</option><option>referral</option><option>trophy</option></select> ', 'Create (draft)' );
-		$rows = array();
-		foreach ( RTS_Business_Logic_5::list_campaigns() as $c ) {
-			$act = '';
-			if ( 'draft' === $c->status || 'paused' === $c->status ) { $act .= self::form( 'ec_status', '', 'Activate', array( 'id' => $c->id, 'status' => 'active' ) ) . ' '; }
-			if ( 'active' === $c->status ) { $act .= self::form( 'ec_trigger', '', 'Run trigger check', array( 'id' => $c->id ), 'button button-primary' ) . ' ' . self::form( 'ec_status', '', 'Pause', array( 'id' => $c->id, 'status' => 'paused' ) ); }
-			$rows[] = array( $c->name, (int) $c->trigger_days . ' days after ' . str_replace( 'days_after_', '', $c->trigger_type ), $c->audience_filter, $c->category, $c->status, (int) $c->sent_count, $act );
-		}
-		echo '<h3>Campaigns</h3>' . self::tbl( array( 'Name', 'Trigger', 'Audience', 'Category', 'Status', 'Sent', 'Actions' ), $rows ) . '</div>';
+		global $wpdb;
+
 	}
 	public static function handle_ec_create()  { self::guard( 'ec_create' );  RTS_Business_Logic_5::create_campaign( array( 'name' => sanitize_text_field( $_POST['name'] ), 'trigger_type' => sanitize_key( $_POST['trigger_type'] ), 'trigger_days' => (int) $_POST['trigger_days'], 'audience_filter' => sanitize_key( $_POST['audience_filter'] ), 'category' => sanitize_key( $_POST['category'] ), 'created_by' => self::admin() ) ); self::back( 'rts-email-campaigns', 'Campaign created as draft.' ); }
-	public static function handle_ec_status()  { self::guard( 'ec_status' );  $r = RTS_Business_Logic_5::set_campaign_status( (int) $_POST['id'], sanitize_key( $_POST['status'] ), self::admin() ); self::back( 'rts-email-campaigns', $r['error'] ? 'Error: ' . $r['error'] : 'Status updated.' ); }
+	public static function handle_ec_save() {
+		self::guard( 'ec_save' );
+		$operation = sanitize_key( $_POST['operation'] ?? 'draft' );
+		$status = in_array( $operation, array( 'schedule', 'send_now' ), true ) ? 'active' : sanitize_key( $_POST['existing_status'] ?? 'draft' );
+		if ( 'draft' === $operation ) { $status = 'draft'; }
+		$scheduled_at = '';
+		$schedule_timestamp = 0;
+		if ( ! empty( $_POST['scheduled_at'] ) ) {
+			$date = date_create_immutable_from_format( 'Y-m-d\TH:i', sanitize_text_field( wp_unslash( $_POST['scheduled_at'] ) ), wp_timezone() );
+			if ( $date ) { $scheduled_at = $date->format( 'Y-m-d H:i:s' ); $schedule_timestamp = $date->getTimestamp(); }
+		}
+		if ( 'send_now' === $operation && 'scheduled' === sanitize_key( $_POST['delivery_mode'] ?? '' ) && ! $scheduled_at ) { $scheduled_at = current_time( 'mysql' ); }
+		$r = RTS_Business_Logic_5::save_campaign( array(
+			'id' => absint( $_POST['id'] ?? 0 ), 'name' => sanitize_text_field( wp_unslash( $_POST['name'] ?? '' ) ),
+			'template_id' => absint( $_POST['template_id'] ?? 0 ), 'delivery_mode' => sanitize_key( $_POST['delivery_mode'] ?? 'automation' ),
+			'trigger_type' => sanitize_key( $_POST['trigger_type'] ?? 'days_after_registration' ), 'trigger_days' => absint( $_POST['trigger_days'] ?? 0 ),
+			'audience_filter' => sanitize_key( $_POST['audience_filter'] ?? 'all' ), 'category' => sanitize_key( $_POST['category'] ?? 'general' ),
+			'scheduled_at' => $scheduled_at, 'status' => $status, 'created_by' => self::admin(),
+		) );
+		if ( $r['error'] ) { self::back( 'rts-email-campaigns', 'Error: ' . $r['error'], array( 'campaign_id' => absint( $_POST['id'] ?? 0 ) ) ); }
+		$id = (int) $r['campaign_id'];
+		if ( in_array( $operation, array( 'draft', 'schedule', 'send_now' ), true ) ) { wp_clear_scheduled_hook( 'rts_run_scheduled_campaign', array( $id ) ); }
+		if ( 'test' === $operation ) {
+			$test = RTS_Business_Logic_5::send_campaign_test( $id, sanitize_email( wp_unslash( $_POST['test_email'] ?? '' ) ), self::admin() );
+			self::back( 'rts-email-campaigns', $test['error'] ? 'Error: ' . $test['error'] : 'Test email sent and logged.', array( 'campaign_id' => $id ) );
+		}
+		if ( 'send_now' === $operation ) {
+			$sent = RTS_Business_Logic_5::run_trigger_check( $id, self::admin(), true );
+			self::back( 'rts-email-campaigns', $sent['error'] ? 'Error: ' . $sent['error'] : 'Campaign sent to ' . (int) $sent['newly_sent'] . ' recipient(s); ' . (int) $sent['excluded_unsubscribed'] . ' excluded by consent.', array( 'campaign_id' => $id ) );
+		}
+		if ( 'schedule' === $operation && 'scheduled' === sanitize_key( $_POST['delivery_mode'] ?? '' ) ) {
+			if ( $schedule_timestamp <= time() ) {
+				$sent = RTS_Business_Logic_5::run_trigger_check( $id, self::admin() );
+				self::back( 'rts-email-campaigns', $sent['error'] ? 'Error: ' . $sent['error'] : 'Scheduled time had already arrived; campaign sent to ' . (int) $sent['newly_sent'] . ' recipient(s).', array( 'campaign_id' => $id ) );
+			}
+			$scheduled = wp_schedule_single_event( $schedule_timestamp, 'rts_run_scheduled_campaign', array( $id ), true );
+			if ( is_wp_error( $scheduled ) ) { self::back( 'rts-email-campaigns', 'Error: SCHEDULE_FAILED — ' . $scheduled->get_error_message(), array( 'campaign_id' => $id ) ); }
+		}
+		self::back( 'rts-email-campaigns', 'schedule' === $operation ? 'Campaign activated. WordPress cron will process it at the configured trigger or scheduled time.' : 'Campaign saved as draft.', array( 'campaign_id' => $id ) );
+	}
+	public static function handle_ec_status()  {
+		self::guard( 'ec_status' );
+		$id = absint( $_POST['id'] ?? 0 ); $status = sanitize_key( $_POST['status'] ?? '' );
+		$r = RTS_Business_Logic_5::set_campaign_status( $id, $status, self::admin() );
+		if ( ! $r['error'] ) {
+			wp_clear_scheduled_hook( 'rts_run_scheduled_campaign', array( $id ) );
+			if ( 'active' === $status ) {
+				global $wpdb; $campaign = $wpdb->get_row( $wpdb->prepare( "SELECT delivery_mode, scheduled_at FROM " . RTS_DB::table( 'email_campaigns' ) . " WHERE id = %d", $id ) );
+				if ( $campaign && 'scheduled' === $campaign->delivery_mode && $campaign->scheduled_at ) {
+					$when = date_create_immutable_from_format( 'Y-m-d H:i:s', $campaign->scheduled_at, wp_timezone() );
+					if ( $when && $when->getTimestamp() > time() ) { wp_schedule_single_event( $when->getTimestamp(), 'rts_run_scheduled_campaign', array( $id ) ); }
+				}
+			}
+		}
+		self::back( 'rts-email-campaigns', $r['error'] ? 'Error: ' . $r['error'] : 'Status updated.' );
+	}
 	public static function handle_ec_trigger() { self::guard( 'ec_trigger' ); $r = RTS_Business_Logic_5::run_trigger_check( (int) $_POST['id'], self::admin() ); self::back( 'rts-email-campaigns', $r['error'] ? 'Error: ' . $r['error'] : 'Trigger check: eligible ' . (int) $r['eligible_count'] . ', newly sent ' . (int) $r['newly_sent'] . ', excluded (unsubscribed) ' . (int) $r['excluded_unsubscribed'] . '.' ); }
 
 	// ---- Email Reporting ----

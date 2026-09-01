@@ -273,7 +273,7 @@ function rts_email_journey_report()
         $recipient,
         $subject,
         $message,
-        array('Content-Type: text/html; charset=UTF-8'),
+        rts_mail_headers(),
         array($attachment)
     );
     @unlink($attachment);

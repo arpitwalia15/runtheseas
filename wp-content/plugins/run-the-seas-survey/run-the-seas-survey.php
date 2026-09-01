@@ -4,7 +4,7 @@
  * Plugin Name: Run The Seas - Survey
  * Plugin URI: https://runtheseas.com/
  * Description: Advanced survey management with gamification, referral system, and Captain's Suite
- * Version: 1.2.80
+ * Version: 1.2.90
  * License: GPL v2 or later
  * Text Domain: run-the-seas
  */
@@ -17,8 +17,61 @@ if (!defined('ABSPATH')) {
 // Define plugin constants
 define('RTS_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('RTS_PLUGIN_PATH', plugin_dir_path(__FILE__));
-define('RTS_VERSION', '1.2.80');
+define('RTS_VERSION', '1.2.90');
 define('RTS_MANAGE_CAPABILITY', 'rts_manage_surveys');
+
+/** Keep legacy shortcode settings aligned with the whole-1K unlock model. */
+function rts_normalize_marathon_target($target)
+{
+    $target = max(1, absint($target));
+
+    return 42200 === $target ? 42000 : $target;
+}
+
+// Microsoft 365 only permits authenticated mailboxes (or explicitly granted
+// aliases) in the From header. Keep every plugin email aligned with the
+// mailbox configured in SMTP instead of falling back to the WP admin email.
+if (!defined('RTS_MAIL_FROM_EMAIL')) {
+    define('RTS_MAIL_FROM_EMAIL', 'noreply@runtheseas.com');
+}
+if (!defined('RTS_MAIL_FROM_NAME')) {
+    define('RTS_MAIL_FROM_NAME', 'Run The Seas');
+}
+
+/**
+ * Build consistent headers for email sent by this plugin.
+ *
+ * FluentSMTP's default connection is used when available. The constants act
+ * as a fallback and may also be defined in wp-config.php. Filters allow other
+ * environments to override the result without editing plugin files.
+ */
+function rts_mail_headers($content_type = 'text/html; charset=UTF-8', $headers = array())
+{
+    if (!is_array($headers)) {
+        $headers = preg_split('/\r?\n/', (string) $headers, -1, PREG_SPLIT_NO_EMPTY);
+    }
+
+    $headers = array_values(array_filter($headers, function ($header) {
+        return stripos((string) $header, 'Content-Type:') !== 0
+            && stripos((string) $header, 'From:') !== 0;
+    }));
+
+    $from_email = RTS_MAIL_FROM_EMAIL;
+    if (function_exists('fluentMailDefaultConnection')) {
+        $smtp_connection = fluentMailDefaultConnection();
+        if (!empty($smtp_connection['sender_email'])) {
+            $from_email = $smtp_connection['sender_email'];
+        }
+    }
+
+    $from_email = sanitize_email((string) apply_filters('rts_mail_from_email', $from_email));
+    $from_name = sanitize_text_field((string) apply_filters('rts_mail_from_name', RTS_MAIL_FROM_NAME));
+
+    $headers[] = 'Content-Type: ' . $content_type;
+    $headers[] = sprintf('From: %s <%s>', $from_name, $from_email);
+
+    return apply_filters('rts_mail_headers', $headers, $content_type);
+}
 
 
 // Load the core class and its concern-specific implementations.

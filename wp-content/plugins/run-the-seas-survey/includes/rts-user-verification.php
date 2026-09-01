@@ -113,7 +113,7 @@ function rts_show_verification_notice_frontend()
 
     $user = wp_get_current_user();
     $registration = new RTS_Registration();
-    $participant = $registration->get_participant_by_email($user->user_email);
+    $participant = $registration->get_participant_for_user($user);
 
     // Only show if email is not verified
     if ($participant && $participant->email_verified == 0) {
@@ -175,7 +175,7 @@ function rts_show_prominent_verification_notice()
 
     $user = wp_get_current_user();
     $registration = new RTS_Registration();
-    $participant = $registration->get_participant_by_email($user->user_email);
+    $participant = $registration->get_participant_for_user($user);
 
     if ($participant && $participant->email_verified == 0) {
     ?>
@@ -238,7 +238,7 @@ function rts_show_verification_after_registration()
 
     $user = wp_get_current_user();
     $registration = new RTS_Registration();
-    $participant = $registration->get_participant_by_email($user->user_email);
+    $participant = $registration->get_participant_for_user($user);
 
     if ($participant && $participant->email_verified == 0) {
     ?>
@@ -297,10 +297,12 @@ function rts_handle_resend_verification_frontend()
 
     $user = wp_get_current_user();
     $registration = new RTS_Registration();
-    $participant = $registration->get_participant_by_email($user->user_email);
+    $participant = $registration->get_participant_for_user($user);
 
     if ($participant && $participant->email_verified == 0) {
-        $sent = $registration->send_verification_email($participant->id);
+        // This is an explicit member request. Force a real resend even when a
+        // previous verification email exists in the timeline.
+        $sent = $registration->send_verification_email($participant->id, true);
 
         if ($sent) {
             // Store message in transient
@@ -586,6 +588,170 @@ function rts_add_user_action_links($actions, $user_object)
     return $actions;
 }
 add_filter('user_row_actions', 'rts_add_user_action_links', 10, 2);
+
+/** Return whether the current administrator may manage member verification. */
+function rts_can_manage_member_verification()
+{
+    return current_user_can('edit_users')
+        || (defined('RTS_MANAGE_CAPABILITY') && current_user_can(RTS_MANAGE_CAPABILITY));
+}
+
+/** Return a participant by its linked WordPress user ID. */
+function rts_get_participant_for_verification_user($user_id)
+{
+    global $wpdb;
+
+    return $wpdb->get_row(
+        $wpdb->prepare(
+            "SELECT * FROM {$wpdb->prefix}rts_participants WHERE user_id = %d LIMIT 1",
+            $user_id
+        )
+    );
+}
+
+/** Redirect an admin verification action back to the Users screen. */
+function rts_redirect_verification_admin_action($status)
+{
+    wp_safe_redirect(
+        add_query_arg(
+            'rts_verification_action',
+            sanitize_key($status),
+            admin_url('users.php')
+        )
+    );
+    exit;
+}
+
+/** Handle the Users screen "Resend Verification" action. */
+function rts_admin_resend_verification()
+{
+    if (!rts_can_manage_member_verification()) {
+        wp_die(esc_html__('You do not have permission to resend verification emails.', 'run-the-seas'), '', array('response' => 403));
+    }
+
+    $user_id = absint($_GET['user_id'] ?? 0);
+    check_admin_referer('rts_resend_verification_' . $user_id);
+
+    $participant = rts_get_participant_for_verification_user($user_id);
+    if (!$participant) {
+        rts_redirect_verification_admin_action('participant_not_found');
+    }
+    $participant = rts_sync_linked_participant_email($user_id, false, false);
+    if (is_wp_error($participant)) {
+        rts_redirect_verification_admin_action('email_sync_failed');
+    }
+    if ((int) $participant->email_verified === 1) {
+        rts_redirect_verification_admin_action('already_verified');
+    }
+
+    $registration = new RTS_Registration();
+    if (!$registration->send_verification_email((int) $participant->id, true)) {
+        rts_redirect_verification_admin_action('resend_failed');
+    }
+
+    $registration->log_timeline(
+        (int) $participant->id,
+        'verification_resent_by_admin',
+        'Verification email resent from the WordPress Users screen',
+        array('admin_id' => get_current_user_id())
+    );
+    rts_redirect_verification_admin_action('resent');
+}
+add_action('admin_post_rts_admin_resend_verification', 'rts_admin_resend_verification');
+
+/** Handle the Users screen "Verify Manually" action. */
+function rts_admin_manual_verify()
+{
+    if (!rts_can_manage_member_verification()) {
+        wp_die(esc_html__('You do not have permission to verify members.', 'run-the-seas'), '', array('response' => 403));
+    }
+
+    $user_id = absint($_GET['user_id'] ?? 0);
+    check_admin_referer('rts_manual_verify_' . $user_id);
+
+    $participant = rts_get_participant_for_verification_user($user_id);
+    if (!$participant) {
+        rts_redirect_verification_admin_action('participant_not_found');
+    }
+    $participant = rts_sync_linked_participant_email($user_id, false, false);
+    if (is_wp_error($participant)) {
+        rts_redirect_verification_admin_action('email_sync_failed');
+    }
+
+    global $wpdb;
+    $now = current_time('mysql');
+    $updated = $wpdb->update(
+        $wpdb->prefix . 'rts_participants',
+        array(
+            'email_verified' => 1,
+            'email_verification_date' => $now,
+            'updated_at' => $now,
+        ),
+        array('id' => (int) $participant->id),
+        array('%d', '%s', '%s'),
+        array('%d')
+    );
+    if (false === $updated) {
+        rts_redirect_verification_admin_action('verify_failed');
+    }
+
+    update_user_meta($user_id, 'rts_email_verified', '1');
+
+    $registration = new RTS_Registration();
+    if ((int) $participant->email_verified !== 1) {
+        $registration->log_timeline(
+            (int) $participant->id,
+            'manual_email_verified',
+            'Email verified manually from the WordPress Users screen',
+            array('admin_id' => get_current_user_id())
+        );
+        do_action('rts_participant_verified', (int) $participant->id);
+    }
+
+    // Re-enable the suite after an email-address change while preserving the
+    // existing credit/certificate numbers through the idempotent service.
+    $benefits = $registration->activate_verified_benefits(
+        (int) $participant->id,
+        get_current_user_id(),
+        true
+    );
+    if (is_wp_error($benefits)) {
+        rts_redirect_verification_admin_action('benefits_failed');
+    }
+
+    rts_redirect_verification_admin_action('verified');
+}
+add_action('admin_post_rts_admin_manual_verify', 'rts_admin_manual_verify');
+
+/** Display the result of a Users screen verification action. */
+function rts_verification_admin_action_notice()
+{
+    if (empty($_GET['rts_verification_action'])) {
+        return;
+    }
+
+    $status = sanitize_key(wp_unslash($_GET['rts_verification_action']));
+    $messages = array(
+        'resent' => array('success', __('Verification email resent successfully.', 'run-the-seas')),
+        'verified' => array('success', __('The member email is verified and the Captain’s Suite is active.', 'run-the-seas')),
+        'already_verified' => array('info', __('That member email is already verified.', 'run-the-seas')),
+        'participant_not_found' => array('error', __('No linked Run The Seas participant was found.', 'run-the-seas')),
+        'email_sync_failed' => array('error', __('The WordPress and Run The Seas emails could not be synchronized. Check that the address is not assigned to another participant.', 'run-the-seas')),
+        'resend_failed' => array('error', __('The verification email could not be sent. Check the mail log and SMTP configuration.', 'run-the-seas')),
+        'verify_failed' => array('error', __('The member verification status could not be saved.', 'run-the-seas')),
+        'benefits_failed' => array('error', __('The email was verified, but the Captain’s Suite could not be reactivated.', 'run-the-seas')),
+    );
+    if (!isset($messages[$status])) {
+        return;
+    }
+
+    printf(
+        '<div class="notice notice-%1$s is-dismissible"><p>%2$s</p></div>',
+        esc_attr($messages[$status][0]),
+        esc_html($messages[$status][1])
+    );
+}
+add_action('admin_notices', 'rts_verification_admin_action_notice');
 
 
 /**

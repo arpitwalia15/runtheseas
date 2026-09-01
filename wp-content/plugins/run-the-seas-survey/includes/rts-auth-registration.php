@@ -56,6 +56,113 @@ function rts_get_member_login_url($redirect_to = '')
 }
 
 /**
+ * Synchronize the participant email with its linked WordPress account.
+ *
+ * The user ID is the permanent relationship. This repairs older mismatches
+ * created when an administrator changed wp_users.user_email without updating
+ * the Run The Seas participant row.
+ */
+function rts_sync_linked_participant_email($user_id, $reset_verification = false, $send_verification = false)
+{
+    $user_id = absint($user_id);
+    $user = $user_id ? get_userdata($user_id) : false;
+    if (!$user instanceof WP_User) {
+        return new WP_Error('rts_user_not_found', __('Member account not found.', 'run-the-seas'));
+    }
+
+    $registration = new RTS_Registration();
+    $participant = $registration->get_participant_by_user_id($user_id);
+    if (!$participant) {
+        return new WP_Error('rts_participant_not_found', __('No linked Run The Seas participant was found.', 'run-the-seas'));
+    }
+
+    $old_email = sanitize_email($participant->email);
+    $new_email = sanitize_email($user->user_email);
+    if (!$new_email || strtolower($old_email) === strtolower($new_email)) {
+        return $participant;
+    }
+
+    $email_owner = $registration->get_participant_by_email($new_email);
+    if ($email_owner && (int) $email_owner->id !== (int) $participant->id) {
+        return new WP_Error('rts_participant_email_conflict', __('That email is linked to another Run The Seas participant.', 'run-the-seas'));
+    }
+
+    global $wpdb;
+    $update = array(
+        'email' => $new_email,
+        'updated_at' => current_time('mysql'),
+    );
+    $formats = array('%s', '%s');
+    if ($reset_verification) {
+        $update['email_verified'] = 0;
+        $update['email_verification_date'] = null;
+        $update['captain_suite_status'] = 'inactive';
+        $formats = array('%s', '%s', '%d', '%s', '%s');
+    }
+
+    $saved = $wpdb->update(
+        $wpdb->prefix . 'rts_participants',
+        $update,
+        array('id' => (int) $participant->id),
+        $formats,
+        array('%d')
+    );
+    if (false === $saved) {
+        return new WP_Error('rts_participant_email_sync_failed', __('The Run The Seas email could not be synchronized.', 'run-the-seas'));
+    }
+
+    $registration->sync_participant_email((int) $participant->id, $old_email, $new_email);
+    update_user_meta($user_id, 'rts_email_verified', $reset_verification ? '0' : ((int) $participant->email_verified === 1 ? '1' : '0'));
+    $registration->log_timeline(
+        (int) $participant->id,
+        $reset_verification ? 'email_updated' : 'email_reconciled',
+        $reset_verification
+            ? 'Participant email synchronized after a WordPress account email change'
+            : 'Participant email reconciled with its linked WordPress account',
+        array('old_email' => $old_email, 'new_email' => $new_email)
+    );
+
+    if ($reset_verification && $send_verification) {
+        $registration->send_verification_email((int) $participant->id, true);
+    }
+
+    return $registration->get_participant((int) $participant->id);
+}
+
+/** Reset verification when an administrator changes the WordPress email. */
+function rts_sync_participant_after_wp_profile_update($user_id, $old_user_data)
+{
+    $user = get_userdata($user_id);
+    if (
+        !$user instanceof WP_User
+        || !$old_user_data instanceof WP_User
+        || strtolower((string) $old_user_data->user_email) === strtolower((string) $user->user_email)
+    ) {
+        return;
+    }
+
+    $result = rts_sync_linked_participant_email($user_id, true, true);
+    if (is_wp_error($result) && 'rts_participant_not_found' !== $result->get_error_code()) {
+        error_log('RTS: WordPress/participant email sync failed for user ' . absint($user_id) . ': ' . $result->get_error_message());
+    }
+}
+add_action('profile_update', 'rts_sync_participant_after_wp_profile_update', 10, 2);
+
+/** Repair a pre-existing email mismatch for the signed-in member. */
+function rts_reconcile_current_member_email()
+{
+    if (!is_user_logged_in()) {
+        return;
+    }
+
+    $result = rts_sync_linked_participant_email(get_current_user_id(), false, false);
+    if (is_wp_error($result) && !in_array($result->get_error_code(), array('rts_participant_not_found', 'rts_user_not_found'), true)) {
+        error_log('RTS: Existing WordPress/participant email mismatch could not be repaired for user ' . get_current_user_id() . ': ' . $result->get_error_message());
+    }
+}
+add_action('init', 'rts_reconcile_current_member_email', 2);
+
+/**
  * Enforce authentication and role access for protected front-end pages.
  *
  * Send guests through the branded member login flow and return them to the
@@ -170,16 +277,7 @@ function rts_password_email_first_name($user)
 /** Ensure HTML is scoped to this email without changing unrelated wp_mail calls. */
 function rts_password_email_headers($headers = array())
 {
-    if (!is_array($headers)) {
-        $headers = preg_split('/\r?\n/', (string) $headers, -1, PREG_SPLIT_NO_EMPTY);
-    }
-
-    $headers = array_values(array_filter($headers, function ($header) {
-        return stripos((string) $header, 'Content-Type:') !== 0;
-    }));
-    $headers[] = 'Content-Type: text/html; charset=UTF-8';
-
-    return $headers;
+    return rts_mail_headers('text/html; charset=UTF-8', $headers);
 }
 
 /** Build the final reset email from the supplied Run The Seas design. */
@@ -386,6 +484,25 @@ function rts_format_miles($miles)
     return number_format($miles);
 }
 
+/**
+ * Format a trophy threshold using its public race-distance label.
+ *
+ * Awards are earned in whole 1K referral increments, while the recognised
+ * half/full-marathon trophy labels remain 21.1K and 42.2K.
+ */
+function rts_format_trophy_miles($miles, $trophy_key = '')
+{
+    $trophy_key = sanitize_key((string) $trophy_key);
+    if ('21k' === $trophy_key) {
+        return '21.1K';
+    }
+    if ('42k' === $trophy_key) {
+        return '42.2K';
+    }
+
+    return rts_format_miles($miles);
+}
+
 // In run-the-seas-survey.php, add this check
 function rts_check_pending_processing()
 {
@@ -433,7 +550,7 @@ function rts_restrict_user_login($user, $username, $password = null)
 
     // Get participant data
     $registration = new RTS_Registration();
-    $participant = $registration->get_participant_by_email($user->user_email);
+    $participant = $registration->get_participant_for_user($user);
 
     if ($participant) {
         $email_verified = $participant->email_verified == 1;
@@ -515,7 +632,7 @@ function rts_redirect_non_verified_users()
 
     $user = wp_get_current_user();
     $registration = new RTS_Registration();
-    $participant = $registration->get_participant_by_email($user->user_email);
+    $participant = $registration->get_participant_for_user($user);
 
     if ($participant) {
         $email_verified = $participant->email_verified == 1;
@@ -528,7 +645,17 @@ function rts_redirect_non_verified_users()
                 return;
             }
 
-            wp_redirect(add_query_arg('rts_verification_required', '1', home_url('/captains-suite')));
+            // The verification notice itself lives on this page. Once the
+            // marker is present, allow the request to render instead of
+            // redirecting the page back to its own URL indefinitely.
+            if (
+                isset($_GET['rts_verification_required'])
+                && (is_page('captains-suite') || is_page('captain-suite'))
+            ) {
+                return;
+            }
+
+            wp_safe_redirect(add_query_arg('rts_verification_required', '1', home_url('/captains-suite/')));
             exit;
         }
 
@@ -563,7 +690,7 @@ function rts_show_verification_required_notice()
     if (isset($_GET['rts_verification_required'])) {
         $user = wp_get_current_user();
         $registration = new RTS_Registration();
-        $participant = $registration->get_participant_by_email($user->user_email);
+        $participant = $registration->get_participant_for_user($user);
     ?>
         <div style="
             background: #fff3cd;

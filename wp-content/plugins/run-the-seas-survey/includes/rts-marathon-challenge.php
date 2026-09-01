@@ -10,9 +10,9 @@ if (!defined('ABSPATH')) {
  * A member stays at the finish line when their lifetime distance is an exact
  * multiple of the target. Their next referral starts the following marathon.
  */
-function rts_marathon_challenge_lap($total_miles, $target = 42200)
+function rts_marathon_challenge_lap($total_miles, $target = 42000)
 {
-    $target = max(1, absint($target));
+    $target = rts_normalize_marathon_target($target);
     $total_miles = max(0, absint($total_miles));
 
     if ($total_miles <= $target) {
@@ -43,9 +43,9 @@ function rts_marathon_challenge_lap($total_miles, $target = 42200)
  * Build deterministic, request-only participants for visual testing.
  * Nothing returned here is written to WordPress or the participants table.
  */
-function rts_marathon_challenge_demo_participants($target = 42200)
+function rts_marathon_challenge_demo_participants($target = 42000)
 {
-    $target = max(1, absint($target));
+    $target = rts_normalize_marathon_target($target);
     $first_names = array('Ava', 'Noah', 'Mia', 'Leo', 'Zoe', 'Eli', 'Ivy', 'Kai', 'Nina', 'Owen', 'Lena', 'Theo');
     $last_names = array('Reed', 'Stone', 'Brooks', 'Lane', 'Cole', 'Hart', 'Wells', 'Shaw', 'Cross', 'Blake');
     $colors = array('#087fdb', '#1aa36f', '#e78216', '#b34fbc', '#c44848', '#488d24', '#177e89', '#8658d4');
@@ -241,6 +241,9 @@ function rts_marathon_challenge_distance($miles)
     if (in_array($miles, array(21000, 21100), true)) {
         return '21.1K';
     }
+    if (in_array($miles, array(42000, 42200), true)) {
+        return '42.2K';
+    }
 
     if ($miles >= 1000 && function_exists('rts_format_miles')) {
         return rts_format_miles(absint($miles));
@@ -256,9 +259,15 @@ function rts_marathon_challenge_distance($miles)
 /** Use the internationally recognised 21.1K label for the half-marathon stop. */
 function rts_marathon_challenge_milestone_distance($milestone)
 {
-    return '21k' === sanitize_key($milestone['key'] ?? '')
-        ? 21100
-        : absint($milestone['miles'] ?? 0);
+    $key = sanitize_key($milestone['key'] ?? '');
+    if ('21k' === $key) {
+        return 21100;
+    }
+    if ('42k' === $key) {
+        return 42200;
+    }
+
+    return absint($milestone['miles'] ?? 0);
 }
 
 /** Keep the map's half-marathon point aligned with the supplied 21.1K design. */
@@ -337,7 +346,7 @@ function rts_marathon_challenge_dummy_avatar($class = '')
  * complete line before interpolation. Therefore every 1K consumes the same
  * visible amount of track instead of inheriting uneven milestone spacing.
  */
-function rts_marathon_challenge_position($distance, $target = 42200)
+function rts_marathon_challenge_position($distance, $target = 42000)
 {
     // Traced from the centre of the orange route in the 1466x1073 map art.
     // Dense points around bends keep interpolated 1K and staggered lap markers
@@ -395,7 +404,7 @@ function rts_marathon_challenge_position($distance, $target = 42200)
         array(73.53, 76.79),
     );
 
-    $target = max(1, absint($target));
+    $target = rts_normalize_marathon_target($target);
     $distance = min(max(0, absint($distance)), $target);
     $segments = array();
     $path_length = 0.0;
@@ -521,7 +530,7 @@ function rts_marathon_challenge_lap_group_position($distance, $target, $marathon
  * early progress to the right of the left-hand track, the 20K section near the
  * middle, and later progress to the left of the right-hand track.
  */
-function rts_marathon_challenge_current_position($distance, $target = 42200)
+function rts_marathon_challenge_current_position($distance, $target = 42000)
 {
     // Exact current-user positions, expressed as map percentages: array(X, Y).
     // Increase X to move right or Y to move down. Unlisted distances continue
@@ -569,7 +578,6 @@ function rts_marathon_challenge_current_position($distance, $target = 42200)
         40000  => array(72.0, 69.4),
         41000  => array(72.0, 69.4),
         42000 => array(72.0, 69.4),
-        42200 => array(72.0, 69.4),
         
     );
 
@@ -709,10 +717,10 @@ function rts_marathon_challenge_popup($id, $title, $participants, $distance, $us
 function rts_marathon_challenge_shortcode($atts)
 {
     $atts = shortcode_atts(array(
-        'target'    => 42200,
+        'target'    => 42000,
         'map_image' => '',
     ), $atts, 'rts_marathon_challenge');
-    $target = max(1, absint($atts['target']));
+    $target = rts_normalize_marathon_target($atts['target']);
     $design_assets = get_option('rts_marathon_challenge_design_assets', array());
     $design_assets = is_array($design_assets) ? $design_assets : array();
     $asset = static function ($key) use ($design_assets) {
@@ -1133,12 +1141,6 @@ function rts_marathon_challenge_shortcode($atts)
                     $milestone_lap_groups = array();
                     foreach ($route_groups_by_marathon as $group_marathon => $marathon_distance_groups) {
                         $lap_members = $marathon_distance_groups[$stored_milestone_distance] ?? array();
-                        // Marathon finishers may be stored at rounded 42K or at
-                        // the exact 42.2K target, but remain separated by lap.
-                        if ('42k' === $milestone_key && 42200 === $stored_milestone_distance) {
-                            $lap_members = array_merge($marathon_distance_groups[42000] ?? array(), $lap_members);
-                            rts_marathon_challenge_sort_recent($lap_members);
-                        }
                         if ($lap_members) {
                             $milestone_lap_groups[absint($group_marathon)] = $lap_members;
                         }
@@ -1209,8 +1211,7 @@ function rts_marathon_challenge_shortcode($atts)
                     if (0 === absint($distance)) {
                         continue;
                     }
-                    if (in_array(absint($distance), $milestone_distances, true)
-                        || (42000 === absint($distance) && in_array(42200, $milestone_distances, true))) {
+                    if (in_array(absint($distance), $milestone_distances, true)) {
                         continue;
                     }
                     $occupied_marathons = array();

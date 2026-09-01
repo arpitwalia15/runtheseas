@@ -254,7 +254,7 @@ class RTS_Registration_Page {
         // --- CHECK IF USER IS ALREADY LOGGED IN ---
         if (is_user_logged_in()) {
             $current_user = wp_get_current_user();
-            $existing = $this->registration->get_participant_by_email($current_user->user_email);
+            $existing = $this->registration->get_participant_for_user($current_user);
             if ($existing) {
                 return $this->render_already_registered($existing);
             }
@@ -1187,7 +1187,7 @@ class RTS_Registration_Page {
         }
         
         $user = wp_get_current_user();
-        $participant = $this->registration->get_participant_by_email($user->user_email);
+        $participant = $this->registration->get_participant_for_user($user);
         
         if (!$participant) {
             return '<p>Please complete your registration.</p>';
