@@ -30,9 +30,13 @@ class RTS_Admin_Menu_2 {
 		if ( ! current_user_can( RTS_Auth::action_cap( $action ) ) || ! isset( $_POST['_rts_nonce'] ) || ! wp_verify_nonce( $_POST['_rts_nonce'], 'rts_' . $action ) ) { wp_die( 'Not allowed.', 'Forbidden', array( 'response' => 403 ) ); }
 	}
 	private static function back( $page, $msg = '', $extra = array() ) {
+		$fragment = isset( $extra['_fragment'] ) ? sanitize_key( $extra['_fragment'] ) : '';
+		unset( $extra['_fragment'] );
 		$args = $extra;
 		if ( $msg ) { $args['rts_msg'] = rawurlencode( $msg ); }
-		wp_safe_redirect( RTSAP_Frontend_Dashboard::screen_url( $page, $args ) ); exit;
+		$url = RTSAP_Frontend_Dashboard::screen_url( $page, $args );
+		if ( $fragment ) { $url .= '#' . $fragment; }
+		wp_safe_redirect( $url ); exit;
 	}
 	private static function notice() {
 		if ( ! empty( $_GET['rts_msg'] ) ) {
@@ -1018,12 +1022,15 @@ class RTS_Admin_Menu_2 {
 
 		$categories = array( 'onboarding', 'acquisition', 'engagement', 'transactional', 'milestone' );
 		$list_url = RTSAP_Frontend_Dashboard::screen_url( 'rts-email-templates' );
-		echo '<div class="wrap"><h1>Edit Email Template</h1>'; self::notice();
+		echo '<div class="wrap"><h1>Edit Email Template</h1>';
 		echo '<p><a class="button" href="' . esc_url( $list_url ) . '">&larr; Back to Template Library</a></p>';
 		echo '<p>Use the <strong>Visual</strong> tab for normal editing or the <strong>Code</strong> tab for complete HTML control. Saving updates this template directly.</p>';
 		echo '<p><em>The logo and certificate shown in this editor are previews. Their saved merge fields are restored automatically so sent emails use the current logo and each participant&rsquo;s personalised certificate.</em></p>';
 		echo '<p><strong>Merge fields:</strong> <code>{first_name}</code> <code>{last_name}</code> <code>{full_name}</code> <code>{email}</code> <code>{password_reset_url}</code> <code>{verification_url}</code> <code>{certificate_number}</code> <code>{founding_runner_number}</code> <code>{certificate_preview_url}</code> <code>{captains_suite_url}</code> <code>{login_url}</code> <code>{account_url}</code> <code>{logo_url}</code> <code>{support_email}</code> <code>{site_name}</code> <code>{site_url}</code></p>';
-		echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
+		// Image replacement values can be dynamic/local URLs. Native URL-field
+		// validation must not silently cancel an otherwise valid template save.
+		echo '<form id="rts-email-template-form" method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" novalidate>';
+		self::notice();
 		echo '<input type="hidden" name="action" value="rts_update_template"><input type="hidden" name="id" value="' . (int) $template->id . '">';
 		wp_nonce_field( 'rts_update_template', '_rts_nonce' );
 		echo '<table class="form-table"><tr><th><label for="rts-template-name">Name</label></th><td><input id="rts-template-name" class="regular-text" type="text" name="name" value="' . esc_attr( $template->name ) . '" required></td></tr>';
@@ -1035,7 +1042,7 @@ class RTS_Admin_Menu_2 {
 		self::render_template_image_controls( $template );
 		echo '<h2>Message body</h2>';
 		wp_editor(
-			self::template_editor_preview_body( $template, (string) $template->html_body ),
+			self::email_template_editor_fragment( self::template_editor_preview_body( $template, (string) $template->html_body ) ),
 			'rts_email_template_body',
 			array(
 				'textarea_name' => 'html_body',
@@ -1047,9 +1054,20 @@ class RTS_Admin_Menu_2 {
 			)
 		);
 		$layout_json = wp_json_encode( self::email_layout_snippets(), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT );
-		echo '<script>(function(){var layouts=' . $layout_json . ';function insertLayout(html){var editor=window.tinymce&&tinymce.get("rts_email_template_body");if(editor&&!editor.isHidden()){editor.focus();editor.execCommand("mceInsertContent",false,html);return;}var field=document.getElementById("rts_email_template_body");if(!field){return;}if(typeof field.setRangeText==="function"){field.setRangeText(html,field.selectionStart,field.selectionEnd,"end");field.dispatchEvent(new Event("input",{bubbles:true}));}else{field.value+=html;}}document.addEventListener("click",function(event){var button=event.target.closest(".rts-insert-email-layout");if(!button||!layouts[button.dataset.layout]){return;}insertLayout(layouts[button.dataset.layout]);});})();</script>';
+		echo '<script>(function(){var layouts=' . $layout_json . ';function insertLayout(html){var editor=window.tinymce&&tinymce.get("rts_email_template_body");if(editor&&!editor.isHidden()){editor.focus();editor.execCommand("mceInsertContent",false,html);return;}var field=document.getElementById("rts_email_template_body");if(!field){return;}if(typeof field.setRangeText==="function"){field.setRangeText(html,field.selectionStart,field.selectionEnd,"end");field.dispatchEvent(new Event("input",{bubbles:true}));}else{field.value+=html;}}document.addEventListener("click",function(event){var button=event.target.closest(".rts-insert-email-layout");if(!button||!layouts[button.dataset.layout]){return;}insertLayout(layouts[button.dataset.layout]);});var form=document.getElementById("rts-email-template-form");if(form){form.addEventListener("submit",function(event){if(window.tinymce){tinymce.triggerSave();}var required=[document.getElementById("rts-template-name"),document.getElementById("rts-template-subject")];for(var i=0;i<required.length;i++){if(required[i]&&!required[i].value.trim()){event.preventDefault();required[i].focus();window.alert("Please complete the template name and subject before saving.");return;}}});}})();</script>';
 		submit_button( 'Save Template' );
 		echo '</form></div>';
+	}
+
+	/** TinyMCE edits body fragments, not nested HTML documents. */
+	private static function email_template_editor_fragment( $html ) {
+		$html = preg_replace( '/^\xEF\xBB\xBF/', '', trim( (string) $html ) );
+		$html = preg_replace( '/<!doctype[^>]*>/i', '', $html );
+		if ( preg_match( '/<body\b[^>]*>(.*)<\/body>/is', $html, $match ) ) {
+			return trim( $match[1] );
+		}
+		$html = preg_replace( '/<\/?html\b[^>]*>/i', '', $html );
+		return trim( $html );
 	}
 
 	/** Starter markup for new marketing templates: email-client-safe tables and inline styles. */
@@ -1131,7 +1149,7 @@ class RTS_Admin_Menu_2 {
 			echo '<div class="rts-template-image-card" style="padding:14px;border:1px solid #ccd0d4;border-radius:6px;background:#fff;">';
 			echo '<strong style="display:block;margin-bottom:9px;">' . esc_html( self::template_image_label( $source, $index ) ) . '</strong>';
 			if ( $preview ) { echo '<img class="rts-template-image-preview" src="' . esc_url( $preview ) . '" alt="" style="display:block;width:auto;max-width:100%;height:100px;object-fit:contain;margin:0 0 10px;background:#eef1f4;">'; }
-			echo '<input class="large-text code rts-template-image-url" type="url" name="template_image_replacement[' . (int) $index . ']" value="' . esc_attr( $preview ) . '" data-default="' . esc_attr( $preview ) . '" placeholder="https://">';
+			echo '<input class="large-text code rts-template-image-url" type="text" inputmode="url" name="template_image_replacement[' . (int) $index . ']" value="' . esc_attr( $preview ) . '" data-default="' . esc_attr( $preview ) . '" placeholder="https://">';
 			echo '<p style="margin:9px 0 0;"><button type="button" class="button rts-template-image-select">Select / Replace from Media Library</button> <button type="button" class="button-link rts-template-image-reset">Undo unsaved replacement</button></p>';
 			echo '</div>';
 		}
@@ -1175,11 +1193,21 @@ class RTS_Admin_Menu_2 {
 			$replacement = esc_url_raw( wp_unslash( $submitted[ $index ] ) );
 			$preview = self::template_image_preview_url( $template, $source );
 			if ( '' === $replacement || $replacement === $preview || $replacement === $source ) { continue; }
+			if ( '{certificate_preview_url}' === $source ) {
+				$asset_option = 'founding_runner_certificate' === ( $template->action_key ?? '' )
+					? 'rts_certificate_email_design_assets'
+					: 'rts_verification_email_design_assets';
+				$assets = get_option( $asset_option, array() );
+				$assets = is_array( $assets ) ? $assets : array();
+				$assets['certificate_preview_image'] = $replacement;
+				update_option( $asset_option, $assets, false );
+				continue;
+			}
 			$body = str_replace( array( $source, esc_url( $source ) ), $replacement, $body );
 		}
 		return $body;
 	}
 	public static function handle_create_template()   { self::guard( 'create_template' ); $subject = sanitize_text_field( $_POST['subject'] ); $body = wp_kses_post( wp_unslash( $_POST['html_body'] ?? '' ) ); if ( '' === trim( $body ) ) { $body = self::default_email_template_html( $subject ); } $r = RTS_Business_Logic_2::create_template( array( 'name' => sanitize_text_field( $_POST['name'] ), 'subject' => $subject, 'category' => sanitize_text_field( $_POST['category'] ?? 'general' ), 'action_key' => sanitize_key( $_POST['action_key'] ?? '' ), 'html_body' => $body, 'created_by' => self::admin() ) ); self::back( 'rts-email-templates', $r['error'] ? 'Error: ' . $r['error'] : 'Template created with an email-safe table layout. Open the Visual / HTML Editor to customise it.' ); }
-	public static function handle_update_template()   { self::guard( 'update_template' );   $id = (int) $_POST['id']; $html_body = self::restore_template_image_merge_fields( $id, wp_kses_post( wp_unslash( $_POST['html_body'] ?? '' ) ) ); $html_body = self::apply_template_image_replacements( $id, $html_body, $_POST['template_image_replacement'] ?? array() ); $r = RTS_Business_Logic_2::update_template( $id, array( 'name' => sanitize_text_field( $_POST['name'] ?? '' ), 'subject' => sanitize_text_field( $_POST['subject'] ), 'category' => sanitize_text_field( $_POST['category'] ?? '' ), 'html_body' => $html_body, 'updated_by' => self::admin() ) ); self::back( 'rts-email-templates', $r['error'] ? 'Error: ' . $r['error'] : 'Template saved.', array( 'template_id' => $id ) ); }
+	public static function handle_update_template()   { self::guard( 'update_template' ); $id = (int) $_POST['id']; $submitted_body = self::email_template_editor_fragment( wp_unslash( $_POST['html_body'] ?? '' ) ); $html_body = self::restore_template_image_merge_fields( $id, wp_kses_post( $submitted_body ) ); $html_body = self::apply_template_image_replacements( $id, $html_body, $_POST['template_image_replacement'] ?? array() ); $r = RTS_Business_Logic_2::update_template( $id, array( 'name' => sanitize_text_field( $_POST['name'] ?? '' ), 'subject' => sanitize_text_field( $_POST['subject'] ), 'category' => sanitize_text_field( $_POST['category'] ?? '' ), 'html_body' => $html_body, 'updated_by' => self::admin() ) ); self::back( 'rts-email-templates', $r['error'] ? 'Error: ' . $r['error'] : 'Template saved.', array( 'template_id' => $id, '_fragment' => 'rts-email-template-form' ) ); }
 	public static function handle_assign_template()   { self::guard( 'assign_template' );   $r = RTS_Business_Logic_2::assign_template_action( (int) $_POST['id'], sanitize_key( $_POST['action_key'] ?? '' ), self::admin() ); self::back( 'rts-email-templates', $r['error'] ? 'Error: ' . $r['error'] : ( $r['action_key'] ? 'Template assigned. Any previous template for this action was unassigned.' : 'Template unassigned; the survey plugin default will be used.' ) ); }
 }

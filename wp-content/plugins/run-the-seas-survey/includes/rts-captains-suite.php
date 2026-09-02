@@ -170,6 +170,79 @@ function rts_resend_member_certificate()
 add_action('admin_post_rts_resend_member_certificate', 'rts_resend_member_certificate');
 
 /**
+ * Return certificate artwork with today's date baked below DATE ISSUED.
+ *
+ * Uses the dedicated registration-page sample when image is omitted. It never
+ * reads or changes the separate Certificate Email Design artwork.
+ * Usage: [rts_certificate_issued_image]
+ *        [rts_certificate_issued_image image="123"]
+ *        [rts_certificate_issued_image image="https://example.com/certificate.png"]
+ */
+function rts_certificate_issued_image_shortcode($atts)
+{
+    $atts = shortcode_atts(array(
+        'image'       => '',
+        'date'        => 'today',
+        'date_format' => 'F j, Y',
+        'date_x'      => '74.5',
+        'date_y'      => '80',
+        'alt'         => __('Run The Seas certificate', 'run-the-seas'),
+        'class'       => '',
+    ), $atts, 'rts_certificate_issued_image');
+
+    $source_url = '';
+    $image_value = trim((string) $atts['image']);
+    if ($image_value !== '' && ctype_digit($image_value)) {
+        $source_url = (string) wp_get_attachment_image_url(absint($image_value), 'full');
+    } elseif ($image_value !== '') {
+        $source_url = esc_url_raw($image_value);
+    }
+
+    if ($source_url === '') {
+        $source_url = esc_url_raw(RTS_PLUGIN_URL . 'assets/register-page-sample-certificate.png');
+    }
+    if ($source_url === '') {
+        return '<span class="rts-certificate-issued-image__notice">'
+            . esc_html__('Please provide a registration certificate image or Media Library ID in the shortcode.', 'run-the-seas')
+            . '</span>';
+    }
+
+    $date_format = sanitize_text_field((string) $atts['date_format']);
+    $date_format = $date_format !== '' ? $date_format : 'F j, Y';
+    $date_value = trim((string) $atts['date']);
+    $date_text = ($date_value === '' || strtolower($date_value) === 'today')
+        ? wp_date($date_format)
+        : sanitize_text_field($date_value);
+
+    $registration = rts_init()->registration;
+    if (!$registration || !method_exists($registration, 'get_dated_certificate_image_url')) {
+        return '';
+    }
+    $image_url = $registration->get_dated_certificate_image_url(
+        $source_url,
+        $date_text,
+        (float) $atts['date_x'],
+        (float) $atts['date_y']
+    );
+    if ($image_url === '') {
+        return '';
+    }
+
+    $classes = array('rts-certificate-issued-image');
+    foreach (preg_split('/\s+/', sanitize_text_field((string) $atts['class'])) as $class_name) {
+        $class_name = sanitize_html_class($class_name);
+        if ($class_name !== '') {
+            $classes[] = $class_name;
+        }
+    }
+
+    return '<img class="' . esc_attr(implode(' ', array_unique($classes))) . '" src="'
+        . esc_url($image_url) . '" alt="' . esc_attr($atts['alt'])
+        . '" loading="lazy" decoding="async" style="display:block;width:100%;max-width:100%;height:auto;">';
+}
+add_shortcode('rts_certificate_issued_image', 'rts_certificate_issued_image_shortcode');
+
+/**
  * Render the member certificate page.
  * Usage: [rts_certificate_page] or [rts_certificate]
  */

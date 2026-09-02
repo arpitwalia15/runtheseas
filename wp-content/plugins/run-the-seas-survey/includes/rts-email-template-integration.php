@@ -64,6 +64,49 @@ function rts_make_transactional_email_outlook_safe($html, $action_key = '')
     );
 }
 
+/** Keep the verification certificate at a true 490px minimum in saved templates. */
+function rts_enforce_verification_certificate_width($html)
+{
+    $html = preg_replace_callback(
+        '/<img\b(?=[^>]*\balt\s*=\s*(["\'])Preview of your Founding Runner Cruise Credit\1)[^>]*\/?\s*>/i',
+        function ($matches) {
+            $tag = $matches[0];
+            if (preg_match('/\bwidth\s*=\s*(["\']).*?\1/i', $tag)) {
+                $tag = preg_replace('/\bwidth\s*=\s*(["\']).*?\1/i', 'width="490"', $tag, 1);
+            } else {
+                $tag = preg_replace('/\s*\/?>$/', ' width="490">', $tag, 1);
+            }
+
+            $required_style = 'display:block;width:100%;min-width:490px;max-width:490px;height:auto;';
+            if (preg_match('/\bstyle\s*=\s*(["\'])(.*?)\1/i', $tag)) {
+                $tag = preg_replace_callback(
+                    '/\bstyle\s*=\s*(["\'])(.*?)\1/i',
+                    function ($style_matches) use ($required_style) {
+                        $style = preg_replace(
+                            '/(?:display|min-width|max-width|(?<!-)width|height)\s*:[^;]*;?/i',
+                            '',
+                            $style_matches[2]
+                        );
+                        return 'style=' . $style_matches[1] . $required_style . ltrim($style) . $style_matches[1];
+                    },
+                    $tag,
+                    1
+                );
+            } else {
+                $tag = preg_replace('/\s*\/?>$/', ' style="' . $required_style . '">', $tag, 1);
+            }
+            return $tag;
+        },
+        (string) $html
+    );
+
+    // The content area is 700px wide; a 30/70 split gives the certificate
+    // column the full 490px required by the image.
+    $html = preg_replace('/\bwidth\s*=\s*(["\'])(?:35%|32%)\1/i', 'width="30%"', $html);
+    $html = preg_replace('/\bwidth\s*=\s*(["\'])(?:65%|68%)\1/i', 'width="70%"', $html);
+    return $html;
+}
+
 /**
  * Resolve an assigned admin-platform template for a transactional email.
  *
@@ -151,6 +194,35 @@ function rts_resolve_transactional_email_template($action_key, $default_subject,
         $context['founding_runner_number'] = $context['certificate_number'];
     }
 
+    // A certificate image selected in the no-code template editor must remain
+    // recipient-aware. Older saves could replace the merge field with the raw,
+    // blank certificate artwork; restore the dynamic field at send time.
+    if (
+        in_array($action_key, array('email_verification', 'founding_runner_certificate'), true)
+        && $context['certificate_preview_url'] !== ''
+    ) {
+        $asset_option = 'founding_runner_certificate' === $action_key
+            ? 'rts_certificate_email_design_assets'
+            : 'rts_verification_email_design_assets';
+        $assets = get_option($asset_option, array());
+        $configured_preview = is_array($assets) && !empty($assets['certificate_preview_image'])
+            ? esc_url_raw($assets['certificate_preview_image'])
+            : '';
+        if ($configured_preview !== '' && $configured_preview !== $context['certificate_preview_url']) {
+            $html = str_replace(
+                array($configured_preview, esc_url($configured_preview)),
+                '{certificate_preview_url}',
+                $html
+            );
+        }
+    }
+
+    // Upgrade previously stored verification templates at render time. This
+    // handles both compact original HTML and TinyMCE's space-normalized HTML.
+    if ('email_verification' === $action_key) {
+        $html = rts_enforce_verification_certificate_width($html);
+    }
+
     $subject_replacements = array();
     $html_replacements = array();
     foreach ($context as $key => $value) {
@@ -204,6 +276,8 @@ function rts_get_transactional_email_design_merge_context($action_key = '')
 
 function rts_get_transactional_email_editor_preview_context($action_key = '')
 {
+    global $wpdb;
+
     $action_key = sanitize_key((string) $action_key);
     $asset_option = 'founding_runner_certificate' === $action_key
         ? 'rts_certificate_email_design_assets'
@@ -214,6 +288,35 @@ function rts_get_transactional_email_editor_preview_context($action_key = '')
     $certificate_preview_url = !empty($assets['certificate_preview_image'])
         ? esc_url_raw($assets['certificate_preview_image'])
         : esc_url_raw(RTS_PLUGIN_URL . 'assets/certificate-template.png');
+
+    // Use a real personalised preview in the admin editor. The base artwork is
+    // intentionally blank, which made correct dynamic templates look broken.
+    if (
+        in_array($action_key, array('email_verification', 'founding_runner_certificate'), true)
+        && function_exists('rts_init')
+    ) {
+        $participant = $wpdb->get_row(
+            "SELECT * FROM {$wpdb->prefix}rts_participants
+            WHERE first_name <> '' OR last_name <> ''
+            ORDER BY id DESC
+            LIMIT 1"
+        );
+        $plugin = rts_init();
+        if (
+            $participant
+            && $plugin
+            && !empty($plugin->registration)
+            && is_callable(array($plugin->registration, 'get_email_certificate_preview_url'))
+        ) {
+            $personalised_preview_url = $plugin->registration->get_email_certificate_preview_url(
+                $participant,
+                $asset_option
+            );
+            if ($personalised_preview_url !== '') {
+                $certificate_preview_url = $personalised_preview_url;
+            }
+        }
+    }
 
     return array_merge(rts_get_transactional_email_design_merge_context($action_key), array(
         'logo_url' => function_exists('rts_password_email_logo_url')

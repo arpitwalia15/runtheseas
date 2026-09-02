@@ -441,7 +441,7 @@ class RTS_Analytics {
             COUNT(DISTINCT CASE WHEN p.email_verified = 1 THEN p.id END) as verified_emails,
             COUNT(DISTINCT CASE WHEN p.email_verified = 0 THEN p.id END) as unverified_emails,
             COUNT(DISTINCT CASE WHEN p.cabin_credit_status = 'approved' THEN p.id END) as cabin_credits_issued,
-            COUNT(DISTINCT CASE WHEN p.certificate_number IS NOT NULL AND p.certificate_number <> '' THEN p.id END) as certificates_issued,
+            COUNT(DISTINCT CASE WHEN p.certificate_issued_at IS NOT NULL THEN p.id END) as certificates_issued,
             COUNT(DISTINCT CASE WHEN p.captain_suite_status = 'active' THEN p.id END) as captain_suites_active,
             COUNT(DISTINCT CASE WHEN p.captain_referral_participation = 'registered' THEN p.id END) as race_participation,
             COUNT(DISTINCT CASE WHEN EXISTS (

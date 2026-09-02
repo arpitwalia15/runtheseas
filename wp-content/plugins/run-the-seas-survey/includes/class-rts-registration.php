@@ -248,7 +248,8 @@ class RTS_Registration {
         $verification_token = bin2hex(random_bytes(32));
         
         // Every completed registration becomes eligible on email verification.
-        // A certificate/credit number is deliberately not allocated until then.
+        // Benefits are not issued until verification; a certificate number is
+        // reserved only when the verification email is prepared.
         $cabin_credit_number = null;
         
         $participant_data = array(
@@ -1307,6 +1308,28 @@ class RTS_Registration {
             error_log('RTS: Email already verified for participant ' . $participant_id);
             return false;
         }
+
+        // Reserve the exact certificate number shown in the verification
+        // preview. It remains unissued until activate_verified_benefits() sets
+        // certificate_issued_at after the recipient verifies their email.
+        if (empty($participant->certificate_number)) {
+            $certificate_number = $this->generate_certificate_number();
+            $certificate_reserved = $wpdb->update(
+                $wpdb->prefix . 'rts_participants',
+                array(
+                    'certificate_number' => $certificate_number,
+                    'updated_at' => current_time('mysql'),
+                ),
+                array('id' => $participant_id),
+                array('%s', '%s'),
+                array('%d')
+            );
+            if ($certificate_reserved === false) {
+                error_log('RTS: Failed to reserve certificate number for participant ' . $participant_id . ': ' . $wpdb->last_error);
+                return false;
+            }
+            $participant->certificate_number = $certificate_number;
+        }
         
         // Check if verification email was sent recently (within last 10 minutes)
         $recent_sent = $wpdb->get_var(
@@ -1475,7 +1498,7 @@ class RTS_Registration {
                 . '<div style="padding-top:9px;font-size:13px;line-height:1.4;font-style:normal;">Run. Explore. Celebrate. Belong.</div>'
                 . '</td></tr></table></td></tr>';
         $certificate = $certificate_preview_image
-            ? '<img src="' . esc_url($certificate_preview_image) . '" width="390" alt="Preview of your Founding Runner Cruise Credit" style="display:block;width:100%;max-width:390px;height:auto;border:1px solid #d59b19;">'
+            ? '<img src="' . esc_url($certificate_preview_image) . '" width="490" alt="Preview of your Founding Runner Cruise Credit" style="display:block;width:100%;min-width:490px;max-width:490px;height:auto;border:1px solid #d59b19;">'
             : '';
         $headline_divider = $headline_divider_image
             ? '<img src="' . $headline_divider_image . '" width="190" alt="" style="display:block;width:100%;max-width:190px;height:auto;border:0;margin:17px 0 13px;">'
@@ -1520,11 +1543,11 @@ class RTS_Registration {
             . '<h2 style="margin:0 0 8px;font-family:Georgia,serif;font-size:29px;line-height:1.2;color:#071b3b;">Please confirm your email address</h2>'
             . '<p style="margin:0 0 20px;font-size:17px;line-height:1.5;">Click the button below to verify your email.</p>'
             . $confirmation_divider
-            . '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr><td valign="top" width="35%" style="padding:0 14px 0 0;text-align:left;">'
+            . '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr><td valign="top" width="30%" style="padding:0 14px 0 0;text-align:left;">'
             . '<div style="padding:17px;border:1px solid #db9a42;border-radius:10px;color:#071b3b;font-size:13px;line-height:1.55;">'
             . $lock_icon
             . '<strong style="display:block;font-size:16px;margin-bottom:8px;color:#a65d12;">Why we need you to confirm your email</strong>Email verification helps us securely deliver your personalized Founding Runner Cruise Credit and keep you updated on the inaugural Run The Seas voyage.'
-            . '</div></td><td valign="top" width="65%" style="padding:0;text-align:center;">'
+            . '</div></td><td valign="top" width="70%" style="padding:0;text-align:center;">'
             . '<p style="margin:0 0 7px;font-family:Georgia,serif;font-size:14px;font-weight:bold;line-height:1.25;"><span style="color:#c56f12;">PREVIEW OF YOUR</span><br><span style="color:#071b3b;">FOUNDING RUNNER CRUISE CREDIT</span></p>'
             . $certificate
             . '</td></tr></table>'
@@ -1534,13 +1557,116 @@ class RTS_Registration {
     }
 
     /** Return the current configured certificate preview for an email recipient. */
-    private function get_email_certificate_preview_url($participant, $option_name) {
+    public function get_email_certificate_preview_url($participant, $option_name) {
         $assets = get_option($option_name, array());
         $assets = is_array($assets) ? $assets : array();
         $source = !empty($assets['certificate_preview_image'])
             ? esc_url($assets['certificate_preview_image'])
             : esc_url(RTS_PLUGIN_URL . 'assets/certificate-template.png');
         return $this->get_verification_certificate_preview_url($participant, $source);
+    }
+
+    /**
+     * Bake an issued date into a locally uploaded certificate image.
+     * Coordinates are percentages so the shortcode remains responsive to the
+     * original artwork dimensions while the returned file stays a real image.
+     */
+    public function get_dated_certificate_image_url($source_url, $date_text, $position_x = 74.5, $position_y = 80) {
+        $source_url = esc_url_raw((string) $source_url);
+        $date_text = trim(wp_strip_all_tags((string) $date_text));
+        if (
+            $source_url === ''
+            || $date_text === ''
+            || !function_exists('imagecreatetruecolor')
+            || !function_exists('imagepng')
+        ) {
+            return $source_url;
+        }
+
+        $source_path = $this->get_verification_preview_source_path($source_url);
+        if (!$source_path || !is_readable($source_path)) {
+            return $source_url;
+        }
+
+        $image_info = @getimagesize($source_path);
+        if (!$image_info) {
+            return $source_url;
+        }
+
+        switch ($image_info[2]) {
+            case IMAGETYPE_JPEG:
+                $certificate = @imagecreatefromjpeg($source_path);
+                break;
+            case IMAGETYPE_PNG:
+                $certificate = @imagecreatefrompng($source_path);
+                break;
+            case IMAGETYPE_WEBP:
+                $certificate = function_exists('imagecreatefromwebp') ? @imagecreatefromwebp($source_path) : false;
+                break;
+            default:
+                $certificate = false;
+        }
+        if (!$certificate) {
+            return $source_url;
+        }
+
+        $uploads = wp_upload_dir();
+        $directory = trailingslashit($uploads['basedir']) . 'rts-certificate-previews/';
+        if (!empty($uploads['error']) || !wp_mkdir_p($directory)) {
+            imagedestroy($certificate);
+            return $source_url;
+        }
+
+        $position_x = min(95, max(5, (float) $position_x));
+        $position_y = min(95, max(5, (float) $position_y));
+        $cache_key = md5('issued-date-v3|' . $source_path . '|' . filemtime($source_path) . '|' . $date_text . '|' . $position_x . '|' . $position_y);
+        $filename = 'certificate-issued-date-' . $cache_key . '.png';
+        $output_path = $directory . $filename;
+        $output_url = trailingslashit($uploads['baseurl']) . 'rts-certificate-previews/' . $filename;
+        if (is_readable($output_path)) {
+            imagedestroy($certificate);
+            return $output_url;
+        }
+
+        $width = imagesx($certificate);
+        $height = imagesy($certificate);
+        imagealphablending($certificate, true);
+        if (function_exists('imageantialias')) {
+            imageantialias($certificate, true);
+        }
+
+        $navy = imagecolorallocate($certificate, 7, 27, 59);
+        $font_path = $this->get_verification_preview_font_path('date');
+        $center_x = (int) round($width * ($position_x / 100));
+        $baseline_y = (int) round($height * ($position_y / 100));
+        $max_width = (int) round($width * 0.20);
+        if ($font_path && function_exists('imagettftext') && function_exists('imagettfbbox')) {
+            $this->draw_verification_preview_text(
+                $certificate,
+                $date_text,
+                $font_path,
+                max(12, (int) round($width * 0.009)),
+                $center_x,
+                $baseline_y,
+                $navy,
+                $max_width,
+                9
+            );
+        } else {
+            $this->draw_verification_preview_bitmap_text(
+                $certificate,
+                $date_text,
+                $center_x,
+                (int) round($baseline_y - ($height * 0.018)),
+                $navy,
+                max(1, $width / 1450),
+                $max_width
+            );
+        }
+
+        $saved = imagepng($certificate, $output_path, 9);
+        imagedestroy($certificate);
+        return $saved ? $output_url : $source_url;
     }
 
     /** Build an editable copy from the exact production verification renderer. */
@@ -1677,7 +1803,9 @@ class RTS_Registration {
         }
         $preview_number = !empty($participant->certificate_number)
             ? (string) $participant->certificate_number
-            : 'RTS-PREVIEW-' . str_pad((string) absint($participant->id), 6, '0', STR_PAD_LEFT);
+            : (!empty($participant->founding_runner_number)
+                ? (string) $participant->founding_runner_number
+                : '#' . str_pad((string) absint($participant->id), 5, '0', STR_PAD_LEFT));
         $cache_key = md5('v9|' . $source_path . '|' . filemtime($source_path) . '|' . $name . '|' . $preview_number);
         $filename = 'verification-preview-' . absint($participant->id) . '-' . $cache_key . '.png';
         $preview_path = $directory . $filename;
@@ -1818,6 +1946,15 @@ class RTS_Registration {
                 'C:/Windows/Fonts/arialbd.ttf',
                 $inter_font,
             );
+        } elseif ('date' === $field) {
+            $candidates = array(
+                RTS_PLUGIN_PATH . 'assets/fonts/DejaVuSans.ttf',
+                '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+                '/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf',
+                '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',
+                'C:/Windows/Fonts/arial.ttf',
+                $inter_font,
+            );
         } else {
             $candidates = array(
                 RTS_PLUGIN_PATH . 'assets/fonts/DejaVuSerif-Italic.ttf',
@@ -1907,6 +2044,26 @@ class RTS_Registration {
             return RTS_PLUGIN_PATH . 'assets/certificate-template.png';
         }
 
+        // Permit other bundled certificate artwork, including the dedicated
+        // registration-page sample, while keeping the resolved path inside
+        // this plugin directory.
+        $plugin_url = trailingslashit(RTS_PLUGIN_URL);
+        if (0 === strpos($source_url, $plugin_url)) {
+            $relative_path = ltrim(rawurldecode(substr($source_url, strlen($plugin_url))), '/');
+            $candidate_path = realpath(RTS_PLUGIN_PATH . $relative_path);
+            $plugin_path = realpath(RTS_PLUGIN_PATH);
+            if (
+                $candidate_path
+                && $plugin_path
+                && 0 === stripos(
+                    wp_normalize_path($candidate_path),
+                    trailingslashit(wp_normalize_path($plugin_path))
+                )
+            ) {
+                return $candidate_path;
+            }
+        }
+
         $attachment_id = attachment_url_to_postid($source_url);
         if ($attachment_id) {
             $attachment_path = get_attached_file($attachment_id);
@@ -1976,6 +2133,33 @@ class RTS_Registration {
     /**
      * Email verification handler
      */
+    private function redirect_to_first_passcode_if_required($participant) {
+        $user_id = !empty($participant->user_id) ? absint($participant->user_id) : 0;
+        if (
+            !$user_id
+            || '1' !== (string) get_user_meta($user_id, 'rts_temp_password', true)
+            || !function_exists('rts_get_first_passcode_setup_url')
+        ) {
+            return false;
+        }
+
+        $setup_url = rts_get_first_passcode_setup_url($user_id);
+        if (is_wp_error($setup_url)) {
+            error_log('RTS: Could not create first-passcode URL for user ' . $user_id . ': ' . $setup_url->get_error_message());
+            return false;
+        }
+
+        $this->log_timeline(
+            absint($participant->id),
+            'passcode_setup_started',
+            'Verified member continued to first-visit passcode creation'
+        );
+        if (wp_safe_redirect($setup_url)) {
+            exit;
+        }
+        return false;
+    }
+
     public function verify_email_handler() {
         if (!isset($_GET['rts_verify_email']) || !isset($_GET['token']) || !isset($_GET['email'])) {
             return;
@@ -1985,9 +2169,9 @@ class RTS_Registration {
         $token = sanitize_text_field($_GET['token']);
         
         // Check if already verified to prevent duplicate processing
-        $check_verified = $this->db->get_var(
+        $verified_participant = $this->db->get_row(
             $this->db->prepare(
-                "SELECT email_verified FROM {$this->db->prefix}rts_participants 
+                "SELECT id, user_id, email_verified FROM {$this->db->prefix}rts_participants 
                 WHERE email = %s AND email_verification_token = %s",
                 $email,
                 $token
@@ -1995,7 +2179,8 @@ class RTS_Registration {
         );
         
         // If already verified, show success message without reprocessing
-        if ($check_verified == 1) {
+        if ($verified_participant && (int) $verified_participant->email_verified === 1) {
+            $this->redirect_to_first_passcode_if_required($verified_participant);
             wp_die(
                 '<h1>Email Already Verified!</h1>
                 <p>Your email has already been verified. You can now enjoy all the benefits of being a Founding Runner.</p>
@@ -2039,6 +2224,10 @@ class RTS_Registration {
                 // If no rows were updated, it was already verified
                 if ($updated === 0) {
                     $this->db->query('COMMIT');
+                    $this->redirect_to_first_passcode_if_required((object) array(
+                        'id' => $participant->id,
+                        'user_id' => $participant->user_id,
+                    ));
                     wp_die(
                         '<h1>Email Already Verified!</h1>
                         <p>Your email has already been verified.</p>
@@ -2160,6 +2349,11 @@ class RTS_Registration {
                 if (is_wp_error($benefits)) {
                     error_log('RTS: Email was verified but benefit fulfilment failed for participant ' . $participant->id . ': ' . $benefits->get_error_message());
                 }
+
+                // A newly created account still has only its inaccessible
+                // random bootstrap password. Continue directly to the branded
+                // one-time passcode creation form instead of the login screen.
+                $this->redirect_to_first_passcode_if_required($participant);
                 
                 // Show success message
                 wp_die(

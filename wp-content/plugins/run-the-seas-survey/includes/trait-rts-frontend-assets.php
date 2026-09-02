@@ -34,6 +34,12 @@ trait RTS_Frontend_Assets
             true
         );
         wp_enqueue_style(
+            'rts-web-fonts',
+            'https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300..700;1,300..700&family=Inter+Tight:ital,wght@0,100..900;1,100..900&display=swap',
+            array(),
+            null
+        );
+        wp_enqueue_style(
             'rts-captains-suite',
             RTS_PLUGIN_URL . 'assets/css/captains-suite.css',
             array(),
@@ -121,6 +127,7 @@ trait RTS_Frontend_Assets
             RTS_VERSION . '.' . filemtime(RTS_PLUGIN_PATH . 'assets/js/luxury-survey-number-rules.js'),
             true
         );
+        $typography_dependencies = array('rts-web-fonts', 'rts-luxury-survey-captains-layout');
         if ($post && (is_page('certificates') || has_shortcode($post->post_content, 'rts_certificate_page') || has_shortcode($post->post_content, 'rts_certificate'))) {
             wp_enqueue_style(
                 'rts-certificate-page',
@@ -128,7 +135,14 @@ trait RTS_Frontend_Assets
                 array('rts-captains-suite'),
                 RTS_VERSION . '.' . filemtime(RTS_PLUGIN_PATH . 'assets/css/certificate-page.css')
             );
+            $typography_dependencies[] = 'rts-certificate-page';
         }
+        wp_enqueue_style(
+            'rts-typography',
+            RTS_PLUGIN_URL . 'assets/css/typography.css',
+            $typography_dependencies,
+            RTS_VERSION . '.' . filemtime(RTS_PLUGIN_PATH . 'assets/css/typography.css')
+        );
         wp_localize_script('rts-frontend', 'rts_ajax', array(
             'ajax_url' => admin_url('admin-ajax.php'),
             'nonce' => wp_create_nonce('rts_nonce'),
@@ -139,5 +153,5 @@ trait RTS_Frontend_Assets
         ));
     }
 
-    // AJAX Methods   
+    // AJAX Methods
 }

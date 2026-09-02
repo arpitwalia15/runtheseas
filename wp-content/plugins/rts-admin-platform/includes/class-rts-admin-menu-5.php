@@ -29,6 +29,7 @@ class RTS_Admin_Menu_5 {
 	// ---- Email Campaigns ----
 	public static function render_campaigns() {
 		global $wpdb;
+		echo '<div class="wrap rtsap-campaign-builder"><h1>Email Campaign Builder</h1>'; self::notice();
 
 	}
 	public static function handle_ec_create()  { self::guard( 'ec_create' );  RTS_Business_Logic_5::create_campaign( array( 'name' => sanitize_text_field( $_POST['name'] ), 'trigger_type' => sanitize_key( $_POST['trigger_type'] ), 'trigger_days' => (int) $_POST['trigger_days'], 'audience_filter' => sanitize_key( $_POST['audience_filter'] ), 'category' => sanitize_key( $_POST['category'] ), 'created_by' => self::admin() ) ); self::back( 'rts-email-campaigns', 'Campaign created as draft.' ); }

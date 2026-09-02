@@ -927,41 +927,6 @@ function rts_process_pending_registrations()
         }
 
         // ============================================
-        // SEND WELCOME EMAIL
-        // ============================================
-        $welcome_sent = $wpdb->get_var(
-            $wpdb->prepare(
-                "SELECT COUNT(*) FROM {$wpdb->prefix}rts_timeline 
-                 WHERE participant_id = %d AND activity_type = 'welcome_email_sent'",
-                $participant_id
-            )
-        );
-
-        if (!$welcome_sent && $user_id > 0) {
-            error_log('RTS: Sending welcome email for participant: ' . $participant_id);
-            $sent = $plugin->send_welcome_email_with_reset_link(
-                $user_id,
-                $email,
-                $email_data['first_name'] ?? '',
-                $email_data['last_name'] ?? ''
-            );
-
-            if ($sent) {
-                $emails_sent++;
-                $registration->log_timeline(
-                    $participant_id,
-                    'welcome_email_sent',
-                    'Welcome email with password reset link sent'
-                );
-                error_log('RTS: Welcome email SENT for participant: ' . $participant_id);
-            } else {
-                error_log('RTS: Failed to send welcome email for participant: ' . $participant_id);
-            }
-        } else {
-            error_log('RTS: Welcome email already sent for participant: ' . $participant_id);
-        }
-
-        // ============================================
         // SEND CONFIRMATION EMAIL
         // ============================================
         $confirmation_sent = $wpdb->get_var(

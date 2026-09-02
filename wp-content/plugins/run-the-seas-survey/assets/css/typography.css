@@ -1,0 +1,21 @@
+/* Shared frontend typography for every Run The Seas component. */
+:root {
+	--rts-font-heading: "Cormorant Garamond", Georgia, "Times New Roman", serif;
+	--rts-font-body: "Inter Tight", Inter, Arial, Helvetica, sans-serif;
+}
+
+/*
+ * The unused ID in :is() intentionally gives these final theme rules enough
+ * specificity to replace legacy component declarations, including !important
+ * declarations, without coupling this file to every individual component.
+ */
+:is(#rts-typography-scope, [class^="rts-"], [class*=" rts-"]):not(:is(.dashicons, .fa, .fas, .far, .fab, .fal, .fad, [class^="fa-"], [class*=" fa-"])),
+:is(#rts-typography-scope, [class^="rts-"], [class*=" rts-"]) :not(:is(.dashicons, .fa, .fas, .far, .fab, .fal, .fad, [class^="fa-"], [class*=" fa-"])) {
+	font-family: var(--rts-font-body) !important;
+}
+
+:is(#rts-typography-scope, [class^="rts-"], [class*=" rts-"]):is(h1, h2, h3, h4, h5, h6, [role="heading"], [class$="__heading"], [class*="__heading "], [class$="__title"], [class*="__title "]):not(:is(.dashicons, .fa, .fas, .far, .fab, .fal, .fad, [class^="fa-"], [class*=" fa-"])),
+:is(#rts-typography-scope, [class^="rts-"], [class*=" rts-"]) :is(h1, h2, h3, h4, h5, h6, [role="heading"], [class$="__heading"], [class*="__heading "], [class$="__title"], [class*="__title "]):not(:is(.dashicons, .fa, .fas, .far, .fab, .fal, .fad, [class^="fa-"], [class*=" fa-"])),
+:is(#rts-typography-scope, [class^="rts-"], [class*=" rts-"]) :is(h1, h2, h3, h4, h5, h6, [role="heading"], [class$="__heading"], [class*="__heading "], [class$="__title"], [class*="__title "]) :not(:is(.dashicons, .fa, .fas, .far, .fab, .fal, .fad, [class^="fa-"], [class*=" fa-"])) {
+	font-family: var(--rts-font-heading) !important;
+}

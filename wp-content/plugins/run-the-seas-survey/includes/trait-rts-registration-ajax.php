@@ -192,17 +192,14 @@ trait RTS_Registration_Ajax
             )
         );
 
-        // ============================================
-        // SEND WELCOME EMAIL WITH PASSWORD RESET LINK
-        // ============================================
-        $welcome_sent = $this->send_welcome_email_with_reset_link($user_id, $email, $first_name, $last_name);
-        if ($welcome_sent) {
-            $registration->log_timeline(
-                $participant_id,
-                'welcome_email_sent',
-                'Welcome email with password reset link sent'
-            );
-        }
+        // Passcode creation now starts only after the member proves ownership
+        // of this address through the verification link. Do not send a reset-
+        // style email to an account that has never chosen a passcode.
+        $registration->log_timeline(
+            $participant_id,
+            'passcode_setup_pending',
+            'Passcode creation will begin after email verification'
+        );
 
         // ============================================
         // OPTIMIZATION: Store email data for background sending
@@ -909,8 +906,8 @@ trait RTS_Registration_Ajax
         $password = wp_generate_password(12, true);
 
         // Create the account while suppressing BuddyNext's separate generic
-        // welcome email. The registration flow sends one BuddyNext reset email
-        // immediately afterwards, which is the useful first-account message.
+        // welcome email. The member creates their own passcode immediately
+        // after proving ownership of their email address.
         $GLOBALS['rts_creating_member_account'] = true;
         try {
             $user_id = wp_create_user($email, $password, $email);
@@ -959,6 +956,12 @@ trait RTS_Registration_Ajax
    
     public function send_welcome_email_with_reset_link($user_id, $email, $first_name, $last_name)
     {
+        // Deprecated: first-time members create their passcode directly after
+        // email verification. Never send a password-reset email at registration,
+        // including from legacy cron jobs or third-party callers.
+        unset($user_id, $email, $first_name, $last_name);
+        return false;
+
         /*
         * Get the WordPress user.
         */

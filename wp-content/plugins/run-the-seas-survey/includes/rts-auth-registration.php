@@ -4,24 +4,25 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-/**
- * Clean up temporary password meta when user updates their password
- */
+/** Clean up first-visit state after the member creates their passcode. */
 function rts_cleanup_temp_password($user)
 {
     $user_id = $user instanceof WP_User ? $user->ID : intval($user);
 
     if (get_user_meta($user_id, 'rts_temp_password', true)) {
+        $GLOBALS['rts_first_passcode_created'][$user_id] = true;
         delete_user_meta($user_id, 'rts_temp_password');
+        delete_user_meta($user_id, 'rts_first_passcode_setup_requested_at');
+        update_user_meta($user_id, 'rts_first_passcode_created_at', current_time('mysql'));
         error_log('RTS: Temporary password meta removed for user ' . $user_id);
     }
 }
 add_action('password_reset', 'rts_cleanup_temp_password');
 
 /**
- * The RTS registration flow sends the first password-setup email itself.
- * Suppress BuddyNext's separate generic welcome email for only that creation
- * request, so a new member receives one account-setup message.
+ * The verification link now continues directly to first-passcode creation.
+ * Suppress BuddyNext's generic account email for only this registration request
+ * so it cannot send the member to a competing setup/reset flow.
  */
 function rts_suppress_buddynext_duplicate_welcome($user_id)
 {
@@ -226,6 +227,31 @@ function rts_get_member_password_reset_url($key = '', $login = '')
         'wp-login.php?action=rp&key=' . rawurlencode($key) .
         '&login=' . rawurlencode($login),
         'login'
+    );
+}
+
+/**
+ * Create the one-time passcode-creation URL used immediately after email
+ * verification. WordPress core owns the key, expiry, and final password write;
+ * the first-visit flag only changes the member-facing wording.
+ */
+function rts_get_first_passcode_setup_url($user_id)
+{
+    $user = get_userdata(absint($user_id));
+    if (!$user instanceof WP_User) {
+        return new WP_Error('rts_first_passcode_user_missing', __('Member account not found.', 'run-the-seas'));
+    }
+
+    $key = get_password_reset_key($user);
+    if (is_wp_error($key)) {
+        return $key;
+    }
+
+    update_user_meta($user->ID, 'rts_first_passcode_setup_requested_at', current_time('mysql'));
+    return add_query_arg(
+        'rts_first_visit',
+        '1',
+        rts_get_member_password_reset_url($key, $user->user_login)
     );
 }
 
@@ -435,6 +461,13 @@ function rts_send_password_changed_confirmation($user, $new_password)
 {
     unset($new_password);
     if (!$user instanceof WP_User || !is_email($user->user_email)) {
+        return;
+    }
+
+    // First-passcode creation is onboarding, not a password change. Later
+    // forgotten-passcode resets still receive the security confirmation.
+    if (!empty($GLOBALS['rts_first_passcode_created'][$user->ID])) {
+        unset($GLOBALS['rts_first_passcode_created'][$user->ID]);
         return;
     }
 

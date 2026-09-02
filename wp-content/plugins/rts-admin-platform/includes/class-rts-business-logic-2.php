@@ -679,7 +679,8 @@ class RTS_Business_Logic_2 {
 		$update = array( 'subject' => $subject, 'html_body' => $html, 'plain_text_body' => $plain, 'updated_at' => current_time( 'mysql' ) );
 		if ( isset( $d['name'] ) && '' !== $d['name'] ) { $update['name'] = $d['name']; }
 		if ( isset( $d['category'] ) && '' !== $d['category'] ) { $update['category'] = $d['category']; }
-		$wpdb->update( $tt, $update, array( 'id' => $id ) );
+		$updated = $wpdb->update( $tt, $update, array( 'id' => $id ) );
+		if ( false === $updated ) { return array( 'error' => 'DATABASE_ERROR: ' . $wpdb->last_error ); }
 		RTS_Business_Logic::log_audit( $d['updated_by'] ?? 'admin', "Email template updated: \"{$t->name}\"", 'Email Templates', 'success', "template_id=$id" );
 		return array( 'error' => null );
 	}

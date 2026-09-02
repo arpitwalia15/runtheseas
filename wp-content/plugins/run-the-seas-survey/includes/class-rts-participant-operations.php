@@ -113,7 +113,7 @@ class RTS_Participant_Operations
             SUM(cabin_credit_status = 'pending') AS credits_pending,
             SUM(cabin_credit_status = 'approved') AS credits_issued,
             SUM(captain_suite_status = 'active') AS suites_active,
-            SUM(certificate_number IS NOT NULL) AS certificates_issued
+            SUM(certificate_issued_at IS NOT NULL) AS certificates_issued
             FROM $participants_table");
 
         $duplicate_alerts = $wpdb->get_results("SELECT st.*, p.id AS participant_id, p.first_name, p.last_name, p.email, dr.decision

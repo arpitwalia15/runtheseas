@@ -14,6 +14,59 @@ if (!defined('ABSPATH')) {
 // Direct shortcode registration (as fallback)
 add_shortcode('rts_registration_form', 'rts_render_registration_form_shortcode');
 
+/** Get the total number of survey submissions marked as completed. */
+function rts_get_completed_surveys_count()
+{
+    global $wpdb;
+
+    $tracking_table = $wpdb->prefix . 'rts_survey_tracking';
+    return absint($wpdb->get_var(
+        "SELECT COUNT(*) FROM {$tracking_table} WHERE completion_status = 'completed'"
+    ));
+}
+
+/** Render the completed-survey total with its display label. */
+function rts_completed_surveys_count_shortcode()
+{
+    $count = number_format_i18n(rts_get_completed_surveys_count());
+
+    return '<span>' . esc_html($count) . '</span><br>'
+        . esc_html__('COMPLETED SURVEYS', 'run-the-seas');
+}
+add_shortcode('rts_completed_surveys_count', 'rts_completed_surveys_count_shortcode');
+
+/**
+ * Return the number of fully qualified Founding Runners.
+ *
+ * A participant qualifies only after completing the survey, submitting a
+ * registration that created a participant record, and verifying their email.
+ */
+function rts_get_founding_runners_count()
+{
+    global $wpdb;
+
+    $tracking_table = $wpdb->prefix . 'rts_survey_tracking';
+    $participants_table = $wpdb->prefix . 'rts_participants';
+    return absint($wpdb->get_var(
+        "SELECT COUNT(DISTINCT participant.id)
+        FROM {$participants_table} participant
+        INNER JOIN {$tracking_table} tracking
+            ON tracking.id = participant.survey_tracking_id
+        WHERE tracking.completion_status = 'completed'
+            AND participant.email_verified = 1"
+    ));
+}
+
+/** Render the Founding Runner count against all completed surveys. */
+function rts_founding_runners_count_shortcode()
+{
+    $founding_runners = number_format_i18n(rts_get_founding_runners_count());
+    $completed_surveys = number_format_i18n(rts_get_completed_surveys_count());
+
+    return esc_html($founding_runners . ' / ' . $completed_surveys);
+}
+add_shortcode('rts_founding_runners_count', 'rts_founding_runners_count_shortcode');
+
 function rts_render_registration_form_shortcode($atts)
 {
     $plugin = RunTheSeasPlugin::get_instance();
