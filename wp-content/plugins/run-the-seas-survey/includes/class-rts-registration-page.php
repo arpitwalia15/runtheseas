@@ -470,7 +470,7 @@ class RTS_Registration_Page {
                             <strong>Do you want to request the Founding Runner Cabin Credit?</strong>
                         </label>
                         <p style="color: #555; font-size: 14px; margin-bottom: 15px;">
-                            This is required to participate in Captain's Suite, Referral Race, and earn Captain's Miles.
+                            This is required to participate in the 42.2K Referral Marathon Challenge.
                         </p>
                         <div style="display: flex; gap: 30px; flex-wrap: wrap;">
                             <label style="font-size: 16px;">
@@ -497,7 +497,7 @@ class RTS_Registration_Page {
                                 ✅ Referral code detected
                             </small>
                         <?php else: ?>
-                            <small style="color: #666;">Enter a referral code to earn bonus Captain's Miles</small>
+                            <!-- <small style="color: #666;">Enter a referral code to participate </small> -->
                         <?php endif; ?>
                     </div>
                     
@@ -667,7 +667,7 @@ class RTS_Registration_Page {
                     if (data.referral_code) {
                         html += '<div style="margin: 20px 0; padding: 20px; background: #f8f9fa; border-radius: 12px; border: 2px solid #1a7efb;">';
                         html += '<h4 style="color: #1a7efb; margin-top: 0; text-align: center;">🔗 Share Your Referral Link</h4>';
-                        html += '<p style="font-size: 14px; color: #666; text-align: center; margin-bottom: 15px;">Share this link with friends and family to earn Captain\'s Miles!</p>';
+                        html += '<p style="font-size: 14px; color: #666; text-align: center; margin-bottom: 15px;">Share this link with friends and family to participate in the 42.2K Referral Marathon Challenge!</p>';
                         
                         html += '<div style="background: #f8f9fa; padding: 12px; border-radius: 8px; margin: 15px 0; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; border: 1px solid #dee2e6;">';
                         html += '<input type="text" value="' + cleanBaseUrl + '" readonly id="rts-share-link" onclick="this.select()" style="flex: 1; min-width: 200px; padding: 10px 12px; border: 1px solid #ddd; border-radius: 4px; background: #fff; font-size: 13px; font-family: monospace; color: #333;">';
@@ -1135,7 +1135,7 @@ class RTS_Registration_Page {
             <div style="background: #fff; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: left;">
                 <p><strong>Cabin Credit:</strong> <?php echo $participant->cabin_credit_number ?: 'Pending'; ?></p>
                 <p><strong>Status:</strong> <?php echo ucfirst($participant->cabin_credit_status); ?></p>
-                <p><strong>Captain's Miles:</strong> <?php echo $participant->captain_miles_balance; ?></p>
+                <p><strong>Distance:</strong> <?php echo $participant->captain_miles_balance; ?></p>
                 <p><strong>Referrals:</strong> <?php echo $participant->referral_count; ?></p>
             </div>
             <a href="/captains-suite" style="display: inline-block; padding: 12px 30px; background: #1a7efb; color: #fff; text-decoration: none; border-radius: 6px;">

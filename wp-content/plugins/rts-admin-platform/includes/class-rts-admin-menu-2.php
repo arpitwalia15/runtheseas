@@ -1041,6 +1041,7 @@ class RTS_Admin_Menu_2 {
 		if ( function_exists( 'wp_enqueue_media' ) ) { wp_enqueue_media(); }
 		self::render_template_image_controls( $template );
 		echo '<h2>Message body</h2>';
+		echo '<div class="rts-email-layout-tools"><div><strong>Email-safe layout blocks</strong><span>Insert table-based sections at the current cursor position. These blocks use inline styles and presentation tables for reliable Gmail and Outlook rendering.</span></div><div class="rts-email-layout-tools__buttons"><button type="button" class="button rts-insert-email-layout" data-layout="frame">Full Email Frame</button><button type="button" class="button rts-insert-email-layout" data-layout="one_column">1 Column Section</button><button type="button" class="button rts-insert-email-layout" data-layout="two_columns">2 Column Section</button><button type="button" class="button rts-insert-email-layout" data-layout="button">Button Row</button></div></div>';
 		wp_editor(
 			self::email_template_editor_fragment( self::template_editor_preview_body( $template, (string) $template->html_body ) ),
 			'rts_email_template_body',

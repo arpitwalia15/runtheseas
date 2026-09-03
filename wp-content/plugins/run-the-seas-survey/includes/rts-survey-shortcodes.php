@@ -243,7 +243,7 @@ function rts_luxury_survey_shortcode($atts)
 add_shortcode('rts_luxury_survey', 'rts_luxury_survey_shortcode');
 
 /**
- * Render the complete Captain's Virtual Marathon page for an Elementor
+ * Render the complete  page for an Elementor
  * Shortcode widget. The island is decorative; all labels and values are live.
  *
  * Usage: [rts_virtual_marathon]
@@ -316,10 +316,10 @@ function rts_virtual_marathon_shortcode($atts)
 
     ob_start();
     ?>
-    <section class="rts-virtual-marathon" aria-label="<?php esc_attr_e("Captain's Virtual Marathon", 'run-the-seas'); ?>">
+    <section class="rts-virtual-marathon" aria-label="<?php esc_attr_e("42.2K Referral Marathon Challenge", 'run-the-seas'); ?>">
         <header class="rts-virtual-marathon__header">
             <span><?php esc_html_e('Run The Seas', 'run-the-seas'); ?></span>
-            <h1><?php esc_html_e("Captain's Virtual Marathon", 'run-the-seas'); ?></h1>
+            <h1><?php esc_html_e("42.2K Referral Marathon Challenge", 'run-the-seas'); ?></h1>
             <p><?php esc_html_e('Every kilometre counts. Every step moves you forward.', 'run-the-seas'); ?></p>
         </header>
 

@@ -267,7 +267,10 @@ class RTS_Business_Logic {
 
 		$elig_sql = "SELECT p.id, p.name, p.email, p.founding_runner_number, p.referral_code, p.unsubscribe_token FROM $ptable p
 			JOIN $stable s ON s.participant_id = p.id AND s.category = %s
-			WHERE p.email_verified = 1 AND s.subscribed = 1 $extra_where_sql";
+			WHERE p.email_verified = 1
+			AND COALESCE(p.declined_further_contact, 0) = 0
+			AND p.email IS NOT NULL AND p.email != ''
+			AND s.subscribed = 1 $extra_where_sql";
 		$params = array_merge( array( $category ), $extra_params );
 		$eligible = $wpdb->get_results( $wpdb->prepare( $elig_sql, ...$params ) );
 

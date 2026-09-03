@@ -231,7 +231,7 @@ function rts_marathon_challenge_sort_recent(&$participants, $milestone_distance 
     });
 }
 
-/** Format a stored Captain's Miles value as a race distance. */
+/** Format a stored value as a race distance. */
 function rts_marathon_challenge_distance($miles)
 {
     $miles = absint($miles);

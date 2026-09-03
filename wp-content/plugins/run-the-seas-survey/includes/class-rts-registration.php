@@ -562,7 +562,7 @@ class RTS_Registration {
             $update_data['captain_suite_status'] = 'pending';
         }
         
-        // Handle Captain's Referral Race participation
+        // Handle participation
         if (isset($data['referral_race_participation']) && $data['referral_race_participation'] === 'Yes') {
             $update_data['captain_referral_participation'] = 'registered';
         }
@@ -1136,19 +1136,19 @@ class RTS_Registration {
         $name = trim($referrer->first_name . ' ' . $referrer->last_name);
         $preferences_url = home_url('/my-details/');
         $message = '<p>Hello ' . esc_html($name) . ',</p>'
-            . '<p><strong>A new referral has verified their email!</strong> You earned <strong>1K Captain\'s Miles</strong> and now have <strong>' . esc_html(rts_format_miles($total_miles)) . '</strong>.</p>'
+            . '<p><strong>A new referral has verified their email!</strong> You earned <strong>1K Miles for the 42.2K Referral Marathon Challenge</strong> and now have <strong>' . esc_html(rts_format_miles($total_miles)) . '</strong>.</p>'
             . '<p>You have <strong>' . esc_html(number_format_i18n($successful_referrals)) . '</strong> verified referral' . ($successful_referrals === 1 ? '' : 's') . '.</p>';
         if ($next_milestone) {
             $referrals_needed = (int) ceil($next_milestone['miles'] / 1000);
             $message .= '<p>You are <strong>' . esc_html(rts_format_miles($next_milestone['miles'])) . '</strong> (' . esc_html(number_format_i18n($referrals_needed)) . ' referral' . ($referrals_needed === 1 ? '' : 's') . ') away from your next medal: <strong>' . esc_html($next_milestone['name']) . '</strong>. Keep sharing your referral link!</p>';
         } else {
-            $message .= '<p>You have reached every current Captain\'s Miles milestone. Keep growing your crew!</p>';
+            $message .= '<p>You have reached every current 42.2K Referral Marathon Challenge milestone. Keep growing your crew!</p>';
         }
         $message .= '<p style="font-size:12px;color:#666;">To turn off these referral-progress emails, update your preference in <a href="' . esc_url($preferences_url) . '">My Details</a>.</p>';
 
         $sent = wp_mail(
             $referrer->email,
-            'You earned 1K Captain\'s Miles!',
+            'You earned 1K Miles for the 42.2K Referral Marathon Challenge!',
             $message,
             rts_mail_headers()
         );
@@ -2536,7 +2536,7 @@ class RTS_Registration {
     }
     
     /**
-     * Add Captain's Miles
+     * Add distance
      */
     public function add_captain_miles($participant_id, $miles, $reason) {
         $participant = $this->get_participant($participant_id);
@@ -2562,7 +2562,7 @@ class RTS_Registration {
             $this->log_timeline(
                 $participant_id,
                 'captain_miles_earned',
-                "Earned {$miles} Captain's Miles",
+                "Earned {$miles} Miles",
                 array(
                     'miles' => $miles,
                     'reason' => $reason,
@@ -2575,7 +2575,7 @@ class RTS_Registration {
             // Check for achievements based on miles
             $this->check_miles_achievements($participant_id, $new_balance);
             
-            error_log("RTS: Added {$miles} Captain's Miles to participant {$participant_id}");
+            error_log("RTS: Added {$miles} miles to participant {$participant_id}");
             return true;
         }
         
@@ -2604,8 +2604,8 @@ class RTS_Registration {
                     $this->add_achievement(
                         $participant_id,
                         'miles_milestone',
-                        "{$milestone} Captain's Miles!",
-                        "Congratulations! You've earned {$milestone} Captain's Miles!"
+                        "{$milestone} DistanceMiles!",
+                        "Congratulations! You've earned {$milestone} for the 42.2K Referral Marathon Challenge!"
                     );
                     
                     // Add medal for major milestones
@@ -2614,8 +2614,8 @@ class RTS_Registration {
                             $participant_id,
                             'miles_milestone',
                             "{$milestone} Miles Medal",
-                            "Awarded for earning {$milestone} Captain's Miles",
-                            'Captain\'s Miles Program',
+                            "Awarded for earning {$milestone} for the 42.2K Referral Marathon Challenge!",
+                            '42.2K Referral Marathon Challenge Program',
                             $milestone >= 10000 ? 'Diamond' : ($milestone >= 5000 ? 'Gold' : 'Silver')
                         );
                     }

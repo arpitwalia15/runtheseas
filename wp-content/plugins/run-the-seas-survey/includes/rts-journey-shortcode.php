@@ -13,7 +13,7 @@ function rts_journey_activity_label($type)
         'verification_sent' => 'Verification Email Sent',
         'referral_made' => 'Referral Verified',
         'referral_completed' => 'Referral Verified',
-        'captain_miles_earned' => "Captain's Miles Earned",
+        'captain_miles_earned' => "Miles Earned",
         'trophy_earned' => 'Trophy Earned',
         'captain_suite_activated' => "Captain's Suite Opened",
         'certificate_issued' => 'Certificate Issued',

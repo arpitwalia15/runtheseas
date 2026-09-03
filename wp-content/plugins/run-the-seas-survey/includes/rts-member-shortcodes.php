@@ -336,7 +336,7 @@ function rts_last_referral_time_shortcode($atts)
 add_shortcode('rts_last_referral_time', 'rts_last_referral_time_shortcode');
 
 /**
- * Display current Captain's Miles. Use target="42000" format="progress"
+ * Display current . Use target="42000" format="progress"
  * for a status such as "27K of 42.2K".
  */
 function rts_member_distance_shortcode($atts)
@@ -378,7 +378,7 @@ function rts_member_distance_shortcode($atts)
 }
 add_shortcode('rts_member_distance', 'rts_member_distance_shortcode');
 
-/** Captain's Miles milestones, ordered by distance for progress displays. */
+/** milestones, ordered by distance for progress displays. */
 function rts_get_captains_milestones()
 {
     $milestones = array(
@@ -444,7 +444,7 @@ function rts_render_trophy_milestone_icon($milestone, $class = '')
     return '<span class="' . esc_attr($class) . '" aria-hidden="true">' . esc_html($milestone['icon'] ?? '🏆') . '</span>';
 }
 
-/** Get earned or currently available Captain's Miles for the current member. */
+/** Get earned or currently available Miles for the current member. */
 function rts_get_current_member_miles($source = 'earned')
 {
     $participant = rts_get_current_member_participant();
@@ -495,7 +495,7 @@ function rts_member_progress_shortcode($atts)
 }
 add_shortcode('rts_member_progress', 'rts_member_progress_shortcode');
 
-/** Display the Captain's Miles remaining until the 42.2K Marathon Trophy. */
+/** Display the Miles remaining until the 42.2K Marathon Trophy. */
 function rts_member_distance_to_trophy_shortcode($atts)
 {
     $atts = shortcode_atts(array(

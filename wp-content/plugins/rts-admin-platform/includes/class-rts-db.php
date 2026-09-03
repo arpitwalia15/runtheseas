@@ -345,13 +345,18 @@ class RTS_DB {
 			trigger_days INT DEFAULT 3,
 			audience_filter VARCHAR(30) DEFAULT 'all',
 			category VARCHAR(20) DEFAULT 'general',
+			recipient_include_ids LONGTEXT NULL,
+			recipient_exclude_ids LONGTEXT NULL,
+			exclusion_rules LONGTEXT NULL,
 			scheduled_at DATETIME NULL,
 			sent_at DATETIME NULL,
+			archived_at DATETIME NULL,
 			status VARCHAR(20) DEFAULT 'draft',
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			PRIMARY KEY (id)
 		) $charset_collate;" );
+		self::ensure_email_campaign_columns( "{$prefix}email_campaigns" );
 
 		dbDelta( "CREATE TABLE {$prefix}campaign_sends (
 			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -630,6 +635,15 @@ class RTS_DB {
 		) );
 		self::add_index( $table, 'template_key', 'UNIQUE KEY `template_key` (`template_key`)' );
 		self::add_index( $table, 'action_key', 'UNIQUE KEY `action_key` (`action_key`)' );
+	}
+
+	private static function ensure_email_campaign_columns( $table ) {
+		self::add_columns( $table, array(
+			'recipient_include_ids' => 'LONGTEXT NULL',
+			'recipient_exclude_ids' => 'LONGTEXT NULL',
+			'exclusion_rules' => 'LONGTEXT NULL',
+			'archived_at' => 'DATETIME NULL',
+		) );
 	}
 
 	/** Seed editable action templates while preserving every existing template. */

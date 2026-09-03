@@ -256,7 +256,7 @@ jQuery(document).ready(function ($) {
     claimHtml += '<ul style="font-size: 16px; line-height: 1.7; padding-left: 24px;">';
     claimHtml += '<li>A $100 Run The Seas Cruise Credit</li>';
     claimHtml += '<li>Free access to your own Captain’s Suite</li>';
-    claimHtml += '<li>Entry into the Run The Seas Virtual Marathon</li>';
+    claimHtml += '<li>Entry into the 42.2K Referral Marathon Challenge</li>';
     claimHtml += '<li>The opportunity to earn digital trophies and additional rewards</li>';
     claimHtml += '</ul>';
     claimHtml += '<h2 style="color: #1a7efb; font-size: 23px; margin: 28px 0 12px;">What Happens Next?</h2>';

@@ -7,7 +7,7 @@
  *              trophies, and subscription/unsubscribe management. Built as a WordPress custom
  *              plugin (PHP + $wpdb custom tables + WP REST API), mirroring the same business
  *              rules already proven in the Node.js prototype, so the two can be directly compared.
- * Version: 1.19.4
+ * Version: 1.21.1
  * Author: Run The Seas
  */
 
@@ -17,8 +17,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 define( 'RTSAP_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'RTSAP_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
-define( 'RTSAP_VERSION', '1.20.2' );
-define( 'RTSAP_DB_VERSION', '1.15.0' );
+define( 'RTSAP_VERSION', '1.21.1' );
+define( 'RTSAP_DB_VERSION', '1.16.2' );
 
 require_once RTSAP_PLUGIN_DIR . 'includes/class-rts-db.php';
 require_once RTSAP_PLUGIN_DIR . 'includes/class-rts-data-mapper.php';

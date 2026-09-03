@@ -66,6 +66,7 @@ class RTS_Auth {
 		'ec_save' => 'rts_send_bulk',
 		'ec_status' => 'rts_send_bulk',
 		'ec_trigger' => 'rts_send_bulk',
+		'ec_delete' => 'rts_send_bulk',
 		'ad_create' => 'rts_manage',
 		'dup_review' => 'rts_manage',
 		'reject_ref' => 'rts_manage',

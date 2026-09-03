@@ -261,7 +261,7 @@ function rts_captains_update_shortcode()
             . '<p>' . esc_html__('By completing the survey, you have earned:', 'run-the-seas') . '</p>'
             . '<ul><li>' . esc_html__('A $100 Run The Seas Cruise Credit', 'run-the-seas') . '</li>'
             . '<li>' . esc_html__('Free access to your own Captain’s Suite', 'run-the-seas') . '</li>'
-            . '<li>' . esc_html__('Entry into the Run The Seas Virtual Marathon', 'run-the-seas') . '</li>'
+            . '<li>' . esc_html__('Entry into the 42.2K Referral Marathon Challenge', 'run-the-seas') . '</li>'
             . '<li>' . esc_html__('The opportunity to earn digital trophies and additional rewards', 'run-the-seas') . '</li></ul>'
             . '<h2>' . esc_html__('What Happens Next?', 'run-the-seas') . '</h2>'
             . '<p>' . esc_html__('Complete the short form below so we can register your $100 Cruise Credit and create your Captain’s Suite.', 'run-the-seas') . '</p>'

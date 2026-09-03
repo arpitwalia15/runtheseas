@@ -743,7 +743,7 @@ class RTS_Admin {
                             <button type="button" class="button rts-select-trophy-case-asset" data-target="rts-trophy-case-responsive-background-image"><?php esc_html_e('Select image', 'run-the-seas'); ?></button>
                             <p class="description"><?php echo esc_html($is_marathon_one
                                 ? __('Optional replacement for the bundled 375 × 1689 responsive cabinet. The layout displays two trophies per shelf row.', 'run-the-seas')
-                                : __('Optional replacement for the bundled 375 × 2197 responsive cabinet. The layout displays two trophies per shelf row.', 'run-the-seas')); ?></p>
+                                : __('Optional replacement for the bundled 375 × 2197 responsive cabinet. Regular trophies use paired rows, while the three feature milestones display one trophy beside its caption.', 'run-the-seas')); ?></p>
                         </td>
                     </tr>
                     <?php if (!$is_marathon_one) : ?>
@@ -2539,7 +2539,7 @@ class RTS_Admin {
     }
 
     /**
-     * Show the highest scoring Captain's Miles participants.
+     * Show the highest scoring participants.
      *
      * This is deliberately separate from referrals: participants can earn
      * points through other eligible activities as well as referrals.
@@ -2558,7 +2558,7 @@ class RTS_Admin {
         ?>
         <div class="wrap">
             <h1><?php esc_html_e("Captain's Leaderboard", 'run-the-seas'); ?></h1>
-            <p><?php esc_html_e("Top five participants with more than zero Captain's Miles.", 'run-the-seas'); ?></p>
+            <p><?php esc_html_e("Top five participants with more than zero miles.", 'run-the-seas'); ?></p>
 
             <?php if (empty($leaders)): ?>
                 <p><?php esc_html_e('No leaderboard points have been earned yet.', 'run-the-seas'); ?></p>
@@ -2568,7 +2568,7 @@ class RTS_Admin {
                         <tr>
                             <th><?php esc_html_e('Rank', 'run-the-seas'); ?></th>
                             <th><?php esc_html_e('Participant', 'run-the-seas'); ?></th>
-                            <th><?php esc_html_e("Captain's Miles", 'run-the-seas'); ?></th>
+                            <th><?php esc_html_e("Distance", 'run-the-seas'); ?></th>
                             <th><?php esc_html_e('Available Miles', 'run-the-seas'); ?></th>
                             <th><?php esc_html_e('Verified Referrals', 'run-the-seas'); ?></th>
                         </tr>

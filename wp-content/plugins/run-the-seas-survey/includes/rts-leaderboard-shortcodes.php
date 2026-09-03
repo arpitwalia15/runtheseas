@@ -35,7 +35,7 @@ function rts_country_flag($country)
     ), ENT_NOQUOTES, 'UTF-8');
 }
 
-/** Render the public Captain's Miles leaderboard as compact sidebar rows. */
+/** Render the public leaderboard as compact sidebar rows. */
 function rts_captains_leaderboard_shortcode($atts)
 {
     $atts = shortcode_atts(array('limit' => 5), $atts, 'rts_captains_leaderboard');
@@ -238,7 +238,7 @@ function rts_leaderboard_winner_trophy_label($trophy)
 }
 
 /**
- * Render a personalised trophy image for the Captain's Miles rank-one leader.
+ * Render a personalised trophy image for the  rank-one leader.
  *
  * Usage: [rts_leaderboard_winner_trophy]
  * Optional attributes: size="520", class="my-extra-class", empty="".
@@ -344,6 +344,64 @@ add_shortcode('rts_leaderboard_first', 'rts_leaderboard_first_shortcode');
 add_shortcode('rts_leaderboard_second', 'rts_leaderboard_second_shortcode');
 add_shortcode('rts_leaderboard_third', 'rts_leaderboard_third_shortcode');
 
+/** Convert cumulative Captain's Miles into a position within the current marathon lap. */
+function rts_leaderboard_lap_progress($miles, $target)
+{
+    $miles = max(0, (int) $miles);
+    $target = max(1, (int) $target);
+    $lap = $miles > 0 ? (int) ceil($miles / $target) : 1;
+    $distance = $miles;
+    if ($miles > $target) {
+        $distance = $miles % $target;
+        if (0 === $distance) {
+            $distance = $target;
+        }
+    }
+
+    return array(
+        'lap' => $lap,
+        'distance' => $distance,
+        'percent' => min(100, round($distance / $target * 100, 1)),
+    );
+}
+
+/** One label per physical point on the repeating marathon progress track. */
+function rts_leaderboard_track_milestones($target, $miles = 0)
+{
+    $target = max(1, (int) $target);
+    $track = array();
+    foreach (rts_get_captains_milestones() as $milestone) {
+        $absolute_miles = absint($milestone['miles'] ?? 0);
+        if (0 === $absolute_miles) {
+            continue;
+        }
+        $key = preg_replace('/^m\d+-/', '', sanitize_key($milestone['key'] ?? ''));
+        // 20K and 21.1K are too close to render separately; retain the feature milestone.
+        if ('20k' === $key) {
+            continue;
+        }
+        $local_miles = $absolute_miles > $target ? $absolute_miles % $target : $absolute_miles;
+        if (0 === $local_miles) {
+            $local_miles = $target;
+        }
+        $identity = (string) $local_miles;
+        if (!isset($track[$identity])) {
+            $track[$identity] = array(
+                'name' => $milestone['name'],
+                'position' => min(100, $local_miles / $target * 100),
+                'earned' => $miles >= $absolute_miles,
+                'label' => rts_format_trophy_miles($local_miles, $key),
+            );
+        } else {
+            $track[$identity]['earned'] = $track[$identity]['earned'] || $miles >= $absolute_miles;
+        }
+    }
+    uasort($track, function ($a, $b) {
+        return $a['position'] <=> $b['position'];
+    });
+    return array_values($track);
+}
+
 /** Progress bar with the same journey milestone markers used by the leaderboard. */
 function rts_leaderboard_progress_shortcode($atts)
 {
@@ -355,22 +413,12 @@ function rts_leaderboard_progress_shortcode($atts)
     ), $atts, 'rts_leaderboard_progress');
     $target = rts_normalize_marathon_target($atts['target']);
     $miles = is_numeric($atts['value']) ? max(0, (int) $atts['value']) : rts_get_current_member_miles($atts['source']);
-    $percent = min(100, round($miles / $target * 100, 1));
-    $milestones = array();
-    foreach (rts_get_captains_milestones() as $milestone) {
-        if (0 === $milestone['miles']) {
-            continue;
-        }
-        $milestones[] = array(
-            'name'     => $milestone['name'],
-            'position' => min(100, $milestone['miles'] / $target * 100),
-            'earned'   => $miles >= $milestone['miles'],
-            'label'    => rts_format_trophy_miles($milestone['miles'], $milestone['key'] ?? ''),
-        );
-    }
+    $progress = rts_leaderboard_lap_progress($miles, $target);
+    $percent = $progress['percent'];
+    $milestones = rts_leaderboard_track_milestones($target, $miles);
 
     $output = '<div class="rts-leaderboard-progress" role="progressbar" aria-valuemin="0" aria-valuemax="'
-        . esc_attr($target) . '" aria-valuenow="' . esc_attr($miles) . '">';
+        . esc_attr($target) . '" aria-valuenow="' . esc_attr($progress['distance']) . '">';
     if ('no' !== strtolower((string) $atts['show_milestones'])) {
         $output .= '<div class="rts-leaderboard-progress__milestones" aria-hidden="true">';
         foreach ($milestones as $milestone) {
@@ -388,11 +436,10 @@ function rts_leaderboard_progress_shortcode($atts)
 
     $output .= '<i class="rts-leaderboard-progress__current" style="left:' . esc_attr($percent) . '%" aria-hidden="true"></i>';
 
-    return $output . '</div><span class="rts-leaderboard-progress__caption">' . esc_html(sprintf(
-        __('%1$s of %2$s', 'run-the-seas'),
-        rts_format_miles($miles),
-        42000 === $target ? rts_format_trophy_miles($target, '42k') : rts_format_miles($target)
-    )) . '</span></div>';
+    $caption = $progress['lap'] > 1
+        ? sprintf(__('%1$s in Marathon %2$d', 'run-the-seas'), rts_format_miles($progress['distance']), $progress['lap'])
+        : sprintf(__('%1$s of %2$s', 'run-the-seas'), rts_format_miles($progress['distance']), 42000 === $target ? rts_format_trophy_miles($target, '42k') : rts_format_miles($target));
+    return $output . '</div><span class="rts-leaderboard-progress__caption">' . esc_html($caption) . '</span></div>';
 }
 add_shortcode('rts_leaderboard_progress', 'rts_leaderboard_progress_shortcode');
 
@@ -478,7 +525,7 @@ function rts_leaderboard_standings_shortcode($atts)
             ? ' is-you'
             : ((int) $rank <= 3 ? ' rts-leaderboard-standings__rank--' . (int) $rank : '');
         $rank_label = $is_you_row ? __('You', 'run-the-seas') : (string) $rank;
-        $percent = min(100, round($miles / $target * 100));
+        $percent = round(rts_leaderboard_lap_progress($miles, $target)['percent']);
 
         return '<article class="rts-leaderboard-standings__row' . ($is_you_row ? ' is-current' : '') . '"><strong class="rts-leaderboard-standings__rank'
             . esc_attr($rank_class) . '">' . esc_html($rank_label) . '</strong><span class="rts-leaderboard-standings__country">'
@@ -493,13 +540,10 @@ function rts_leaderboard_standings_shortcode($atts)
 
     $milestone_header = '<span class="rts-leaderboard-standings__milestone-header" aria-label="'
         . esc_attr__('Trophy milestones', 'run-the-seas') . '">';
-    foreach (rts_get_captains_milestones() as $milestone) {
-        if (0 === $milestone['miles']) {
-            continue;
-        }
-        $position = min(100, $milestone['miles'] / $target * 100);
+    foreach (rts_leaderboard_track_milestones($target) as $milestone) {
+        $position = $milestone['position'];
         $milestone_header .= '<i style="left:' . esc_attr($position) . '%">'
-            . esc_html(rts_format_trophy_miles($milestone['miles'], $milestone['key'] ?? '')) . '</i>';
+            . esc_html($milestone['label']) . '</i>';
     }
     $milestone_header .= '</span>';
 
@@ -694,7 +738,7 @@ function rts_live_leaderboard_shortcode($atts)
                         $rank = $index + 1;
                         $is_current = $current_id && $current_id === (int) $leader->id;
                         $miles = (int) $leader->total_captain_miles_earned;
-                        $percent = min(100, round($miles / $target * 100));
+                        $percent = round(rts_leaderboard_lap_progress($miles, $target)['percent']);
                         $name = trim($leader->first_name . ' ' . $leader->last_name) ?: __('Captain', 'run-the-seas');
                     ?>
                         <article class="rts-live-leaderboard__standing<?php echo $is_current ? ' is-current' : ''; ?>">
@@ -707,7 +751,7 @@ function rts_live_leaderboard_shortcode($atts)
                     <?php endforeach; ?>
                 <?php endif; ?>
 
-                <?php if ($current && $current_rank > $limit) : $percent = min(100, round((int) $current->total_captain_miles_earned / $target * 100)); ?>
+                <?php if ($current && $current_rank > $limit) : $percent = round(rts_leaderboard_lap_progress((int) $current->total_captain_miles_earned, $target)['percent']); ?>
                     <article class="rts-live-leaderboard__standing is-current rts-live-leaderboard__standing--you">
                         <strong class="rts-live-leaderboard__standing-rank"><?php echo esc_html($current_rank); ?></strong>
                         <span class="rts-live-leaderboard__standing-captain"><?php echo get_avatar((int) $current->user_id, 42, '', '', array('class' => 'rts-live-leaderboard__avatar')); ?><?php echo esc_html(trim($current->first_name . ' ' . $current->last_name)); ?> (<?php esc_html_e('You', 'run-the-seas'); ?>)</span>

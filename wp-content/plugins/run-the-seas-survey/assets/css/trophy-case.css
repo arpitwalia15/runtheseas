@@ -1678,9 +1678,10 @@
 	text-align: center;
 }
 
-/* Mobile/tablet cabinet artwork. Both responsive cabinets provide five
- * illuminated trophy shelves, so the ten milestones are deliberately paired
- * into five rows. Desktop keeps the original fixed cabinet composition. */
+/* Mobile/tablet cabinet artwork. Marathon 1 keeps five paired trophy rows.
+ * Marathon 2 uses paired rows for the regular trophies and gives each of its
+ * three feature milestones a dedicated trophy-and-caption row. Desktop keeps
+ * the original fixed cabinet composition. */
 @media (max-width: 1100px) {
 	.rts-trophy-case.has-background-artwork.has-responsive-background-artwork {
 		left: 50%;
@@ -1923,7 +1924,9 @@
 		content: none;
 	}
 
-	/* Marathon 2: its narrower shelf bays sit above the large milestone area. */
+	/* Marathon 2: seven regular trophies use four rows (the unpaired 35K trophy
+	 * is centred). The founding, half-marathon and marathon trophies then each
+	 * share a dedicated row with their matching live caption. */
 	.rts-trophy-case.rts-trophy-case--marathon-two.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item {
 		height: 8.25%;
 		--rts-podium-name-bottom: 4.2%;
@@ -1933,32 +1936,54 @@
 	}
 
 	/* Balance the wider founding, half-marathon and marathon artwork against
-	 * the narrow standard trophy domes without moving them off their lights. */
+	 * the narrow standard trophy domes, alternating the trophy and caption
+	 * sides from one feature row to the next. */
 	.rts-trophy-case.rts-trophy-case--marathon-two.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--founding-runner {
-		left: 12%;
+		left: 54%;
 		width: 34%;
 	}
 
-	.rts-trophy-case.rts-trophy-case--marathon-two.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--21k,
+	.rts-trophy-case.rts-trophy-case--marathon-two.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--21k {
+		left: 10%;
+		width: 34%;
+	}
+
 	.rts-trophy-case.rts-trophy-case--marathon-two.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--42k {
 		left: 54%;
 		width: 34%;
 	}
 
-	.rts-trophy-case.rts-trophy-case--marathon-two.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--founding-runner,
-	.rts-trophy-case.rts-trophy-case--marathon-two.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--5k { top: 5.0%; }
+	.rts-trophy-case.rts-trophy-case--marathon-two.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--5k,
+	.rts-trophy-case.rts-trophy-case--marathon-two.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--15k,
+	.rts-trophy-case.rts-trophy-case--marathon-two.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--25k {
+		left: 10%;
+	}
 
 	.rts-trophy-case.rts-trophy-case--marathon-two.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--10k,
-	.rts-trophy-case.rts-trophy-case--marathon-two.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--15k { top: 13.6%; }
-
 	.rts-trophy-case.rts-trophy-case--marathon-two.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--20k,
-	.rts-trophy-case.rts-trophy-case--marathon-two.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--21k { top: 22.0%; }
+	.rts-trophy-case.rts-trophy-case--marathon-two.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--30k {
+		left: 52%;
+	}
+
+	.rts-trophy-case.rts-trophy-case--marathon-two.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--5k,
+	.rts-trophy-case.rts-trophy-case--marathon-two.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--10k { top: 5.0%; }
+
+	.rts-trophy-case.rts-trophy-case--marathon-two.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--15k,
+	.rts-trophy-case.rts-trophy-case--marathon-two.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--20k { top: 13.6%; }
 
 	.rts-trophy-case.rts-trophy-case--marathon-two.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--25k,
-	.rts-trophy-case.rts-trophy-case--marathon-two.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--30k { top: 30.6%; }
+	.rts-trophy-case.rts-trophy-case--marathon-two.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--30k { top: 22.0%; }
 
-	.rts-trophy-case.rts-trophy-case--marathon-two.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--35k,
-	.rts-trophy-case.rts-trophy-case--marathon-two.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--42k { top: 39.0%; }
+	.rts-trophy-case.rts-trophy-case--marathon-two.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--35k {
+		top: 30.6%;
+		left: 31%;
+	}
+
+	.rts-trophy-case.rts-trophy-case--marathon-two.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--founding-runner { top: 39.0%; }
+
+	.rts-trophy-case.rts-trophy-case--marathon-two.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--21k { top: 51.5%; }
+
+	.rts-trophy-case.rts-trophy-case--marathon-two.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__item--42k { top: 64.0%; }
 
 	.rts-trophy-case.rts-trophy-case--marathon-two.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__header,
 	.rts-trophy-case.rts-trophy-case--marathon-two.has-background-artwork.has-responsive-background-artwork.has-title-artwork .rts-trophy-case__header {
@@ -1981,24 +2006,30 @@
 	}
 
 	.rts-trophy-case.rts-trophy-case--marathon-two.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__milestone-copy--founding {
-		top: 51.5%;
-		left: 14%;
-		width: 72%;
-		font-size: clamp(15px, 4.5vw, 30px);
+		top: 39.0%;
+		left: 10%;
+		width: 38%;
+		height: 8.25%;
+		font-size: clamp(12px, 3.6vw, 24px);
+		justify-content: center;
 	}
 
 	.rts-trophy-case.rts-trophy-case--marathon-two.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__milestone-copy--half {
-		top: 64%;
-		left: 7%;
-		width: 42%;
-		font-size: clamp(14px, 4vw, 27px);
+		top: 51.5%;
+		left: 52%;
+		width: 38%;
+		height: 8.25%;
+		font-size: clamp(12px, 3.6vw, 24px);
+		justify-content: center;
 	}
 
 	.rts-trophy-case.rts-trophy-case--marathon-two.has-background-artwork.has-responsive-background-artwork .rts-trophy-case__milestone-copy--marathon {
 		top: 64%;
-		left: 51%;
-		width: 42%;
-		font-size: clamp(14px, 4vw, 27px);
+		left: 10%;
+		width: 38%;
+		height: 8.25%;
+		font-size: clamp(12px, 3.6vw, 24px);
+		justify-content: center;
 	}
 
 	.rts-trophy-case.rts-trophy-case--marathon-two.has-background-artwork.has-responsive-background-artwork.has-footer-frame-artwork .rts-trophy-case__footer {

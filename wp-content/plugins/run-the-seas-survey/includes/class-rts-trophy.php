@@ -269,7 +269,7 @@ class RTS_Trophy {
 
         // Registration includes the required age/legal confirmation. The
         // Founding Runner trophy is awarded as soon as that registration's
-        // email address is verified; it does not require Captain's Miles.
+        // email address is verified; it does not require .
         if (
             !empty($participant->age_consent_confirmed_at) &&
             !$this->has_trophy($participant_id, 'founding-runner')
@@ -846,8 +846,8 @@ class RTS_Trophy {
             
             <?php if (empty($trophies)): ?>
                 <div class="rts-no-trophies">
-                    <p>No trophies yet. Earn Captain's Miles by referring friends!</p>
-                    <p>Every referral earns you 1K Captain's Miles.</p>
+                    <p>No trophies yet. Earn miles by referring friends!</p>
+                    <p>Every referral earns you 1K for the 42.2K Referral Marathon Challenge.</p>
                 </div>
             <?php else: ?>
                 <div class="rts-trophies-grid">
@@ -1152,7 +1152,7 @@ class RTS_Trophy {
                     <span><?php echo esc_html($member_name); ?></span>
                 </p>
                 <div class="rts-trophy-case__summary">
-                    <span><?php echo esc_html(rts_format_miles($total_miles)); ?> <?php esc_html_e("Captain's Miles", 'run-the-seas'); ?></span>
+                    <span><?php echo esc_html(rts_format_miles($total_miles)); ?> <?php esc_html_e("Miles", 'run-the-seas'); ?></span>
                     <span><?php echo esc_html($case_earned_count); ?> / <?php echo esc_html(count($case_items)); ?> <?php echo esc_html(sprintf(__('Marathon %d milestones earned', 'run-the-seas'), $is_marathon_one ? 1 : 2)); ?></span>
                     <?php if (!$email_verified) : ?>
                         <span><?php esc_html_e('Verify your email to unlock new trophies', 'run-the-seas'); ?></span>
@@ -1514,7 +1514,7 @@ class RTS_Trophy {
             ">
                 <h3 style="margin: 0; color: #1a7efb;">HOW TO EARN TROPHIES</h3>
                 <p style="color: #666; font-size: 14px; margin: 5px 0;">
-                    Every referral earns you 1K Captain's Miles. Earn enough miles and unlock trophies!
+                    Every referral earns you 1K miles for 42.2K Referral Marathon Challenge. Earn enough miles and unlock trophies!
                 </p>
                 <a href="/captains-suite" style="
                     display: inline-block;

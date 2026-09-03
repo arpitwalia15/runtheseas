@@ -200,7 +200,7 @@ function rts_show_prominent_verification_notice()
                             🏅 Cabin Credit Approval
                         </span>
                         <span style="background: #fff; padding: 4px 12px; border-radius: 20px; font-size: 13px; border: 1px solid #ffc107;">
-                            ⭐ Captain's Miles
+                            ⭐ Miles Earned
                         </span>
                         <span style="background: #fff; padding: 4px 12px; border-radius: 20px; font-size: 13px; border: 1px solid #ffc107;">
                             🏆 Achievements
