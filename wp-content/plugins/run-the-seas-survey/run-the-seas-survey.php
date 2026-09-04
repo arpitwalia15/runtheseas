@@ -4,7 +4,7 @@
  * Plugin Name: Run The Seas - Survey
  * Plugin URI: https://runtheseas.com/
  * Description: Advanced survey management with gamification, 42.2K Referral Marathon Challenge
- * Version: 1.2.91
+ * Version: 1.2.92
  * License: GPL v2 or later
  * Text Domain: run-the-seas
  */
@@ -17,7 +17,7 @@ if (!defined('ABSPATH')) {
 // Define plugin constants
 define('RTS_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('RTS_PLUGIN_PATH', plugin_dir_path(__FILE__));
-define('RTS_VERSION', '1.2.91');
+define('RTS_VERSION', '1.2.92');
 define('RTS_MANAGE_CAPABILITY', 'rts_manage_surveys');
 
 /** Keep legacy shortcode settings aligned with the whole-1K unlock model. */
@@ -105,6 +105,43 @@ function rts_maybe_upgrade_verification_schema()
 }
 add_action('plugins_loaded', 'rts_maybe_upgrade_verification_schema', 11);
 
+/** Preserve complete registration data and detected survey location. */
+function rts_maybe_upgrade_participant_registration_schema()
+{
+    $schema_version = '1.2';
+    if (get_option('rts_participant_registration_schema_version') === $schema_version) {
+        return;
+    }
+
+    $plugin = RunTheSeasPlugin::get_instance();
+    if ($plugin->ensure_participant_registration_columns()) {
+        update_option('rts_participant_registration_schema_version', $schema_version, false);
+    }
+}
+add_action('plugins_loaded', 'rts_maybe_upgrade_participant_registration_schema', 12);
+
+/** Backfill registration details into WordPress user meta for existing users. */
+function rts_maybe_backfill_participant_user_meta()
+{
+    $sync_version = '1.2';
+    if (get_option('rts_participant_user_meta_sync_version') === $sync_version) {
+        return;
+    }
+
+    global $wpdb;
+    $participant_ids = $wpdb->get_col(
+        "SELECT id FROM {$wpdb->prefix}rts_participants
+         WHERE user_id IS NOT NULL OR (email IS NOT NULL AND email != '')"
+    );
+    $registration = RunTheSeasPlugin::get_instance()->registration;
+    foreach ((array) $participant_ids as $participant_id) {
+        $registration->sync_participant_user_meta($participant_id);
+    }
+
+    update_option('rts_participant_user_meta_sync_version', $sync_version, false);
+}
+add_action('plugins_loaded', 'rts_maybe_backfill_participant_user_meta', 13);
+
 // Register activation hook
 function rts_activate_plugin()
 {
@@ -123,6 +160,7 @@ register_activation_hook(__FILE__, 'rts_activate_plugin');
 
 // Load feature modules. Each module owns its functions and hook registrations.
 require_once RTS_PLUGIN_PATH . 'includes/rts-admin-dashboard.php';
+require_once RTS_PLUGIN_PATH . 'includes/rts-admin-ajax-isolation.php';
 require_once RTS_PLUGIN_PATH . 'includes/rts-member-shortcodes.php';
 require_once RTS_PLUGIN_PATH . 'includes/rts-leaderboard-shortcodes.php';
 require_once RTS_PLUGIN_PATH . 'includes/rts-dashboard-widgets.php';
@@ -133,6 +171,7 @@ require_once RTS_PLUGIN_PATH . 'includes/rts-journey-shortcode.php';
 require_once RTS_PLUGIN_PATH . 'includes/rts-user-verification.php';
 require_once RTS_PLUGIN_PATH . 'includes/rts-referrals-trophies.php';
 require_once RTS_PLUGIN_PATH . 'includes/rts-auth-registration.php';
+require_once RTS_PLUGIN_PATH . 'includes/rts-admin-user-profile.php';
 
 add_filter('http_request_timeout', function ($timeout, $url) {
     if (

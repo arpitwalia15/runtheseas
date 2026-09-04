@@ -323,10 +323,6 @@ class RTS_Admin {
                 'Complete confirmation button image',
                 'Upload the complete Confirm My Email Address button, including its left logo, text, background, and right icon. The entire image becomes the secure verification link.'
             ),
-            'certificate_preview_image' => array(
-                'Certificate preview image',
-                'Preview only: it is shown as an image in the email, never attached or linked for download. Select it from the Media Library to add each recipient\'s name onto the preview automatically.'
-            ),
         );
 
         wp_enqueue_media();
@@ -393,7 +389,6 @@ class RTS_Admin {
             'email_icon_image',
             'lock_icon_image',
             'complete_button_image',
-            'certificate_preview_image',
         ) as $key) {
             $assets[$key] = isset($input[$key]) ? esc_url_raw(trim((string) $input[$key])) : '';
         }
@@ -416,7 +411,7 @@ class RTS_Admin {
             'header_logo_image' => array('Header logo', 'Optional fallback logo when a complete header banner is not used.'),
             'hero_image' => array('Cruise hero image', 'Wide image of the ship, ocean, and sky shown behind the congratulations message.'),
             'hero_divider_image' => array('Hero name divider', 'Transparent divider displayed below the large recipient name in the cruise banner.'),
-            'certificate_preview_image' => array('Certificate artwork', 'The landscape certificate artwork used for the email preview. The recipient name and certificate number are added automatically when possible.'),
+            'certificate_preview_image' => array('Certificate backplate (used everywhere)', 'Upload the empty landscape certificate. It becomes the shared artwork for certificate emails, Captain\'s Suite viewing, printing, and PDF downloads. Name, Founding Runner number, certificate number, approval status, and issue date are added automatically.'),
             'suite_background_image' => array("Captain's Suite background", 'Optional navy/gold background image for the Captain’s Suite panel.'),
             'suite_top_divider_image' => array("Captain's Suite top divider", 'Transparent divider displayed above “Welcome to Your Captain’s Suite”.'),
             'suite_bottom_divider_image' => array("Captain's Suite bottom divider", 'Transparent divider displayed below the Captain’s Suite heading.'),
@@ -435,7 +430,7 @@ class RTS_Admin {
         ?>
         <div class="wrap">
             <h1><?php esc_html_e('Certificate Email Design', 'run-the-seas'); ?></h1>
-            <p><?php esc_html_e('Choose the artwork used in the certificate email sent after a participant verifies their email. Every field is optional: the email keeps a polished fallback layout when an image has not been selected.', 'run-the-seas'); ?></p>
+            <p><?php esc_html_e('Choose the artwork used after a participant verifies their email. The certificate backplate is shared by certificate emails, the Captain\'s Suite, printing, and downloads. Every field is optional: the approved bundled artwork is used when an image has not been selected.', 'run-the-seas'); ?></p>
             <?php if (isset($_GET['rts_certificate_email_design']) && 'saved' === sanitize_key(wp_unslash($_GET['rts_certificate_email_design']))) : ?>
                 <div class="notice notice-success is-dismissible"><p><?php esc_html_e('Certificate email design saved.', 'run-the-seas'); ?></p></div>
             <?php endif; ?>
@@ -2495,7 +2490,7 @@ class RTS_Admin {
                                 <th>Pending</th>
                                 <th>Completed</th>
                                 <th>Bonus Earned</th>
-                                <th>Total Miles</th>
+                                <th>Total Kilometres</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -2558,7 +2553,7 @@ class RTS_Admin {
         ?>
         <div class="wrap">
             <h1><?php esc_html_e("Captain's Leaderboard", 'run-the-seas'); ?></h1>
-            <p><?php esc_html_e("Top five participants with more than zero miles.", 'run-the-seas'); ?></p>
+            <p><?php esc_html_e('Top five participants with verified referral progress.', 'run-the-seas'); ?></p>
 
             <?php if (empty($leaders)): ?>
                 <p><?php esc_html_e('No leaderboard points have been earned yet.', 'run-the-seas'); ?></p>
@@ -2569,7 +2564,7 @@ class RTS_Admin {
                             <th><?php esc_html_e('Rank', 'run-the-seas'); ?></th>
                             <th><?php esc_html_e('Participant', 'run-the-seas'); ?></th>
                             <th><?php esc_html_e("Distance", 'run-the-seas'); ?></th>
-                            <th><?php esc_html_e('Available Miles', 'run-the-seas'); ?></th>
+                            <th><?php esc_html_e('Available Kilometres', 'run-the-seas'); ?></th>
                             <th><?php esc_html_e('Verified Referrals', 'run-the-seas'); ?></th>
                         </tr>
                     </thead>
@@ -2659,7 +2654,7 @@ class RTS_Admin {
                     </div>
                     <div style="background: #f8f9fa; padding: 15px; border-radius: 6px; text-align: center;">
                         <div style="font-size: 24px; font-weight: bold; color: #1a7efb;"><?php echo rts_format_miles($participant->total_referral_bonus); ?></div>
-                        <div style="font-size: 12px; color: #666;">Bonus Miles</div>
+                        <div style="font-size: 12px; color: #666;">Referral Kilometres</div>
                     </div>
                 </div>
             </div>

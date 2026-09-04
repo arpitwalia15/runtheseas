@@ -94,7 +94,7 @@ jQuery(document).ready(function($) {
             { key: 'referral_participation', label: 'Referrals', icon: '🏃', class: 'info' },
             { key: 'cabin_credits_issued', label: 'Cabin Credits', icon: '🏅', class: 'success' },
             { key: 'captain_race_participation', label: 'Race Participants', icon: '🏁', class: 'info' },
-            { key: 'captain_miles_balance', label: 'Captain Miles', icon: '⭐', class: 'info' },
+            { key: 'captain_miles_balance', label: 'Kilometres', icon: '⭐', class: 'info' },
             { key: 'unique_respondents', label: 'Unique Users', icon: '👤', class: 'info' }
         ];
         

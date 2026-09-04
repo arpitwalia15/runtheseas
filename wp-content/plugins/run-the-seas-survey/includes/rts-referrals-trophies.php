@@ -209,7 +209,7 @@ add_filter('rts_trophy_definitions', function ($trophies) {
         'crew_members'   => 5,
         'trophy_type'    => '5k',
         'rank'           => 1,
-        'description'    => 'Founding Member Marathon - 5K',
+        'description'    => 'Founding Runner Marathon - 5K',
         'image_url'      => $trophy_image_base_url . 'run-the-sea-gold.png',
         //'icon_url'       => $trophy_image_base_url . 'run-the-sea-gold.png',
     );
@@ -220,7 +220,7 @@ add_filter('rts_trophy_definitions', function ($trophies) {
         'crew_members'   => 5,
         'trophy_type'    => '10k',
         'rank'           => 2,
-        'description'    => 'Founding Member Marathon - 10K',
+        'description'    => 'Founding Runner Marathon - 10K',
         'image_url'      => $trophy_image_base_url . '10k.png',
         //'icon_url'       => $trophy_image_base_url . '10k.png',
     );

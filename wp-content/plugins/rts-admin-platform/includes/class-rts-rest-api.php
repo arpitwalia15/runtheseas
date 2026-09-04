@@ -99,7 +99,7 @@ class RTS_REST_API {
 		$body = json_decode( $req->get_body(), true ) ?: array();
 		// Input validation (public route): email must be valid; free-text fields sanitized + length-capped.
 		if ( empty( $body['email'] ) || ! is_email( $body['email'] ) ) { return new WP_REST_Response( array( 'error' => 'INVALID_EMAIL' ), 400 ); }
-		foreach ( array( 'name','country','province','city','gender','age_range','household_income_bracket','marketing_source','utm_campaign','referred_by_code','runner_status' ) as $k ) {
+		foreach ( array( 'name','phone','country','registration_country','detected_country','province','registration_province','city','postal_code','address','address_2','date_of_birth','gender','age_range','emergency_contact_name','emergency_contact_phone','household_income_bracket','marketing_source','utm_campaign','referred_by_code','runner_status' ) as $k ) {
 			if ( isset( $body[ $k ] ) ) { $body[ $k ] = mb_substr( sanitize_text_field( (string) $body[ $k ] ), 0, 255 ); }
 		}
 		$body['email'] = sanitize_email( $body['email'] );

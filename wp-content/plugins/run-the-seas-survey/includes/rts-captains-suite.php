@@ -170,10 +170,10 @@ function rts_resend_member_certificate()
 add_action('admin_post_rts_resend_member_certificate', 'rts_resend_member_certificate');
 
 /**
- * Return certificate artwork with today's date baked below DATE ISSUED.
+ * Return a sample certificate rendered from the shared production backplate.
  *
- * Uses the dedicated registration-page sample when image is omitted. It never
- * reads or changes the separate Certificate Email Design artwork.
+ * The sample name, Founding Runner number, certificate number, approval badge,
+ * and issue date use the same renderer as every issued member certificate.
  * Usage: [rts_certificate_issued_image]
  *        [rts_certificate_issued_image image="123"]
  *        [rts_certificate_issued_image image="https://example.com/certificate.png"]
@@ -184,8 +184,6 @@ function rts_certificate_issued_image_shortcode($atts)
         'image'       => '',
         'date'        => 'today',
         'date_format' => 'F j, Y',
-        'date_x'      => '74.5',
-        'date_y'      => '80',
         'alt'         => __('Run The Seas certificate', 'run-the-seas'),
         'class'       => '',
     ), $atts, 'rts_certificate_issued_image');
@@ -199,7 +197,7 @@ function rts_certificate_issued_image_shortcode($atts)
     }
 
     if ($source_url === '') {
-        $source_url = esc_url_raw(RTS_PLUGIN_URL . 'assets/register-page-sample-certificate.png');
+        $source_url = esc_url_raw(RTS_PLUGIN_URL . 'assets/certificate-backplate-v3.jpg');
     }
     if ($source_url === '') {
         return '<span class="rts-certificate-issued-image__notice">'
@@ -215,15 +213,10 @@ function rts_certificate_issued_image_shortcode($atts)
         : sanitize_text_field($date_value);
 
     $registration = rts_init()->registration;
-    if (!$registration || !method_exists($registration, 'get_dated_certificate_image_url')) {
+    if (!$registration || !method_exists($registration, 'get_sample_certificate_preview_url')) {
         return '';
     }
-    $image_url = $registration->get_dated_certificate_image_url(
-        $source_url,
-        $date_text,
-        (float) $atts['date_x'],
-        (float) $atts['date_y']
-    );
+    $image_url = $registration->get_sample_certificate_preview_url($source_url, $date_text);
     if ($image_url === '') {
         return '';
     }
@@ -284,6 +277,10 @@ function rts_certificate_page_shortcode($atts)
 
     $view_url = rts_member_certificate_action_url('rts_view_member_certificate', $participant->id, 'rts_certificate_file');
     $resend_url = rts_member_certificate_action_url('rts_resend_member_certificate', $participant->id, 'rts_resend_certificate');
+    $registration = rts_init()->registration;
+    $preview_url = ($registration && method_exists($registration, 'get_email_certificate_preview_url'))
+        ? $registration->get_email_certificate_preview_url($participant, 'rts_certificate_email_design_assets')
+        : '';
     $back_url = rts_get_member_page_url($atts['suite_page']);
     $email_status = sanitize_key($_GET['rts_certificate_email'] ?? '');
 
@@ -313,7 +310,11 @@ function rts_certificate_page_shortcode($atts)
         <?php endif; ?>
 
         <div class="rts-certificate-page__viewer">
-            <iframe title="<?php esc_attr_e('Your Founding Runner certificate', 'run-the-seas'); ?>" src="<?php echo esc_url($view_url); ?>#toolbar=0&amp;navpanes=0" loading="lazy"></iframe>
+            <?php if ($preview_url !== '') : ?>
+                <img src="<?php echo esc_url($preview_url); ?>" alt="<?php esc_attr_e('Your Founding Runner certificate', 'run-the-seas'); ?>" loading="eager" decoding="async">
+            <?php else : ?>
+                <iframe title="<?php esc_attr_e('Your Founding Runner certificate', 'run-the-seas'); ?>" src="<?php echo esc_url($view_url); ?>#toolbar=0&amp;navpanes=0&amp;scrollbar=0&amp;view=FitH" loading="lazy" scrolling="no"></iframe>
+            <?php endif; ?>
         </div>
 
         <div class="rts-certificate-page__actions" aria-label="<?php esc_attr_e('Certificate actions', 'run-the-seas'); ?>">

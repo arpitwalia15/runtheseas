@@ -335,7 +335,7 @@ class RTS_Registration_Page {
             <div style="background: #fff; padding: 20px 25px; border-left: 2px solid #dee2e6; border-right: 2px solid #dee2e6; border-radius: 12px 12px 0 0; border-top: 2px solid #dee2e6;">
                 <div id="rts-registration-status" style="display: none; margin-bottom: 20px;"></div>
                 
-                <form id="rts-registration-form" class="rts-registration-form" method="post">
+                <form id="rts-registration-form" class="rts-registration-form" method="post" novalidate>
                     <?php wp_nonce_field('rts_registration_nonce', 'rts_registration_nonce'); ?>
                     
                     <!-- Hidden fields -->
@@ -399,6 +399,7 @@ class RTS_Registration_Page {
                         <label for="address_2" style="font-weight: 600; color: #333;">ADDRESS LINE 2 (OPTIONAL)</label>
                         <input type="text" id="address_2" name="address_2"
                             placeholder="Apt, suite, unit, building, etc."
+                            value="<?php echo esc_attr($survey_data['address_2'] ?? ''); ?>"
                             style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 16px; box-sizing: border-box;">
                     </div>
                     
@@ -414,12 +415,14 @@ class RTS_Registration_Page {
                             <label for="state" style="font-weight: 600; color: #333;">STATE / PROVINCE *</label>
                             <input type="text" id="state" name="state" required
                                 placeholder="Enter your state / province"
+                                value="<?php echo esc_attr($survey_data['state'] ?? $survey_data['province'] ?? ''); ?>"
                                 style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 16px; box-sizing: border-box;">
                         </div>
                         <div class="rts-form-group">
                             <label for="zip" style="font-weight: 600; color: #333;">ZIP / POSTAL CODE *</label>
                             <input type="text" id="zip" name="zip" required
                                 placeholder="Enter your ZIP / postal code"
+                                value="<?php echo esc_attr($survey_data['zip'] ?? $survey_data['postal_code'] ?? ''); ?>"
                                 style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 16px; box-sizing: border-box;">
                         </div>
                     </div>
@@ -470,7 +473,7 @@ class RTS_Registration_Page {
                             <strong>Do you want to request the Founding Runner Cabin Credit?</strong>
                         </label>
                         <p style="color: #555; font-size: 14px; margin-bottom: 15px;">
-                            This is required to participate in the 42.2K Referral Marathon Challenge.
+                            This is required to participate in the 42.2 km Referral Marathon Challenge.
                         </p>
                         <div style="display: flex; gap: 30px; flex-wrap: wrap;">
                             <label style="font-size: 16px;">
@@ -565,6 +568,12 @@ class RTS_Registration_Page {
                 color: #dc3545;
                 font-size: 14px;
                 margin: 6px 0 12px;
+            }
+            .rts-registration-form .rts-field-error {
+                color: #dc3545;
+                display: block;
+                font-size: 14px;
+                margin-top: 6px;
             }
             .rts-registration-form .rts-submit-btn:hover {
                 background: #1565c0 !important;
@@ -667,7 +676,7 @@ class RTS_Registration_Page {
                     if (data.referral_code) {
                         html += '<div style="margin: 20px 0; padding: 20px; background: #f8f9fa; border-radius: 12px; border: 2px solid #1a7efb;">';
                         html += '<h4 style="color: #1a7efb; margin-top: 0; text-align: center;">🔗 Share Your Referral Link</h4>';
-                        html += '<p style="font-size: 14px; color: #666; text-align: center; margin-bottom: 15px;">Share this link with friends and family to participate in the 42.2K Referral Marathon Challenge!</p>';
+                        html += '<p style="font-size: 14px; color: #666; text-align: center; margin-bottom: 15px;">Share this link with friends and family to participate in the 42.2 km Referral Marathon Challenge!</p>';
                         
                         html += '<div style="background: #f8f9fa; padding: 12px; border-radius: 8px; margin: 15px 0; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; border: 1px solid #dee2e6;">';
                         html += '<input type="text" value="' + cleanBaseUrl + '" readonly id="rts-share-link" onclick="this.select()" style="flex: 1; min-width: 200px; padding: 10px 12px; border: 1px solid #ddd; border-radius: 4px; background: #fff; font-size: 13px; font-family: monospace; color: #333;">';
@@ -830,6 +839,17 @@ class RTS_Registration_Page {
                 var $status = $('#rts-registration-status');
                 var $ageConsent = $('#age_consent');
                 var $ageConsentError = $('#age_consent_error');
+                var requiredFieldLabels = {
+                    first_name: 'First name',
+                    last_name: 'Last name',
+                    email: 'Email address',
+                    phone: 'Mobile phone',
+                    address: 'Address',
+                    city: 'City',
+                    state: 'State / province',
+                    zip: 'ZIP / postal code',
+                    country: 'Country'
+                };
 
                 function showAgeConsentError() {
                     $ageConsent.addClass('error').attr('aria-invalid', 'true');
@@ -841,24 +861,71 @@ class RTS_Registration_Page {
                     $ageConsentError.prop('hidden', true);
                 }
 
-                $ageConsent.on('invalid', function(e) {
-                    e.preventDefault();
-                    showAgeConsentError();
-                }).on('change', function() {
-                    if (this.checked) {
-                        clearAgeConsentError();
-                    } else {
-                        showAgeConsentError();
+                function getFieldError($field) {
+                    if ($field.attr('type') === 'checkbox') {
+                        return $field.is(':checked')
+                            ? ''
+                            : 'Please confirm your age and agreement to the Terms & Conditions and Privacy Policy.';
                     }
-                });
 
-                // Native constraint validation may stop the submit event from
-                // firing, so surface the inline message on the button click too.
-                $submitBtn.on('click', function(e) {
-                    if (!$ageConsent.is(':checked')) {
-                        e.preventDefault();
+                    var value = String($field.val() || '').trim();
+                    var fieldName = $field.attr('name');
+                    if (!value) {
+                        return (requiredFieldLabels[fieldName] || 'This field') + ' is required.';
+                    }
+
+                    if ('email' === $field.attr('type') && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+                        return 'Please enter a valid email address.';
+                    }
+
+                    return '';
+                }
+
+                function showFieldError($field, message) {
+                    if ($field.is($ageConsent)) {
                         showAgeConsentError();
-                        $ageConsent.trigger('focus');
+                        return;
+                    }
+
+                    var fieldName = $field.attr('name');
+                    var errorId = 'rts_' + fieldName + '_error';
+                    var $error = $('#' + errorId);
+                    if (!$error.length) {
+                        $error = $('<div>', {
+                            id: errorId,
+                            'class': 'rts-field-error',
+                            role: 'alert',
+                            'aria-live': 'polite'
+                        });
+                        $field.after($error);
+                    }
+
+                    $field.addClass('error')
+                        .attr('aria-invalid', 'true')
+                        .attr('aria-describedby', errorId);
+                    $error.text(message).prop('hidden', false);
+                }
+
+                function clearFieldError($field) {
+                    if ($field.is($ageConsent)) {
+                        clearAgeConsentError();
+                        return;
+                    }
+
+                    var errorId = 'rts_' + $field.attr('name') + '_error';
+                    $field.removeClass('error')
+                        .removeAttr('aria-invalid')
+                        .removeAttr('aria-describedby');
+                    $('#' + errorId).prop('hidden', true);
+                }
+
+                $form.on('input change', 'input[required], select[required]', function() {
+                    var $field = $(this);
+                    var message = getFieldError($field);
+                    if (message) {
+                        showFieldError($field, message);
+                    } else {
+                        clearFieldError($field);
                     }
                 });
                 
@@ -878,45 +945,22 @@ class RTS_Registration_Page {
                     
                     $form.find('input[required], select[required]').each(function() {
                         var $field = $(this);
-                        var value = $field.val();
-                        
-                        if ($field.attr('type') === 'checkbox') {
-                            if (!$field.is(':checked')) {
-                                $field.addClass('error');
-                                if ($field.is($ageConsent)) showAgeConsentError();
-                                valid = false;
-                                if (!firstError) firstError = $field;
-                            } else {
-                                $field.removeClass('error');
-                                if ($field.is($ageConsent)) clearAgeConsentError();
-                            }
-                            return;
-                        }
-                        
-                        if (!value || value.trim() === '') {
-                            $field.addClass('error');
+                        var message = getFieldError($field);
+
+                        if (message) {
+                            showFieldError($field, message);
                             valid = false;
                             if (!firstError) firstError = $field;
                         } else {
-                            $field.removeClass('error');
+                            clearFieldError($field);
                         }
                     });
-                    
-                    var $email = $('#email');
-                    if ($email.length && $email.val()) {
-                        var email = $email.val();
-                        if (!email.includes('@') || !email.includes('.')) {
-                            $email.addClass('error');
-                            valid = false;
-                            if (!firstError) firstError = $email;
-                        }
-                    }
                     
                     if (!valid) {
                         if (firstError) {
                             firstError.focus();
                         }
-                        alert('Please fill in all required fields correctly.');
+                        $status.show().html('<div style="padding: 15px; background: #f8d7da; border-radius: 6px; color: #721c24; text-align: center; border: 1px solid #f5c6cb;">Please complete all highlighted required fields.</div>');
                         return false;
                     }
                     
@@ -954,9 +998,20 @@ class RTS_Registration_Page {
                                 $submitBtn.hide();
                                 
                             } else {
-                                var errorMsg = response.data || 'Registration failed. Please try again.';
-                                if (typeof errorMsg === 'object') {
-                                    errorMsg = errorMsg.message || JSON.stringify(errorMsg);
+                                var errorData = response.data || 'Registration failed. Please try again.';
+                                var errorMsg = errorData;
+                                if (typeof errorData === 'object') {
+                                    errorMsg = errorData.message || JSON.stringify(errorData);
+                                    if (Array.isArray(errorData.fields)) {
+                                        var firstServerError = null;
+                                        errorData.fields.forEach(function(fieldName) {
+                                            var $field = $form.find('[name="' + fieldName + '"]').first();
+                                            if (!$field.length) return;
+                                            showFieldError($field, getFieldError($field) || errorMsg);
+                                            if (!firstServerError) firstServerError = $field;
+                                        });
+                                        if (firstServerError) firstServerError.trigger('focus');
+                                    }
                                 }
                                 console.error('RTS: Registration error:', errorMsg);
                                 $status.html('<div style="padding: 20px; background: #f8d7da; border-radius: 8px; color: #721c24; text-align: center; border: 1px solid #f5c6cb;">❌ ' + errorMsg + '</div>');
@@ -1107,7 +1162,13 @@ class RTS_Registration_Page {
                     'phone' => 'phone',
                     'country' => 'country',
                     'city' => 'city',
-                    'address' => 'address'
+                    'state' => 'state',
+                    'province' => 'province',
+                    'zip' => 'zip',
+                    'postal_code' => 'postal_code',
+                    'address' => 'address',
+                    'address_2' => 'address_2',
+                    'age_range' => 'age_range'
                 );
                 
                 $field = $answer->question_id;
@@ -1135,8 +1196,8 @@ class RTS_Registration_Page {
             <div style="background: #fff; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: left;">
                 <p><strong>Cabin Credit:</strong> <?php echo $participant->cabin_credit_number ?: 'Pending'; ?></p>
                 <p><strong>Status:</strong> <?php echo ucfirst($participant->cabin_credit_status); ?></p>
-                <p><strong>Distance:</strong> <?php echo $participant->captain_miles_balance; ?></p>
-                <p><strong>Referrals:</strong> <?php echo $participant->referral_count; ?></p>
+                <p><strong>Kilometres completed:</strong> <?php echo esc_html(rts_format_miles($participant->captain_miles_balance)); ?></p>
+                <p><strong>Verified referrals:</strong> <?php echo esc_html($participant->successful_referrals); ?></p>
             </div>
             <a href="/captains-suite" style="display: inline-block; padding: 12px 30px; background: #1a7efb; color: #fff; text-decoration: none; border-radius: 6px;">
                 Go to Captain's Suite →
@@ -1221,11 +1282,11 @@ class RTS_Registration_Page {
                 </div>
                 <div style="background: #f8f9fa; padding: 12px; border-radius: 6px; text-align: center;">
                     <div style="font-size: 20px; font-weight: bold; color: #1a7efb;"><?php echo rts_format_miles($participant->total_referral_bonus); ?></div>
-                    <div style="font-size: 11px; color: #666;">Bonus Miles</div>
+                    <div style="font-size: 11px; color: #666;">Referral Kilometres</div>
                 </div>
                 <div style="background: #f8f9fa; padding: 12px; border-radius: 6px; text-align: center;">
                     <div style="font-size: 20px; font-weight: bold; color: #1a7efb;"><?php echo rts_format_miles($participant->total_captain_miles_earned); ?></div>
-                    <div style="font-size: 11px; color: #666;">Total Miles</div>
+                    <div style="font-size: 11px; color: #666;">Kilometres Completed</div>
                 </div>
             </div>
             
@@ -1269,7 +1330,7 @@ class RTS_Registration_Page {
                     <p><a href="/captains-suite/referrals" style="color: #1a7efb;">View all referrals →</a></p>
                 <?php endif; ?>
             <?php else: ?>
-                <p style="color: #666;">You haven't referred anyone yet. Share your referral link to start earning miles!</p>
+                <p style="color: #666;">You haven't referred anyone yet. Share your referral link to start gaining verified referrals!</p>
             <?php endif; ?>
             
             <script>

@@ -201,28 +201,83 @@ class RTS_Registration {
         $first_name = sanitize_text_field($data['first_name'] ?? '');
         $last_name = sanitize_text_field($data['last_name'] ?? '');
         $phone = sanitize_text_field($data['phone'] ?? '');
-        $country = sanitize_text_field($data['country'] ?? '');
+        $registration_country = strtoupper(sanitize_text_field($data['country'] ?? $data['registration_country'] ?? ''));
+        $detected_country = '';
         $city = sanitize_text_field($data['city'] ?? '');
+        $province = sanitize_text_field($data['state'] ?? $data['province'] ?? '');
+        $postal_code = sanitize_text_field($data['zip'] ?? $data['postal_code'] ?? '');
         $address = sanitize_textarea_field($data['address'] ?? '');
+        $address_2 = sanitize_text_field($data['address_2'] ?? '');
         $date_of_birth = sanitize_text_field($data['date_of_birth'] ?? '');
         $gender = sanitize_text_field($data['gender'] ?? '');
+        $age_range = sanitize_text_field($data['age_range'] ?? '');
         $emergency_contact_name = sanitize_text_field($data['emergency_contact_name'] ?? '');
-        $emergency_contact_phone = sanitize_text_field($data['emergency_contact_phone'] ?? '');       
+        $emergency_contact_phone = sanitize_text_field($data['emergency_contact_phone'] ?? '');
+        $marketing_consent = !empty($data['marketing_consent']) ? 1 : 0;
+
+        // Keep this validation at the data-write boundary as well as the AJAX
+        // endpoint so imports, hooks, or future callers cannot bypass it.
+        $required_fields = array(
+            'first_name' => $first_name,
+            'last_name' => $last_name,
+            'email' => $email,
+            'phone' => $phone,
+            'address' => $address,
+            'city' => $city,
+            'state' => $province,
+            'zip' => $postal_code,
+            'country' => $registration_country,
+        );
+        $missing_fields = array();
+
+        foreach ($required_fields as $field_name => $field_value) {
+            if ('' === trim((string) $field_value)) {
+                $missing_fields[] = $field_name;
+            }
+        }
+
+        if ($missing_fields) {
+            error_log('RTS: Participant creation rejected; missing required fields: ' . implode(', ', $missing_fields));
+            return false;
+        }
+
+        if (!is_email($email)) {
+            error_log('RTS: Participant creation rejected because the email address is invalid');
+            return false;
+        }
+
+        if (!preg_match('/^[A-Z]{2}$/', $registration_country)) {
+            error_log('RTS: Participant creation rejected because the registration country is invalid');
+            return false;
+        }
+
+        // International postal codes may contain letters, spaces, and hyphens.
+        if (strlen($postal_code) > 30) {
+            error_log('RTS: Participant creation rejected because the postal code is too long');
+            return false;
+        }
         
         // Check if there's a referral code in the data
         $referral_code = sanitize_text_field($data['referral_code_input'] ?? '');
         $referred_by = null;
         $tracking_id = isset($data['tracking_id']) ? intval($data['tracking_id']) : 0;
         $travel_party_size = $this->get_travel_party_size_from_survey($tracking_id, $data);
+
+        $tracking = $tracking_id > 0 ? $this->db->get_row(
+            $this->db->prepare(
+                "SELECT referral_code, referrer_participant_id, country FROM {$this->db->prefix}rts_survey_tracking WHERE id = %d",
+                $tracking_id
+            )
+        ) : null;
+        if ($tracking && !empty($tracking->country)) {
+            $detected_country = sanitize_text_field($tracking->country);
+        }
+        // Public surfaces and reporting use the country detected during the
+        // survey, falling back to the country entered during registration.
+        $country = $detected_country ?: $registration_country;
         
         // If no referral code provided, check if we have one from tracking
-        if (empty($referral_code) && $tracking_id > 0) {
-            $tracking = $this->db->get_row(
-                $this->db->prepare(
-                    "SELECT referral_code, referrer_participant_id FROM {$this->db->prefix}rts_survey_tracking WHERE id = %d",
-                    $tracking_id
-                )
-            );
+        if (empty($referral_code) && $tracking) {
             if ($tracking && !empty($tracking->referral_code)) {
                 $referral_code = $tracking->referral_code;
                 if (!empty($tracking->referrer_participant_id)) {
@@ -260,12 +315,20 @@ class RTS_Registration {
                 'last_name' => $last_name,
                 'phone' => $phone,
                 'country' => $country,
+                'registration_country' => $registration_country,
+                'detected_country' => $detected_country,
                 'city' => $city,
+                'province' => $province,
+                'registration_province' => $province,
+                'postal_code' => $postal_code,
                 'address' => $address,
+                'address_2' => $address_2,
                 'date_of_birth' => $date_of_birth,
                 'gender' => $gender,
+                'age_range' => $age_range,
                 'emergency_contact_name' => $emergency_contact_name,
                 'emergency_contact_phone' => $emergency_contact_phone,
+                'marketing_consent' => $marketing_consent,
                 'age_consent_confirmed_at' => $age_consent_confirmed_at,
                 'age_consent_ip_address' => $age_consent_ip_address,
                 'registration_date' => current_time('mysql'),
@@ -305,6 +368,7 @@ class RTS_Registration {
         
         $participant_id = $this->db->insert_id;
         error_log("RTS: Created participant ID: {$participant_id}");
+        $this->sync_participant_user_meta($participant_id);
         
         // If referred by someone, add to referrals table (ONLY if not exists)
         if ($referred_by && $participant_id) {
@@ -394,21 +458,31 @@ class RTS_Registration {
      * Update existing participant
      */
     private function update_participant($participant_id, $data) {
+        $registration_country = sanitize_text_field($data['country'] ?? $data['registration_country'] ?? '');
+        $tracking_id = isset($data['tracking_id']) ? absint($data['tracking_id']) : 0;
+        $detected_country = $this->get_detected_country($tracking_id);
         $update_data = array(
             'first_name' => sanitize_text_field($data['first_name'] ?? ''),
             'last_name' => sanitize_text_field($data['last_name'] ?? ''),
             'phone' => sanitize_text_field($data['phone'] ?? ''),
-            'country' => sanitize_text_field($data['country'] ?? ''),
+            'country' => $detected_country ?: $registration_country,
+            'registration_country' => $registration_country,
+            'detected_country' => $detected_country,
             'city' => sanitize_text_field($data['city'] ?? ''),
+            'province' => sanitize_text_field($data['state'] ?? $data['province'] ?? ''),
+            'registration_province' => sanitize_text_field($data['state'] ?? $data['registration_province'] ?? $data['province'] ?? ''),
+            'postal_code' => sanitize_text_field($data['zip'] ?? $data['postal_code'] ?? ''),
             'address' => sanitize_textarea_field($data['address'] ?? ''),
+            'address_2' => sanitize_text_field($data['address_2'] ?? ''),
             'date_of_birth' => sanitize_text_field($data['date_of_birth'] ?? ''),
             'gender' => sanitize_text_field($data['gender'] ?? ''),
+            'age_range' => sanitize_text_field($data['age_range'] ?? ''),
             'emergency_contact_name' => sanitize_text_field($data['emergency_contact_name'] ?? ''),
             'emergency_contact_phone' => sanitize_text_field($data['emergency_contact_phone'] ?? ''),
+            'marketing_consent' => !empty($data['marketing_consent']) ? 1 : 0,
             'updated_at' => current_time('mysql')
         );
 
-        $tracking_id = isset($data['tracking_id']) ? absint($data['tracking_id']) : 0;
         $travel_party_size = $this->get_travel_party_size_from_survey($tracking_id, $data);
         if (null !== $travel_party_size) {
             $update_data['travel_party_size'] = $travel_party_size;
@@ -430,11 +504,120 @@ class RTS_Registration {
         );
         
         if ($updated !== false) {
+            $this->sync_participant_user_meta($participant_id);
             error_log("RTS: Updated participant ID: {$participant_id}");
             $this->log_timeline($participant_id, 'registration_update', 'Participant information updated');
         }
         
         return $participant_id;
+    }
+
+    /**
+     * Copy registration-owned participant fields to WordPress user meta.
+     *
+     * The participant table remains authoritative; these keys make the same
+     * values available to themes, membership plugins and WordPress APIs.
+     */
+    public function sync_participant_user_meta($participant_id) {
+        $participant_id = absint($participant_id);
+        if (!$participant_id) {
+            return false;
+        }
+
+        $participant = $this->get_participant($participant_id);
+        if (!$participant) {
+            return false;
+        }
+
+        $user_id = !empty($participant->user_id) ? absint($participant->user_id) : 0;
+        if (!$user_id && !empty($participant->email)) {
+            $user = get_user_by('email', $participant->email);
+            $user_id = $user ? absint($user->ID) : 0;
+            if ($user_id) {
+                $this->db->update(
+                    $this->db->prefix . 'rts_participants',
+                    array('user_id' => $user_id),
+                    array('id' => $participant_id),
+                    array('%d'),
+                    array('%d')
+                );
+            }
+        }
+        if (!$user_id) {
+            return false;
+        }
+
+        $meta = array(
+            'rts_phone' => $participant->phone ?? '',
+            'rts_address' => $participant->address ?? '',
+            'rts_address_2' => $participant->address_2 ?? '',
+            'rts_city' => $participant->city ?? '',
+            'rts_province' => $participant->registration_province ?? '',
+            'rts_postal_code' => $participant->postal_code ?? '',
+            'rts_registration_country' => $participant->registration_country ?? '',
+            'rts_detected_country' => $participant->detected_country ?? '',
+            'rts_country' => $participant->country ?? $participant->registration_country ?? '',
+            'rts_gender' => $participant->gender ?? '',
+            'rts_age_range' => $participant->age_range ?? '',
+            'rts_marketing_consent' => !empty($participant->marketing_consent) ? '1' : '0',
+            'rts_age_consent_confirmed_at' => $participant->age_consent_confirmed_at ?? '',
+        );
+        foreach ($meta as $key => $value) {
+            update_user_meta($user_id, $key, sanitize_text_field((string) $value));
+        }
+
+        return true;
+    }
+
+    /** Return the country detected for a survey session, if available. */
+    private function get_detected_country($tracking_id) {
+        if (!$tracking_id) {
+            return '';
+        }
+
+        return sanitize_text_field((string) $this->db->get_var(
+            $this->db->prepare(
+                "SELECT country FROM {$this->db->prefix}rts_survey_tracking WHERE id = %d",
+                $tracking_id
+            )
+        ));
+    }
+
+    /** Apply survey-detected country priority when linking an existing account. */
+    public function sync_location_from_tracking($participant_id, $tracking_id) {
+        $participant_id = absint($participant_id);
+        $tracking_id = absint($tracking_id);
+        $detected_country = $this->get_detected_country($tracking_id);
+        if (!$participant_id || !$tracking_id || '' === $detected_country) {
+            return false;
+        }
+
+        $participant = $this->db->get_row($this->db->prepare(
+            "SELECT user_id, country_verified FROM {$this->db->prefix}rts_participants WHERE id = %d",
+            $participant_id
+        ));
+        $update_data = array(
+            'survey_tracking_id' => $tracking_id,
+            'detected_country' => $detected_country,
+            'updated_at' => current_time('mysql'),
+        );
+        if (!$participant || empty($participant->country_verified)) {
+            $update_data['country'] = $detected_country;
+        }
+
+        $updated = false !== $this->db->update(
+            $this->db->prefix . 'rts_participants',
+            $update_data,
+            array('id' => $participant_id)
+        );
+        if ($updated && $participant && !empty($participant->user_id)) {
+            update_user_meta((int) $participant->user_id, 'rts_detected_country', $detected_country);
+            if (empty($participant->country_verified)) {
+                update_user_meta((int) $participant->user_id, 'rts_country', $detected_country);
+            }
+        }
+
+        return $updated;
     }
 
     /**
@@ -738,10 +921,13 @@ class RTS_Registration {
         }
 
         $now = current_time('mysql');
-        $credit_number = $participant->cabin_credit_number ?: $this->generate_cabin_credit_number();
         $certificate_number = !empty($participant->certificate_number)
             ? $participant->certificate_number
             : $this->generate_certificate_number();
+        // For new issuances, the certificate number is also the permanent
+        // cruise-credit reference. Preserve historical references already on
+        // older records instead of silently renumbering them.
+        $credit_number = $participant->cabin_credit_number ?: $certificate_number;
         $credit_was_issued = $participant->cabin_credit_status === 'approved';
         $suite_was_active = $participant->captain_suite_status === 'active';
 
@@ -823,57 +1009,26 @@ class RTS_Registration {
         $filename = 'run-the-seas-certificate-' . absint($participant_id) . '-' . sanitize_file_name($participant->certificate_number) . '.pdf';
         $path = $directory . $filename;
 
-        $template_path = RTS_PLUGIN_PATH . 'assets/certificate-template.png';
-        if (!function_exists('imagecreatefrompng') || !is_readable($template_path)) {
+        $template_url = $this->get_certificate_backplate_url('rts_certificate_email_design_assets');
+        $template_path = $this->get_verification_preview_source_path($template_url);
+        if (!$template_path || !is_readable($template_path)) {
             return new WP_Error('rts_certificate_template', __('The approved certificate artwork is unavailable.', 'run-the-seas'));
         }
-        $template = imagecreatefrompng($template_path);
+        $template = $this->create_certificate_image_resource($template_path);
         if (!$template) {
             return new WP_Error('rts_certificate_template', __('The approved certificate artwork could not be read.', 'run-the-seas'));
         }
         $width = imagesx($template);
         $height = imagesy($template);
-        $full_name = trim($participant->first_name . ' ' . $participant->last_name);
-        $certificate_number = (string) $participant->certificate_number;
-        $ribbon_first_name = strtoupper(trim((string) $participant->first_name));
-        $ribbon_last_name = strtoupper(trim((string) $participant->last_name));
-        if ($ribbon_first_name === '') {
-            $ribbon_first_name = strtoupper($full_name);
-            $ribbon_last_name = '';
-        }
 
-        // Rasterize the personalized fields with the same GD fonts, fitting,
-        // and coordinates used by the email preview. This avoids the inaccurate
-        // width estimates of PDF base fonts and keeps both outputs identical.
+        // Rasterize every personalised field before embedding the image. The
+        // PDF, email preview, Captain's Suite, print, and download views now
+        // share this exact renderer and therefore cannot drift apart.
         imagealphablending($template, true);
         if (function_exists('imageantialias')) {
             imageantialias($template, true);
         }
-        $navy = imagecolorallocate($template, 7, 27, 59);
-        $gold = imagecolorallocate($template, 197, 137, 21);
-        $name_font_path = $this->get_verification_preview_font_path('name');
-        $number_font_path = $this->get_verification_preview_font_path('number');
-        $has_freetype = function_exists('imagettftext') && function_exists('imagettfbbox');
-
-        if ($name_font_path && $has_freetype) {
-            $this->draw_verification_preview_text($template, $full_name, $name_font_path, max(20, (int) round($width * 0.018)), (int) round($width * 0.50), (int) round($height * 0.442), $navy, (int) round($width * 0.54));
-        } else {
-            $this->draw_verification_preview_bitmap_text($template, $full_name, (int) round($width * 0.50), (int) round($height * 0.414), $navy, 1.65, (int) round($width * 0.54));
-        }
-
-        if ($number_font_path && $has_freetype) {
-            $this->draw_verification_preview_text($template, $certificate_number, $number_font_path, max(11, (int) round($width * 0.010)), (int) round($width * 0.168), (int) round($height * 0.806), $navy, (int) round($width * 0.17));
-            $this->draw_verification_preview_text($template, $ribbon_first_name, $number_font_path, max(9, (int) round($width * 0.009)), (int) round($width * 0.865), (int) round($height * 0.394), $gold, (int) round($width * 0.082), 9);
-            if ($ribbon_last_name !== '') {
-                $this->draw_verification_preview_text($template, $ribbon_last_name, $number_font_path, max(9, (int) round($width * 0.009)), (int) round($width * 0.865), (int) round($height * 0.418), $gold, (int) round($width * 0.082), 9);
-            }
-        } else {
-            $this->draw_verification_preview_bitmap_text($template, $certificate_number, (int) round($width * 0.168), (int) round($height * 0.790), $navy, 1.25, (int) round($width * 0.17));
-            $this->draw_verification_preview_bitmap_text($template, $ribbon_first_name, (int) round($width * 0.865), (int) round($height * 0.384), $gold, 1.25, (int) round($width * 0.082));
-            if ($ribbon_last_name !== '') {
-                $this->draw_verification_preview_bitmap_text($template, $ribbon_last_name, (int) round($width * 0.865), (int) round($height * 0.411), $gold, 1.25, (int) round($width * 0.082));
-            }
-        }
+        $this->render_certificate_personalisation($template, $participant);
 
         ob_start();
         imagejpeg($template, null, 94);
@@ -932,6 +1087,7 @@ class RTS_Registration {
             $participant,
             $captains_suite_url
         );
+        $certificate_values = $this->get_certificate_personalisation($participant);
         $email_template = rts_resolve_transactional_email_template(
             'founding_runner_certificate',
             $subject,
@@ -941,7 +1097,7 @@ class RTS_Registration {
                 'last_name' => $participant->last_name,
                 'email' => $participant->email,
                 'certificate_number' => $participant->certificate_number,
-                'founding_runner_number' => !empty($participant->founding_runner_number) ? $participant->founding_runner_number : $participant->certificate_number,
+                'founding_runner_number' => $certificate_values['runner_number'],
                 'captains_suite_url' => $captains_suite_url,
                 'account_url' => $captains_suite_url,
                 'certificate_preview_url' => $this->get_email_certificate_preview_url($participant, 'rts_certificate_email_design_assets'),
@@ -1136,19 +1292,19 @@ class RTS_Registration {
         $name = trim($referrer->first_name . ' ' . $referrer->last_name);
         $preferences_url = home_url('/my-details/');
         $message = '<p>Hello ' . esc_html($name) . ',</p>'
-            . '<p><strong>A new referral has verified their email!</strong> You earned <strong>1K Miles for the 42.2K Referral Marathon Challenge</strong> and now have <strong>' . esc_html(rts_format_miles($total_miles)) . '</strong>.</p>'
+            . '<p><strong>A new referral has verified their email!</strong> That verified referral advanced you by <strong>1 km</strong>. You have now completed <strong>' . esc_html(rts_format_miles($total_miles)) . '</strong> in the 42.2 km Referral Marathon Challenge.</p>'
             . '<p>You have <strong>' . esc_html(number_format_i18n($successful_referrals)) . '</strong> verified referral' . ($successful_referrals === 1 ? '' : 's') . '.</p>';
         if ($next_milestone) {
             $referrals_needed = (int) ceil($next_milestone['miles'] / 1000);
-            $message .= '<p>You are <strong>' . esc_html(rts_format_miles($next_milestone['miles'])) . '</strong> (' . esc_html(number_format_i18n($referrals_needed)) . ' referral' . ($referrals_needed === 1 ? '' : 's') . ') away from your next medal: <strong>' . esc_html($next_milestone['name']) . '</strong>. Keep sharing your referral link!</p>';
+            $message .= '<p>You need <strong>' . esc_html(number_format_i18n($referrals_needed)) . ' more verified referral' . ($referrals_needed === 1 ? '' : 's') . '</strong> (' . esc_html(rts_format_miles($next_milestone['miles'])) . ') to reach your next medal: <strong>' . esc_html($next_milestone['name']) . '</strong>. Keep sharing your referral link!</p>';
         } else {
-            $message .= '<p>You have reached every current 42.2K Referral Marathon Challenge milestone. Keep growing your crew!</p>';
+            $message .= '<p>You have reached every current 42.2 km Referral Marathon Challenge milestone. Keep growing your crew!</p>';
         }
         $message .= '<p style="font-size:12px;color:#666;">To turn off these referral-progress emails, update your preference in <a href="' . esc_url($preferences_url) . '">My Details</a>.</p>';
 
         $sent = wp_mail(
             $referrer->email,
-            'You earned 1K Miles for the 42.2K Referral Marathon Challenge!',
+            'A verified referral advanced you by 1 km!',
             $message,
             rts_mail_headers()
         );
@@ -1419,6 +1575,7 @@ class RTS_Registration {
         
         $subject = 'Confirm Your Email Address | Run The Seas';
         $message = $this->get_verification_email_message($participant, $verification_link);
+        $certificate_values = $this->get_certificate_personalisation($participant);
         $email_template = rts_resolve_transactional_email_template(
             'email_verification',
             $subject,
@@ -1429,7 +1586,7 @@ class RTS_Registration {
                 'email' => $participant->email,
                 'verification_url' => $verification_link,
                 'certificate_number' => !empty($participant->certificate_number) ? $participant->certificate_number : '',
-                'founding_runner_number' => !empty($participant->founding_runner_number) ? $participant->founding_runner_number : '',
+                'founding_runner_number' => $certificate_values['runner_number'],
                 'captains_suite_url' => function_exists('rts_get_captains_suite_url') ? rts_get_captains_suite_url() : home_url('/captains-suite/'),
                 'certificate_preview_url' => $this->get_email_certificate_preview_url($participant, 'rts_verification_email_design_assets'),
             )
@@ -1556,14 +1713,180 @@ class RTS_Registration {
             . '</td></tr></table></td></tr></table></body></html>';
     }
 
+    /** Return the shared certificate backplate selected by staff, or the bundled approved artwork. */
+    private function get_certificate_backplate_url($option_name = '') {
+        $option_names = array('rts_certificate_email_design_assets');
+        if ($option_name !== '' && !in_array($option_name, $option_names, true)) {
+            $option_names[] = $option_name;
+        }
+
+        foreach ($option_names as $asset_option) {
+            $assets = get_option($asset_option, array());
+            if (is_array($assets) && !empty($assets['certificate_preview_image'])) {
+                return esc_url_raw($assets['certificate_preview_image']);
+            }
+        }
+
+        return esc_url_raw(RTS_PLUGIN_URL . 'assets/certificate-backplate-v3.jpg');
+    }
+
     /** Return the current configured certificate preview for an email recipient. */
     public function get_email_certificate_preview_url($participant, $option_name) {
-        $assets = get_option($option_name, array());
-        $assets = is_array($assets) ? $assets : array();
-        $source = !empty($assets['certificate_preview_image'])
-            ? esc_url($assets['certificate_preview_image'])
-            : esc_url(RTS_PLUGIN_URL . 'assets/certificate-template.png');
+        // The confirmation email deliberately shows the approved sample rather
+        // than implying that an unverified registration already owns an issued
+        // and redeemable certificate.
+        if ('rts_verification_email_design_assets' === $option_name) {
+            return esc_url_raw(RTS_PLUGIN_URL . 'assets/certificate-confirmation-preview-v4.jpg');
+        }
+
+        $source = $this->get_certificate_backplate_url($option_name);
         return $this->get_verification_certificate_preview_url($participant, $source);
+    }
+
+    /** Create the public registration-page sample from the same live renderer. */
+    public function get_sample_certificate_preview_url($source_url, $date_text) {
+        $sample = (object) array(
+            'id' => 237,
+            'first_name' => 'Your Name',
+            'last_name' => 'Here',
+            'founding_runner_number' => '0000237',
+            'certificate_number' => 'RTS-CERT-' . wp_date('Y') . '-V6JYLZ',
+            'certificate_issued_at' => $date_text,
+            'email_verified' => 1,
+        );
+
+        $source_url = esc_url_raw((string) $source_url);
+        if ($source_url === '') {
+            $source_url = $this->get_certificate_backplate_url('rts_certificate_email_design_assets');
+        }
+
+        return $this->get_verification_certificate_preview_url($sample, $source_url);
+    }
+
+    /** Load supported certificate artwork into a GD image resource. */
+    private function create_certificate_image_resource($source_path) {
+        $image_info = @getimagesize($source_path);
+        if (!$image_info) {
+            return false;
+        }
+
+        switch ($image_info[2]) {
+            case IMAGETYPE_JPEG:
+                return function_exists('imagecreatefromjpeg') ? @imagecreatefromjpeg($source_path) : false;
+            case IMAGETYPE_PNG:
+                return function_exists('imagecreatefrompng') ? @imagecreatefrompng($source_path) : false;
+            case IMAGETYPE_WEBP:
+                return function_exists('imagecreatefromwebp') ? @imagecreatefromwebp($source_path) : false;
+        }
+
+        return false;
+    }
+
+    /** Build the exact participant-specific values shown on the certificate. */
+    private function get_certificate_personalisation($participant) {
+        $name = trim((string) ($participant->first_name ?? '') . ' ' . (string) ($participant->last_name ?? ''));
+        $name = $name !== '' ? $name : __('Founding Runner', 'run-the-seas');
+
+        $runner_number = trim((string) ($participant->founding_runner_number ?? ''));
+        if ($runner_number === '') {
+            $runner_number = str_pad((string) absint($participant->id ?? 0), 7, '0', STR_PAD_LEFT);
+        } else {
+            $runner_number = ltrim($runner_number, '#');
+            if (ctype_digit($runner_number)) {
+                $runner_number = str_pad($runner_number, 7, '0', STR_PAD_LEFT);
+            }
+        }
+        $runner_number = '#' . $runner_number;
+
+        $certificate_number = trim((string) ($participant->certificate_number ?? ''));
+        $certificate_number = $certificate_number !== '' ? $certificate_number : __('Pending', 'run-the-seas');
+
+        $issued_at = trim((string) ($participant->certificate_issued_at ?? ''));
+        $issued_date = __('Pending verification', 'run-the-seas');
+        if ($issued_at !== '') {
+            $timestamp = strtotime($issued_at);
+            $issued_date = $timestamp ? wp_date('F j, Y', $timestamp) : $issued_at;
+        }
+
+        $credit_status = sanitize_key((string) ($participant->cabin_credit_status ?? ''));
+        if ('redeemed' === $credit_status) {
+            $status = 'REDEEMED';
+        } elseif (in_array($credit_status, array('void', 'cancelled', 'canceled', 'declined', 'rejected'), true)) {
+            $status = 'VOID';
+        } elseif ('approved' === $credit_status || ($issued_at !== '' && (int) ($participant->email_verified ?? 0) === 1)) {
+            $status = 'APPROVED';
+        } else {
+            // NOT REQUESTED is an administrative state and is never printed.
+            $status = 'PENDING';
+        }
+
+        return array(
+            'name' => $name,
+            'runner_number' => $runner_number,
+            'certificate_number' => $certificate_number,
+            'status' => $status,
+            'issued_date' => $issued_date,
+            'approved' => 'APPROVED' === $status,
+        );
+    }
+
+    /** Draw all fields onto the approved blank backplate using sample-v4 positioning. */
+    private function render_certificate_personalisation($certificate, $participant) {
+        $width = imagesx($certificate);
+        $height = imagesy($certificate);
+        $values = $this->get_certificate_personalisation($participant);
+        $navy = imagecolorallocate($certificate, 7, 27, 59);
+        $muted_navy = imagecolorallocate($certificate, 44, 65, 86);
+        $white = imagecolorallocate($certificate, 255, 255, 255);
+        $status_colour = $values['approved']
+            ? imagecolorallocate($certificate, 45, 153, 91)
+            : imagecolorallocate($certificate, 190, 126, 18);
+        $name_font = $this->get_verification_preview_font_path('name');
+        $bold_font = $this->get_verification_preview_font_path('number');
+        $regular_font = $this->get_verification_preview_font_path('date');
+        $has_freetype = function_exists('imagettftext') && function_exists('imagettfbbox');
+
+        if ($name_font && $has_freetype) {
+            $this->draw_verification_preview_text(
+                $certificate,
+                $values['name'],
+                $name_font,
+                max(34, (int) round($width * 0.043)),
+                (int) round($width * 0.468),
+                (int) round($height * 0.435),
+                $navy,
+                (int) round($width * 0.54),
+                22
+            );
+        } else {
+            $this->draw_verification_preview_bitmap_text(
+                $certificate,
+                $values['name'],
+                (int) round($width * 0.468),
+                (int) round($height * 0.414),
+                $navy,
+                max(1.5, $width / 620),
+                (int) round($width * 0.54)
+            );
+        }
+
+        $left = (int) round($width * 0.065);
+        $small_size = max(9, (int) round($width * 0.0084));
+        $value_size = max(14, (int) round($width * 0.0135));
+        if ($regular_font && $bold_font && $has_freetype) {
+            $this->draw_verification_preview_text_left($certificate, __('FOUNDING RUNNER NUMBER', 'run-the-seas'), $regular_font, $small_size, $left, (int) round($height * 0.713), $muted_navy, (int) round($width * 0.26));
+            $this->draw_verification_preview_text_left($certificate, $values['runner_number'], $bold_font, $value_size, $left, (int) round($height * 0.746), $navy, (int) round($width * 0.22));
+            $this->draw_verification_preview_text_left($certificate, __('CERTIFICATE NO.', 'run-the-seas'), $regular_font, $small_size, $left, (int) round($height * 0.779), $muted_navy, (int) round($width * 0.09));
+            $this->draw_verification_preview_text_left($certificate, $values['certificate_number'], $bold_font, $small_size, (int) round($width * 0.172), (int) round($height * 0.779), $navy, (int) round($width * 0.14), 7);
+            $this->draw_certificate_status_badge($certificate, $values['status'], $bold_font, max(8, $small_size - 1), (int) round($width * 0.316), (int) round($height * 0.765), $status_colour, $white);
+            $this->draw_verification_preview_text_left($certificate, __('ISSUED:', 'run-the-seas'), $regular_font, $small_size, $left, (int) round($height * 0.811), $muted_navy, (int) round($width * 0.05));
+            $this->draw_verification_preview_text_left($certificate, $values['issued_date'], $bold_font, $small_size, (int) round($width * 0.116), (int) round($height * 0.811), $navy, (int) round($width * 0.19), 7);
+        } else {
+            imagestring($certificate, 2, $left, (int) round($height * 0.700), __('FOUNDING RUNNER NUMBER', 'run-the-seas'), $muted_navy);
+            imagestring($certificate, 5, $left, (int) round($height * 0.720), $values['runner_number'], $navy);
+            imagestring($certificate, 2, $left, (int) round($height * 0.754), __('CERTIFICATE NO. ', 'run-the-seas') . $values['certificate_number'], $navy);
+            imagestring($certificate, 2, $left, (int) round($height * 0.780), __('ISSUED: ', 'run-the-seas') . $values['issued_date'], $navy);
+        }
     }
 
     /**
@@ -1588,24 +1911,7 @@ class RTS_Registration {
             return $source_url;
         }
 
-        $image_info = @getimagesize($source_path);
-        if (!$image_info) {
-            return $source_url;
-        }
-
-        switch ($image_info[2]) {
-            case IMAGETYPE_JPEG:
-                $certificate = @imagecreatefromjpeg($source_path);
-                break;
-            case IMAGETYPE_PNG:
-                $certificate = @imagecreatefrompng($source_path);
-                break;
-            case IMAGETYPE_WEBP:
-                $certificate = function_exists('imagecreatefromwebp') ? @imagecreatefromwebp($source_path) : false;
-                break;
-            default:
-                $certificate = false;
-        }
+        $certificate = $this->create_certificate_image_resource($source_path);
         if (!$certificate) {
             return $source_url;
         }
@@ -1796,17 +2102,13 @@ class RTS_Registration {
             return $source_url;
         }
 
-        $name = trim((string) $participant->first_name . ' ' . (string) $participant->last_name);
+        $name = trim((string) ($participant->first_name ?? '') . ' ' . (string) ($participant->last_name ?? ''));
         if ($name === '') {
             imagedestroy($certificate);
             return $source_url;
         }
-        $preview_number = !empty($participant->certificate_number)
-            ? (string) $participant->certificate_number
-            : (!empty($participant->founding_runner_number)
-                ? (string) $participant->founding_runner_number
-                : '#' . str_pad((string) absint($participant->id), 5, '0', STR_PAD_LEFT));
-        $cache_key = md5('v9|' . $source_path . '|' . filemtime($source_path) . '|' . $name . '|' . $preview_number);
+        $values = $this->get_certificate_personalisation($participant);
+        $cache_key = md5('v12-readable-type|' . $source_path . '|' . filemtime($source_path) . '|' . wp_json_encode($values));
         $filename = 'verification-preview-' . absint($participant->id) . '-' . $cache_key . '.png';
         $preview_path = $directory . $filename;
         $preview_url = trailingslashit($uploads['baseurl']) . 'rts-certificate-previews/' . $filename;
@@ -1815,117 +2117,11 @@ class RTS_Registration {
             return $preview_url;
         }
 
-        $certificate_width = imagesx($certificate);
-        $certificate_height = imagesy($certificate);
         imagealphablending($certificate, true);
         if (function_exists('imageantialias')) {
             imageantialias($certificate, true);
         }
-        $navy = imagecolorallocate($certificate, 7, 27, 59);
-        $gold = imagecolorallocate($certificate, 197, 137, 21);
-        $name_font_path = $this->get_verification_preview_font_path('name');
-        $number_font_path = $this->get_verification_preview_font_path('number');
-        $first_name = strtoupper(trim((string) $participant->first_name));
-        $last_name = strtoupper(trim((string) $participant->last_name));
-        $has_freetype = function_exists('imagettftext') && function_exists('imagettfbbox');
-
-        if ($name_font_path && $has_freetype) {
-            $this->draw_verification_preview_text(
-                $certificate,
-                $name,
-                $name_font_path,
-                max(20, (int) round($certificate_width * 0.018)),
-                (int) round($certificate_width * 0.50),
-                (int) round($certificate_height * 0.442),
-                $navy,
-                (int) round($certificate_width * 0.54)
-            );
-        } else {
-            $this->draw_verification_preview_bitmap_text(
-                $certificate,
-                $name,
-                (int) round($certificate_width * 0.50),
-                (int) round($certificate_height * 0.414),
-                $navy,
-                1.65,
-                (int) round($certificate_width * 0.54)
-            );
-        }
-
-        if ($number_font_path && $has_freetype) {
-            $this->draw_verification_preview_text(
-                $certificate,
-                $preview_number,
-                $number_font_path,
-                max(11, (int) round($certificate_width * 0.010)),
-                (int) round($certificate_width * 0.168),
-                (int) round($certificate_height * 0.806),
-                $navy,
-                (int) round($certificate_width * 0.17)
-            );
-        } else {
-            $this->draw_verification_preview_bitmap_text(
-                $certificate,
-                $preview_number,
-                (int) round($certificate_width * 0.168),
-                (int) round($certificate_height * 0.790),
-                $navy,
-                1.25,
-                (int) round($certificate_width * 0.17)
-            );
-        }
-
-        if ($number_font_path && $has_freetype) {
-            if ($first_name !== '') {
-                $this->draw_verification_preview_text(
-                    $certificate,
-                    $first_name,
-                    $number_font_path,
-                    max(9, (int) round($certificate_width * 0.009)),
-                    (int) round($certificate_width * 0.865),
-                    (int) round($certificate_height * 0.394),
-                    $gold,
-                    (int) round($certificate_width * 0.082),
-                    9
-                );
-            }
-            if ($last_name !== '') {
-                $this->draw_verification_preview_text(
-                    $certificate,
-                    $last_name,
-                    $number_font_path,
-                    max(9, (int) round($certificate_width * 0.009)),
-                    (int) round($certificate_width * 0.865),
-                    (int) round($certificate_height * 0.418),
-                    $gold,
-                    (int) round($certificate_width * 0.082),
-                    9
-                );
-            }
-        } else {
-            if ($first_name !== '') {
-                $this->draw_verification_preview_bitmap_text(
-                    $certificate,
-                    $first_name,
-                    (int) round($certificate_width * 0.865),
-                    (int) round($certificate_height * 0.384),
-                    $gold,
-                    1.25,
-                    (int) round($certificate_width * 0.082)
-                );
-            }
-            if ($last_name !== '') {
-                $this->draw_verification_preview_bitmap_text(
-                    $certificate,
-                    $last_name,
-                    (int) round($certificate_width * 0.865),
-                    (int) round($certificate_height * 0.411),
-                    $gold,
-                    1.25,
-                    (int) round($certificate_width * 0.082)
-                );
-            }
-        }
+        $this->render_certificate_personalisation($certificate, $participant);
         $saved = imagepng($certificate, $preview_path, 9);
         imagedestroy($certificate);
 
@@ -1957,6 +2153,8 @@ class RTS_Registration {
             );
         } else {
             $candidates = array(
+                RTS_PLUGIN_PATH . 'assets/fonts/CormorantGaramond-SemiBoldItalic.ttf',
+                RTS_PLUGIN_PATH . 'assets/fonts/Allura-Regular.ttf',
                 RTS_PLUGIN_PATH . 'assets/fonts/DejaVuSerif-Italic.ttf',
                 '/usr/share/fonts/truetype/dejavu/DejaVuSerif-Italic.ttf',
                 '/usr/share/fonts/truetype/liberation2/LiberationSerif-Italic.ttf',
@@ -1995,6 +2193,59 @@ class RTS_Registration {
         }
         $position_x = (int) round($center_x - ($width / 2) - $box[0]);
         imagettftext($image, $font_size, 0, $position_x, (int) $baseline_y, $colour, $font_path, $text);
+    }
+
+    /** Draw left-aligned TrueType text, reducing its size until it fits. */
+    private function draw_verification_preview_text_left($image, $text, $font_path, $font_size, $left_x, $baseline_y, $colour, $max_width, $min_font_size = 6) {
+        $text = trim((string) $text);
+        if ($text === '') {
+            return;
+        }
+
+        $font_size = max($min_font_size, (int) $font_size);
+        do {
+            $box = imagettfbbox($font_size, 0, $font_path, $text);
+            $text_width = $box ? abs($box[2] - $box[0]) : 0;
+            if ($text_width <= $max_width || $font_size <= $min_font_size) {
+                break;
+            }
+            $font_size--;
+        } while ($font_size > $min_font_size);
+
+        if ($box) {
+            imagettftext($image, $font_size, 0, (int) $left_x - $box[0], (int) $baseline_y, $colour, $font_path, $text);
+        }
+    }
+
+    /** Draw the compact APPROVED/PENDING pill shown beside the certificate number. */
+    private function draw_certificate_status_badge($image, $text, $font_path, $font_size, $left_x, $top_y, $background, $foreground) {
+        $text = trim((string) $text);
+        if ($text === '' || !$font_path || !function_exists('imagettfbbox') || !function_exists('imagettftext')) {
+            return;
+        }
+
+        $font_size = max(6, (int) $font_size);
+        $box = imagettfbbox($font_size, 0, $font_path, $text);
+        if (!$box) {
+            return;
+        }
+
+        $text_width = abs($box[2] - $box[0]);
+        $text_height = abs($box[7] - $box[1]);
+        $padding_x = max(5, (int) round($font_size * 0.65));
+        $padding_y = max(3, (int) round($font_size * 0.42));
+        $badge_width = $text_width + ($padding_x * 2);
+        $badge_height = $text_height + ($padding_y * 2);
+        $radius = (int) floor($badge_height / 2);
+        $center_y = (int) $top_y + $radius;
+
+        imagefilledrectangle($image, (int) $left_x + $radius, (int) $top_y, (int) $left_x + $badge_width - $radius, (int) $top_y + $badge_height, $background);
+        imagefilledellipse($image, (int) $left_x + $radius, $center_y, $badge_height, $badge_height, $background);
+        imagefilledellipse($image, (int) $left_x + $badge_width - $radius, $center_y, $badge_height, $badge_height, $background);
+
+        $text_x = (int) $left_x + $padding_x - $box[0];
+        $text_y = (int) $top_y + $padding_y - $box[7];
+        imagettftext($image, $font_size, 0, $text_x, $text_y, $foreground, $font_path, $text);
     }
 
     /** Last-resort text rendering when FreeType fonts are unavailable. */
@@ -2039,9 +2290,9 @@ class RTS_Registration {
 
     /** Resolve a Media Library or bundled certificate image URL to its file path. */
     private function get_verification_preview_source_path($source_url) {
-        $bundled_url = RTS_PLUGIN_URL . 'assets/certificate-template.png';
+        $bundled_url = RTS_PLUGIN_URL . 'assets/certificate-backplate-v3.jpg';
         if (untrailingslashit($source_url) === untrailingslashit($bundled_url)) {
-            return RTS_PLUGIN_PATH . 'assets/certificate-template.png';
+            return RTS_PLUGIN_PATH . 'assets/certificate-backplate-v3.jpg';
         }
 
         // Permit other bundled certificate artwork, including the dedicated
@@ -2562,7 +2813,7 @@ class RTS_Registration {
             $this->log_timeline(
                 $participant_id,
                 'captain_miles_earned',
-                "Earned {$miles} Miles",
+                'Verified referral progress: +' . rts_format_miles($miles),
                 array(
                     'miles' => $miles,
                     'reason' => $reason,
@@ -2604,8 +2855,8 @@ class RTS_Registration {
                     $this->add_achievement(
                         $participant_id,
                         'miles_milestone',
-                        "{$milestone} DistanceMiles!",
-                        "Congratulations! You've earned {$milestone} for the 42.2K Referral Marathon Challenge!"
+                        rts_format_miles($milestone) . ' milestone!',
+                        "Congratulations! You've completed " . rts_format_miles($milestone) . " in the 42.2 km Referral Marathon Challenge!"
                     );
                     
                     // Add medal for major milestones
@@ -2613,9 +2864,9 @@ class RTS_Registration {
                         $this->add_medal(
                             $participant_id,
                             'miles_milestone',
-                            "{$milestone} Miles Medal",
-                            "Awarded for earning {$milestone} for the 42.2K Referral Marathon Challenge!",
-                            '42.2K Referral Marathon Challenge Program',
+                            rts_format_miles($milestone) . ' Milestone Medal',
+                            "Awarded for completing " . rts_format_miles($milestone) . " in the 42.2 km Referral Marathon Challenge!",
+                            '42.2 km Referral Marathon Challenge Program',
                             $milestone >= 10000 ? 'Diamond' : ($milestone >= 5000 ? 'Gold' : 'Silver')
                         );
                     }

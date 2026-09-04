@@ -501,36 +501,34 @@ function rts_send_password_changed_confirmation($user, $new_password)
 add_action('after_password_reset', 'rts_send_password_changed_confirmation', 20, 2);
 
 /**
- * Format miles to readable format (e.g., 1000 -> 1K, 1500 -> 1.5K, 42200 -> 42.2K)
+ * Format the legacy stored progress units as kilometres.
+ *
+ * The database historically called these values "miles", but one verified
+ * referral stores 1,000 units and represents one kilometre of progress.
  */
 function rts_format_miles($miles)
 {
-    if ($miles >= 1000) {
-        $formatted = $miles / 1000;
-        // If it's a whole number, display as XK
-        if (floor($formatted) == $formatted) {
-            return number_format($formatted, 0) . 'K';
-        }
-        // Otherwise display as X.XK
-        return number_format($formatted, 1) . 'K';
-    }
-    return number_format($miles);
+    $kilometres = max(0, (float) $miles / 1000);
+    $decimals = floor($kilometres) === $kilometres ? 0 : 1;
+
+    return number_format_i18n($kilometres, $decimals) . ' km';
 }
 
 /**
- * Format a trophy threshold using its public race-distance label.
- *
- * Awards are earned in whole 1K referral increments, while the recognised
- * half/full-marathon trophy labels remain 21.1K and 42.2K.
+ * Format a trophy threshold using its public kilometre-distance label.
  */
 function rts_format_trophy_miles($miles, $trophy_key = '')
 {
     $trophy_key = sanitize_key((string) $trophy_key);
-    if ('21k' === $trophy_key) {
-        return '21.1K';
+    $milestone_key = preg_replace('/^m2-/', '', $trophy_key);
+    if ('21k' === $milestone_key) {
+        return '21.1 km';
     }
-    if ('42k' === $trophy_key) {
-        return '42.2K';
+    if ('42k' === $milestone_key) {
+        return '42.2 km';
+    }
+    if (str_starts_with($trophy_key, 'm2-')) {
+        $miles = max(0, absint($miles) - 42000);
     }
 
     return rts_format_miles($miles);

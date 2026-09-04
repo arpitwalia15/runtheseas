@@ -559,8 +559,14 @@ body.rtsap-admin-page {
 .rtsap-profile-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 12px; }
 .rtsap-profile-edit-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 12px; }
 .rtsap-profile-edit-form > label > span:first-child { display: block; margin-bottom: 5px; color: var(--rtsap-muted); font-size: 10px; font-weight: 700; letter-spacing: .035em; text-transform: uppercase; }
-.rtsap-profile-edit-form input[type="email"],.rtsap-profile-edit-form input[type="text"],.rtsap-profile-edit-form select { box-sizing: border-box; width: 100%; min-height: 36px; }
+.rtsap-profile-edit-form input[type="email"],.rtsap-profile-edit-form input[type="text"],.rtsap-profile-edit-form input[type="date"],.rtsap-profile-edit-form select,.rtsap-profile-edit-form textarea { box-sizing: border-box; width: 100%; min-height: 36px; }
+.rtsap-profile-edit-form textarea { resize: vertical; }
 .rtsap-profile-edit-submit { grid-column: 1 / -1; display: flex; justify-content: flex-end; padding-top: 2px; }
+.rtsap-registration-details { margin-bottom: 18px; }
+.rtsap-registration-edit-form,.rtsap-registration-view-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.rtsap-registration-edit-form .rtsap-field-wide { grid-column: span 2; }
+.rtsap-location-source { flex: 0 0 auto; padding: 4px 8px; border: 1px solid var(--rtsap-border); border-radius: 12px; color: var(--rtsap-muted); font-size: 10px; font-weight: 700; }
+.rtsap-profile-check-field > span:last-child { display: flex; align-items: center; gap: 7px; min-height: 36px; color: var(--rtsap-text); font-size: 12px; }
 .rtsap-profile-switch { display: flex; align-items: center; gap: 9px; min-height: 36px; }
 .rtsap-profile-switch input { position: absolute; opacity: 0; pointer-events: none; }
 .rtsap-profile-switch i { position: relative; width: 36px; height: 20px; border-radius: 12px; background: #2aa86b; box-shadow: inset 0 0 0 1px rgba(11,20,32,.08); cursor: pointer; }
@@ -682,6 +688,7 @@ body.rtsap-admin-page {
 	.rtsap-participant-toolbar { align-items: stretch; flex-direction: column; }
 	.rtsap-participant-toolbar select,.rtsap-participant-search,.rtsap-participant-toolbar .button { box-sizing: border-box; width: 100%; max-width: none; }
 	.rtsap-profile-overview { grid-template-columns: 1fr; }
+	.rtsap-registration-edit-form,.rtsap-registration-view-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 	.rtsap-profile-kpis--wide { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 	.rtsap-profile-actions { flex-wrap: wrap; margin-right: -16px; margin-left: -16px; padding-right: 16px; padding-left: 16px; }
 	.rtsap-analysis-controls { grid-template-columns: 1fr; }
@@ -716,6 +723,7 @@ body.rtsap-admin-page {
 	.rtsap-funnel__row { grid-template-columns: 82px minmax(100px, 1fr) 70px; }
 	.rtsap-bar-chart { gap: 4px; }
 	.rtsap-profile-fields,.rtsap-profile-edit-form,.rtsap-profile-kpis,.rtsap-profile-kpis--wide,.rtsap-trophy-list { grid-template-columns: 1fr; }
+	.rtsap-registration-edit-form .rtsap-field-wide { grid-column: auto; }
 	.rtsap-admin-note-form { align-items: stretch; flex-direction: column; }
 	.rtsap-survey-merge-summary { grid-template-columns: 1fr; }
 	.rtsap-profile-identity { align-items: flex-start; }

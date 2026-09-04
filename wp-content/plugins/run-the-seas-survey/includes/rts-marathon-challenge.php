@@ -236,13 +236,13 @@ function rts_marathon_challenge_distance($miles)
 {
     $miles = absint($miles);
     if (0 === $miles) {
-        return '0K';
+        return '0 km';
     }
     if (in_array($miles, array(21000, 21100), true)) {
-        return '21.1K';
+        return '21.1 km';
     }
     if (in_array($miles, array(42000, 42200), true)) {
-        return '42.2K';
+        return '42.2 km';
     }
 
     if ($miles >= 1000 && function_exists('rts_format_miles')) {
@@ -250,10 +250,10 @@ function rts_marathon_challenge_distance($miles)
     }
 
     if ($miles >= 1000) {
-        return rtrim(rtrim(number_format_i18n($miles / 1000, 1), '0'), '.') . 'K';
+        return rtrim(rtrim(number_format_i18n($miles / 1000, 1), '0'), '.') . ' km';
     }
 
-    return rtrim(rtrim(number_format_i18n($miles / 1000, 1), '0'), '.') . 'K';
+    return rtrim(rtrim(number_format_i18n($miles / 1000, 1), '0'), '.') . ' km';
 }
 
 /** Use the internationally recognised 21.1K label for the half-marathon stop. */
@@ -1080,7 +1080,7 @@ function rts_marathon_challenge_shortcode($atts)
 
         <header class="rts-mc-header<?php echo $asset('header_frame_image') ? ' has-artwork-frame' : ''; ?>">
             <?php if ($asset('header_frame_image')) : ?><img class="rts-mc-header__frame" src="<?php echo esc_url($asset('header_frame_image')); ?>" alt="" aria-hidden="true"><?php endif; ?>
-            <h1 id="rts-mc-title"><?php esc_html_e('The 42.2K Referral Marathon Challenge', 'run-the-seas'); ?></h1>
+            <h1 id="rts-mc-title"><?php esc_html_e('The 42.2 km Referral Marathon Challenge', 'run-the-seas'); ?></h1>
         </header>
 
         <div class="rts-mc-layout">
@@ -1123,7 +1123,7 @@ function rts_marathon_challenge_shortcode($atts)
 
             <main class="rts-mc-map" id="rts-mc-map" data-rts-mc-map tabindex="0" role="region" aria-label="<?php esc_attr_e('Interactive marathon milestone map', 'run-the-seas'); ?>">
                 <div class="rts-mc-map__viewport" data-rts-mc-map-viewport>
-                <?php if ($map_url) : ?><img class="rts-mc-map__art" src="<?php echo esc_url($map_url); ?>" alt="<?php esc_attr_e('Tropical island with a 42.2K marathon route', 'run-the-seas'); ?>"><?php endif; ?>
+                <?php if ($map_url) : ?><img class="rts-mc-map__art" src="<?php echo esc_url($map_url); ?>" alt="<?php esc_attr_e('Tropical island with a 42.2 km marathon route', 'run-the-seas'); ?>"><?php endif; ?>
 
                 <?php if ($finishers) : ?>
                     <section class="rts-mc-finishers" aria-label="<?php esc_attr_e('Marathon finishers', 'run-the-seas'); ?>">

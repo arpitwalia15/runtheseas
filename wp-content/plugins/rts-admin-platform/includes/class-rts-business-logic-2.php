@@ -406,8 +406,25 @@ class RTS_Business_Logic_2 {
 		if ( ! $current ) { return array( 'error' => 'NOT_FOUND' ); }
 		if ( ! empty( $current->merged_into_participant_id ) ) { return array( 'error' => 'PARTICIPANT_ALREADY_MERGED' ); }
 
-		$allowed = array( 'email','name','runner_status','marketing_source','country','province','city','gender','age_range','travel_party_size','household_income_bracket','account_status' );
+		$allowed = array(
+			'email','name','first_name','last_name','phone','runner_status','marketing_source',
+			'country','registration_country','detected_country','province','registration_province','city','postal_code',
+			'address','address_2','date_of_birth','gender','age_range','travel_party_size',
+			'household_income_bracket','emergency_contact_name','emergency_contact_phone',
+			'marketing_consent','country_verified','account_status',
+		);
 		$data = array_intersect_key( (array) $fields, array_flip( $allowed ) );
+		$text_fields = array_diff( $allowed, array( 'email', 'address', 'travel_party_size', 'marketing_consent', 'country_verified' ) );
+		foreach ( $text_fields as $field ) {
+			if ( isset( $data[ $field ] ) ) { $data[ $field ] = sanitize_text_field( $data[ $field ] ); }
+		}
+		if ( isset( $data['address'] ) ) { $data['address'] = sanitize_textarea_field( $data['address'] ); }
+		if ( isset( $data['travel_party_size'] ) ) { $data['travel_party_size'] = max( 0, min( 50, (int) $data['travel_party_size'] ) ); }
+		if ( isset( $data['marketing_consent'] ) ) { $data['marketing_consent'] = empty( $data['marketing_consent'] ) ? 0 : 1; }
+		if ( isset( $data['country_verified'] ) ) { $data['country_verified'] = empty( $data['country_verified'] ) ? 0 : 1; }
+		if ( isset( $data['registration_province'] ) && ! isset( $data['province'] ) ) {
+			$data['province'] = $data['registration_province'];
+		}
 		if ( isset( $data['email'] ) ) {
 			$data['email'] = sanitize_email( $data['email'] );
 			if ( ! is_email( $data['email'] ) ) { return array( 'error' => 'INVALID_EMAIL' ); }
@@ -416,7 +433,11 @@ class RTS_Business_Logic_2 {
 		}
 		if ( isset( $data['runner_status'] ) && ! in_array( $data['runner_status'], array( 'runner', 'non_runner', 'not_specified' ), true ) ) { return array( 'error' => 'INVALID_RUNNER_STATUS' ); }
 		if ( isset( $data['account_status'] ) && ! in_array( $data['account_status'], array( 'active', 'suspended' ), true ) ) { return array( 'error' => 'INVALID_ACCOUNT_STATUS' ); }
+		if ( isset( $data['date_of_birth'] ) && '' !== $data['date_of_birth'] && ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $data['date_of_birth'] ) ) { return array( 'error' => 'INVALID_DATE_OF_BIRTH' ); }
 		if ( isset( $data['marketing_source'] ) ) { $data['marketing_source'] = sanitize_text_field( $data['marketing_source'] ); }
+		if ( ( isset( $data['first_name'] ) || isset( $data['last_name'] ) ) && ! isset( $data['name'] ) ) {
+			$data['name'] = trim( ( $data['first_name'] ?? $current->first_name ) . ' ' . ( $data['last_name'] ?? $current->last_name ) );
+		}
 
 		$changes = array();
 		foreach ( $data as $field => $value ) {
@@ -425,8 +446,8 @@ class RTS_Business_Logic_2 {
 		}
 		if ( ! $changes ) { return array( 'error' => null, 'changed' => array() ); }
 
+		$user = $current->user_id ? get_user_by( 'id', (int) $current->user_id ) : get_user_by( 'email', $current->email );
 		if ( isset( $changes['email'] ) ) {
-			$user = $current->user_id ? get_user_by( 'id', (int) $current->user_id ) : get_user_by( 'email', $current->email );
 			$email_owner = email_exists( $data['email'] );
 			if ( $email_owner && ( ! $user || (int) $email_owner !== (int) $user->ID ) ) { return array( 'error' => 'WORDPRESS_EMAIL_ALREADY_IN_USE' ); }
 			if ( $user ) {
@@ -434,16 +455,48 @@ class RTS_Business_Logic_2 {
 				if ( is_wp_error( $updated_user ) ) { return array( 'error' => $updated_user->get_error_message() ); }
 			}
 		}
+		if ( $user && ( isset( $changes['first_name'] ) || isset( $changes['last_name'] ) ) ) {
+			$first_name = $data['first_name'] ?? $current->first_name;
+			$last_name = $data['last_name'] ?? $current->last_name;
+			$updated_user = wp_update_user( array(
+				'ID' => $user->ID,
+				'first_name' => $first_name,
+				'last_name' => $last_name,
+				'display_name' => trim( $first_name . ' ' . $last_name ),
+			) );
+			if ( is_wp_error( $updated_user ) ) { return array( 'error' => $updated_user->get_error_message() ); }
+		}
 
 		$write = array();
 		foreach ( array_keys( $changes ) as $field ) { $write[ $field ] = $data[ $field ]; }
+		if ( isset( $changes['country_verified'] ) ) {
+			$write['country_verified_at'] = $data['country_verified'] ? current_time( 'mysql' ) : null;
+			$write['country_verified_by'] = $data['country_verified'] ? get_current_user_id() : null;
+		}
 		$write['updated_at'] = current_time( 'mysql' );
 		if ( false === $wpdb->update( $pt, $write, array( 'id' => $id ) ) ) { return array( 'error' => $wpdb->last_error ?: 'UPDATE_FAILED' ); }
 		if ( isset( $changes['email'] ) ) {
 			$wpdb->update( RTS_DB::table( 'referrals' ), array( 'referred_email' => $data['email'] ), array( 'referred_participant_id' => $id ) );
 			$wpdb->update( RTS_DB::table( 'survey_tracking' ), array( 'email' => $data['email'] ), array( 'id' => (int) $current->survey_tracking_id ) );
 		}
-		$labels = array( 'email' => 'Email', 'runner_status' => 'Runner Status', 'marketing_source' => 'Marketing Source', 'account_status' => 'Account Status' );
+		if ( $user ) {
+			$meta_map = array(
+				'phone' => 'rts_phone', 'country' => 'rts_country', 'city' => 'rts_city',
+				'registration_country' => 'rts_registration_country', 'detected_country' => 'rts_detected_country',
+				'province' => 'rts_province', 'registration_province' => 'rts_province', 'postal_code' => 'rts_postal_code',
+				'address' => 'rts_address', 'address_2' => 'rts_address_2',
+			);
+			foreach ( $meta_map as $field => $meta_key ) {
+				if ( isset( $changes[ $field ] ) ) { update_user_meta( $user->ID, $meta_key, $data[ $field ] ); }
+			}
+		}
+		$labels = array(
+			'email' => 'Email', 'runner_status' => 'Runner Status', 'marketing_source' => 'Marketing Source',
+			'account_status' => 'Account Status', 'registration_country' => 'Registration Country',
+			'detected_country' => 'Survey-detected Country', 'country' => 'Country Used Across Site',
+			'postal_code' => 'ZIP / Postal Code', 'address_2' => 'Address Line 2',
+			'marketing_consent' => 'Marketing Consent', 'country_verified' => 'Country Verified',
+		);
 		$details = array();
 		foreach ( $changes as $field => $values ) {
 			$label = $labels[ $field ] ?? ucwords( str_replace( '_', ' ', $field ) );
@@ -483,7 +536,12 @@ class RTS_Business_Logic_2 {
 		$merge_earned  = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM $earned WHERE participant_id = %d", $merge_id ) );
 		$merge_credit  = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM $ct WHERE participant_id = %d", $merge_id ) );
 		$keep_credit   = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM $ct WHERE participant_id = %d", $keep_id ) );
-		$merge_fields = array( 'email','name','first_name','last_name','phone','runner_status','marketing_source','country','province','city','gender','age_range','travel_party_size' );
+		$merge_fields = array(
+			'email','name','first_name','last_name','phone','runner_status','marketing_source',
+			'country','registration_country','detected_country','province','registration_province','city','postal_code',
+			'address','address_2','date_of_birth','gender','age_range','travel_party_size',
+			'emergency_contact_name','emergency_contact_phone','marketing_consent',
+		);
 
 		$preview = array(
 			'referrals_to_reassign' => count( $merge_refs ),

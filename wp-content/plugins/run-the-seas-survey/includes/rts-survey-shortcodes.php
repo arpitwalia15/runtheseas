@@ -316,10 +316,10 @@ function rts_virtual_marathon_shortcode($atts)
 
     ob_start();
     ?>
-    <section class="rts-virtual-marathon" aria-label="<?php esc_attr_e("42.2K Referral Marathon Challenge", 'run-the-seas'); ?>">
+    <section class="rts-virtual-marathon" aria-label="<?php esc_attr_e('42.2 km Referral Marathon Challenge', 'run-the-seas'); ?>">
         <header class="rts-virtual-marathon__header">
             <span><?php esc_html_e('Run The Seas', 'run-the-seas'); ?></span>
-            <h1><?php esc_html_e("42.2K Referral Marathon Challenge", 'run-the-seas'); ?></h1>
+            <h1><?php esc_html_e('42.2 km Referral Marathon Challenge', 'run-the-seas'); ?></h1>
             <p><?php esc_html_e('Every kilometre counts. Every step moves you forward.', 'run-the-seas'); ?></p>
         </header>
 
@@ -354,7 +354,7 @@ function rts_virtual_marathon_shortcode($atts)
                 <div class="rts-vm-map" style="background-image:url('<?php echo esc_url($map_url); ?>')">
                     <section class="rts-vm-progress-card">
                         <h2><?php esc_html_e('Your progress', 'run-the-seas'); ?></h2>
-                        <strong><?php echo esc_html(rts_format_miles($current_miles)); ?><small> KM</small></strong>
+                        <strong><?php echo esc_html(rts_format_miles($current_miles)); ?></strong>
                         <span><?php echo esc_html($current_rank ? sprintf(__('Rank #%d', 'run-the-seas'), $current_rank) : __('Begin your voyage', 'run-the-seas')); ?></span>
                         <b><?php echo esc_html(number_format_i18n($trophy_count)); ?> <?php esc_html_e('trophies earned', 'run-the-seas'); ?></b>
                         <?php if ($next_trophy) : ?>

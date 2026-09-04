@@ -13,7 +13,7 @@ function rts_journey_activity_label($type)
         'verification_sent' => 'Verification Email Sent',
         'referral_made' => 'Referral Verified',
         'referral_completed' => 'Referral Verified',
-        'captain_miles_earned' => "Miles Earned",
+        'captain_miles_earned' => 'Verified Referral Progress',
         'trophy_earned' => 'Trophy Earned',
         'captain_suite_activated' => "Captain's Suite Opened",
         'certificate_issued' => 'Certificate Issued',
@@ -151,7 +151,7 @@ function rts_journey_shortcode($atts)
     $updated = current_time('timestamp');
     $email_subject = sprintf('%s — %s', $title, $full_name);
     $email_body = sprintf(
-        "My Run The Seas Journey\n\nCertificate: %s\nVerified referrals: %d\nDistance: %sK of 42.2K\nCruise credits: $%s",
+        "My Run The Seas Journey\n\nCertificate: %s\nVerified referrals: %d\nDistance: %s km of 42.2 km\nCruise credits: $%s",
         $certificate,
         $verified_referrals,
         number_format_i18n($distance, $distance == floor($distance) ? 0 : 1),
@@ -185,15 +185,15 @@ function rts_journey_shortcode($atts)
         <div class="rts-journey__view<?php echo $hero_image ? ' has-image' : ''; ?>"<?php echo $hero_image ? ' style="--rts-journey-hero:url(\'' . esc_url($hero_image) . '\')"' : ''; ?>><?php if ($hero_image) : ?><img class="rts-journey__scene-image" src="<?php echo esc_url($hero_image); ?>" alt="" aria-hidden="true"><?php else : ?><span class="rts-journey__porthole" aria-hidden="true"></span><span class="rts-journey__compass" aria-hidden="true">&#10021;</span><?php endif; ?></div>
 
         <div class="rts-journey__progress">
-            <div class="rts-journey__distance"><span><?php esc_html_e('Current Distance', 'run-the-seas'); ?></span><strong><?php echo esc_html(number_format_i18n($distance, $distance == floor($distance) ? 0 : 1)); ?>K OF 42.2K</strong></div>
-            <div class="rts-journey__track-wrap"><?php if ($progress_start_icon) : ?><img class="rts-journey__track-start" src="<?php echo esc_url($progress_start_icon); ?>" alt=""><?php endif; ?><div class="rts-journey__track"><div class="rts-journey__track-fill" style="width:<?php echo esc_attr(min(100, ($distance / 42.2) * 100)); ?>%"></div><?php foreach ($milestones as $milestone) : $percent = ($milestone / 42.2) * 100; ?><span class="rts-journey__mile<?php echo $distance >= $milestone ? ' is-earned' : ''; ?>" style="left:<?php echo esc_attr($percent); ?>%"><b><?php echo esc_html($milestone); ?>K</b><i></i></span><?php endforeach; ?></div></div>
+            <div class="rts-journey__distance"><span><?php esc_html_e('Current Distance', 'run-the-seas'); ?></span><strong><?php echo esc_html(number_format_i18n($distance, $distance == floor($distance) ? 0 : 1)); ?> km OF 42.2 km</strong></div>
+            <div class="rts-journey__track-wrap"><?php if ($progress_start_icon) : ?><img class="rts-journey__track-start" src="<?php echo esc_url($progress_start_icon); ?>" alt=""><?php endif; ?><div class="rts-journey__track"><div class="rts-journey__track-fill" style="width:<?php echo esc_attr(min(100, ($distance / 42.2) * 100)); ?>%"></div><?php foreach ($milestones as $milestone) : $percent = ($milestone / 42.2) * 100; ?><span class="rts-journey__mile<?php echo $distance >= $milestone ? ' is-earned' : ''; ?>" style="left:<?php echo esc_attr($percent); ?>%"><b><?php echo esc_html($milestone); ?> km</b><i></i></span><?php endforeach; ?></div></div>
         </div>
 
         <div class="rts-journey__summary">
             <div><span><?php esc_html_e('Certificate', 'run-the-seas'); ?></span><strong><?php echo esc_html($certificate); ?></strong></div>
             <div><span><?php esc_html_e('Verified Referrals', 'run-the-seas'); ?></span><strong><?php echo esc_html(number_format_i18n($verified_referrals)); ?></strong></div>
-            <div><span><?php esc_html_e('Current Distance', 'run-the-seas'); ?></span><strong><?php echo esc_html(number_format_i18n($distance, $distance == floor($distance) ? 0 : 1)); ?>K OF 42.2K</strong></div>
-            <div><span><?php esc_html_e('Next Trophy', 'run-the-seas'); ?></span><strong><?php echo esc_html($next_trophy); ?>K</strong></div>
+            <div><span><?php esc_html_e('Current Distance', 'run-the-seas'); ?></span><strong><?php echo esc_html(number_format_i18n($distance, $distance == floor($distance) ? 0 : 1)); ?> km OF 42.2 km</strong></div>
+            <div><span><?php esc_html_e('Next Trophy', 'run-the-seas'); ?></span><strong><?php echo esc_html($next_trophy); ?> km</strong></div>
             <div><span><?php esc_html_e('Cruise Credits', 'run-the-seas'); ?></span><strong>$<?php echo esc_html(number_format_i18n($credit, 0)); ?></strong></div>
             <div><span><?php esc_html_e('Last Activity', 'run-the-seas'); ?></span><strong><?php echo esc_html($last_activity ? wp_date('F j, Y', $last_activity) : '—'); ?></strong></div>
         </div>
@@ -211,7 +211,7 @@ function rts_journey_shortcode($atts)
             $date_value = !empty($entry->activity_date) ? strtotime($entry->activity_date) : 0;
             $category = strpos($type, 'referral') !== false ? 'referral' : (strpos($type, 'trophy') !== false ? 'trophy' : (strpos($type, 'certificate') !== false ? 'certificate' : (strpos($type, 'verif') !== false ? 'verification' : 'other')));
         ?>
-            <tr data-type="<?php echo esc_attr($category); ?>" data-time="<?php echo esc_attr($date_value); ?>"><td><?php echo esc_html($date_value ? wp_date('F j, Y', $date_value) : '—'); ?></td><td><?php echo esc_html(rts_journey_activity_label($type)); ?></td><td><?php echo esc_html($entry->activity_description); ?></td><td><span class="rts-journey__check">✓</span> <?php echo strpos($type, 'miles') !== false ? '+1K' : esc_html__('Completed', 'run-the-seas'); ?></td></tr>
+            <tr data-type="<?php echo esc_attr($category); ?>" data-time="<?php echo esc_attr($date_value); ?>"><td><?php echo esc_html($date_value ? wp_date('F j, Y', $date_value) : '—'); ?></td><td><?php echo esc_html(rts_journey_activity_label($type)); ?></td><td><?php echo strpos($type, 'miles') !== false ? esc_html__('Verified referral progress recorded', 'run-the-seas') : esc_html($entry->activity_description); ?></td><td><span class="rts-journey__check">✓</span> <?php echo strpos($type, 'miles') !== false ? '+1 km' : esc_html__('Completed', 'run-the-seas'); ?></td></tr>
         <?php endforeach; ?>
         </tbody></table></div></div>
         <footer class="rts-journey__footer"><span class="rts-journey__footer-message"><?php if ($footer_icon) : ?><img src="<?php echo esc_url($footer_icon); ?>" alt=""><?php else : ?><span aria-hidden="true">&#9875;</span><?php endif; ?> <?php esc_html_e('Report automatically updated from your member account.', 'run-the-seas'); ?></span><span><?php echo esc_html(sprintf(__('Last updated: %s', 'run-the-seas'), wp_date('F j, Y \a\t g:i A', $updated))); ?></span></footer>

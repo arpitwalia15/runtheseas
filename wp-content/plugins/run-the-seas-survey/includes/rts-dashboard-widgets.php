@@ -89,6 +89,7 @@ function rts_captain_status_shortcode($atts)
         ? rts_get_current_member_next_trophy()
         : null;
     $remaining = $next ? max(0, (int) $next['miles'] - $miles) : 0;
+    $referrals_remaining = (int) ceil($remaining / 1000);
     $frame = rts_dashboard_design_image('status_frame_image');
     $classes = 'rts-captain-status';
     $extra_class = rts_dashboard_extra_classes($atts['class']);
@@ -117,7 +118,7 @@ function rts_captain_status_shortcode($atts)
         </article>
         <article class="rts-captain-status__card rts-captain-status__card--next">
             <?php echo rts_dashboard_card_icon('next_trophy_icon_image', '🏅', 'rts-captain-status__icon'); ?>
-            <div><span><?php esc_html_e('Next Trophy', 'run-the-seas'); ?></span><strong><?php echo esc_html($next ? $next['name'] : __('All Unlocked', 'run-the-seas')); ?></strong><small><?php echo $next ? esc_html(sprintf(__('%s referral away', 'run-the-seas'), rts_format_miles($remaining))) : esc_html__('Marathon complete!', 'run-the-seas'); ?></small></div>
+            <div><span><?php esc_html_e('Next Trophy', 'run-the-seas'); ?></span><strong><?php echo esc_html($next ? $next['name'] : __('All Unlocked', 'run-the-seas')); ?></strong><small><?php echo $next ? esc_html(sprintf(_n('%1$d verified referral needed (%2$s)', '%1$d verified referrals needed (%2$s)', $referrals_remaining, 'run-the-seas'), $referrals_remaining, rts_format_miles($remaining))) : esc_html__('Marathon complete!', 'run-the-seas'); ?></small></div>
         </article>
     </section>
     <?php

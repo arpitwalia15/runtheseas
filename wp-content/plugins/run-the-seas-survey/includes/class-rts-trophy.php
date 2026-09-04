@@ -33,7 +33,7 @@ class RTS_Trophy {
                 'crew_members' => 5,
                 'trophy_type' => '5k',
                 'rank' => 1,
-                'description' => 'Founding Member Marathon - 5K',
+                'description' => 'Founding Runner Marathon - 5K',
                 'image_url' => RTS_PLUGIN_URL . 'assets/images/trophies/5k.png',
                 'icon' => '🏅'
             ),
@@ -43,7 +43,7 @@ class RTS_Trophy {
                 'crew_members' => 5,
                 'trophy_type' => '10k',
                 'rank' => 2,
-                'description' => 'Founding Member Marathon - 10K',
+                'description' => 'Founding Runner Marathon - 10K',
                 'image_url' => RTS_PLUGIN_URL . 'assets/images/trophies/10k.png',
                 'icon' => '🏅'
             ),
@@ -53,7 +53,7 @@ class RTS_Trophy {
                 'crew_members' => 5,
                 'trophy_type' => '15k',
                 'rank' => 3,
-                'description' => 'Founding Member Marathon - 15K',
+                'description' => 'Founding Runner Marathon - 15K',
                 'image_url' => RTS_PLUGIN_URL . 'assets/images/trophies/15k.png',
                 'icon' => '🏅'
             ),
@@ -63,7 +63,7 @@ class RTS_Trophy {
                 'crew_members' => 5,
                 'trophy_type' => '20k',
                 'rank' => 4,
-                'description' => 'Founding Member Marathon - 20K',
+                'description' => 'Founding Runner Marathon - 20K',
                 'image_url' => RTS_PLUGIN_URL . 'assets/images/trophies/20k.png',
                 'icon' => '🏅'
             ),
@@ -73,7 +73,7 @@ class RTS_Trophy {
                 'crew_members' => 5,
                 'trophy_type' => '25k',
                 'rank' => 5,
-                'description' => 'Founding Member Marathon - 25K',
+                'description' => 'Founding Runner Marathon - 25K',
                 'image_url' => RTS_PLUGIN_URL . 'assets/images/trophies/25k.png',
                 'icon' => '🏅'
             ),
@@ -83,7 +83,7 @@ class RTS_Trophy {
                 'crew_members' => 5,
                 'trophy_type' => '30k',
                 'rank' => 6,
-                'description' => 'Founding Member Marathon - 30K',
+                'description' => 'Founding Runner Marathon - 30K',
                 'image_url' => RTS_PLUGIN_URL . 'assets/images/trophies/30k.png',
                 'icon' => '🏅'
             ),
@@ -93,7 +93,7 @@ class RTS_Trophy {
                 'crew_members' => 5,
                 'trophy_type' => '35k',
                 'rank' => 7,
-                'description' => 'Founding Member Marathon - 35K',
+                'description' => 'Founding Runner Marathon - 35K',
                 'image_url' => RTS_PLUGIN_URL . 'assets/images/trophies/35k.png',
                 'icon' => '🏅'
             ),
@@ -734,13 +734,28 @@ class RTS_Trophy {
      */
     private function send_trophy_notification($participant_id, $trophy_key) {
         $participant = $this->registration->get_participant($participant_id);
-        $trophy = $this->trophy_definitions[$trophy_key];
+        $trophy = isset($this->trophy_definitions[$trophy_key])
+            ? $this->trophy_definitions[$trophy_key]
+            : null;
         
         if (!$participant || !$trophy) {
             return;
         }
         
         $crew_members = $this->get_crew_members_count($trophy_key, $trophy['miles_required']);
+        $milestone_key = preg_replace('/^m2-/', '', sanitize_key($trophy_key));
+        $requirements = array(
+            '5k' => array('referrals' => 5, 'kilometres' => '5'),
+            '10k' => array('referrals' => 10, 'kilometres' => '10'),
+            '15k' => array('referrals' => 15, 'kilometres' => '15'),
+            '20k' => array('referrals' => 20, 'kilometres' => '20'),
+            '21k' => array('referrals' => 21, 'kilometres' => '21'),
+            '25k' => array('referrals' => 25, 'kilometres' => '25'),
+            '30k' => array('referrals' => 30, 'kilometres' => '30'),
+            '35k' => array('referrals' => 35, 'kilometres' => '35'),
+            '42k' => array('referrals' => 42, 'kilometres' => '42'),
+        );
+        $requirement = $requirements[$milestone_key] ?? null;
         
         $subject = "🏆 You've Earned a New Trophy! - " . $trophy['name'];
         
@@ -749,7 +764,11 @@ class RTS_Trophy {
         $message .= "**Details:**\n";
         $message .= "• Trophy: " . $trophy['name'] . "\n";
         $message .= "• Crew Members: " . $crew_members . "\n";
-        $message .= "• Miles Required: " . number_format($trophy['miles_required']) . "\n\n";
+        if ($requirement) {
+            $message .= "• Verified referrals needed: " . $requirement['referrals']
+                . " (" . $requirement['kilometres'] . " km)\n";
+        }
+        $message .= "\n";
         $message .= "View your trophy case: " . home_url('/trophy-case') . "\n\n";
         $message .= "Keep going, Captain! 🚀\n\n";
         $message .= "Best regards,\nThe Run The Seas Team";
@@ -835,7 +854,7 @@ class RTS_Trophy {
                 
                 <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 10px 0;">
                     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-                        <span><strong>Total Miles:</strong> <?php echo rts_format_miles($total_miles); ?></span>
+                        <span><strong>Kilometres completed:</strong> <?php echo rts_format_miles($total_miles); ?></span>
                         <span><strong>Trophies Earned:</strong> <?php echo count($trophies); ?>/<?php echo count($definitions); ?></span>
                         <?php if (!$email_verified): ?>
                             <span style="color: #856404;">⚠️ Verify email to unlock trophies</span>
@@ -846,8 +865,8 @@ class RTS_Trophy {
             
             <?php if (empty($trophies)): ?>
                 <div class="rts-no-trophies">
-                    <p>No trophies yet. Earn miles by referring friends!</p>
-                    <p>Every referral earns you 1K for the 42.2K Referral Marathon Challenge.</p>
+                    <p>No trophies yet. Invite friends to start gaining verified referrals!</p>
+                    <p>Every verified referral advances you by 1 km in the 42.2 km Referral Marathon Challenge.</p>
                 </div>
             <?php else: ?>
                 <div class="rts-trophies-grid">
@@ -1133,7 +1152,7 @@ class RTS_Trophy {
                             <span class="rts-trophy-case__title-run-copy"><?php esc_html_e('Run Th', 'run-the-seas'); ?><?php if ($title_icon_url) : ?><img class="rts-trophy-case__title-word-icon" src="<?php echo esc_url($title_icon_url); ?>" alt="" decoding="async"><?php endif; ?><?php esc_html_e('e Seas', 'run-the-seas'); ?></span>
                             <?php if ($marathon_one_decor_urls['title_right_flourish_image']) : ?><img src="<?php echo esc_url($marathon_one_decor_urls['title_right_flourish_image']); ?>" alt="" decoding="async"><?php endif; ?>
                         </div>
-                        <small><?php esc_html_e('Founding Member Marathon', 'run-the-seas'); ?></small>
+                        <small><?php esc_html_e('Founding Runner Marathon', 'run-the-seas'); ?></small>
                         <div class="rts-trophy-case__title-case-line">
                             <?php if ($marathon_one_decor_urls['title_left_compass_image']) : ?><img src="<?php echo esc_url($marathon_one_decor_urls['title_left_compass_image']); ?>" alt="" decoding="async"><?php endif; ?>
                             <strong><?php esc_html_e('Trophy Case', 'run-the-seas'); ?></strong>
@@ -1152,7 +1171,7 @@ class RTS_Trophy {
                     <span><?php echo esc_html($member_name); ?></span>
                 </p>
                 <div class="rts-trophy-case__summary">
-                    <span><?php echo esc_html(rts_format_miles($total_miles)); ?> <?php esc_html_e("Miles", 'run-the-seas'); ?></span>
+                    <span><?php echo esc_html(rts_format_miles($total_miles)); ?> <?php esc_html_e('completed', 'run-the-seas'); ?></span>
                     <span><?php echo esc_html($case_earned_count); ?> / <?php echo esc_html(count($case_items)); ?> <?php echo esc_html(sprintf(__('Marathon %d milestones earned', 'run-the-seas'), $is_marathon_one ? 1 : 2)); ?></span>
                     <?php if (!$email_verified) : ?>
                         <span><?php esc_html_e('Verify your email to unlock new trophies', 'run-the-seas'); ?></span>
@@ -1417,7 +1436,7 @@ class RTS_Trophy {
                 text-align: center;
             ">
                 <h1 style="margin: 0; font-size: 28px; color: #fff;">🏆 RUN THE SEAS</h1>
-                <h2 style="margin: 5px 0; font-size: 18px; opacity: 0.8;">FOUNDING MEMBER MARATHON</h2>
+                <h2 style="margin: 5px 0; font-size: 18px; opacity: 0.8;">FOUNDING RUNNER MARATHON</h2>
                 <p style="margin: 10px 0 0 0; font-size: 16px; opacity: 0.7;">
                     <?php echo esc_html($participant->first_name . ' ' . $participant->last_name); ?>
                     <?php if (!$email_verified): ?>
@@ -1494,7 +1513,7 @@ class RTS_Trophy {
                                 <div style="font-size: 11px; color: #1a7efb; margin-top: 5px;">🔓 Ready to Earn</div>
                             <?php else: ?>
                                 <div style="font-size: 11px; color: #999; margin-top: 5px;">
-                                    🔒 <?php echo rts_format_miles($trophy['miles_required'] - $total_miles); ?> more miles needed
+                                    🔒 <?php echo esc_html((int) ceil(max(0, $trophy['miles_required'] - $total_miles) / 1000)); ?> more verified referrals needed (<?php echo esc_html(rts_format_miles($trophy['miles_required'] - $total_miles)); ?>)
                                 </div>
                             <?php endif; ?>
                         </div>
@@ -1514,7 +1533,7 @@ class RTS_Trophy {
             ">
                 <h3 style="margin: 0; color: #1a7efb;">HOW TO EARN TROPHIES</h3>
                 <p style="color: #666; font-size: 14px; margin: 5px 0;">
-                    Every referral earns you 1K miles for 42.2K Referral Marathon Challenge. Earn enough miles and unlock trophies!
+                    Every verified referral advances you by 1 km in the 42.2 km Referral Marathon Challenge. Reach each kilometre milestone to unlock trophies!
                 </p>
                 <a href="/captains-suite" style="
                     display: inline-block;
@@ -1542,7 +1561,7 @@ class RTS_Trophy {
                 <h3 style="margin: 0 0 5px 0; color: #1a7efb;">RACE PROGRESS</h3>
                 <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
                     <div style="font-size: 24px; font-weight: bold; color: #1a7efb;">
-                        <?php echo rts_format_miles($total_miles); ?> / 42.2K
+                        <?php echo rts_format_miles($total_miles); ?> / 42.2 km
                     </div>
                     <div style="flex: 1; min-width: 200px;">
                         <div style="
@@ -1648,9 +1667,9 @@ class RTS_Trophy {
             ">
                 <div style="font-size: 64px; margin-bottom: 10px;">🏆</div>
                 <h1 style="margin: 0; font-size: 24px; color: #fff;">MARATHON TROPHY</h1>
-                <h2 style="margin: 5px 0; font-size: 18px; opacity: 0.8;"><?php echo esc_html($trophy_def['name']); ?></h2>
+                <h2 style="margin: 5px 0; font-size: 18px; opacity: 0.8; color: #fff;"><?php echo esc_html($trophy_def['name']); ?></h2>
                 <p style="margin: 10px 0 0 0; font-size: 14px; opacity: 0.7;">
-                    FOUNDING MEMBER MARATHON
+                    FOUNDING RUNNER MARATHON
                 </p>
             </div>
             
@@ -1663,7 +1682,7 @@ class RTS_Trophy {
             ">
                 <div style="font-size: 48px; margin-bottom: 10px;">🏆</div>
                 <h2 style="margin: 0; font-size: 20px; color: #1a7efb;"><?php echo esc_html($trophy_def['name']); ?></h2>
-                <p style="color: #666; font-size: 14px;">FOUNDING MEMBER MARATHON</p>
+                <p style="color: #666; font-size: 14px;">FOUNDING RUNNER MARATHON</p>
                 
                 <div style="
                     background: #fff;

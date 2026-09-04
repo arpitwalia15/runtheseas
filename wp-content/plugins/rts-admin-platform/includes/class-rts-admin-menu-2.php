@@ -436,6 +436,13 @@ class RTS_Admin_Menu_2 {
 			"SELECT * FROM " . RTS_DB::table( 'participant_notes' ) . " WHERE participant_id = %d ORDER BY created_at DESC, id DESC",
 			$id
 		) );
+		$tracking_location = null;
+		if ( ! empty( $p->survey_tracking_id ) ) {
+			$tracking_location = $wpdb->get_row( $wpdb->prepare(
+				"SELECT country, city, region, location_source, location_accuracy FROM " . RTS_DB::table( 'survey_tracking' ) . " WHERE id = %d",
+				(int) $p->survey_tracking_id
+			) );
+		}
 
 		$name = trim( (string) ( $p->name ?: trim( (string) $p->first_name . ' ' . (string) $p->last_name ) ) );
 		if ( '' === $name ) { $name = 'Participant #' . $id; }
@@ -443,7 +450,7 @@ class RTS_Admin_Menu_2 {
 		$initials = strtoupper( substr( $name_parts[0], 0, 1 ) . ( count( $name_parts ) > 1 ? substr( end( $name_parts ), 0, 1 ) : '' ) );
 		$registered_raw = $p->registered_at ?: ( $p->registration_date ?: $p->created_at );
 		$registered = $registered_raw ? date_i18n( get_option( 'date_format' ), strtotime( $registered_raw ) ) : '—';
-		$location = implode( ', ', array_filter( array( $p->city, $p->province, $p->country ) ) );
+		$location = implode( ', ', array_filter( array( $p->city, $p->registration_province, $p->country ) ) );
 		$status = $p->email_verified ? 'Verified' : 'Pending';
 		$status_class = $p->email_verified ? 'is-verified' : 'is-pending';
 		$participant_user = $p->user_id ? get_user_by( 'id', (int) $p->user_id ) : get_user_by( 'email', $p->email );
@@ -499,6 +506,64 @@ class RTS_Admin_Menu_2 {
 			$value = $credit ? '$' . number_format_i18n( (float) $credit->value_usd, 0 ) . ' USD' : '—';
 			foreach ( array( 'Credit Status' => $credit_status, 'Redemption' => $redemption, 'Value' => $value ) as $label => $value ) { echo '<div class="rtsap-profile-kpi"><span>' . esc_html( $label ) . '</span><strong>' . esc_html( $value ) . '</strong></div>'; }
 			echo '</div></section></div>';
+
+			$registration_fields = array(
+				'first_name' => array( 'First Name', 'text' ),
+				'last_name' => array( 'Last Name', 'text' ),
+				'phone' => array( 'Mobile Phone', 'text' ),
+				'address' => array( 'Address Line 1', 'textarea' ),
+				'address_2' => array( 'Address Line 2', 'text' ),
+				'city' => array( 'City', 'text' ),
+				'registration_province' => array( 'State / Province', 'text' ),
+				'postal_code' => array( 'ZIP / Postal Code', 'text' ),
+				'registration_country' => array( 'Country Entered at Registration', 'text' ),
+				'detected_country' => array( 'Country Detected During Survey', 'text' ),
+				'country' => array( 'Country Used on Leaderboards & Reports', 'text' ),
+				'gender' => array( 'Gender', 'text' ),
+				'age_range' => array( 'Age Range', 'text' ),
+			);
+			$age_policy_confirmed = ! empty( $p->age_consent_confirmed_at );
+			$age_policy_label = $age_policy_confirmed
+				? sprintf( 'Accepted on %s', date_i18n( get_option( 'date_format' ), strtotime( $p->age_consent_confirmed_at ) ) )
+				: 'Not recorded';
+			$source_text = $tracking_location && $tracking_location->location_source
+				? ucwords( str_replace( '_', ' ', $tracking_location->location_source ) )
+				: 'Not detected';
+			if ( $tracking_location && $tracking_location->location_accuracy ) { $source_text .= ' · ±' . number_format_i18n( (float) $tracking_location->location_accuracy, 0 ) . 'm'; }
+			echo '<section class="rtsap-panel rtsap-registration-details"><div class="rtsap-panel__head"><div><h3>' . esc_html__( 'Registration & Location Details', 'run-the-seas' ) . '</h3><span>'
+				. esc_html__( 'Detected country is preferred automatically; registration country is the fallback. Staff can correct the country used across leaderboards and reports, then mark it verified.', 'run-the-seas' )
+				. '</span></div><span class="rtsap-location-source">' . esc_html( 'Detection: ' . $source_text ) . '</span></div>';
+			if ( current_user_can( 'rts_manage' ) ) {
+				echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" class="rtsap-profile-edit-form rtsap-registration-edit-form">'
+					. '<input type="hidden" name="action" value="rts_participant_edit">' . wp_nonce_field( 'rts_participant_edit', '_rts_nonce', true, false )
+					. '<input type="hidden" name="id" value="' . (int) $id . '">';
+				foreach ( $registration_fields as $field => $config ) {
+					$value = (string) ( $p->$field ?? '' );
+					$wide_class = 'address' === $field ? ' class="rtsap-field-wide"' : '';
+					echo '<label' . $wide_class . '><span>' . esc_html( $config[0] ) . '</span>';
+					if ( 'textarea' === $config[1] ) {
+						echo '<textarea name="' . esc_attr( $field ) . '" rows="2">' . esc_textarea( $value ) . '</textarea>';
+					} else {
+						echo '<input type="' . esc_attr( $config[1] ) . '" name="' . esc_attr( $field ) . '" value="' . esc_attr( $value ) . '">';
+					}
+					echo '</label>';
+				}
+					echo '<label class="rtsap-profile-check-field"><span>' . esc_html__( 'Marketing Consent', 'run-the-seas' ) . '</span><input type="hidden" name="marketing_consent" value="0"><span><input type="checkbox" name="marketing_consent" value="1"' . checked( ! empty( $p->marketing_consent ), true, false ) . '> ' . esc_html__( 'Participant opted in', 'run-the-seas' ) . '</span></label>'
+					. '<label class="rtsap-profile-check-field"><span>' . esc_html__( 'Age & Policy Confirmation', 'run-the-seas' ) . '</span><span><input type="checkbox" disabled' . checked( $age_policy_confirmed, true, false ) . '> ' . esc_html( $age_policy_label ) . '</span></label>'
+					. '<label class="rtsap-profile-check-field"><span>' . esc_html__( 'Country Verification', 'run-the-seas' ) . '</span><input type="hidden" name="country_verified" value="0"><span><input type="checkbox" name="country_verified" value="1"' . checked( ! empty( $p->country_verified ), true, false ) . '> ' . esc_html__( 'Country reviewed and verified', 'run-the-seas' ) . '</span></label>'
+					. '<div class="rtsap-profile-edit-submit"><button type="submit" class="button button-primary">' . esc_html__( 'Save Registration Details', 'run-the-seas' ) . '</button></div></form>';
+			} else {
+				echo '<div class="rtsap-profile-fields rtsap-registration-view-fields">';
+				foreach ( $registration_fields as $field => $config ) {
+					$value = (string) ( $p->$field ?? '' );
+					echo '<div class="rtsap-profile-field"><span>' . esc_html( $config[0] ) . '</span><strong>' . esc_html( '' !== $value ? $value : 'Not recorded' ) . '</strong></div>';
+				}
+				foreach ( array( 'Marketing Consent' => ! empty( $p->marketing_consent ) ? 'Yes' : 'No', 'Age & Policy Confirmation' => $age_policy_label, 'Country Verified' => ! empty( $p->country_verified ) ? 'Yes' : 'No' ) as $label => $value ) {
+					echo '<div class="rtsap-profile-field"><span>' . esc_html( $label ) . '</span><strong>' . esc_html( $value ) . '</strong></div>';
+				}
+				echo '</div>';
+			}
+			echo '</section>';
 
 			$activity_counts = array();
 			foreach ( array_reverse( $refs ) as $ref ) {
@@ -588,7 +653,7 @@ class RTS_Admin_Menu_2 {
 					. self::form( 'merge', '<input type="hidden" name="mode" value="commit"><input type="hidden" name="source_type" value="tracking"><input type="hidden" name="source_id" value="' . (int) $source_id . '">', 'Confirm — Attach Survey Record', array( 'keep_id' => $id ) ) . '</section>';
 			} else {
 			$mid = $source_id;
-			$field_labels = array( 'email' => 'Email', 'name' => 'Display Name', 'first_name' => 'First Name', 'last_name' => 'Last Name', 'phone' => 'Phone', 'runner_status' => 'Runner Status', 'marketing_source' => 'Marketing Source', 'country' => 'Country', 'province' => 'Province', 'city' => 'City', 'gender' => 'Gender', 'age_range' => 'Age Range', 'travel_party_size' => 'Travel Party Size' );
+			$field_labels = array( 'email' => 'Email', 'name' => 'Display Name', 'first_name' => 'First Name', 'last_name' => 'Last Name', 'phone' => 'Phone', 'runner_status' => 'Runner Status', 'marketing_source' => 'Marketing Source', 'country' => 'Country Used Across Site', 'registration_country' => 'Registration Country', 'detected_country' => 'Survey-detected Country', 'province' => 'Province', 'registration_province' => 'Registration State / Province', 'city' => 'City', 'postal_code' => 'ZIP / Postal Code', 'address' => 'Address Line 1', 'address_2' => 'Address Line 2', 'date_of_birth' => 'Date of Birth', 'gender' => 'Gender', 'age_range' => 'Age Range', 'travel_party_size' => 'Travel Party Size', 'emergency_contact_name' => 'Emergency Contact Name', 'emergency_contact_phone' => 'Emergency Contact Phone', 'marketing_consent' => 'Marketing Consent' );
 			echo '<section class="rtsap-panel rtsap-merge-preview"><div class="rtsap-panel__head"><div><h3>' . esc_html__( 'Merge Duplicate Comparison', 'run-the-seas' ) . '</h3><span>' . esc_html__( 'Choose the surviving value for each field, then commit the merge.', 'run-the-seas' ) . '</span></div></div><ul>'
 			   . '<li>Reassign ' . (int) $pv['referrals_to_reassign'] . ' referral(s) to this record</li>'
 			   . '<li>Merge ' . count( (array) $pv['trophies_to_merge'] ) . ' trophy unlock(s)</li>'
@@ -861,15 +926,26 @@ class RTS_Admin_Menu_2 {
 		if ( ! $p ) { self::back( 'rts-participant-profile', 'Error: Participant not found.', array( 'id' => $id ) ); }
 		$user = $p->user_id ? get_user_by( 'id', (int) $p->user_id ) : get_user_by( 'email', $p->email );
 		if ( $user && RTSAP_Frontend_Dashboard::is_platform_user( $user ) ) { self::back( 'rts-participant-profile', 'Error: Staff dashboard accounts must be managed from Security.', array( 'id' => $id ) ); }
-		$fields = array(
-			'email' => sanitize_email( wp_unslash( $_POST['email'] ?? '' ) ),
-			'runner_status' => sanitize_key( wp_unslash( $_POST['runner_status'] ?? '' ) ),
-			'marketing_source' => sanitize_text_field( wp_unslash( $_POST['marketing_source'] ?? '' ) ),
-			'account_status' => sanitize_key( wp_unslash( $_POST['account_status'] ?? '' ) ),
+		$fields = array();
+		$text_fields = array(
+			'first_name','last_name','phone','registration_country','detected_country','country',
+			'city','province','registration_province','postal_code','address_2','date_of_birth','gender','age_range',
+			'emergency_contact_name','emergency_contact_phone','marketing_source',
 		);
+		foreach ( $text_fields as $field ) {
+			if ( array_key_exists( $field, $_POST ) ) { $fields[ $field ] = sanitize_text_field( wp_unslash( $_POST[ $field ] ) ); }
+		}
+		if ( array_key_exists( 'address', $_POST ) ) { $fields['address'] = sanitize_textarea_field( wp_unslash( $_POST['address'] ) ); }
+		if ( array_key_exists( 'email', $_POST ) ) { $fields['email'] = sanitize_email( wp_unslash( $_POST['email'] ) ); }
+		foreach ( array( 'runner_status', 'account_status' ) as $field ) {
+			if ( array_key_exists( $field, $_POST ) ) { $fields[ $field ] = sanitize_key( wp_unslash( $_POST[ $field ] ) ); }
+		}
+		foreach ( array( 'marketing_consent', 'country_verified' ) as $field ) {
+			if ( array_key_exists( $field, $_POST ) ) { $fields[ $field ] = empty( $_POST[ $field ] ) ? 0 : 1; }
+		}
 		$result = RTS_Business_Logic_2::update_participant( $id, $fields, self::admin() );
 		if ( $result['error'] ) { self::back( 'rts-participant-profile', 'Error: ' . $result['error'], array( 'id' => $id ) ); }
-		if ( 'suspended' === $fields['account_status'] ) { self::destroy_participant_sessions( $id ); }
+		if ( 'suspended' === ( $fields['account_status'] ?? '' ) ) { self::destroy_participant_sessions( $id ); }
 		$message = empty( $result['changed'] ) ? 'No profile changes were needed.' : 'Participant profile updated and logged.';
 		self::back( 'rts-participant-profile', $message, array( 'id' => $id ) );
 	}

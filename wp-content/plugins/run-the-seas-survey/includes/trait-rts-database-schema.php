@@ -133,12 +133,23 @@ trait RTS_Database_Schema
             last_name varchar(100) NOT NULL,
             phone varchar(50) DEFAULT NULL,
             country varchar(100) DEFAULT NULL,
+            registration_country varchar(100) DEFAULT NULL,
+            detected_country varchar(100) DEFAULT NULL,
+            country_verified tinyint(1) DEFAULT 0,
+            country_verified_at datetime DEFAULT NULL,
+            country_verified_by bigint(20) DEFAULT NULL,
             city varchar(100) DEFAULT NULL,
+            province varchar(100) DEFAULT NULL,
+            registration_province varchar(100) DEFAULT NULL,
+            postal_code varchar(30) DEFAULT NULL,
             address text DEFAULT NULL,
+            address_2 varchar(255) DEFAULT NULL,
             date_of_birth date DEFAULT NULL,
             gender varchar(20) DEFAULT NULL,
+            age_range varchar(20) DEFAULT NULL,
             emergency_contact_name varchar(255) DEFAULT NULL,
             emergency_contact_phone varchar(50) DEFAULT NULL,
+            marketing_consent tinyint(1) DEFAULT 0,
             age_consent_confirmed_at datetime DEFAULT NULL,
             age_consent_ip_address varchar(45) DEFAULT NULL,
             registration_date datetime DEFAULT NULL,
@@ -298,6 +309,97 @@ trait RTS_Database_Schema
         return is_array($columns)
             && in_array('verification_token', $columns, true)
             && in_array('verification_sent_at', $columns, true);
+    }
+
+    /** Add complete registration and location-source fields on upgrade. */
+    public function ensure_participant_registration_columns()
+    {
+        global $wpdb;
+
+        $table = $wpdb->prefix . 'rts_participants';
+        if ($wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table)) !== $table) {
+            return false;
+        }
+
+        $columns = $wpdb->get_col("SHOW COLUMNS FROM `{$table}`", 0);
+        if (!is_array($columns)) {
+            return false;
+        }
+
+        $required = array(
+            'registration_country' => 'varchar(100) DEFAULT NULL AFTER country',
+            'detected_country' => 'varchar(100) DEFAULT NULL AFTER registration_country',
+            'country_verified' => 'tinyint(1) DEFAULT 0 AFTER detected_country',
+            'country_verified_at' => 'datetime DEFAULT NULL AFTER country_verified',
+            'country_verified_by' => 'bigint(20) DEFAULT NULL AFTER country_verified_at',
+            'province' => 'varchar(100) DEFAULT NULL AFTER city',
+            'registration_province' => 'varchar(100) DEFAULT NULL AFTER province',
+            'postal_code' => 'varchar(30) DEFAULT NULL AFTER registration_province',
+            'address_2' => 'varchar(255) DEFAULT NULL AFTER address',
+            'age_range' => 'varchar(20) DEFAULT NULL AFTER gender',
+            'marketing_consent' => 'tinyint(1) DEFAULT 0 AFTER emergency_contact_phone',
+        );
+
+        foreach ($required as $column => $definition) {
+            if (!in_array($column, $columns, true)) {
+                if (false === $wpdb->query("ALTER TABLE `{$table}` ADD COLUMN `{$column}` {$definition}")) {
+                    return false;
+                }
+                $columns[] = $column;
+            }
+        }
+
+        // Recover a registration state only from registration-owned data. A
+        // tracking region is deliberately not used because it may describe
+        // the participant's current device rather than their mailing address.
+        $participants = $wpdb->get_results("SELECT id, user_id, province, registration_province FROM `{$table}`");
+        foreach ((array) $participants as $participant) {
+            if (!empty($participant->registration_province)) {
+                continue;
+            }
+
+            $registration_province = '';
+            $pending = get_option('rts_pending_registration_' . (int) $participant->id);
+            if (is_array($pending) && !empty($pending['post_data']['state'])) {
+                $registration_province = sanitize_text_field($pending['post_data']['state']);
+            } elseif (!empty($participant->user_id)) {
+                $registration_province = sanitize_text_field(
+                    (string) get_user_meta((int) $participant->user_id, 'rts_province', true)
+                );
+            }
+
+            if ('' !== $registration_province) {
+                $wpdb->update(
+                    $table,
+                    array('registration_province' => $registration_province, 'province' => $registration_province),
+                    array('id' => (int) $participant->id),
+                    array('%s', '%s'),
+                    array('%d')
+                );
+            }
+        }
+
+        // Preserve the original saved country before detected survey location
+        // becomes the public/reporting value for existing participants.
+        $wpdb->query("UPDATE `{$table}`
+            SET registration_country = country
+            WHERE (registration_country IS NULL OR registration_country = '')
+              AND country IS NOT NULL AND country != ''");
+
+        $tracking_table = $wpdb->prefix . 'rts_survey_tracking';
+        if ($wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $tracking_table)) === $tracking_table) {
+            $wpdb->query("UPDATE `{$table}` p
+                INNER JOIN `{$tracking_table}` st ON st.id = p.survey_tracking_id
+                SET p.detected_country = st.country
+                WHERE st.country IS NOT NULL AND st.country != ''");
+            $wpdb->query("UPDATE `{$table}` p
+                INNER JOIN `{$tracking_table}` st ON st.id = p.survey_tracking_id
+                SET p.country = st.country
+                WHERE st.country IS NOT NULL AND st.country != ''
+                  AND (p.country_verified IS NULL OR p.country_verified = 0)");
+        }
+
+        return true;
     }
 
     public function create_race_tables()

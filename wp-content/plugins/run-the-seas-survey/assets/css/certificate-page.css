@@ -112,6 +112,7 @@
 }
 
 .rts-certificate-page__viewer {
+    aspect-ratio: 1076 / 802;
     max-width: 1300px;
     margin: 0 auto;
     overflow: hidden;
@@ -119,16 +120,16 @@
     border-radius: 16px;
     background: #f4ead6;
     box-shadow: 0 0 0 5px rgba(255, 220, 137, .18), 0 22px 42px rgba(0, 0, 0, .62);
-    margin-top: 430px;
 }
 
-.rts-certificate-page__viewer iframe {
+.rts-certificate-page__viewer iframe,
+.rts-certificate-page__viewer img {
     display: block;
     width: 100%;
-    height: min(72.8vw, 930px);
-    min-height: 430px;
+    height: 100%;
     border: 0;
     background: #f4ead6;
+    object-fit: contain;
 }
 
 .rts-certificate-page__actions {
@@ -271,7 +272,7 @@
     left: var(--rts-certificate-left, 18.1%);
     width: var(--rts-certificate-width, 63.8%);
     max-width: none;
-    aspect-ratio: 1470 / 1070;
+    aspect-ratio: 1076 / 802;
     margin: 0;
 }
 
@@ -336,11 +337,6 @@
 
     .rts-certificate-page__brand-mark {
         font-size: 2.5rem;
-    }
-
-    .rts-certificate-page__viewer iframe {
-        height: 72.8vw;
-        min-height: 320px;
     }
 
     .rts-certificate-page__actions {

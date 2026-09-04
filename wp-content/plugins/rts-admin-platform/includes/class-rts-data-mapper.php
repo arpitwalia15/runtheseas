@@ -184,9 +184,12 @@ class RTSAP_Data_Mapper {
 			referred_by_participant_id = COALESCE(referred_by_participant_id, referred_by),
 			account_status = COALESCE(NULLIF(account_status,''), 'active')" );
 
-		$rows = $wpdb->get_results( "SELECT id, email, survey_tracking_id, unsubscribe_token, country, gender, age_range, household_income_bracket FROM $participants" );
+		$rows = $wpdb->get_results( "SELECT id, email, survey_tracking_id, unsubscribe_token, country, registration_country, detected_country, country_verified, gender, age_range, household_income_bracket FROM $participants" );
 		foreach ( $rows as $participant ) {
 			$data = array();
+			if ( empty( $participant->registration_country ) && ! empty( $participant->country ) && ! self::looks_like_income( $participant->country ) ) {
+				$data['registration_country'] = mb_substr( trim( (string) $participant->country ), 0, 100 );
+			}
 			if ( empty( $participant->unsubscribe_token ) ) {
 				$data['unsubscribe_token'] = substr( hash_hmac( 'sha256', $participant->email . '|' . $participant->id, wp_salt( 'auth' ) ), 0, 40 );
 			}
@@ -196,11 +199,13 @@ class RTSAP_Data_Mapper {
 				if ( $tracking_id ) { $data['survey_tracking_id'] = $tracking_id; }
 			}
 			if ( $tracking_id && self::exists( $tracking ) ) {
-				$track = $wpdb->get_row( $wpdb->prepare( "SELECT referral_source, country, region FROM $tracking WHERE id = %d", $tracking_id ) );
+				$track = $wpdb->get_row( $wpdb->prepare( "SELECT referral_source, country FROM $tracking WHERE id = %d", $tracking_id ) );
 				if ( $track ) {
 					if ( $track->referral_source ) { $data['marketing_source'] = mb_substr( $track->referral_source, 0, 50 ); }
-					if ( $track->country && ( empty( $participant->country ) || self::looks_like_income( $participant->country ) ) ) { $data['country'] = $track->country; }
-					if ( $track->region ) { $data['province'] = $track->region; }
+					if ( $track->country ) {
+						$data['detected_country'] = mb_substr( trim( (string) $track->country ), 0, 100 );
+						if ( empty( $participant->country_verified ) ) { $data['country'] = $data['detected_country']; }
+					}
 				}
 			}
 			if ( $tracking_id && self::exists( $answers ) ) {
@@ -208,7 +213,6 @@ class RTSAP_Data_Mapper {
 				// Do not trust question_id here: historical imports may reuse or
 				// coerce those keys, which can put an income answer in every field.
 				$answer_map = array(
-					'country'                  => '%country do you currently live in%',
 					'age_range'                => '%what is your age range%',
 					'gender'                   => '%describe your gender%',
 					'household_income_bracket' => '%annual household income%',
@@ -224,7 +228,12 @@ class RTSAP_Data_Mapper {
 			// If corrupted demographic values cannot be repaired from a linked
 			// survey answer, clear them instead of continuing to report income as
 			// a country, gender, or age. A valid existing value is preserved.
-			if ( ! array_key_exists( 'country', $data ) && self::looks_like_income( $participant->country ) ) { $data['country'] = null; }
+			if ( ! array_key_exists( 'country', $data ) && empty( $participant->country_verified ) ) {
+				$fallback_country = ! empty( $participant->detected_country )
+					? $participant->detected_country
+					: ( $participant->registration_country ?: $participant->country );
+				$data['country'] = self::looks_like_income( $fallback_country ) ? null : $fallback_country;
+			}
 			if ( ! array_key_exists( 'gender', $data ) && ! empty( $participant->gender ) && ! self::valid_demographic_value( 'gender', $participant->gender ) ) { $data['gender'] = null; }
 			if ( ! array_key_exists( 'age_range', $data ) && ! empty( $participant->age_range ) && ! self::valid_demographic_value( 'age_range', $participant->age_range ) ) { $data['age_range'] = null; }
 			if ( ! array_key_exists( 'household_income_bracket', $data ) && ! empty( $participant->household_income_bracket ) && ! self::valid_demographic_value( 'household_income_bracket', $participant->household_income_bracket ) ) { $data['household_income_bracket'] = null; }

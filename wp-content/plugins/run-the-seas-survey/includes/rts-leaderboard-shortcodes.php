@@ -52,7 +52,7 @@ function rts_captains_leaderboard_shortcode($atts)
     ));
 
     if (empty($leaders)) {
-        return '<p class="rts-captains-leaderboard__empty">' . esc_html__('No Captain’s Miles have been earned yet.', 'run-the-seas') . '</p>';
+        return '<p class="rts-captains-leaderboard__empty">' . esc_html__('No verified referrals have been recorded yet.', 'run-the-seas') . '</p>';
     }
 
     $current = rts_get_current_member_participant();
@@ -109,8 +109,8 @@ function rts_leaderboard_header_shortcode($atts)
     return '<div class="rts-leaderboard-header"><p class="rts-leaderboard-header__live"><span></span>'
         . esc_html__('Live Leaderboard', 'run-the-seas') . '</p><h2>'
         . esc_html__('The', 'run-the-seas') . ' <strong>' . esc_html(42000 === $target ? rts_format_trophy_miles($target, '42k') : rts_format_miles($target)) . '</strong> '
-        . esc_html__('Referral Marathon Challenge', 'run-the-seas') . '</h2><p>'
-        . esc_html__('Every verified referral moves you 1K closer to the finish line.', 'run-the-seas') . '</p><small>'
+        . esc_html__('Referral Marathon Challenge Leaderboard', 'run-the-seas') . '</h2><p>'
+        . esc_html__('Every verified referral advances you by 1 km toward the finish line.', 'run-the-seas') . '</p><small>'
         . esc_html(sprintf(__('Last updated: %s', 'run-the-seas'), current_time(get_option('time_format')))) . '</small></div>';
 }
 add_shortcode('rts_leaderboard_header', 'rts_leaderboard_header_shortcode');
@@ -119,7 +119,7 @@ add_shortcode('rts_leaderboard_header', 'rts_leaderboard_header_shortcode');
 function rts_leaderboard_how_it_works_shortcode()
 {
     $items = array(
-        __('Every verified referral earns 1K Captain’s Miles.', 'run-the-seas'),
+        __('Every verified referral advances you by 1 km.', 'run-the-seas'),
         __('Your kilometres accumulate automatically.', 'run-the-seas'),
         __('Reach milestones to unlock Run The Seas trophies.', 'run-the-seas'),
         __('Standings update as verified referrals are recorded.', 'run-the-seas'),
@@ -143,7 +143,7 @@ function rts_leaderboard_podium_shortcode()
          ORDER BY total_captain_miles_earned DESC, captain_miles_balance DESC, id ASC LIMIT 3"
     );
     if (empty($leaders)) {
-        return '<p class="rts-leaderboard-empty">' . esc_html__('No Captain’s Miles have been earned yet.', 'run-the-seas') . '</p>';
+        return '<p class="rts-leaderboard-empty">' . esc_html__('No verified referrals have been recorded yet.', 'run-the-seas') . '</p>';
     }
 
     $output = '<div class="rts-leaderboard-podium">';
@@ -390,7 +390,13 @@ function rts_leaderboard_track_milestones($target, $miles = 0)
                 'name' => $milestone['name'],
                 'position' => min(100, $local_miles / $target * 100),
                 'earned' => $miles >= $absolute_miles,
-                'label' => rts_format_trophy_miles($local_miles, $key),
+                // The surrounding column already identifies kilometres. Keep
+                // these tightly spaced marker labels numeric to avoid overlap.
+                'label' => preg_replace(
+                    '/\s*km$/i',
+                    '',
+                    rts_format_trophy_miles($local_miles, $key)
+                ) . 'K',
             );
         } else {
             $track[$identity]['earned'] = $track[$identity]['earned'] || $miles >= $absolute_miles;
@@ -460,7 +466,7 @@ function rts_leaderboard_standings_shortcode($atts)
 
     $current = rts_get_current_member_participant();
     if (empty($leaders) && !$current) {
-        return '<p class="rts-leaderboard-empty">' . esc_html__('No Captain’s Miles have been earned yet.', 'run-the-seas') . '</p>';
+        return '<p class="rts-leaderboard-empty">' . esc_html__('No verified referrals have been recorded yet.', 'run-the-seas') . '</p>';
     }
 
     // Keep the member in their real ranked position. Their personal row is
@@ -700,7 +706,7 @@ function rts_live_leaderboard_shortcode($atts)
         <header class="rts-live-leaderboard__hero">
             <p class="rts-live-leaderboard__live"><span aria-hidden="true"></span><?php esc_html_e('Live Leaderboard', 'run-the-seas'); ?></p>
             <h1><?php esc_html_e('The', 'run-the-seas'); ?> <strong><?php echo esc_html(42000 === $target ? rts_format_trophy_miles($target, '42k') : rts_format_miles($target)); ?></strong> <?php esc_html_e('Referral Marathon Challenge', 'run-the-seas'); ?></h1>
-            <p><?php esc_html_e('Every verified referral moves you 1K closer to the finish line.', 'run-the-seas'); ?></p>
+            <p><?php esc_html_e('Every verified referral advances you by 1 km toward the finish line.', 'run-the-seas'); ?></p>
             <small><?php echo esc_html(sprintf(__('Last updated: %s', 'run-the-seas'), $updated)); ?></small>
         </header>
 
@@ -721,7 +727,7 @@ function rts_live_leaderboard_shortcode($atts)
             <aside class="rts-live-leaderboard__how-it-works">
                 <h2><?php esc_html_e('How the leaderboard works', 'run-the-seas'); ?></h2>
                 <ul>
-                    <li><?php esc_html_e('Every verified referral earns 1K Captain’s Miles.', 'run-the-seas'); ?></li>
+                    <li><?php esc_html_e('Every verified referral advances you by 1 km.', 'run-the-seas'); ?></li>
                     <li><?php esc_html_e('Your kilometres accumulate automatically.', 'run-the-seas'); ?></li>
                     <li><?php esc_html_e('Reach milestones to unlock Run The Seas trophies.', 'run-the-seas'); ?></li>
                     <li><?php esc_html_e('Standings update as verified referrals are recorded.', 'run-the-seas'); ?></li>
@@ -731,7 +737,7 @@ function rts_live_leaderboard_shortcode($atts)
             <div class="rts-live-leaderboard__standings">
                 <h2><?php esc_html_e('Current standings', 'run-the-seas'); ?></h2>
                 <?php if (empty($leaders)) : ?>
-                    <p><?php esc_html_e('No Captain’s Miles have been earned yet.', 'run-the-seas'); ?></p>
+                    <p><?php esc_html_e('No verified referrals have been recorded yet.', 'run-the-seas'); ?></p>
                 <?php else : ?>
                     <div class="rts-live-leaderboard__labels" aria-hidden="true"><span><?php esc_html_e('Rank', 'run-the-seas'); ?></span><span><?php esc_html_e('Participant', 'run-the-seas'); ?></span><span><?php esc_html_e('Country', 'run-the-seas'); ?></span><span><?php esc_html_e('Distance', 'run-the-seas'); ?></span><span><?php esc_html_e('Progress', 'run-the-seas'); ?></span></div>
                     <?php foreach ($leaders as $index => $leader) :

@@ -339,6 +339,7 @@ trait RTS_Survey_Ajax
         );
 
         if ($updated !== false) {
+            $this->sync_participant_country_from_tracking($tracking_id);
             // Get submission_id for logging
             $submission_id = $wpdb->get_var(
                 $wpdb->prepare(
@@ -401,6 +402,7 @@ trait RTS_Survey_Ajax
         );
 
         if ($updated !== false) {
+            $this->sync_participant_country_from_tracking($tracking_id);
             // Get submission_id for logging
             $submission_id = $wpdb->get_var(
                 $wpdb->prepare(
@@ -424,6 +426,20 @@ trait RTS_Survey_Ajax
             ));
         } else {
             wp_send_json_error('Failed to update fallback location');
+        }
+    }
+
+    /** Keep the participant's effective country aligned with survey tracking. */
+    private function sync_participant_country_from_tracking($tracking_id)
+    {
+        global $wpdb;
+
+        $participant_id = (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT id FROM {$wpdb->prefix}rts_participants WHERE survey_tracking_id = %d LIMIT 1",
+            absint($tracking_id)
+        ));
+        if ($participant_id && $this->registration instanceof RTS_Registration) {
+            $this->registration->sync_location_from_tracking($participant_id, $tracking_id);
         }
     }
 

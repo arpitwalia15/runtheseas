@@ -208,9 +208,26 @@ function rts_resolve_transactional_email_template($action_key, $default_subject,
         $configured_preview = is_array($assets) && !empty($assets['certificate_preview_image'])
             ? esc_url_raw($assets['certificate_preview_image'])
             : '';
-        if ($configured_preview !== '' && $configured_preview !== $context['certificate_preview_url']) {
+
+        // Previously saved templates may contain the old bundled image URL
+        // instead of the merge field. Upgrade those URLs at send time too, so
+        // existing templates adopt the approved certificate without a resave.
+        $legacy_previews = array(
+            $configured_preview,
+            RTS_PLUGIN_URL . 'assets/register-page-sample-certificate.png',
+            RTS_PLUGIN_URL . 'assets/certificate-template.jpg',
+            RTS_PLUGIN_URL . 'assets/certificate-template.png',
+            RTS_PLUGIN_URL . 'assets/certificate-template--.png',
+            RTS_PLUGIN_URL . 'assets/certificate-template-------.png',
+            RTS_PLUGIN_URL . 'assets/certificate-template--old.png',
+            RTS_PLUGIN_URL . 'assets/certificate-template%20%281%29.png',
+        );
+        foreach (array_unique(array_filter($legacy_previews)) as $legacy_preview) {
+            if ($legacy_preview === $context['certificate_preview_url']) {
+                continue;
+            }
             $html = str_replace(
-                array($configured_preview, esc_url($configured_preview)),
+                array($legacy_preview, esc_url($legacy_preview)),
                 '{certificate_preview_url}',
                 $html
             );
@@ -285,12 +302,16 @@ function rts_get_transactional_email_editor_preview_context($action_key = '')
     $assets = get_option($asset_option, array());
     $assets = is_array($assets) ? $assets : array();
 
-    $certificate_preview_url = !empty($assets['certificate_preview_image'])
-        ? esc_url_raw($assets['certificate_preview_image'])
-        : esc_url_raw(RTS_PLUGIN_URL . 'assets/certificate-template.png');
+    if ('email_verification' === $action_key) {
+        $certificate_preview_url = esc_url_raw(RTS_PLUGIN_URL . 'assets/certificate-confirmation-preview-v4.jpg');
+    } else {
+        $certificate_preview_url = !empty($assets['certificate_preview_image'])
+            ? esc_url_raw($assets['certificate_preview_image'])
+            : esc_url_raw(RTS_PLUGIN_URL . 'assets/certificate-backplate-v3.jpg');
+    }
 
-    // Use a real personalised preview in the admin editor. The base artwork is
-    // intentionally blank, which made correct dynamic templates look broken.
+    // Use the approved confirmation sample for verification emails and a
+    // personalised render of the shared backplate for certificate emails.
     if (
         in_array($action_key, array('email_verification', 'founding_runner_certificate'), true)
         && function_exists('rts_init')

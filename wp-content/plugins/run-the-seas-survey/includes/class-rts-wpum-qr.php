@@ -369,7 +369,7 @@ class RTS_BuddyPress_QR
                     </div>
                     <label class="rts-profile-check">
                         <input type="checkbox" name="rts_referral_progress_notifications" value="1" <?php checked($referral_progress_notifications); ?>>
-                        <span><strong><?php esc_html_e('Referral progress emails', 'run-the-seas'); ?></strong><small><?php esc_html_e('Email me when a referral verifies and I earn Captain’s Miles.', 'run-the-seas'); ?></small></span>
+                        <span><strong><?php esc_html_e('Referral progress emails', 'run-the-seas'); ?></strong><small><?php esc_html_e('Email me when a referral is verified and advances my kilometre progress.', 'run-the-seas'); ?></small></span>
                     </label>
                 </section>
 
@@ -1636,19 +1636,19 @@ class RTS_BuddyPress_QR
                     <div style="font-size: 48px; margin-bottom: 15px;">🏃</div>
                     <h3 style="color: #856404; margin: 0;">Keep Going, Captain!</h3>
                     <p style="color: #856404; font-size: 16px; max-width: 500px; margin: 10px auto;">
-                        You need to earn <strong><?php echo rts_format_miles(5000 - $total_miles); ?></strong> more Miles 
+                        You need <strong><?php echo esc_html((int) ceil(max(0, 5000 - $total_miles) / 1000)); ?></strong> more verified referrals
                         to unlock your QR Code Card.
                     </p>
                     <div style="background: #fff; border-radius: 8px; padding: 15px; margin: 15px auto; max-width: 400px;">
                         <div style="display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 5px;">
                             <span>Progress</span>
-                            <span><?php echo rts_format_miles($total_miles); ?> / 5K</span>
+                            <span><?php echo rts_format_miles($total_miles); ?> / 5 km</span>
                         </div>
                         <div style="height: 8px; background: #e9ecef; border-radius: 4px; overflow: hidden;">
                             <div style="height: 100%; width: <?php echo min(($total_miles / 5000) * 100, 100); ?>%; background: linear-gradient(90deg, #1a7efb, #28a745); border-radius: 4px;"></div>
                         </div>
                     </div>
-                    <p style="font-size: 13px; color: #856404;">💡 Earn miles by referring friends! Every successful referral = 1K miles.</p>
+                    <p style="font-size: 13px; color: #856404;">💡 Invite friends to join. Every verified referral advances you by 1 km.</p>
                 </div> -->
 
             <?php //$this->render_referral_share_options($participant, $referral_link); 
@@ -1708,7 +1708,7 @@ class RTS_BuddyPress_QR
             </div>
 
             <div style="margin-top: 20px; font-size: 12px; color: #999; text-align: center;">
-                <p>Share your QR card with friends and family to earn <strong>1K miles for the 42.2K Referral Marathon Challenge</strong> per referral!</p>
+                <p>Share your QR card with friends and family. Each verified referral advances you by <strong>1 km in the 42.2 km Referral Marathon Challenge</strong>.</p>
             </div>
             <?php //endif; 
             ?>
@@ -1922,7 +1922,7 @@ class RTS_BuddyPress_QR
     ?>
         <div class="rts-referral-share-section" style="background: #fff; border-radius: 12px; padding: 20px; margin-top: 20px; border: 1px solid #dee2e6;">
             <h4 style="color: #1a7efb; margin: 0 0 10px 0;">🔗 Share Your Referral Link</h4>
-            <p style="font-size: 13px; color: #666; margin-bottom: 10px;">Share this link with friends and family to participate for the 42.2K Referral Marathon Challenge!</p>
+            <p style="font-size: 13px; color: #666; margin-bottom: 10px;">Share this link with friends and family to participate in the 42.2 km Referral Marathon Challenge!</p>
 
             <div style="background: #f8f9fa; padding: 10px 15px; border-radius: 6px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; border: 1px solid #dee2e6; margin: 10px 0;">
                 <input type="text" value="<?php echo esc_url($referral_link); ?>" readonly id="rts-share-link" onclick="this.select()" style="flex: 1; min-width: 200px; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; background: #fff; font-size: 13px; font-family: monospace; color: #333;">
@@ -1939,7 +1939,7 @@ class RTS_BuddyPress_QR
                 <button onclick="window.location.href='mailto:?subject=Join%20me%20as%20a%20Founding%20Runner!&body=Join%20me%20as%20a%20Founding%20Runner%20with%20Run%20The%20Seas!%20<?php echo urlencode($referral_link); ?>'; rtsTrackShareEvent('share', 'email');" style="padding: 6px 14px; background: #6c757d; color: #fff; border: none; border-radius: 4px; font-size: 12px; cursor: pointer; font-weight: 600;">📧 Email</button>
             </div>
 
-            <div style="font-size: 11px; color: #999; text-align: center; margin-top: 10px;">💡 Each successful referral earns you 1K for the 42.2K Referral Marathon Challenge!</div>
+            <div style="font-size: 11px; color: #999; text-align: center; margin-top: 10px;">💡 Each verified referral advances you by 1 km in the 42.2 km Referral Marathon Challenge!</div>
         </div>
 <?php
     }
