@@ -108,6 +108,166 @@ function rts_enforce_verification_certificate_width($html)
 }
 
 /**
+ * Render certificate personalization over the blank backplate without GD.
+ *
+ * The ordinary path sends a baked PNG. This table/VML version is only used
+ * when the live server returns the untouched artwork because image processing
+ * is unavailable. VML supplies the background in desktop Outlook, while the
+ * table background covers Gmail, Apple Mail, and web clients.
+ */
+function rts_render_email_certificate_html_fallback($backplate_url, array $context = array())
+{
+    $backplate_url = esc_url((string) $backplate_url);
+    if ($backplate_url === '') {
+        return '';
+    }
+
+    $name = trim((string) ($context['full_name'] ?? ''));
+    if ($name === '') {
+        $name = trim((string) ($context['first_name'] ?? '') . ' ' . (string) ($context['last_name'] ?? ''));
+    }
+    $name = $name !== '' ? $name : __('Founding Runner', 'run-the-seas');
+    $runner_number = trim((string) ($context['founding_runner_number'] ?? ''));
+    $certificate_number = trim((string) ($context['certificate_number'] ?? ''));
+    $status = strtoupper(trim((string) ($context['certificate_status'] ?? 'PENDING')));
+    $issued_date = trim((string) ($context['certificate_issued_date'] ?? ''));
+
+    $runner_number = $runner_number !== '' ? $runner_number : __('Pending', 'run-the-seas');
+    $certificate_number = $certificate_number !== '' ? $certificate_number : __('Pending', 'run-the-seas');
+    $status = $status !== '' ? $status : 'PENDING';
+    $issued_date = $issued_date !== '' ? $issued_date : __('Pending verification', 'run-the-seas');
+    $status_colour = 'APPROVED' === $status ? '#2d995b' : ('VOID' === $status ? '#9b2c2c' : '#be7e12');
+
+    $content = '<table role="presentation" width="490" height="366" cellspacing="0" cellpadding="0" border="0" background="' . $backplate_url . '" style="width:490px;height:366px;border-collapse:collapse;background-color:#f2e5cf;background-image:url(\'' . $backplate_url . '\');background-position:center center;background-repeat:no-repeat;background-size:490px 366px;">'
+        . '<tr><td height="140" style="height:140px;font-size:0;line-height:0;">&nbsp;</td></tr>'
+        . '<tr><td height="30" align="center" valign="middle" style="height:30px;padding:0 72px;color:#071b3b;font-family:Georgia,\'Times New Roman\',serif;font-size:20px;font-style:italic;font-weight:bold;line-height:22px;white-space:nowrap;">' . esc_html($name) . '</td></tr>'
+        . '<tr><td height="86" style="height:86px;font-size:0;line-height:0;">&nbsp;</td></tr>'
+        . '<tr><td height="49" valign="top" style="height:49px;padding:0 0 0 32px;color:#071b3b;font-family:Arial,Helvetica,sans-serif;text-align:left;">'
+        . '<table role="presentation" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;color:#071b3b;font-family:Arial,Helvetica,sans-serif;text-align:left;">'
+        . '<tr><td colspan="2" style="padding:0;font-size:7px;line-height:8px;color:#2c4156;">FOUNDING RUNNER NUMBER</td></tr>'
+        . '<tr><td colspan="2" style="padding:1px 0 3px;font-size:12px;line-height:13px;font-weight:bold;">' . esc_html($runner_number) . '</td></tr>'
+        . '<tr><td style="padding:0 6px 0 0;font-size:7px;line-height:9px;color:#2c4156;">CERTIFICATE NO.</td><td style="padding:0;font-size:7px;line-height:9px;font-weight:bold;white-space:nowrap;">' . esc_html($certificate_number) . '&nbsp;&nbsp;<span style="display:inline-block;padding:1px 4px;background:' . esc_attr($status_colour) . ';color:#ffffff;font-size:6px;line-height:8px;font-weight:bold;">' . esc_html($status) . '</span></td></tr>'
+        . '<tr><td style="padding:1px 6px 0 0;font-size:7px;line-height:9px;color:#2c4156;">ISSUED:</td><td style="padding:1px 0 0;font-size:7px;line-height:9px;font-weight:bold;white-space:nowrap;">' . esc_html($issued_date) . '</td></tr>'
+        . '</table></td></tr>'
+        . '<tr><td height="61" style="height:61px;font-size:0;line-height:0;">&nbsp;</td></tr>'
+        . '</table>';
+
+    return '<!--[if gte mso 9]><v:rect xmlns:v="urn:schemas-microsoft-com:vml" fill="true" stroke="false" style="width:490px;height:366px;"><v:fill type="frame" src="' . $backplate_url . '" color="#f2e5cf"/><v:textbox inset="0,0,0,0"><![endif]-->'
+        . $content
+        . '<!--[if gte mso 9]></v:textbox></v:rect><![endif]-->';
+}
+
+/** Identify certificate slots in saved transactional templates, including Media Library artwork. */
+function rts_is_email_certificate_image($source, $alt, $action_key, $preview_url = '')
+{
+    if (!in_array($action_key, array('email_verification', 'founding_runner_certificate'), true)) {
+        return false;
+    }
+    $source = html_entity_decode(trim((string) $source), ENT_QUOTES, 'UTF-8');
+    if ('{certificate_preview_url}' === $source || ($preview_url !== '' && $source === $preview_url)) {
+        return true;
+    }
+    if (in_array(trim((string) $alt), array('Preview of your Founding Runner Cruise Credit', 'Your Founding Runner Gift Certificate'), true)) {
+        return true;
+    }
+    foreach (array('rts_verification_email_design_assets', 'rts_certificate_email_design_assets') as $option) {
+        $assets = get_option($option, array());
+        if (is_array($assets) && !empty($assets['certificate_preview_image']) && $source === $assets['certificate_preview_image']) {
+            return true;
+        }
+    }
+
+    $path = rawurldecode((string) wp_parse_url($source, PHP_URL_PATH));
+    $filename = str_replace('_', '-', strtolower(basename($path)));
+    // Match the approved named backplates, including WordPress thumbnail,
+    // duplicate-upload, and scaled suffixes. Do not match arbitrary certificates
+    // or certificate-related button/icon images.
+    return (bool) preg_match('~^(?:runtheseas-)?certificate-(?:backplate|template|confirmation-preview)(?:-v\d+)?(?:-\d+|-(?:\d+x\d+)|-scaled|-old|--*|[ -]*\(\d+\))*\.(?:jpe?g|png|webp)$~i', $filename)
+        || 'register-page-sample-certificate.png' === $filename
+        || (bool) preg_match('~/rts-certificate-previews/verification-preview-\d+-[a-f0-9]+\.png$~i', $path)
+        || false !== strpos($source, 'rts_certificate_preview=1');
+}
+
+/**
+ * Keep the selected backplate separate from the personalized image merge field.
+ * The same normalization runs when editing, saving, and sending a template, so
+ * existing static Media Library images are repaired without a manual HTML edit.
+ */
+function rts_normalize_email_certificate_template($html, $action_key, $preview_url = '')
+{
+    $result = array('html_body' => (string) $html, 'backplate_url' => '', 'sources' => array());
+    if (!in_array($action_key, array('email_verification', 'founding_runner_certificate'), true)) {
+        return $result;
+    }
+    $tags = new WP_HTML_Tag_Processor((string) $html);
+    while ($tags->next_tag('IMG')) {
+        $source = (string) $tags->get_attribute('src');
+        $backplate = (string) $tags->get_attribute('data-rts-certificate-backplate');
+        if ($backplate === '' && !rts_is_email_certificate_image($source, $tags->get_attribute('alt'), $action_key, $preview_url)) {
+            continue;
+        }
+        $result['sources'][] = $source;
+        if ($backplate === '' && $source !== '{certificate_preview_url}' && $source !== $preview_url
+            && false === strpos($source, '/rts-certificate-previews/') && false === strpos($source, 'rts_certificate_preview=')) {
+            $backplate = esc_url_raw($source);
+        }
+        if ($backplate !== '') {
+            $backplate = esc_url_raw($backplate);
+            $result['backplate_url'] = $backplate;
+            $tags->set_attribute('data-rts-certificate-backplate', $backplate);
+        }
+        // Tag Processor URL-escapes src values, which strips merge-field braces.
+        // Use a reserved URL during parsing and restore the token afterwards.
+        $tags->set_attribute('src', 'https://rts-template.invalid/certificate-preview-url');
+        $tags->set_attribute('alt', 'email_verification' === $action_key
+            ? 'Preview of your Founding Runner Cruise Credit' : 'Your Founding Runner Gift Certificate');
+        // A Media Library srcset or lazy-load URL can override the personalized
+        // src in supporting clients. Keep just the recipient-aware source.
+        foreach (array('srcset', 'sizes', 'data-src', 'data-srcset', 'data-lazy-src', 'data-mce-src') as $attribute) {
+            $tags->remove_attribute($attribute);
+        }
+    }
+    $result['html_body'] = str_replace('src="https://rts-template.invalid/certificate-preview-url"',
+        'src="{certificate_preview_url}"', $tags->get_updated_html());
+    $links = new WP_HTML_Tag_Processor($result['html_body']);
+    while ($links->next_tag('A')) {
+        if (in_array($links->get_attribute('href'), $result['sources'], true)) {
+            $links->set_attribute('href', 'https://rts-template.invalid/certificate-preview-url');
+        }
+    }
+    $result['html_body'] = str_replace('href="https://rts-template.invalid/certificate-preview-url"',
+        'href="{certificate_preview_url}"', $links->get_updated_html());
+    return $result;
+}
+
+/** Replace the certificate image by source, regardless of editor-altered alt text. */
+function rts_replace_email_certificate_image($html, $preview_url, $replacement)
+{
+    $preview_url = html_entity_decode((string) $preview_url, ENT_QUOTES, 'UTF-8');
+    $replaced = false;
+
+    return preg_replace_callback(
+        '/<img\b[^>]*\/?\s*>/i',
+        function ($matches) use ($preview_url, $replacement, &$replaced) {
+            if ($replaced || !preg_match('/\bsrc\s*=\s*(["\'])(.*?)\1/i', $matches[0], $source_match)) {
+                return $matches[0];
+            }
+
+            $image_source = html_entity_decode((string) $source_match[2], ENT_QUOTES, 'UTF-8');
+            $is_certificate = '{certificate_preview_url}' === $image_source
+                || untrailingslashit($image_source) === untrailingslashit($preview_url);
+            if (!$is_certificate) {
+                return $matches[0];
+            }
+
+            $replaced = true;
+            return (string) $replacement;
+        },
+        (string) $html
+    );
+}
+
+/**
  * Resolve an assigned admin-platform template for a transactional email.
  *
  * An assigned template may leave its body empty to inherit the complete
@@ -165,6 +325,8 @@ function rts_resolve_transactional_email_template($action_key, $default_subject,
             'verify_url' => '',
             'certificate_number' => '',
             'founding_runner_number' => '',
+            'certificate_status' => '',
+            'certificate_issued_date' => '',
             'certificate_preview_url' => '',
             'captains_suite_url' => '',
             'login_url' => '',
@@ -201,38 +363,48 @@ function rts_resolve_transactional_email_template($action_key, $default_subject,
         in_array($action_key, array('email_verification', 'founding_runner_certificate'), true)
         && $context['certificate_preview_url'] !== ''
     ) {
+        $certificate_template = rts_normalize_email_certificate_template($html, $action_key, $context['certificate_preview_url']);
+        $html = $certificate_template['html_body'];
         $asset_option = 'founding_runner_certificate' === $action_key
             ? 'rts_certificate_email_design_assets'
             : 'rts_verification_email_design_assets';
-        $assets = get_option($asset_option, array());
-        $configured_preview = is_array($assets) && !empty($assets['certificate_preview_image'])
-            ? esc_url_raw($assets['certificate_preview_image'])
-            : '';
 
-        // Previously saved templates may contain the old bundled image URL
-        // instead of the merge field. Upgrade those URLs at send time too, so
-        // existing templates adopt the approved certificate without a resave.
-        $legacy_previews = array(
-            $configured_preview,
-            RTS_PLUGIN_URL . 'assets/register-page-sample-certificate.png',
-            RTS_PLUGIN_URL . 'assets/certificate-confirmation-preview-v4.jpg',
-            RTS_PLUGIN_URL . 'assets/certificate-backplate-v3.jpg',
-            RTS_PLUGIN_URL . 'assets/certificate-template.jpg',
-            RTS_PLUGIN_URL . 'assets/certificate-template.png',
-            RTS_PLUGIN_URL . 'assets/certificate-template--.png',
-            RTS_PLUGIN_URL . 'assets/certificate-template-------.png',
-            RTS_PLUGIN_URL . 'assets/certificate-template--old.png',
-            RTS_PLUGIN_URL . 'assets/certificate-template%20%281%29.png',
-        );
-        foreach (array_unique(array_filter($legacy_previews)) as $legacy_preview) {
-            if ($legacy_preview === $context['certificate_preview_url']) {
-                continue;
+        // Template Images can select different artwork from the email-design
+        // settings. Render that actual backplate with the current recipient;
+        // merely swapping a list of known URLs leaves these uploads untouched.
+        $backplate = $certificate_template['backplate_url'];
+        if ($backplate !== '') {
+            $context['certificate_preview_url'] = $backplate;
+            if (!empty($context['_certificate_participant']) && class_exists('RTS_Registration')) {
+                $registration = (new ReflectionClass('RTS_Registration'))->newInstanceWithoutConstructor();
+                $context['certificate_preview_url'] = $registration->get_email_certificate_preview_url(
+                    $context['_certificate_participant'], $asset_option, $backplate
+                );
             }
-            $html = str_replace(
-                array($legacy_preview, esc_url($legacy_preview)),
-                '{certificate_preview_url}',
-                $html
-            );
+        }
+
+        // Detect an unrendered image using both the template-specific artwork
+        // and shared settings. This also works when GD is absent on the host.
+        $raw_previews = array($backplate, RTS_PLUGIN_URL . 'assets/certificate-template.jpg');
+        foreach (array('rts_verification_email_design_assets', 'rts_certificate_email_design_assets') as $option) {
+            $assets = get_option($option, array());
+            if (is_array($assets) && !empty($assets['certificate_preview_image'])) {
+                $raw_previews[] = $assets['certificate_preview_image'];
+            }
+        }
+        $preview_url = html_entity_decode((string) $context['certificate_preview_url'], ENT_QUOTES, 'UTF-8');
+        $uses_raw_backplate = false;
+        foreach (array_filter($raw_previews) as $raw_preview) {
+            if (untrailingslashit($preview_url) === untrailingslashit(html_entity_decode((string) $raw_preview, ENT_QUOTES, 'UTF-8'))) {
+                $uses_raw_backplate = true;
+                break;
+            }
+        }
+        if ($uses_raw_backplate) {
+            $fallback = rts_render_email_certificate_html_fallback($preview_url, $context);
+            if ($fallback !== '') {
+                $html = rts_replace_email_certificate_image($html, $preview_url, $fallback);
+            }
         }
     }
 
@@ -293,7 +465,7 @@ function rts_get_transactional_email_design_merge_context($action_key = '')
     return $context;
 }
 
-function rts_get_transactional_email_editor_preview_context($action_key = '')
+function rts_get_transactional_email_editor_preview_context($action_key = '', $template_html = '')
 {
     global $wpdb;
 
@@ -303,16 +475,11 @@ function rts_get_transactional_email_editor_preview_context($action_key = '')
         : 'rts_verification_email_design_assets';
     $assets = get_option($asset_option, array());
     $assets = is_array($assets) ? $assets : array();
-
-    if ('email_verification' === $action_key) {
-        $certificate_preview_url = !empty($assets['certificate_preview_image'])
-            ? esc_url_raw($assets['certificate_preview_image'])
-            : esc_url_raw(RTS_PLUGIN_URL . 'assets/certificate-template.jpg');
-    } else {
-        $certificate_preview_url = !empty($assets['certificate_preview_image'])
-            ? esc_url_raw($assets['certificate_preview_image'])
-            : esc_url_raw(RTS_PLUGIN_URL . 'assets/certificate-template.jpg');
-    }
+    $certificate_template = rts_normalize_email_certificate_template($template_html, $action_key);
+    $template_backplate = $certificate_template['backplate_url'];
+    $certificate_preview_url = $template_backplate !== '' ? $template_backplate : (!empty($assets['certificate_preview_image'])
+        ? esc_url_raw($assets['certificate_preview_image'])
+        : esc_url_raw(RTS_PLUGIN_URL . 'assets/certificate-template.jpg'));
 
     // Use the approved confirmation sample for verification emails and a
     // personalised render of the shared backplate for certificate emails.
@@ -335,7 +502,8 @@ function rts_get_transactional_email_editor_preview_context($action_key = '')
         ) {
             $personalised_preview_url = $plugin->registration->get_email_certificate_preview_url(
                 $participant,
-                $asset_option
+                $asset_option,
+                $template_backplate
             );
             if ($personalised_preview_url !== '') {
                 $certificate_preview_url = $personalised_preview_url;

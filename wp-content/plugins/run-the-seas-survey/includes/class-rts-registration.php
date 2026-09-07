@@ -21,6 +21,7 @@ class RTS_Registration
         add_action('fluentform/after_submission', array($this, 'after_registration_submission'), 10, 3);
 
         // Email verification
+        add_action('init', array($this, 'serve_certificate_preview_image'), 0);
         add_action('init', array($this, 'verify_email_handler'));
 
         // AJAX handlers
@@ -1122,9 +1123,12 @@ class RTS_Registration
                 'email' => $participant->email,
                 'certificate_number' => $participant->certificate_number,
                 'founding_runner_number' => $certificate_values['runner_number'],
+                'certificate_status' => $certificate_values['status'],
+                'certificate_issued_date' => $certificate_values['issued_date'],
                 'captains_suite_url' => $captains_suite_url,
                 'account_url' => $captains_suite_url,
                 'certificate_preview_url' => $this->get_email_certificate_preview_url($participant, 'rts_certificate_email_design_assets'),
+                '_certificate_participant' => $participant,
             )
         );
         $subject = $email_template['subject'];
@@ -1617,8 +1621,11 @@ class RTS_Registration
                 'verification_url' => $verification_link,
                 'certificate_number' => !empty($participant->certificate_number) ? $participant->certificate_number : '',
                 'founding_runner_number' => $certificate_values['runner_number'],
+                'certificate_status' => $certificate_values['status'],
+                'certificate_issued_date' => $certificate_values['issued_date'],
                 'captains_suite_url' => function_exists('rts_get_captains_suite_url') ? rts_get_captains_suite_url() : home_url('/captains-suite/'),
                 'certificate_preview_url' => $this->get_email_certificate_preview_url($participant, 'rts_verification_email_design_assets'),
+                '_certificate_participant' => $participant,
             )
         );
         $subject = $email_template['subject'];
@@ -1765,23 +1772,24 @@ class RTS_Registration
         return esc_url_raw(RTS_PLUGIN_URL . 'assets/certificate-template.jpg');
     }
 
-    /** Return the current configured certificate preview for an email recipient. */
-    public function get_email_certificate_preview_url($participant, $option_name)
+    /** Return the current configured, participant-specific certificate preview. */
+    public function get_email_certificate_preview_url($participant, $option_name, $backplate_url = '')
     {
-        $source = $this->get_certificate_backplate_url($option_name);
+        $configured_source = $this->get_certificate_backplate_url($option_name);
+        $source = $backplate_url !== '' ? esc_url_raw($backplate_url) : $configured_source;
 
-        // Verification emails use the registering participant's name while
-        // retaining sample certificate values until verification is complete.
-        if ('rts_verification_email_design_assets' === $option_name) {
-            return $this->get_sample_certificate_preview_url(
-                $source,
-                wp_date('F j, Y'),
-                (string) ($participant->first_name ?? ''),
-                (string) ($participant->last_name ?? '')
-            );
-        }
-
-        return $this->get_verification_certificate_preview_url($participant, $source);
+        // The certificate number is reserved before the confirmation email is
+        // built, so the preview can and must use the real participant values.
+        // Verification state is rendered as PENDING until the link is opened.
+        // The signed endpoint renders the configured design. A template-only
+        // backplate must instead fall back to HTML over that exact artwork if
+        // its PNG cannot be saved; otherwise the endpoint would use a different
+        // image from the one staff selected in the template editor.
+        return $this->get_verification_certificate_preview_url(
+            $participant,
+            $source,
+            $source === $configured_source ? $option_name : ''
+        );
     }
 
     /** Create the public registration-page sample from the same live renderer. */
@@ -2107,17 +2115,125 @@ class RTS_Registration
     }
 
     /**
-     * Create an image-only, personalised certificate preview for verification
-     * emails. It uses the same certificate artwork but never creates a PDF,
-     * attachment, or download URL. If the selected image cannot be read by GD,
-     * the original image remains the safe preview fallback.
+     * Stream a signed participant certificate when a generated preview file
+     * could not be persisted in the uploads directory.
      */
-    private function get_verification_certificate_preview_url($participant, $source_url)
+    public function serve_certificate_preview_image()
+    {
+        if (empty($_GET['rts_certificate_preview'])) {
+            return;
+        }
+
+        $participant_id = isset($_GET['rts_participant'])
+            ? absint(wp_unslash($_GET['rts_participant']))
+            : 0;
+        $design = isset($_GET['rts_design'])
+            ? sanitize_key(wp_unslash($_GET['rts_design']))
+            : '';
+        $signature = isset($_GET['rts_signature'])
+            ? sanitize_text_field(wp_unslash($_GET['rts_signature']))
+            : '';
+        $option_names = array(
+            'verification' => 'rts_verification_email_design_assets',
+            'certificate' => 'rts_certificate_email_design_assets',
+        );
+
+        if (
+            $participant_id < 1
+            || !isset($option_names[$design])
+            || $signature === ''
+            || !hash_equals($this->get_certificate_preview_signature($participant_id, $design), $signature)
+        ) {
+            status_header(403);
+            exit;
+        }
+
+        $participant = $this->get_participant($participant_id);
+        if (!$participant) {
+            status_header(404);
+            exit;
+        }
+
+        $source_url = $this->get_certificate_backplate_url($option_names[$design]);
+        $source_path = $this->get_verification_preview_source_path($source_url);
+        $certificate = $source_path && is_readable($source_path)
+            ? $this->create_certificate_image_resource($source_path)
+            : false;
+
+        // A stale or externally hosted design URL must not turn the email back
+        // into an empty certificate. The bundled approved backplate is always
+        // available as a local rendering fallback.
+        if (!$certificate) {
+            $source_path = RTS_PLUGIN_PATH . 'assets/certificate-template.jpg';
+            $certificate = is_readable($source_path)
+                ? $this->create_certificate_image_resource($source_path)
+                : false;
+        }
+        if (!$certificate || !function_exists('imagepng')) {
+            status_header(404);
+            exit;
+        }
+
+        imagealphablending($certificate, true);
+        if (function_exists('imageantialias')) {
+            imageantialias($certificate, true);
+        }
+        $this->render_certificate_personalisation($certificate, $participant);
+
+        nocache_headers();
+        header('Content-Type: image/png');
+        header('Content-Disposition: inline; filename="founding-runner-certificate-' . $participant_id . '.png"');
+        imagepng($certificate);
+        imagedestroy($certificate);
+        exit;
+    }
+
+    /** Create the HMAC used by the public image fallback endpoint. */
+    private function get_certificate_preview_signature($participant_id, $design)
+    {
+        return hash_hmac(
+            'sha256',
+            absint($participant_id) . '|' . sanitize_key((string) $design),
+            wp_salt('auth')
+        );
+    }
+
+    /** Return a signed image URL only for real recipient email previews. */
+    private function get_dynamic_certificate_preview_url($participant, $option_name)
+    {
+        $participant_id = absint($participant->id ?? 0);
+        if ($participant_id < 1) {
+            return '';
+        }
+
+        if ('rts_verification_email_design_assets' === $option_name) {
+            $design = 'verification';
+        } elseif ('rts_certificate_email_design_assets' === $option_name) {
+            $design = 'certificate';
+        } else {
+            return '';
+        }
+
+        return add_query_arg(
+            array(
+                'rts_certificate_preview' => '1',
+                'rts_participant' => $participant_id,
+                'rts_design' => $design,
+                'rts_signature' => $this->get_certificate_preview_signature($participant_id, $design),
+            ),
+            home_url('/')
+        );
+    }
+
+    /**
+     * Create an image-only, personalised certificate preview for email. It
+     * uses the shared artwork but never creates a PDF or attachment. When the
+     * PNG cannot be persisted, a signed render-on-request URL is returned.
+     */
+    private function get_verification_certificate_preview_url($participant, $source_url, $option_name = '')
     {
         if (
-            !function_exists('imagecreatetruecolor')
-            || !function_exists('imagepng')
-            || !function_exists('imagestring')
+            !function_exists('imagepng')
             || empty($participant->id)
             || empty($source_url)
         ) {
@@ -2126,27 +2242,15 @@ class RTS_Registration
 
         $source_path = $this->get_verification_preview_source_path($source_url);
         if (!$source_path || !is_readable($source_path)) {
-            return $source_url;
+            if ($option_name === '') {
+                return $source_url;
+            }
+            $source_path = RTS_PLUGIN_PATH . 'assets/certificate-template.jpg';
         }
 
-        $image_info = @getimagesize($source_path);
-        if (!$image_info) {
-            return $source_url;
-        }
-
-        switch ($image_info[2]) {
-            case IMAGETYPE_JPEG:
-                $certificate = @imagecreatefromjpeg($source_path);
-                break;
-            case IMAGETYPE_PNG:
-                $certificate = @imagecreatefrompng($source_path);
-                break;
-            case IMAGETYPE_WEBP:
-                $certificate = function_exists('imagecreatefromwebp') ? @imagecreatefromwebp($source_path) : false;
-                break;
-            default:
-                $certificate = false;
-        }
+        $certificate = is_readable($source_path)
+            ? $this->create_certificate_image_resource($source_path)
+            : false;
         if (!$certificate) {
             return $source_url;
         }
@@ -2155,7 +2259,8 @@ class RTS_Registration
         $directory = trailingslashit($uploads['basedir']) . 'rts-certificate-previews/';
         if (!empty($uploads['error']) || !wp_mkdir_p($directory)) {
             imagedestroy($certificate);
-            return $source_url;
+            $dynamic_url = $this->get_dynamic_certificate_preview_url($participant, $option_name);
+            return $dynamic_url !== '' ? $dynamic_url : $source_url;
         }
 
         $name = trim((string) ($participant->first_name ?? '') . ' ' . (string) ($participant->last_name ?? ''));
@@ -2164,7 +2269,7 @@ class RTS_Registration
             return $source_url;
         }
         $values = $this->get_certificate_personalisation($participant);
-        $cache_key = md5('v22-positioned-name|' . $source_path . '|' . filemtime($source_path) . '|' . wp_json_encode($values));
+        $cache_key = md5('v23-real-participant|' . $source_path . '|' . filemtime($source_path) . '|' . wp_json_encode($values));
         $filename = 'verification-preview-' . absint($participant->id) . '-' . $cache_key . '.png';
         $preview_path = $directory . $filename;
         $preview_url = trailingslashit($uploads['baseurl']) . 'rts-certificate-previews/' . $filename;
@@ -2178,10 +2283,17 @@ class RTS_Registration
             imageantialias($certificate, true);
         }
         $this->render_certificate_personalisation($certificate, $participant);
-        $saved = imagepng($certificate, $preview_path, 9);
+        $saved = @imagepng($certificate, $preview_path, 9);
         imagedestroy($certificate);
 
-        return $saved ? $preview_url : $source_url;
+        if ($saved) {
+            return $preview_url;
+        }
+
+        $dynamic_url = $this->get_dynamic_certificate_preview_url($participant, $option_name);
+        error_log('RTS: Certificate preview could not be saved to ' . $preview_path
+            . ($dynamic_url !== '' ? '; using signed image endpoint.' : '; using template artwork with email personalization.'));
+        return $dynamic_url !== '' ? $dynamic_url : $source_url;
     }
 
     /** Find separate portable fonts for the certificate name and number. */
@@ -2352,6 +2464,8 @@ class RTS_Registration
     /** Resolve a Media Library or bundled certificate image URL to its file path. */
     private function get_verification_preview_source_path($source_url)
     {
+        // Cache-busting query strings are not part of the Media Library file.
+        $source_url = preg_replace('/[?#].*$/', '', (string) $source_url);
         $bundled_url = RTS_PLUGIN_URL . 'assets/certificate-template.jpg';
         if (untrailingslashit($source_url) === untrailingslashit($bundled_url)) {
             return RTS_PLUGIN_PATH . 'assets/certificate-template.jpg';

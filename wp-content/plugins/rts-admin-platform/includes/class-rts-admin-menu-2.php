@@ -1095,6 +1095,10 @@ class RTS_Admin_Menu_2 {
 			echo '<div class="wrap"><h1>Email Template</h1><div class="notice notice-error"><p>Template not found.</p></div></div>';
 			return;
 		}
+		if ( function_exists( 'rts_normalize_email_certificate_template' ) ) {
+			$certificate = rts_normalize_email_certificate_template( $template->html_body, $template->action_key ?? '' );
+			$template->html_body = $certificate['html_body'];
+		}
 
 		$categories = array( 'onboarding', 'acquisition', 'engagement', 'transactional', 'milestone' );
 		$list_url = RTSAP_Frontend_Dashboard::screen_url( 'rts-email-templates' );
@@ -1195,7 +1199,7 @@ class RTS_Admin_Menu_2 {
 	private static function template_image_preview_url( $template, $source ) {
 		if ( ! preg_match( '/^\{([a-z0-9_]+)\}$/', (string) $source, $match ) ) { return $source; }
 		if ( ! function_exists( 'rts_get_transactional_email_editor_preview_context' ) ) { return ''; }
-		$context = rts_get_transactional_email_editor_preview_context( $template->action_key ?? '' );
+		$context = rts_get_transactional_email_editor_preview_context( $template->action_key ?? '', $template->html_body );
 		return ! empty( $context[ $match[1] ] ) ? (string) $context[ $match[1] ] : '';
 	}
 
@@ -1217,14 +1221,19 @@ class RTS_Admin_Menu_2 {
 	/** Display Media Library replacement controls without requiring HTML edits. */
 	private static function render_template_image_controls( $template ) {
 		$sources = self::template_image_sources( $template->html_body );
+		$certificate = function_exists( 'rts_normalize_email_certificate_template' )
+			? rts_normalize_email_certificate_template( $template->html_body, $template->action_key ?? '' ) : array();
 		echo '<h2>Template Images</h2>';
 		echo '<p>Images marked <strong>from email design</strong> follow the Survey plugin&rsquo;s email-design settings. Replacing one here creates an override for this template only. New images added in the Visual editor appear here after the template is saved and reopened.</p>';
 		if ( ! $sources ) { echo '<p><em>No images were detected in this template.</em></p>'; return; }
 		echo '<div class="rts-template-image-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin:14px 0 24px;">';
 		foreach ( $sources as $index => $source ) {
-			$preview = self::template_image_preview_url( $template, $source );
+			$is_certificate = '{certificate_preview_url}' === $source;
+			$preview = $is_certificate && ! empty( $certificate['backplate_url'] )
+				? $certificate['backplate_url'] : self::template_image_preview_url( $template, $source );
 			echo '<div class="rts-template-image-card" style="padding:14px;border:1px solid #ccd0d4;border-radius:6px;background:#fff;">';
 			echo '<strong style="display:block;margin-bottom:9px;">' . esc_html( self::template_image_label( $source, $index ) ) . '</strong>';
+			if ( $is_certificate ) { echo '<p>The selected image is the certificate background. The recipient&rsquo;s name and certificate details are added automatically when sending.</p>'; }
 			if ( $preview ) { echo '<img class="rts-template-image-preview" src="' . esc_url( $preview ) . '" alt="" style="display:block;width:auto;max-width:100%;height:100px;object-fit:contain;margin:0 0 10px;background:#eef1f4;">'; }
 			echo '<input class="large-text code rts-template-image-url" type="text" inputmode="url" name="template_image_replacement[' . (int) $index . ']" value="' . esc_attr( $preview ) . '" data-default="' . esc_attr( $preview ) . '" placeholder="https://">';
 			echo '<p style="margin:9px 0 0;"><button type="button" class="button rts-template-image-select">Select / Replace from Media Library</button> <button type="button" class="button-link rts-template-image-reset">Undo unsaved replacement</button></p>';
@@ -1237,7 +1246,7 @@ class RTS_Admin_Menu_2 {
 	/** Replace image merge fields with real URLs while the Visual editor is open. */
 	private static function template_editor_preview_body( $template, $body ) {
 		if ( ! function_exists( 'rts_get_transactional_email_editor_preview_context' ) ) { return $body; }
-		$context = rts_get_transactional_email_editor_preview_context( $template->action_key ?? '' );
+		$context = rts_get_transactional_email_editor_preview_context( $template->action_key ?? '', $template->html_body );
 		foreach ( $context as $key => $value ) {
 			if ( ! empty( $value ) ) { $body = str_replace( '{' . $key . '}', $value, $body ); }
 		}
@@ -1249,14 +1258,22 @@ class RTS_Admin_Menu_2 {
 		global $wpdb;
 		$template = $wpdb->get_row( $wpdb->prepare( "SELECT action_key, html_body FROM " . RTS_DB::table( 'email_templates' ) . " WHERE id = %d", $template_id ) );
 		if ( ! $template || ! function_exists( 'rts_get_transactional_email_editor_preview_context' ) ) { return $body; }
-		$context = rts_get_transactional_email_editor_preview_context( $template->action_key ?? '' );
+		if ( function_exists( 'rts_normalize_email_certificate_template' ) ) {
+			$certificate = rts_normalize_email_certificate_template( $template->html_body, $template->action_key ?? '' );
+			$template->html_body = $certificate['html_body'];
+		}
+		$context = rts_get_transactional_email_editor_preview_context( $template->action_key ?? '', $template->html_body );
 		foreach ( $context as $key => $value ) {
 			$token = '{' . $key . '}';
+			// Certificate src is restored by the HTML parser below. A global URL
+			// replacement would also erase its backplate metadata when GD is absent.
+			if ( 'certificate_preview_url' === $key && function_exists( 'rts_normalize_email_certificate_template' ) ) { continue; }
 			if ( false !== strpos( (string) $template->html_body, $token ) && ! empty( $value ) ) {
 				$body = str_replace( array( $value, esc_url( $value ) ), $token, $body );
 			}
 		}
-		return $body;
+		return function_exists( 'rts_normalize_email_certificate_template' )
+			? rts_normalize_email_certificate_template( $body, $template->action_key ?? '', $context['certificate_preview_url'] ?? '' )['html_body'] : $body;
 	}
 
 	/** Apply replacements selected in the Template Images panel. */
@@ -1264,32 +1281,36 @@ class RTS_Admin_Menu_2 {
 		global $wpdb;
 		$template = $wpdb->get_row( $wpdb->prepare( "SELECT action_key, html_body FROM " . RTS_DB::table( 'email_templates' ) . " WHERE id = %d", $template_id ) );
 		if ( ! $template || ! is_array( $submitted ) ) { return $body; }
-		$sources = self::template_image_sources( $template->html_body );
-		$certificate_source = '';
-		if ( in_array( $template->action_key ?? '', array( 'email_verification', 'founding_runner_certificate' ), true ) ) {
-			if ( preg_match( '~<img\b(?=[^>]*\balt\s*=\s*(["\'])(?:Preview of your Founding Runner Cruise Credit|Your Founding Runner Gift Certificate)\1)[^>]*\bsrc\s*=\s*(["\'])(.*?)\2~is', (string) $template->html_body, $certificate_match ) ) {
-				$certificate_source = html_entity_decode( trim( (string) $certificate_match[3] ), ENT_QUOTES, 'UTF-8' );
-			}
+		if ( function_exists( 'rts_normalize_email_certificate_template' ) ) {
+			$certificate = rts_normalize_email_certificate_template( $template->html_body, $template->action_key ?? '' );
+			$template->html_body = $certificate['html_body'];
 		}
+		$sources = self::template_image_sources( $template->html_body );
 		foreach ( $sources as $index => $source ) {
 			if ( ! array_key_exists( $index, $submitted ) ) { continue; }
 			$replacement = esc_url_raw( wp_unslash( $submitted[ $index ] ) );
 			$preview = self::template_image_preview_url( $template, $source );
-			if ( '' === $replacement || $replacement === $preview || $replacement === $source ) { continue; }
-			if ( '{certificate_preview_url}' === $source || ( '' !== $certificate_source && $certificate_source === $source ) ) {
-				$asset_option = 'founding_runner_certificate' === ( $template->action_key ?? '' )
-					? 'rts_certificate_email_design_assets'
-					: 'rts_verification_email_design_assets';
-				$assets = get_option( $asset_option, array() );
-				$assets = is_array( $assets ) ? $assets : array();
-				$assets['certificate_preview_image'] = $replacement;
-				update_option( $asset_option, $assets, false );
-				$body = str_replace( array( $source, esc_url( $source ) ), '{certificate_preview_url}', $body );
+			if ( '{certificate_preview_url}' === $source && function_exists( 'rts_normalize_email_certificate_template' ) ) {
+				$normalized = rts_normalize_email_certificate_template( $body, $template->action_key ?? '', $preview );
+				$body = $normalized['html_body'];
+				// Repair even an unchanged Media Library selection. Store the artwork
+				// on this template, leaving src as the recipient-aware merge field.
+				if ( '' !== $replacement && $replacement !== $preview && $replacement !== $source ) {
+					$tags = new WP_HTML_Tag_Processor( $body );
+					while ( $tags->next_tag( 'IMG' ) ) {
+						if ( '{certificate_preview_url}' === $tags->get_attribute( 'src' ) ) {
+							$tags->set_attribute( 'data-rts-certificate-backplate', $replacement );
+						}
+					}
+					$body = $tags->get_updated_html();
+				}
 				continue;
 			}
+			if ( '' === $replacement || $replacement === $preview || $replacement === $source ) { continue; }
 			$body = str_replace( array( $source, esc_url( $source ) ), $replacement, $body );
 		}
-		return $body;
+		return function_exists( 'rts_normalize_email_certificate_template' )
+			? rts_normalize_email_certificate_template( $body, $template->action_key ?? '' )['html_body'] : $body;
 	}
 	public static function handle_create_template()   { self::guard( 'create_template' ); $subject = sanitize_text_field( $_POST['subject'] ); $body = wp_kses_post( wp_unslash( $_POST['html_body'] ?? '' ) ); if ( '' === trim( $body ) ) { $body = self::default_email_template_html( $subject ); } $r = RTS_Business_Logic_2::create_template( array( 'name' => sanitize_text_field( $_POST['name'] ), 'subject' => $subject, 'category' => sanitize_text_field( $_POST['category'] ?? 'general' ), 'action_key' => sanitize_key( $_POST['action_key'] ?? '' ), 'html_body' => $body, 'created_by' => self::admin() ) ); self::back( 'rts-email-templates', $r['error'] ? 'Error: ' . $r['error'] : 'Template created with an email-safe table layout. Open the Visual / HTML Editor to customise it.' ); }
 	public static function handle_update_template()   { self::guard( 'update_template' ); $id = (int) $_POST['id']; $submitted_body = self::email_template_editor_fragment( wp_unslash( $_POST['html_body'] ?? '' ) ); $html_body = self::restore_template_image_merge_fields( $id, wp_kses_post( $submitted_body ) ); $html_body = self::apply_template_image_replacements( $id, $html_body, $_POST['template_image_replacement'] ?? array() ); $r = RTS_Business_Logic_2::update_template( $id, array( 'name' => sanitize_text_field( $_POST['name'] ?? '' ), 'subject' => sanitize_text_field( $_POST['subject'] ), 'category' => sanitize_text_field( $_POST['category'] ?? '' ), 'html_body' => $html_body, 'updated_by' => self::admin() ) ); self::back( 'rts-email-templates', $r['error'] ? 'Error: ' . $r['error'] : 'Template saved.', array( 'template_id' => $id, '_fragment' => 'rts-email-template-form' ) ); }
