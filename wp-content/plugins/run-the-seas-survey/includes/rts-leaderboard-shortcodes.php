@@ -108,7 +108,7 @@ function rts_leaderboard_header_shortcode($atts)
 
     return '<div class="rts-leaderboard-header"><p class="rts-leaderboard-header__live"><span></span>'
         . esc_html__('Live Leaderboard', 'run-the-seas') . '</p><h2>'
-        . esc_html__('The', 'run-the-seas') . ' <strong>' . esc_html(42000 === $target ? rts_format_trophy_miles($target, '42k') : rts_format_miles($target)) . '</strong> '
+        . esc_html__('The', 'run-the-seas') . ' <strong>' . esc_html(rts_format_trophy_miles($target, 42000 === $target ? '42k' : (21000 === $target ? '21k' : ''))) . '</strong> '
         . esc_html__('Referral Marathon Challenge Leaderboard', 'run-the-seas') . '</h2><p>'
         . esc_html__('Every verified referral advances you by 1 km toward the finish line.', 'run-the-seas') . '</p><small>'
         . esc_html(sprintf(__('Last updated: %s', 'run-the-seas'), current_time(get_option('time_format')))) . '</small></div>';
@@ -390,13 +390,8 @@ function rts_leaderboard_track_milestones($target, $miles = 0)
                 'name' => $milestone['name'],
                 'position' => min(100, $local_miles / $target * 100),
                 'earned' => $miles >= $absolute_miles,
-                // The surrounding column already identifies kilometres. Keep
-                // these tightly spaced marker labels numeric to avoid overlap.
-                'label' => preg_replace(
-                    '/\s*km$/i',
-                    '',
-                    rts_format_trophy_miles($local_miles, $key)
-                ) . 'K',
+                // Trophy names already include their fixed K suffix.
+                'label' => rts_format_trophy_miles($local_miles, $key),
             );
         } else {
             $track[$identity]['earned'] = $track[$identity]['earned'] || $miles >= $absolute_miles;
@@ -705,7 +700,7 @@ function rts_live_leaderboard_shortcode($atts)
     <section class="rts-live-leaderboard" aria-label="<?php esc_attr_e('Live leaderboard', 'run-the-seas'); ?>">
         <header class="rts-live-leaderboard__hero">
             <p class="rts-live-leaderboard__live"><span aria-hidden="true"></span><?php esc_html_e('Live Leaderboard', 'run-the-seas'); ?></p>
-            <h1><?php esc_html_e('The', 'run-the-seas'); ?> <strong><?php echo esc_html(42000 === $target ? rts_format_trophy_miles($target, '42k') : rts_format_miles($target)); ?></strong> <?php esc_html_e('Referral Marathon Challenge', 'run-the-seas'); ?></h1>
+            <h1><?php esc_html_e('The', 'run-the-seas'); ?> <strong><?php echo esc_html(rts_format_trophy_miles($target, 42000 === $target ? '42k' : (21000 === $target ? '21k' : ''))); ?></strong> <?php esc_html_e('Referral Marathon Challenge', 'run-the-seas'); ?></h1>
             <p><?php esc_html_e('Every verified referral advances you by 1 km toward the finish line.', 'run-the-seas'); ?></p>
             <small><?php echo esc_html(sprintf(__('Last updated: %s', 'run-the-seas'), $updated)); ?></small>
         </header>

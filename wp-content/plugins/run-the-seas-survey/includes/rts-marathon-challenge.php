@@ -231,29 +231,21 @@ function rts_marathon_challenge_sort_recent(&$participants, $milestone_distance 
     });
 }
 
-/** Format a stored value as a race distance. */
+/** Format a map/milestone race label. Descriptive progress uses rts_format_miles(). */
 function rts_marathon_challenge_distance($miles)
 {
     $miles = absint($miles);
     if (0 === $miles) {
-        return '0 km';
+        return '0K';
     }
     if (in_array($miles, array(21000, 21100), true)) {
-        return '21.1 km';
+        return '21.1K';
     }
     if (in_array($miles, array(42000, 42200), true)) {
-        return '42.2 km';
+        return '42.2K';
     }
 
-    if ($miles >= 1000 && function_exists('rts_format_miles')) {
-        return rts_format_miles(absint($miles));
-    }
-
-    if ($miles >= 1000) {
-        return rtrim(rtrim(number_format_i18n($miles / 1000, 1), '0'), '.') . ' km';
-    }
-
-    return rtrim(rtrim(number_format_i18n($miles / 1000, 1), '0'), '.') . ' km';
+    return rtrim(rtrim(number_format($miles / 1000, 1, '.', ''), '0'), '.') . 'K';
 }
 
 /** Use the internationally recognised 21.1K label for the half-marathon stop. */
@@ -1080,7 +1072,7 @@ function rts_marathon_challenge_shortcode($atts)
 
         <header class="rts-mc-header<?php echo $asset('header_frame_image') ? ' has-artwork-frame' : ''; ?>">
             <?php if ($asset('header_frame_image')) : ?><img class="rts-mc-header__frame" src="<?php echo esc_url($asset('header_frame_image')); ?>" alt="" aria-hidden="true"><?php endif; ?>
-            <h1 id="rts-mc-title"><?php esc_html_e('The 42.2 km Referral Marathon Challenge', 'run-the-seas'); ?></h1>
+            <h1 id="rts-mc-title"><?php esc_html_e('The 42.2K Referral Marathon Challenge', 'run-the-seas'); ?></h1>
         </header>
 
         <div class="rts-mc-layout">

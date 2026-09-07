@@ -508,30 +508,33 @@ add_action('after_password_reset', 'rts_send_password_changed_confirmation', 20,
  */
 function rts_format_miles($miles)
 {
-    $kilometres = max(0, (float) $miles / 1000);
+    // Keep zero a float so the whole-number comparison also removes its decimal.
+    $kilometres = max(0.0, (float) $miles / 1000);
     $decimals = floor($kilometres) === $kilometres ? 0 : 1;
 
     return number_format_i18n($kilometres, $decimals) . ' km';
 }
 
 /**
- * Format a trophy threshold using its public kilometre-distance label.
+ * Format a trophy threshold as a fixed product label, never as a progress unit.
+ * Keep K and the decimal point even when descriptive kilometres are localised.
  */
 function rts_format_trophy_miles($miles, $trophy_key = '')
 {
     $trophy_key = sanitize_key((string) $trophy_key);
     $milestone_key = preg_replace('/^m2-/', '', $trophy_key);
     if ('21k' === $milestone_key) {
-        return '21.1 km';
+        return '21.1K';
     }
     if ('42k' === $milestone_key) {
-        return '42.2 km';
+        return '42.2K';
     }
     if (str_starts_with($trophy_key, 'm2-')) {
         $miles = max(0, absint($miles) - 42000);
     }
 
-    return rts_format_miles($miles);
+    $kilometres = max(0, (float) $miles / 1000);
+    return rtrim(rtrim(number_format($kilometres, 1, '.', ''), '0'), '.') . 'K';
 }
 
 // In run-the-seas-survey.php, add this check

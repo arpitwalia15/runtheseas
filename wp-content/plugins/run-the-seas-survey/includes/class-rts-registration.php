@@ -1322,13 +1322,13 @@ class RTS_Registration
         $name = trim($referrer->first_name . ' ' . $referrer->last_name);
         $preferences_url = home_url('/my-details/');
         $message = '<p>Hello ' . esc_html($name) . ',</p>'
-            . '<p><strong>A new referral has verified their email!</strong> That verified referral advanced you by <strong>1 km</strong>. You have now completed <strong>' . esc_html(rts_format_miles($total_miles)) . '</strong> in the 42.2 km Referral Marathon Challenge.</p>'
+            . '<p><strong>A new referral has verified their email!</strong> That verified referral advanced you by <strong>1 km</strong>. You have now completed <strong>' . esc_html(rts_format_miles($total_miles)) . '</strong> in the 42.2K Referral Marathon Challenge.</p>'
             . '<p>You have <strong>' . esc_html(number_format_i18n($successful_referrals)) . '</strong> verified referral' . ($successful_referrals === 1 ? '' : 's') . '.</p>';
         if ($next_milestone) {
             $referrals_needed = (int) ceil($next_milestone['miles'] / 1000);
             $message .= '<p>You need <strong>' . esc_html(number_format_i18n($referrals_needed)) . ' more verified referral' . ($referrals_needed === 1 ? '' : 's') . '</strong> (' . esc_html(rts_format_miles($next_milestone['miles'])) . ') to reach your next medal: <strong>' . esc_html($next_milestone['name']) . '</strong>. Keep sharing your referral link!</p>';
         } else {
-            $message .= '<p>You have reached every current 42.2 km Referral Marathon Challenge milestone. Keep growing your crew!</p>';
+            $message .= '<p>You have reached every current 42.2K Referral Marathon Challenge milestone. Keep growing your crew!</p>';
         }
         $message .= '<p style="font-size:12px;color:#666;">To turn off these referral-progress emails, update your preference in <a href="' . esc_url($preferences_url) . '">My Details</a>.</p>';
 
@@ -3069,8 +3069,8 @@ class RTS_Registration
                     $this->add_achievement(
                         $participant_id,
                         'miles_milestone',
-                        rts_format_miles($milestone) . ' milestone!',
-                        "Congratulations! You've completed " . rts_format_miles($milestone) . " in the 42.2 km Referral Marathon Challenge!"
+                        rts_format_trophy_miles($milestone) . ' milestone!',
+                        "Congratulations! You've completed " . rts_format_miles($milestone) . " in the 42.2K Referral Marathon Challenge!"
                     );
 
                     // Add medal for major milestones
@@ -3078,9 +3078,9 @@ class RTS_Registration
                         $this->add_medal(
                             $participant_id,
                             'miles_milestone',
-                            rts_format_miles($milestone) . ' Milestone Medal',
-                            "Awarded for completing " . rts_format_miles($milestone) . " in the 42.2 km Referral Marathon Challenge!",
-                            '42.2 km Referral Marathon Challenge Program',
+                            rts_format_trophy_miles($milestone) . ' Milestone Medal',
+                            "Awarded for completing " . rts_format_miles($milestone) . " in the 42.2K Referral Marathon Challenge!",
+                            '42.2K Referral Marathon Challenge Program',
                             $milestone >= 10000 ? 'Diamond' : ($milestone >= 5000 ? 'Gold' : 'Silver')
                         );
                     }

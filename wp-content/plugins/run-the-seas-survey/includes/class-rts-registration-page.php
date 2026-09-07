@@ -473,7 +473,7 @@ class RTS_Registration_Page {
                             <strong>Do you want to request the Founding Runner Cabin Credit?</strong>
                         </label>
                         <p style="color: #555; font-size: 14px; margin-bottom: 15px;">
-                            This is required to participate in the 42.2 km Referral Marathon Challenge.
+                            This is required to participate in the 42.2K Referral Marathon Challenge.
                         </p>
                         <div style="display: flex; gap: 30px; flex-wrap: wrap;">
                             <label style="font-size: 16px;">
@@ -676,7 +676,7 @@ class RTS_Registration_Page {
                     if (data.referral_code) {
                         html += '<div style="margin: 20px 0; padding: 20px; background: #f8f9fa; border-radius: 12px; border: 2px solid #1a7efb;">';
                         html += '<h4 style="color: #1a7efb; margin-top: 0; text-align: center;">🔗 Share Your Referral Link</h4>';
-                        html += '<p style="font-size: 14px; color: #666; text-align: center; margin-bottom: 15px;">Share this link with friends and family to participate in the 42.2 km Referral Marathon Challenge!</p>';
+                        html += '<p style="font-size: 14px; color: #666; text-align: center; margin-bottom: 15px;">Share this link with friends and family to participate in the 42.2K Referral Marathon Challenge!</p>';
                         
                         html += '<div style="background: #f8f9fa; padding: 12px; border-radius: 8px; margin: 15px 0; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; border: 1px solid #dee2e6;">';
                         html += '<input type="text" value="' + cleanBaseUrl + '" readonly id="rts-share-link" onclick="this.select()" style="flex: 1; min-width: 200px; padding: 10px 12px; border: 1px solid #ddd; border-radius: 4px; background: #fff; font-size: 13px; font-family: monospace; color: #333;">';

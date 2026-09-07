@@ -619,7 +619,7 @@ function rts_member_current_trophy_shortcode($atts)
         return rts_render_trophy_milestone_icon($current, 'rts-member-current-trophy__icon');
     }
     if ('distance' === $field) {
-        return esc_html(rts_format_miles($current['miles']));
+        return esc_html(rts_format_trophy_miles($current['miles'], $current['key'] ?? ''));
     }
 
     return '<div class="rts-member-current-trophy"><span class="rts-member-current-trophy__label">'

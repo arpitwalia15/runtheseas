@@ -652,7 +652,7 @@ trait RTS_Registration_Ajax
         $message .= "<ul style='list-style: none; padding: 0;'>";
         $message .= "<li style='padding: 8px 0; border-bottom: 1px solid #dee2e6;'>✅ <strong>Founding Runner Cabin Credit</strong> - Your unique credit number</li>";
         $message .= "<li style='padding: 8px 0; border-bottom: 1px solid #dee2e6;'>✅ <strong>Captain's Suite</strong> - Exclusive access and privileges</li>";
-        $message .= "<li style='padding: 8px 0; border-bottom: 1px solid #dee2e6;'>✅ <strong>42.2 km Referral Marathon Challenge</strong> - Compete and win rewards</li>";
+        $message .= "<li style='padding: 8px 0; border-bottom: 1px solid #dee2e6;'>✅ <strong>42.2K Referral Marathon Challenge</strong> - Compete and win rewards</li>";
         $message .= "<li style='padding: 8px 0; border-bottom: 1px solid #dee2e6;'>✅ <strong>Verified Referral Progress</strong> - Each verified referral advances you by one kilometre</li>";
         $message .= "<li style='padding: 8px 0;'>✅ <strong>Digital Medals & Achievements</strong> - Build your collection</li>";
         $message .= "</ul>";

@@ -186,14 +186,14 @@ function rts_journey_shortcode($atts)
 
         <div class="rts-journey__progress">
             <div class="rts-journey__distance"><span><?php esc_html_e('Current Distance', 'run-the-seas'); ?></span><strong><?php echo esc_html(number_format_i18n($distance, $distance == floor($distance) ? 0 : 1)); ?> km OF 42.2 km</strong></div>
-            <div class="rts-journey__track-wrap"><?php if ($progress_start_icon) : ?><img class="rts-journey__track-start" src="<?php echo esc_url($progress_start_icon); ?>" alt=""><?php endif; ?><div class="rts-journey__track"><div class="rts-journey__track-fill" style="width:<?php echo esc_attr(min(100, ($distance / 42.2) * 100)); ?>%"></div><?php foreach ($milestones as $milestone) : $percent = ($milestone / 42.2) * 100; ?><span class="rts-journey__mile<?php echo $distance >= $milestone ? ' is-earned' : ''; ?>" style="left:<?php echo esc_attr($percent); ?>%"><b><?php echo esc_html($milestone); ?> km</b><i></i></span><?php endforeach; ?></div></div>
+            <div class="rts-journey__track-wrap"><?php if ($progress_start_icon) : ?><img class="rts-journey__track-start" src="<?php echo esc_url($progress_start_icon); ?>" alt=""><?php endif; ?><div class="rts-journey__track"><div class="rts-journey__track-fill" style="width:<?php echo esc_attr(min(100, ($distance / 42.2) * 100)); ?>%"></div><?php foreach ($milestones as $milestone) : $percent = ($milestone / 42.2) * 100; ?><span class="rts-journey__mile<?php echo $distance >= $milestone ? ' is-earned' : ''; ?>" style="left:<?php echo esc_attr($percent); ?>%"><b><?php echo esc_html($milestone); ?>K</b><i></i></span><?php endforeach; ?></div></div>
         </div>
 
         <div class="rts-journey__summary">
             <div><span><?php esc_html_e('Certificate', 'run-the-seas'); ?></span><strong><?php echo esc_html($certificate); ?></strong></div>
             <div><span><?php esc_html_e('Verified Referrals', 'run-the-seas'); ?></span><strong><?php echo esc_html(number_format_i18n($verified_referrals)); ?></strong></div>
             <div><span><?php esc_html_e('Current Distance', 'run-the-seas'); ?></span><strong><?php echo esc_html(number_format_i18n($distance, $distance == floor($distance) ? 0 : 1)); ?> km OF 42.2 km</strong></div>
-            <div><span><?php esc_html_e('Next Trophy', 'run-the-seas'); ?></span><strong><?php echo esc_html($next_trophy); ?> km</strong></div>
+            <div><span><?php esc_html_e('Next Trophy', 'run-the-seas'); ?></span><strong><?php echo esc_html($next_trophy); ?>K</strong></div>
             <div><span><?php esc_html_e('Cruise Credits', 'run-the-seas'); ?></span><strong>$<?php echo esc_html(number_format_i18n($credit, 0)); ?></strong></div>
             <div><span><?php esc_html_e('Last Activity', 'run-the-seas'); ?></span><strong><?php echo esc_html($last_activity ? wp_date('F j, Y', $last_activity) : '—'); ?></strong></div>
         </div>

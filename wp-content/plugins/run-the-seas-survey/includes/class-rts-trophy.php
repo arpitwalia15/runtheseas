@@ -867,7 +867,7 @@ class RTS_Trophy {
             <?php if (empty($trophies)): ?>
                 <div class="rts-no-trophies">
                     <p>No trophies yet. Invite friends to start gaining verified referrals!</p>
-                    <p>Every verified referral advances you by 1 km in the 42.2 km Referral Marathon Challenge.</p>
+                    <p>Every verified referral advances you by 1 km in the 42.2K Referral Marathon Challenge.</p>
                 </div>
             <?php else: ?>
                 <div class="rts-trophies-grid">
@@ -1534,7 +1534,7 @@ class RTS_Trophy {
             ">
                 <h3 style="margin: 0; color: #1a7efb;">HOW TO EARN TROPHIES</h3>
                 <p style="color: #666; font-size: 14px; margin: 5px 0;">
-                    Every verified referral advances you by 1 km in the 42.2 km Referral Marathon Challenge. Reach each kilometre milestone to unlock trophies!
+                    Every verified referral advances you by 1 km in the 42.2K Referral Marathon Challenge. Reach each kilometre milestone to unlock trophies!
                 </p>
                 <a href="/captains-suite" style="
                     display: inline-block;
