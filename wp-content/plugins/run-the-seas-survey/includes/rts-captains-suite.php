@@ -170,13 +170,15 @@ function rts_resend_member_certificate()
 add_action('admin_post_rts_resend_member_certificate', 'rts_resend_member_certificate');
 
 /**
- * Return a sample certificate rendered from the shared production backplate.
+ * Return a registration certificate image with today's issue date.
  *
- * The sample name, Founding Runner number, certificate number, approval badge,
- * and issue date use the same renderer as every issued member certificate.
+ * Date-only rendering is the default because registration artwork can have a
+ * different layout from the issued member certificate. Full sample fields are
+ * still available for future artwork with mode="personalized".
  * Usage: [rts_certificate_issued_image]
- *        [rts_certificate_issued_image image="123"]
+ *        [rts_certificate_issued_image image="123" date_x="74.5" date_y="80"]
  *        [rts_certificate_issued_image image="https://example.com/certificate.png"]
+ *        [rts_certificate_issued_image image="123" mode="personalized"]
  */
 function rts_certificate_issued_image_shortcode($atts)
 {
@@ -184,6 +186,9 @@ function rts_certificate_issued_image_shortcode($atts)
         'image'       => '',
         'date'        => 'today',
         'date_format' => 'F j, Y',
+        'date_x'      => '74.5',
+        'date_y'      => '80',
+        'mode'        => 'date_only',
         'alt'         => __('Run The Seas certificate', 'run-the-seas'),
         'class'       => '',
     ), $atts, 'rts_certificate_issued_image');
@@ -197,7 +202,7 @@ function rts_certificate_issued_image_shortcode($atts)
     }
 
     if ($source_url === '') {
-        $source_url = esc_url_raw(RTS_PLUGIN_URL . 'assets/certificate-backplate-v3.jpg');
+        $source_url = esc_url_raw(RTS_PLUGIN_URL . 'assets/certificate-template.jpg');
     }
     if ($source_url === '') {
         return '<span class="rts-certificate-issued-image__notice">'
@@ -213,10 +218,23 @@ function rts_certificate_issued_image_shortcode($atts)
         : sanitize_text_field($date_value);
 
     $registration = rts_init()->registration;
-    if (!$registration || !method_exists($registration, 'get_sample_certificate_preview_url')) {
+    if (!$registration) {
         return '';
     }
-    $image_url = $registration->get_sample_certificate_preview_url($source_url, $date_text);
+
+    $mode = sanitize_key((string) $atts['mode']);
+    if ('personalized' === $mode && method_exists($registration, 'get_sample_certificate_preview_url')) {
+        $image_url = $registration->get_sample_certificate_preview_url($source_url, $date_text);
+    } elseif (method_exists($registration, 'get_dated_certificate_image_url')) {
+        $image_url = $registration->get_dated_certificate_image_url(
+            $source_url,
+            $date_text,
+            (float) $atts['date_x'],
+            (float) $atts['date_y']
+        );
+    } else {
+        $image_url = $source_url;
+    }
     if ($image_url === '') {
         return '';
     }

@@ -495,7 +495,7 @@ class RTS_Race_Manager {
                             <h3><?php echo esc_html($race->race_name); ?></h3>
                             <div class="rts-race-details">
                                 <span class="race-type"><?php echo esc_html($race->race_type); ?></span>
-                                <span class="race-distance"><?php echo esc_html($race->distance_km); ?> KM</span>
+                                <span class="race-distance"><?php echo esc_html($race->distance_km); ?> K</span>
                                 <span class="race-date"><?php echo date('M j, Y', strtotime($race->start_date)); ?></span>
                             </div>
                             <div class="rts-race-actions">
@@ -626,7 +626,7 @@ class RTS_Race_Manager {
                             </td>
                         </tr>
                         <tr>
-                            <th><label for="distance_km">Distance (KM)</label></th>
+                            <th><label for="distance_km">Distance (K)</label></th>
                             <td><input type="number" id="distance_km" name="distance_km" step="0.1" required></td>
                         </tr>
                         <tr>

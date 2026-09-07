@@ -525,7 +525,7 @@ class RTS_Registration_Page {
                             BECOME A FOUNDING RUNNER
                         </button>
                         <p style="font-size: 12px; color: #999; margin-top: 10px;">
-                            Your information is secure, encrypted, and used only to deliver your certificate and future Run The Seas® updates.
+                            Your information is secure, encrypted, and used only to deliver your certificate and future Run The Seas™ updates.
                         </p>
                     </div>
                 </form>

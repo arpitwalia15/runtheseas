@@ -583,10 +583,10 @@ trait RTS_Registration_Ajax
         $message .= "<h2 style='color: #1a7efb; margin-top: 0; text-align: center;'>🎫 YOUR PERSONALIZED CERTIFICATE</h2>";
 
         $message .= "<div style='background: #fff; border-radius: 8px; padding: 20px; margin: 15px 0; border: 1px solid #dee2e6;'>";
-        $message .= "<p style='font-size: 20px; font-weight: bold; color: #1a7efb; margin: 0;'>RUN THE SEAS®</p>";
+        $message .= "<p style='font-size: 20px; font-weight: bold; color: #1a7efb; margin: 0;'>RUN THE SEAS™</p>";
         $message .= "<p style='font-size: 16px; color: #333; margin: 5px 0;'><strong>FOUNDERS CRUISE CREDIT</strong></p>";
         $message .= "<p style='font-size: 36px; font-weight: bold; color: #28a745; margin: 10px 0;'>$100</p>";
-        $message .= "<p style='font-size: 14px; color: #666; margin: 5px 0;'>GOOD TOWARDS THE FIRST RUN THE SEAS® CRUISE!</p>";
+        $message .= "<p style='font-size: 14px; color: #666; margin: 5px 0;'>GOOD TOWARDS THE FIRST RUN THE SEAS™ CRUISE!</p>";
         $message .= "<hr style='border: 1px dashed #dee2e6; margin: 15px 0;'>";
         $message .= "<p><strong>FOUNDING RUNNER:</strong> #" . sprintf("%06d", $participant->id) . "</p>";
         $message .= "<p><strong>CERTIFICATE NUMBER:</strong> " . ($cabin_credit_number ?: 'RTS-' . date('Y') . '-' . strtoupper(substr(uniqid(), -6))) . "</p>";
@@ -665,7 +665,7 @@ trait RTS_Registration_Ajax
         $message .= "</div>";
 
         $message .= "<p style='text-align: center; color: #999; font-size: 12px; margin-top: 20px;'>";
-        $message .= "Your information is secure, encrypted, and used only to deliver your certificate and future Run The Seas® updates.";
+        $message .= "Your information is secure, encrypted, and used only to deliver your certificate and future Run The Seas™ updates.";
         $message .= "</p>";
         $message .= "</body></html>";
 
@@ -1190,7 +1190,7 @@ trait RTS_Registration_Ajax
         */
         $message .= "<p style='text-align: center; color: #999; font-size: 12px; margin-top: 20px;'>";
 
-        $message .= "Your information is secure and encrypted. © Run The Seas®";
+        $message .= "Your information is secure and encrypted. © Run The Seas™";
 
         $message .= "</p>";
 

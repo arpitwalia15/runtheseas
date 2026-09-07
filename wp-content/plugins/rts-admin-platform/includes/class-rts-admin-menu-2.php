@@ -1265,12 +1265,18 @@ class RTS_Admin_Menu_2 {
 		$template = $wpdb->get_row( $wpdb->prepare( "SELECT action_key, html_body FROM " . RTS_DB::table( 'email_templates' ) . " WHERE id = %d", $template_id ) );
 		if ( ! $template || ! is_array( $submitted ) ) { return $body; }
 		$sources = self::template_image_sources( $template->html_body );
+		$certificate_source = '';
+		if ( in_array( $template->action_key ?? '', array( 'email_verification', 'founding_runner_certificate' ), true ) ) {
+			if ( preg_match( '~<img\b(?=[^>]*\balt\s*=\s*(["\'])(?:Preview of your Founding Runner Cruise Credit|Your Founding Runner Gift Certificate)\1)[^>]*\bsrc\s*=\s*(["\'])(.*?)\2~is', (string) $template->html_body, $certificate_match ) ) {
+				$certificate_source = html_entity_decode( trim( (string) $certificate_match[3] ), ENT_QUOTES, 'UTF-8' );
+			}
+		}
 		foreach ( $sources as $index => $source ) {
 			if ( ! array_key_exists( $index, $submitted ) ) { continue; }
 			$replacement = esc_url_raw( wp_unslash( $submitted[ $index ] ) );
 			$preview = self::template_image_preview_url( $template, $source );
 			if ( '' === $replacement || $replacement === $preview || $replacement === $source ) { continue; }
-			if ( '{certificate_preview_url}' === $source ) {
+			if ( '{certificate_preview_url}' === $source || ( '' !== $certificate_source && $certificate_source === $source ) ) {
 				$asset_option = 'founding_runner_certificate' === ( $template->action_key ?? '' )
 					? 'rts_certificate_email_design_assets'
 					: 'rts_verification_email_design_assets';
@@ -1278,6 +1284,7 @@ class RTS_Admin_Menu_2 {
 				$assets = is_array( $assets ) ? $assets : array();
 				$assets['certificate_preview_image'] = $replacement;
 				update_option( $asset_option, $assets, false );
+				$body = str_replace( array( $source, esc_url( $source ) ), '{certificate_preview_url}', $body );
 				continue;
 			}
 			$body = str_replace( array( $source, esc_url( $source ) ), $replacement, $body );

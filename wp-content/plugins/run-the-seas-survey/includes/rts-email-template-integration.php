@@ -215,6 +215,8 @@ function rts_resolve_transactional_email_template($action_key, $default_subject,
         $legacy_previews = array(
             $configured_preview,
             RTS_PLUGIN_URL . 'assets/register-page-sample-certificate.png',
+            RTS_PLUGIN_URL . 'assets/certificate-confirmation-preview-v4.jpg',
+            RTS_PLUGIN_URL . 'assets/certificate-backplate-v3.jpg',
             RTS_PLUGIN_URL . 'assets/certificate-template.jpg',
             RTS_PLUGIN_URL . 'assets/certificate-template.png',
             RTS_PLUGIN_URL . 'assets/certificate-template--.png',
@@ -303,11 +305,13 @@ function rts_get_transactional_email_editor_preview_context($action_key = '')
     $assets = is_array($assets) ? $assets : array();
 
     if ('email_verification' === $action_key) {
-        $certificate_preview_url = esc_url_raw(RTS_PLUGIN_URL . 'assets/certificate-confirmation-preview-v4.jpg');
+        $certificate_preview_url = !empty($assets['certificate_preview_image'])
+            ? esc_url_raw($assets['certificate_preview_image'])
+            : esc_url_raw(RTS_PLUGIN_URL . 'assets/certificate-template.jpg');
     } else {
         $certificate_preview_url = !empty($assets['certificate_preview_image'])
             ? esc_url_raw($assets['certificate_preview_image'])
-            : esc_url_raw(RTS_PLUGIN_URL . 'assets/certificate-backplate-v3.jpg');
+            : esc_url_raw(RTS_PLUGIN_URL . 'assets/certificate-template.jpg');
     }
 
     // Use the approved confirmation sample for verification emails and a

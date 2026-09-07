@@ -1,51 +1,55 @@
 <?php
+
 /**
  * Class RTS_Registration
  * Handles participant registration and Cabin Credit management
  */
-class RTS_Registration {
-    
+class RTS_Registration
+{
+
     private $db;
     private $tracking;
-    
-    public function __construct($tracking = null) {
+
+    public function __construct($tracking = null)
+    {
         global $wpdb;
         $this->db = $wpdb;
         $this->tracking = $tracking;
-        
+
         // Hook into Fluent Form submission for registration form
         add_action('fluentform/before_insert_submission', array($this, 'handle_registration_submission'), 10, 3);
         add_action('fluentform/after_submission', array($this, 'after_registration_submission'), 10, 3);
-        
+
         // Email verification
         add_action('init', array($this, 'verify_email_handler'));
-        
+
         // AJAX handlers
         add_action('wp_ajax_rts_get_participant_data', array($this, 'ajax_get_participant_data'));
         add_action('wp_ajax_nopriv_rts_get_participant_data', array($this, 'ajax_get_participant_data'));
     }
-    
+
     /**
      * Handle registration form submission
      */
-    public function handle_registration_submission($submission_data, $form_data, $form) {
+    public function handle_registration_submission($submission_data, $form_data, $form)
+    {
         // Check if this is the registration form (Form ID 4 - adjust as needed)
         $registration_form_id = apply_filters('rts_registration_form_id', 4);
         if ($form->id != $registration_form_id) {
             return;
         }
-        
+
         error_log("RTS: Processing registration submission for form: {$form->id}");
-        
+
         // Extract form data
         $email = sanitize_email($submission_data['email'] ?? '');
         $first_name = sanitize_text_field($submission_data['first_name'] ?? '');
         $last_name = sanitize_text_field($submission_data['last_name'] ?? '');
-        $request_cabin_credit = isset($submission_data['request_cabin_credit']) && 
-                                $submission_data['request_cabin_credit'] === 'Yes';
+        $request_cabin_credit = isset($submission_data['request_cabin_credit']) &&
+            $submission_data['request_cabin_credit'] === 'Yes';
         $age_consent = isset($submission_data['age_consent']) &&
             'true' === sanitize_text_field(wp_unslash($submission_data['age_consent']));
-        
+
         if (empty($email) || empty($first_name) || empty($last_name)) {
             error_log("RTS: Missing required fields for registration");
             return;
@@ -55,10 +59,10 @@ class RTS_Registration {
             error_log('RTS: Fluent Forms registration rejected because age/legal consent was not confirmed');
             return;
         }
-        
+
         // Check if participant already exists
         $existing = $this->get_participant_by_email($email);
-        
+
         if ($existing) {
             // Update existing participant
             $participant_id = $this->update_participant($existing->id, $submission_data);
@@ -72,24 +76,24 @@ class RTS_Registration {
                 $age_consent,
                 $this->get_request_ip_address()
             );
-            
+
             // REMOVED: send_verification_email is now handled by background processor
             // if ($participant_id) {
             //     $this->send_verification_email($participant_id);
             //     $this->log_timeline($participant_id, 'registration_created', 'New registration created - Email verification sent');
             // }
-            
+
             // Just log the creation without email
             if ($participant_id) {
                 $this->log_timeline($participant_id, 'registration_created', 'New registration created - Email will be sent by background processor');
             }
         }
-        
+
         // If cabin credit requested, handle the request
         if ($request_cabin_credit && $participant_id) {
             $this->handle_cabin_credit_request($participant_id, $submission_data);
         }
-        
+
         // Store in session for later use
         if ($participant_id) {
             if (!session_id()) {
@@ -104,9 +108,10 @@ class RTS_Registration {
     /**
      * Check if user has a completed survey but no registration
      */
-    public function get_completed_survey_without_registration($email = null) {
+    public function get_completed_survey_without_registration($email = null)
+    {
         global $wpdb;
-        
+
         // If email is provided, check by email
         if ($email) {
             $tracking = $wpdb->get_row(
@@ -122,7 +127,7 @@ class RTS_Registration {
                 return $tracking;
             }
         }
-        
+
         // Check by tracking ID from cookie
         $tracking_id = (
             isset($_COOKIE['rts_survey_cookie_consent']) &&
@@ -142,7 +147,7 @@ class RTS_Registration {
                 return $tracking;
             }
         }
-        
+
         // Check by submission ID from cookie
         $submission_id = (
             isset($_COOKIE['rts_survey_cookie_consent']) &&
@@ -162,30 +167,32 @@ class RTS_Registration {
                 return $tracking;
             }
         }
-        
+
         return null;
     }
-    
+
     /**
      * After registration submission - send confirmation
      */
-    public function after_registration_submission($submission_data, $form_data, $form) {
+    public function after_registration_submission($submission_data, $form_data, $form)
+    {
         $registration_form_id = apply_filters('rts_registration_form_id', 4);
         if ($form->id != $registration_form_id) {
             return;
         }
-        
+
         // Send confirmation email
         $email = sanitize_email($submission_data['email'] ?? '');
         if ($email) {
             $this->send_confirmation_email($email, $submission_data);
         }
     }
-    
+
     /**
      * Create a new participant
      */
-    public function create_participant($data, $request_cabin_credit, $user_id = null, $age_consent = false, $age_consent_ip_address = '') {
+    public function create_participant($data, $request_cabin_credit, $user_id = null, $age_consent = false, $age_consent_ip_address = '')
+    {
         // Defense in depth for every code path that can create a Founding Runner.
         if (true !== $age_consent) {
             error_log('RTS: Participant creation rejected because age/legal consent was not confirmed');
@@ -256,7 +263,7 @@ class RTS_Registration {
             error_log('RTS: Participant creation rejected because the postal code is too long');
             return false;
         }
-        
+
         // Check if there's a referral code in the data
         $referral_code = sanitize_text_field($data['referral_code_input'] ?? '');
         $referred_by = null;
@@ -275,7 +282,7 @@ class RTS_Registration {
         // Public surfaces and reporting use the country detected during the
         // survey, falling back to the country entered during registration.
         $country = $detected_country ?: $registration_country;
-        
+
         // If no referral code provided, check if we have one from tracking
         if (empty($referral_code) && $tracking) {
             if ($tracking && !empty($tracking->referral_code)) {
@@ -286,7 +293,7 @@ class RTS_Registration {
                 }
             }
         }
-        
+
         // If still no referrer, look up by referral code
         if (empty($referred_by) && !empty($referral_code)) {
             $referrer = $this->get_participant_by_referral_code($referral_code);
@@ -295,63 +302,63 @@ class RTS_Registration {
                 error_log('RTS: New user referred by participant: ' . $referred_by);
             }
         }
-        
+
         // Generate unique referral code for this user
         $new_referral_code = $this->generate_referral_code($first_name, $last_name);
-        
+
         // Generate verification token
         $verification_token = bin2hex(random_bytes(32));
-        
+
         // Every completed registration becomes eligible on email verification.
         // Benefits are not issued until verification; a certificate number is
         // reserved only when the verification email is prepared.
         $cabin_credit_number = null;
-        
+
         $participant_data = array(
-                'user_id' => $user_id,
-                'survey_tracking_id' => $tracking_id,
-                'email' => $email,
-                'first_name' => $first_name,
-                'last_name' => $last_name,
-                'phone' => $phone,
-                'country' => $country,
-                'registration_country' => $registration_country,
-                'detected_country' => $detected_country,
-                'city' => $city,
-                'province' => $province,
-                'registration_province' => $province,
-                'postal_code' => $postal_code,
-                'address' => $address,
-                'address_2' => $address_2,
-                'date_of_birth' => $date_of_birth,
-                'gender' => $gender,
-                'age_range' => $age_range,
-                'emergency_contact_name' => $emergency_contact_name,
-                'emergency_contact_phone' => $emergency_contact_phone,
-                'marketing_consent' => $marketing_consent,
-                'age_consent_confirmed_at' => $age_consent_confirmed_at,
-                'age_consent_ip_address' => $age_consent_ip_address,
-                'registration_date' => current_time('mysql'),
-                'email_verified' => 0,
-                'email_verification_token' => $verification_token,
-                'verification_token' => $verification_token,
-                'cabin_credit_requested' => 1,
-                'cabin_credit_number' => $cabin_credit_number,
-                'cabin_credit_status' => 'pending',
-                'cabin_credit_amount' => 100.00,
-                'captain_suite_status' => 'inactive',
-                'captain_referral_participation' => isset($data['referral_race_participation']) && $data['referral_race_participation'] === 'Yes' ? 'registered' : 'not_started',
-                'captain_miles_balance' => 0,
-                'total_captain_miles_earned' => 0,
-                'total_captain_miles_used' => 0,
-                'referral_code' => $new_referral_code,
-                'referred_by' => $referred_by,
-                'referral_count' => 0,
-                'successful_referrals' => 0,
-                'total_referral_bonus' => 0,
-                'created_at' => current_time('mysql'),
-                'updated_at' => current_time('mysql')
-            );
+            'user_id' => $user_id,
+            'survey_tracking_id' => $tracking_id,
+            'email' => $email,
+            'first_name' => $first_name,
+            'last_name' => $last_name,
+            'phone' => $phone,
+            'country' => $country,
+            'registration_country' => $registration_country,
+            'detected_country' => $detected_country,
+            'city' => $city,
+            'province' => $province,
+            'registration_province' => $province,
+            'postal_code' => $postal_code,
+            'address' => $address,
+            'address_2' => $address_2,
+            'date_of_birth' => $date_of_birth,
+            'gender' => $gender,
+            'age_range' => $age_range,
+            'emergency_contact_name' => $emergency_contact_name,
+            'emergency_contact_phone' => $emergency_contact_phone,
+            'marketing_consent' => $marketing_consent,
+            'age_consent_confirmed_at' => $age_consent_confirmed_at,
+            'age_consent_ip_address' => $age_consent_ip_address,
+            'registration_date' => current_time('mysql'),
+            'email_verified' => 0,
+            'email_verification_token' => $verification_token,
+            'verification_token' => $verification_token,
+            'cabin_credit_requested' => 1,
+            'cabin_credit_number' => $cabin_credit_number,
+            'cabin_credit_status' => 'pending',
+            'cabin_credit_amount' => 100.00,
+            'captain_suite_status' => 'inactive',
+            'captain_referral_participation' => isset($data['referral_race_participation']) && $data['referral_race_participation'] === 'Yes' ? 'registered' : 'not_started',
+            'captain_miles_balance' => 0,
+            'total_captain_miles_earned' => 0,
+            'total_captain_miles_used' => 0,
+            'referral_code' => $new_referral_code,
+            'referred_by' => $referred_by,
+            'referral_count' => 0,
+            'successful_referrals' => 0,
+            'total_referral_bonus' => 0,
+            'created_at' => current_time('mysql'),
+            'updated_at' => current_time('mysql')
+        );
         if (null !== $travel_party_size) {
             $participant_data['travel_party_size'] = $travel_party_size;
         }
@@ -360,16 +367,16 @@ class RTS_Registration {
             $this->db->prefix . 'rts_participants',
             $participant_data
         );
-        
+
         if ($inserted === false) {
             error_log("RTS: Failed to create participant: " . $this->db->last_error);
             return false;
         }
-        
+
         $participant_id = $this->db->insert_id;
         error_log("RTS: Created participant ID: {$participant_id}");
         $this->sync_participant_user_meta($participant_id);
-        
+
         // If referred by someone, add to referrals table (ONLY if not exists)
         if ($referred_by && $participant_id) {
             // CRITICAL: Check if referral already exists for this email
@@ -381,7 +388,7 @@ class RTS_Registration {
                     $email
                 )
             );
-            
+
             if (!$existing_referral) {
                 // Insert new referral
                 $this->db->insert(
@@ -411,20 +418,21 @@ class RTS_Registration {
                 error_log('RTS: Updated existing referral with participant ID ' . $participant_id);
             }
         }
-        
+
         // Add initial achievements
         $this->add_achievement($participant_id, 'registration', 'Welcome Aboard!', 'Thank you for registering as a Founding Runner!');
-        
+
         // Add timeline entry
         $this->log_timeline($participant_id, 'registration_created', 'Participant registered successfully');
-        
+
         return $participant_id;
     }
 
     /**
      * Return the validated submitting IP address used for consent evidence.
      */
-    public function get_request_ip_address() {
+    public function get_request_ip_address()
+    {
         if ($this->tracking && is_callable(array($this->tracking, 'get_real_ip'))) {
             $ip_address = $this->tracking->get_real_ip();
         } else {
@@ -434,7 +442,8 @@ class RTS_Registration {
         return filter_var($ip_address, FILTER_VALIDATE_IP) ? $ip_address : '0.0.0.0';
     }
 
-    public function get_participant_by_referral_code($referral_code) {
+    public function get_participant_by_referral_code($referral_code)
+    {
         return $this->db->get_row(
             $this->db->prepare(
                 "SELECT * FROM {$this->db->prefix}rts_participants WHERE referral_code = %s",
@@ -446,18 +455,20 @@ class RTS_Registration {
     /**
      * Generate referral link
      */
-    public function get_referral_link($participant_id) {
+    public function get_referral_link($participant_id)
+    {
         $participant = $this->get_participant($participant_id);
         if (!$participant || empty($participant->referral_code)) {
             return '';
         }
         return home_url('/?ref=' . $participant->referral_code);
     }
-    
+
     /**
      * Update existing participant
      */
-    private function update_participant($participant_id, $data) {
+    private function update_participant($participant_id, $data)
+    {
         $registration_country = sanitize_text_field($data['country'] ?? $data['registration_country'] ?? '');
         $tracking_id = isset($data['tracking_id']) ? absint($data['tracking_id']) : 0;
         $detected_country = $this->get_detected_country($tracking_id);
@@ -487,7 +498,7 @@ class RTS_Registration {
         if (null !== $travel_party_size) {
             $update_data['travel_party_size'] = $travel_party_size;
         }
-        
+
         // Only update cabin credit request if it's explicitly set
         if (isset($data['request_cabin_credit'])) {
             $request_cabin_credit = $data['request_cabin_credit'] === 'Yes';
@@ -496,19 +507,19 @@ class RTS_Registration {
                 $update_data['cabin_credit_status'] = 'pending';
             }
         }
-        
+
         $updated = $this->db->update(
             $this->db->prefix . 'rts_participants',
             $update_data,
             array('id' => $participant_id)
         );
-        
+
         if ($updated !== false) {
             $this->sync_participant_user_meta($participant_id);
             error_log("RTS: Updated participant ID: {$participant_id}");
             $this->log_timeline($participant_id, 'registration_update', 'Participant information updated');
         }
-        
+
         return $participant_id;
     }
 
@@ -518,7 +529,8 @@ class RTS_Registration {
      * The participant table remains authoritative; these keys make the same
      * values available to themes, membership plugins and WordPress APIs.
      */
-    public function sync_participant_user_meta($participant_id) {
+    public function sync_participant_user_meta($participant_id)
+    {
         $participant_id = absint($participant_id);
         if (!$participant_id) {
             return false;
@@ -570,7 +582,8 @@ class RTS_Registration {
     }
 
     /** Return the country detected for a survey session, if available. */
-    private function get_detected_country($tracking_id) {
+    private function get_detected_country($tracking_id)
+    {
         if (!$tracking_id) {
             return '';
         }
@@ -584,7 +597,8 @@ class RTS_Registration {
     }
 
     /** Apply survey-detected country priority when linking an existing account. */
-    public function sync_location_from_tracking($participant_id, $tracking_id) {
+    public function sync_location_from_tracking($participant_id, $tracking_id)
+    {
         $participant_id = absint($participant_id);
         $tracking_id = absint($tracking_id);
         $detected_country = $this->get_detected_country($tracking_id);
@@ -628,7 +642,8 @@ class RTS_Registration {
      * is an integer because the admin dashboards calculate an average, so the
      * displayed "6+" answer is stored as its numeric lower bound, 6.
      */
-    public function get_travel_party_size_from_survey($tracking_id = 0, $data = array()) {
+    public function get_travel_party_size_from_survey($tracking_id = 0, $data = array())
+    {
         $data = is_array($data) ? $data : array();
         $cabin_answer = isset($data['s12_radio'])
             ? $this->normalize_survey_answer_value($data['s12_radio'])
@@ -682,7 +697,8 @@ class RTS_Registration {
     }
 
     /** Update an existing participant after linking a completed survey. */
-    public function sync_travel_party_size($participant_id, $tracking_id) {
+    public function sync_travel_party_size($participant_id, $tracking_id)
+    {
         $travel_party_size = $this->get_travel_party_size_from_survey(absint($tracking_id));
         if (null === $travel_party_size) {
             return false;
@@ -701,7 +717,8 @@ class RTS_Registration {
     }
 
     /** Normalize plain or JSON-encoded answer values stored by survey tracking. */
-    private function normalize_survey_answer_value($value) {
+    private function normalize_survey_answer_value($value)
+    {
         if (is_array($value)) {
             $value = reset($value);
         }
@@ -722,38 +739,39 @@ class RTS_Registration {
 
         return $value;
     }
-    
-   
+
+
     /**
      * Handle Cabin Credit request
      */
-    public function handle_cabin_credit_request($participant_id, $data) {
+    public function handle_cabin_credit_request($participant_id, $data)
+    {
         // Get current participant data
         $participant = $this->get_participant($participant_id);
         if (!$participant) {
             return false;
         }
-        
+
         $update_data = array(
             'cabin_credit_status' => 'pending',
             'cabin_credit_requested' => 1,
             'cabin_credit_amount' => 100.00
         );
-        
+
         // Handle Captain's Suite request
         if (isset($data['captain_suite_request']) && $data['captain_suite_request'] === 'Yes') {
             $update_data['captain_suite_status'] = 'pending';
         }
-        
+
         // Handle participation
         if (isset($data['referral_race_participation']) && $data['referral_race_participation'] === 'Yes') {
             $update_data['captain_referral_participation'] = 'registered';
         }
-        
+
         // Handle referral code - ONLY if not already processed
         if (!empty($data['referral_code_input'])) {
             $referral_code = sanitize_text_field($data['referral_code_input']);
-            
+
             // Check if this participant already has a referral
             $has_referral = $this->db->get_var(
                 $this->db->prepare(
@@ -763,7 +781,7 @@ class RTS_Registration {
                     $participant->email
                 )
             );
-            
+
             // Only process if no referral exists yet
             if (!$has_referral) {
                 $this->process_referral($participant_id, $referral_code);
@@ -771,16 +789,16 @@ class RTS_Registration {
                 error_log("RTS: Referral already exists for participant {$participant_id}, skipping");
             }
         }
-        
+
         $updated = $this->db->update(
             $this->db->prefix . 'rts_participants',
             $update_data,
             array('id' => $participant_id)
         );
-        
+
         if ($updated !== false) {
             error_log("RTS: Cabin Credit eligibility recorded for participant {$participant_id}");
-            
+
             // Add achievement (check if already exists)
             $achievement_exists = $this->db->get_var(
                 $this->db->prepare(
@@ -789,7 +807,7 @@ class RTS_Registration {
                     $participant_id
                 )
             );
-            
+
             if (!$achievement_exists) {
                 $this->add_achievement(
                     $participant_id,
@@ -798,7 +816,7 @@ class RTS_Registration {
                     'Your $100 Founding Runner Cabin Credit will be issued after email verification.'
                 );
             }
-            
+
             // Log timeline
             $this->log_timeline(
                 $participant_id,
@@ -809,16 +827,17 @@ class RTS_Registration {
 
         return $updated !== false;
     }
-    
+
     /**
      * Generate unique cabin credit number
      */
-    private function generate_cabin_credit_number() {
+    private function generate_cabin_credit_number()
+    {
         $prefix = 'RTS';
         $year = date('Y');
         $random = strtoupper(substr(uniqid(), -6));
         $number = $prefix . $year . '-' . $random;
-        
+
         // Check if number exists
         $exists = $this->db->get_var(
             $this->db->prepare(
@@ -826,11 +845,11 @@ class RTS_Registration {
                 $number
             )
         );
-        
+
         if ($exists) {
             return $this->generate_cabin_credit_number();
         }
-        
+
         return $number;
     }
 
@@ -839,7 +858,8 @@ class RTS_Registration {
      * requires an administrator to approve its benefits. A matching session is
      * only a duplicate within the same survey form; the email may be different.
      */
-    private function get_duplicate_benefit_hold($participant) {
+    private function get_duplicate_benefit_hold($participant)
+    {
         if (empty($participant->survey_tracking_id)) {
             return false;
         }
@@ -893,7 +913,8 @@ class RTS_Registration {
      * remain the source of truth; timestamps and actor IDs make the decision
      * visible in Participant Verification & Account Operations.
      */
-    public function activate_verified_benefits($participant_id, $actor_id = 0, $send_certificate = true) {
+    public function activate_verified_benefits($participant_id, $actor_id = 0, $send_certificate = true)
+    {
         $participant = $this->get_participant($participant_id);
         if (!$participant) {
             return new WP_Error('rts_participant_not_found', __('Participant not found.', 'run-the-seas'));
@@ -978,7 +999,8 @@ class RTS_Registration {
         return $this->get_participant($participant_id);
     }
 
-    private function generate_certificate_number() {
+    private function generate_certificate_number()
+    {
         do {
             $number = 'RTS-CERT-' . gmdate('Y') . '-' . strtoupper(wp_generate_password(6, false, false));
         } while ($this->db->get_var($this->db->prepare("SELECT id FROM {$this->db->prefix}rts_participants WHERE certificate_number = %s", $number)));
@@ -991,7 +1013,8 @@ class RTS_Registration {
      * The approved artwork stays intact; only the participant-specific fields
      * are overlaid at issue time.
      */
-    public function generate_certificate_pdf($participant_id) {
+    public function generate_certificate_pdf($participant_id)
+    {
         $participant = $this->get_participant($participant_id);
         if (!$participant || empty($participant->certificate_number)) {
             return new WP_Error('rts_certificate_unavailable', __('No issued certificate is available for this participant.', 'run-the-seas'));
@@ -1069,7 +1092,8 @@ class RTS_Registration {
         return $path;
     }
 
-    public function send_certificate($participant_id, $actor_id = 0) {
+    public function send_certificate($participant_id, $actor_id = 0)
+    {
         $participant = $this->get_participant($participant_id);
         if (!$participant || (int) $participant->email_verified !== 1) {
             return new WP_Error('rts_certificate_email', __('A verified participant is required to send a certificate.', 'run-the-seas'));
@@ -1120,7 +1144,8 @@ class RTS_Registration {
      * layout and inline styles are intentionally email-client safe; imagery is
      * configured in Surveys > Certificate Email in the WordPress admin.
      */
-    private function get_certificate_email_message($participant, $captains_suite_url) {
+    private function get_certificate_email_message($participant, $captains_suite_url)
+    {
         $assets = get_option('rts_certificate_email_design_assets', array());
         $assets = is_array($assets) ? $assets : array();
         $asset = function ($key) use ($assets) {
@@ -1144,12 +1169,12 @@ class RTS_Registration {
         $header_section = $header_image
             ? '<tr><td style="background:#031b38;border-bottom:2px solid #d99a1b;">' . $image($header_image, 1200, 'Run The Seas — More than a race') . '</td></tr>'
             : '<tr><td style="padding:20px 28px;background:#031b38;border-bottom:2px solid #d99a1b;">'
-                . '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr>'
-                . '<td width="52%" valign="middle">'
-                . ($header_logo ? $image($header_logo, 300, 'Run The Seas') : '<span style="font-family:Georgia,serif;font-size:30px;font-weight:bold;letter-spacing:.5px;color:#e7a41e;">&#9875; RUN THE SEAS</span>')
-                . '</td><td width="48%" align="right" valign="middle" style="font-family:Georgia,serif;color:#f5bd42;">'
-                . '<div style="font-size:21px;line-height:1.2;">More than a race.</div><div style="padding-top:5px;font-size:13px;color:#ffffff;">IT&rsquo;S THE ADVENTURE OF A LIFETIME.<br>RUN. EXPLORE. CELEBRATE. BELONG.</div>'
-                . '</td></tr></table></td></tr>';
+            . '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr>'
+            . '<td width="52%" valign="middle">'
+            . ($header_logo ? $image($header_logo, 300, 'Run The Seas') : '<span style="font-family:Georgia,serif;font-size:30px;font-weight:bold;letter-spacing:.5px;color:#e7a41e;">&#9875; RUN THE SEAS</span>')
+            . '</td><td width="48%" align="right" valign="middle" style="font-family:Georgia,serif;color:#f5bd42;">'
+            . '<div style="font-size:21px;line-height:1.2;">More than a race.</div><div style="padding-top:5px;font-size:13px;color:#ffffff;">IT&rsquo;S THE ADVENTURE OF A LIFETIME.<br>RUN. EXPLORE. CELEBRATE. BELONG.</div>'
+            . '</td></tr></table></td></tr>';
 
         $hero_divider_image = $image($asset('hero_divider_image'), 245, '', 'margin:0 0 19px;');
         $hero_divider = $hero_divider_image ?: '<table role="presentation" width="245" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 19px;"><tr>'
@@ -1177,7 +1202,7 @@ class RTS_Registration {
         $download_button = $download_button_image
             ? '<a' . $certificate_link_attributes . ' style="display:inline-block;text-decoration:none;">' . $download_button_image . '</a>'
             : '<a' . $certificate_link_attributes . ' style="display:inline-block;padding:14px 28px;border-radius:6px;background:#eaa20f;color:#15110a;font-family:Georgia,serif;font-size:18px;font-weight:bold;text-decoration:none;border:1px solid #b97508;">DOWNLOAD CERTIFICATE</a>';
-      
+
         $suite_benefits = array(
             array('suite_icon_voyage', 'Voyage updates and key announcements'),
             array('suite_icon_priority', 'Priority access to booking and events'),
@@ -1248,7 +1273,8 @@ class RTS_Registration {
     }
 
     /** Notify an opted-in referrer when a referred participant verifies. */
-    public function send_referral_progress_notification($referrer_id) {
+    public function send_referral_progress_notification($referrer_id)
+    {
         $referrer = $this->get_participant($referrer_id);
         if (!$referrer || empty($referrer->email)) {
             return false;
@@ -1314,20 +1340,22 @@ class RTS_Registration {
         return $sent;
     }
 
-    private function pdf_escape($value) {
+    private function pdf_escape($value)
+    {
         $value = wp_strip_all_tags($value);
         $value = preg_replace('/[^\x20-\x7E]/', '', $value);
         return str_replace(array('\\', '(', ')'), array('\\\\', '\\(', '\\)'), $value);
     }
-    
+
     /**
      * Generate unique referral code
      */
-    private function generate_referral_code($first_name, $last_name) {
+    private function generate_referral_code($first_name, $last_name)
+    {
         $base = strtoupper(substr($first_name, 0, 3) . substr($last_name, 0, 3));
         $random = strtoupper(substr(uniqid(), -4));
         $code = $base . $random;
-        
+
         // Check if code exists
         $exists = $this->db->get_var(
             $this->db->prepare(
@@ -1335,18 +1363,19 @@ class RTS_Registration {
                 $code
             )
         );
-        
+
         if ($exists) {
             return $this->generate_referral_code($first_name, $last_name);
         }
-        
+
         return $code;
     }
-    
+
     /**
      * Process referral
      */
-    private function process_referral($participant_id, $referral_code) {
+    private function process_referral($participant_id, $referral_code)
+    {
         // Find referrer by referral code
         $referrer = $this->db->get_row(
             $this->db->prepare(
@@ -1354,20 +1383,20 @@ class RTS_Registration {
                 $referral_code
             )
         );
-        
+
         if (!$referrer) {
             error_log("RTS: Invalid referral code: {$referral_code}");
             return false;
         }
-        
+
         // Get participant data
         $participant = $this->get_participant($participant_id);
-        
+
         if (!$participant) {
             error_log("RTS: Participant not found: {$participant_id}");
             return false;
         }
-        
+
         // CRITICAL: Check if referral already exists for this email and referrer
         $existing = $this->db->get_var(
             $this->db->prepare(
@@ -1377,7 +1406,7 @@ class RTS_Registration {
                 $participant->email
             )
         );
-        
+
         if ($existing) {
             error_log("RTS: Referral already exists for {$participant->email} by referrer {$referrer->id}");
             // Update existing referral with participant ID if missing
@@ -1390,7 +1419,7 @@ class RTS_Registration {
             );
             return true;
         }
-        
+
         // Record referral - only if it doesn't exist
         $inserted = $this->db->insert(
             $this->db->prefix . 'rts_referrals',
@@ -1406,7 +1435,7 @@ class RTS_Registration {
                 'created_at' => current_time('mysql')
             )
         );
-        
+
         if ($inserted !== false) {
             // Update referrer's referral count
             $this->db->query(
@@ -1417,7 +1446,7 @@ class RTS_Registration {
                     $referrer->id
                 )
             );
-            
+
             // Add achievement for referrer
             $this->add_achievement(
                 $referrer->id,
@@ -1425,40 +1454,41 @@ class RTS_Registration {
                 'New Referral!',
                 "You referred {$participant->first_name} {$participant->last_name} to the Founding Runners program!"
             );
-            
+
             // Log timeline
             $this->log_timeline(
                 $participant_id,
                 'referred_by',
                 "Referred by {$referrer->id} using code: {$referral_code}"
             );
-            
+
             $this->log_timeline(
                 $referrer->id,
                 'referral_made',
                 "Referred {$participant->first_name} {$participant->last_name}"
             );
-            
+
             error_log("RTS: Referral processed: {$referrer->id} -> {$participant_id}");
             return true;
         }
-        
+
         return false;
     }
-    
+
     /**
      * Send verification email
      */
-    public function send_verification_email($participant_id, $force = false) {
+    public function send_verification_email($participant_id, $force = false)
+    {
         global $wpdb;
-        
+
         $participant = $this->get_participant($participant_id);
-        
+
         if (!$participant) {
             error_log('RTS: Participant not found for verification email: ' . $participant_id);
             return false;
         }
-        
+
         // Check if already verified
         if ($participant->email_verified == 1) {
             error_log('RTS: Email already verified for participant ' . $participant_id);
@@ -1486,7 +1516,7 @@ class RTS_Registration {
             }
             $participant->certificate_number = $certificate_number;
         }
-        
+
         // Check if verification email was sent recently (within last 10 minutes)
         $recent_sent = $wpdb->get_var(
             $wpdb->prepare(
@@ -1497,12 +1527,12 @@ class RTS_Registration {
                 $participant_id
             )
         );
-        
+
         if (!$force && $recent_sent > 0) {
             error_log('RTS: Verification email already sent recently for participant ' . $participant_id);
             return true;
         }
-        
+
         // Check total count
         $total_sent = $wpdb->get_var(
             $wpdb->prepare(
@@ -1511,7 +1541,7 @@ class RTS_Registration {
                 $participant_id
             )
         );
-        
+
         if (!$force && $total_sent > 0) {
             error_log('RTS: Verification email already sent ' . $total_sent . ' times for participant ' . $participant_id);
             // If already sent once, don't send again unless it's a manual resend
@@ -1536,7 +1566,7 @@ class RTS_Registration {
             error_log('RTS: Verification email already issued for participant ' . $participant_id);
             return true;
         }
-        
+
         error_log('RTS: Sending verification email for participant ' . $participant_id);
 
         // Every resend gets a fresh token, invalidating older links. Keep the
@@ -1563,7 +1593,7 @@ class RTS_Registration {
 
         $participant->email_verification_token = $verification_token;
         $participant->verification_token = $verification_token;
-        
+
         $verification_link = add_query_arg(
             array(
                 'rts_verify_email' => '1',
@@ -1572,7 +1602,7 @@ class RTS_Registration {
             ),
             home_url()
         );
-        
+
         $subject = 'Confirm Your Email Address | Run The Seas';
         $message = $this->get_verification_email_message($participant, $verification_link);
         $certificate_values = $this->get_certificate_personalisation($participant);
@@ -1594,9 +1624,9 @@ class RTS_Registration {
         $subject = $email_template['subject'];
         $message = $email_template['html_body'];
         $headers = rts_mail_headers();
-        
+
         $sent = wp_mail($participant->email, $subject, $message, $headers);
-        
+
         if ($sent) {
             $verification_sent_at = current_time('mysql');
             $wpdb->update(
@@ -1618,7 +1648,7 @@ class RTS_Registration {
         } else {
             error_log('RTS: Verification email FAILED for ' . $participant->email);
         }
-        
+
         return $sent;
     }
 
@@ -1627,7 +1657,8 @@ class RTS_Registration {
      * No certificate file is attached or linked; the selected certificate is an
      * image-only preview for the verification email.
      */
-    private function get_verification_email_message($participant, $verification_link) {
+    private function get_verification_email_message($participant, $verification_link)
+    {
         $assets = get_option('rts_verification_email_design_assets', array());
         $assets = is_array($assets) ? $assets : array();
         $complete_header_image = !empty($assets['complete_header_image']) ? esc_url($assets['complete_header_image']) : '';
@@ -1648,12 +1679,12 @@ class RTS_Registration {
         $header_section = $complete_header_image
             ? '<tr><td bgcolor="#041c3a" style="background:#041c3a;border-bottom:2px solid #d48618;"><img src="' . $complete_header_image . '" width="1200" alt="Run The Seas — More than a race. It’s the adventure of a lifetime." style="display:block;width:100%;height:auto;border:0;"></td></tr>'
             : '<tr><td bgcolor="#041c3a" style="padding:22px 26px;border-bottom:2px solid #d48618;background:#041c3a;">'
-                . '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr>'
-                . '<td width="52%" valign="middle" align="left">' . $header_logo . '</td>'
-                . '<td width="48%" valign="middle" align="right" style="padding-left:18px;color:#f6bd32;font-family:Georgia,serif;">'
-                . '<div style="font-size:22px;line-height:1.25;font-style:italic;">More than a race.<br>It&rsquo;s the adventure of a lifetime!</div>'
-                . '<div style="padding-top:9px;font-size:13px;line-height:1.4;font-style:normal;">Run. Explore. Celebrate. Belong.</div>'
-                . '</td></tr></table></td></tr>';
+            . '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr>'
+            . '<td width="52%" valign="middle" align="left">' . $header_logo . '</td>'
+            . '<td width="48%" valign="middle" align="right" style="padding-left:18px;color:#f6bd32;font-family:Georgia,serif;">'
+            . '<div style="font-size:22px;line-height:1.25;font-style:italic;">More than a race.<br>It&rsquo;s the adventure of a lifetime!</div>'
+            . '<div style="padding-top:9px;font-size:13px;line-height:1.4;font-style:normal;">Run. Explore. Celebrate. Belong.</div>'
+            . '</td></tr></table></td></tr>';
         $certificate = $certificate_preview_image
             ? '<img src="' . esc_url($certificate_preview_image) . '" width="490" alt="Preview of your Founding Runner Cruise Credit" style="display:block;width:100%;min-width:490px;max-width:490px;height:auto;border:1px solid #d59b19;">'
             : '';
@@ -1714,10 +1745,14 @@ class RTS_Registration {
     }
 
     /** Return the shared certificate backplate selected by staff, or the bundled approved artwork. */
-    private function get_certificate_backplate_url($option_name = '') {
-        $option_names = array('rts_certificate_email_design_assets');
-        if ($option_name !== '' && !in_array($option_name, $option_names, true)) {
+    private function get_certificate_backplate_url($option_name = '')
+    {
+        $option_names = array();
+        if ($option_name !== '') {
             $option_names[] = $option_name;
+        }
+        if (!in_array('rts_certificate_email_design_assets', $option_names, true)) {
+            $option_names[] = 'rts_certificate_email_design_assets';
         }
 
         foreach ($option_names as $asset_option) {
@@ -1727,28 +1762,42 @@ class RTS_Registration {
             }
         }
 
-        return esc_url_raw(RTS_PLUGIN_URL . 'assets/certificate-backplate-v3.jpg');
+        return esc_url_raw(RTS_PLUGIN_URL . 'assets/certificate-template.jpg');
     }
 
     /** Return the current configured certificate preview for an email recipient. */
-    public function get_email_certificate_preview_url($participant, $option_name) {
-        // The confirmation email deliberately shows the approved sample rather
-        // than implying that an unverified registration already owns an issued
-        // and redeemable certificate.
+    public function get_email_certificate_preview_url($participant, $option_name)
+    {
+        $source = $this->get_certificate_backplate_url($option_name);
+
+        // Verification emails use the registering participant's name while
+        // retaining sample certificate values until verification is complete.
         if ('rts_verification_email_design_assets' === $option_name) {
-            return esc_url_raw(RTS_PLUGIN_URL . 'assets/certificate-confirmation-preview-v4.jpg');
+            return $this->get_sample_certificate_preview_url(
+                $source,
+                wp_date('F j, Y'),
+                (string) ($participant->first_name ?? ''),
+                (string) ($participant->last_name ?? '')
+            );
         }
 
-        $source = $this->get_certificate_backplate_url($option_name);
         return $this->get_verification_certificate_preview_url($participant, $source);
     }
 
     /** Create the public registration-page sample from the same live renderer. */
-    public function get_sample_certificate_preview_url($source_url, $date_text) {
+    public function get_sample_certificate_preview_url($source_url, $date_text, $first_name = 'Your Name', $last_name = 'Here')
+    {
+        $first_name = trim((string) $first_name);
+        $last_name = trim((string) $last_name);
+        if ($first_name === '' && $last_name === '') {
+            $first_name = 'Your Name';
+            $last_name = 'Here';
+        }
+
         $sample = (object) array(
             'id' => 237,
-            'first_name' => 'Your Name',
-            'last_name' => 'Here',
+            'first_name' => $first_name,
+            'last_name' => $last_name,
             'founding_runner_number' => '0000237',
             'certificate_number' => 'RTS-CERT-' . wp_date('Y') . '-V6JYLZ',
             'certificate_issued_at' => $date_text,
@@ -1764,7 +1813,8 @@ class RTS_Registration {
     }
 
     /** Load supported certificate artwork into a GD image resource. */
-    private function create_certificate_image_resource($source_path) {
+    private function create_certificate_image_resource($source_path)
+    {
         $image_info = @getimagesize($source_path);
         if (!$image_info) {
             return false;
@@ -1783,7 +1833,8 @@ class RTS_Registration {
     }
 
     /** Build the exact participant-specific values shown on the certificate. */
-    private function get_certificate_personalisation($participant) {
+    private function get_certificate_personalisation($participant)
+    {
         $name = trim((string) ($participant->first_name ?? '') . ' ' . (string) ($participant->last_name ?? ''));
         $name = $name !== '' ? $name : __('Founding Runner', 'run-the-seas');
 
@@ -1831,7 +1882,8 @@ class RTS_Registration {
     }
 
     /** Draw all fields onto the approved blank backplate using sample-v4 positioning. */
-    private function render_certificate_personalisation($certificate, $participant) {
+    private function render_certificate_personalisation($certificate, $participant)
+    {
         $width = imagesx($certificate);
         $height = imagesy($certificate);
         $values = $this->get_certificate_personalisation($participant);
@@ -1851,12 +1903,12 @@ class RTS_Registration {
                 $certificate,
                 $values['name'],
                 $name_font,
-                max(34, (int) round($width * 0.043)),
-                (int) round($width * 0.468),
+                max(23, (int) round($width * 0.026)),
+                (int) round($width * 0.490),
                 (int) round($height * 0.435),
                 $navy,
                 (int) round($width * 0.54),
-                22
+                14
             );
         } else {
             $this->draw_verification_preview_bitmap_text(
@@ -1865,7 +1917,7 @@ class RTS_Registration {
                 (int) round($width * 0.468),
                 (int) round($height * 0.414),
                 $navy,
-                max(1.5, $width / 620),
+                max(1.25, $width / 760),
                 (int) round($width * 0.54)
             );
         }
@@ -1894,7 +1946,8 @@ class RTS_Registration {
      * Coordinates are percentages so the shortcode remains responsive to the
      * original artwork dimensions while the returned file stays a real image.
      */
-    public function get_dated_certificate_image_url($source_url, $date_text, $position_x = 74.5, $position_y = 80) {
+    public function get_dated_certificate_image_url($source_url, $date_text, $position_x = 74.5, $position_y = 80)
+    {
         $source_url = esc_url_raw((string) $source_url);
         $date_text = trim(wp_strip_all_tags((string) $date_text));
         if (
@@ -1976,7 +2029,8 @@ class RTS_Registration {
     }
 
     /** Build an editable copy from the exact production verification renderer. */
-    public function get_verification_email_template_definition() {
+    public function get_verification_email_template_definition()
+    {
         $participant = (object) array(
             'id' => 0,
             'first_name' => 'RTS_FIRST_NAME',
@@ -2014,7 +2068,8 @@ class RTS_Registration {
     }
 
     /** Build an editable copy from the exact production certificate renderer. */
-    public function get_certificate_email_template_definition() {
+    public function get_certificate_email_template_definition()
+    {
         $participant = (object) array(
             'id' => 0,
             'first_name' => 'RTS_FIRST_NAME',
@@ -2057,7 +2112,8 @@ class RTS_Registration {
      * attachment, or download URL. If the selected image cannot be read by GD,
      * the original image remains the safe preview fallback.
      */
-    private function get_verification_certificate_preview_url($participant, $source_url) {
+    private function get_verification_certificate_preview_url($participant, $source_url)
+    {
         if (
             !function_exists('imagecreatetruecolor')
             || !function_exists('imagepng')
@@ -2108,7 +2164,7 @@ class RTS_Registration {
             return $source_url;
         }
         $values = $this->get_certificate_personalisation($participant);
-        $cache_key = md5('v12-readable-type|' . $source_path . '|' . filemtime($source_path) . '|' . wp_json_encode($values));
+        $cache_key = md5('v22-positioned-name|' . $source_path . '|' . filemtime($source_path) . '|' . wp_json_encode($values));
         $filename = 'verification-preview-' . absint($participant->id) . '-' . $cache_key . '.png';
         $preview_path = $directory . $filename;
         $preview_url = trailingslashit($uploads['baseurl']) . 'rts-certificate-previews/' . $filename;
@@ -2129,7 +2185,8 @@ class RTS_Registration {
     }
 
     /** Find separate portable fonts for the certificate name and number. */
-    private function get_verification_preview_font_path($field = 'name') {
+    private function get_verification_preview_font_path($field = 'name')
+    {
         $inter_font = defined('WP_CONTENT_DIR')
             ? WP_CONTENT_DIR . '/plugins/wb-gamification/assets/fonts/Inter.ttf'
             : '';
@@ -2173,7 +2230,8 @@ class RTS_Registration {
     }
 
     /** Draw centred, fitted TrueType text into a certificate field. */
-    private function draw_verification_preview_text($image, $text, $font_path, $font_size, $center_x, $baseline_y, $colour, $max_width, $min_font_size = 8) {
+    private function draw_verification_preview_text($image, $text, $font_path, $font_size, $center_x, $baseline_y, $colour, $max_width, $min_font_size = 8)
+    {
         $text = trim((string) $text);
         if ($text === '') {
             return;
@@ -2196,7 +2254,8 @@ class RTS_Registration {
     }
 
     /** Draw left-aligned TrueType text, reducing its size until it fits. */
-    private function draw_verification_preview_text_left($image, $text, $font_path, $font_size, $left_x, $baseline_y, $colour, $max_width, $min_font_size = 6) {
+    private function draw_verification_preview_text_left($image, $text, $font_path, $font_size, $left_x, $baseline_y, $colour, $max_width, $min_font_size = 6)
+    {
         $text = trim((string) $text);
         if ($text === '') {
             return;
@@ -2218,7 +2277,8 @@ class RTS_Registration {
     }
 
     /** Draw the compact APPROVED/PENDING pill shown beside the certificate number. */
-    private function draw_certificate_status_badge($image, $text, $font_path, $font_size, $left_x, $top_y, $background, $foreground) {
+    private function draw_certificate_status_badge($image, $text, $font_path, $font_size, $left_x, $top_y, $background, $foreground)
+    {
         $text = trim((string) $text);
         if ($text === '' || !$font_path || !function_exists('imagettfbbox') || !function_exists('imagettftext')) {
             return;
@@ -2249,7 +2309,8 @@ class RTS_Registration {
     }
 
     /** Last-resort text rendering when FreeType fonts are unavailable. */
-    private function draw_verification_preview_bitmap_text($image, $text, $center_x, $position_y, $colour, $scale, $max_width = 0) {
+    private function draw_verification_preview_bitmap_text($image, $text, $center_x, $position_y, $colour, $scale, $max_width = 0)
+    {
         $text = trim((string) $text);
         if ($text === '') {
             return;
@@ -2289,10 +2350,11 @@ class RTS_Registration {
     }
 
     /** Resolve a Media Library or bundled certificate image URL to its file path. */
-    private function get_verification_preview_source_path($source_url) {
-        $bundled_url = RTS_PLUGIN_URL . 'assets/certificate-backplate-v3.jpg';
+    private function get_verification_preview_source_path($source_url)
+    {
+        $bundled_url = RTS_PLUGIN_URL . 'assets/certificate-template.jpg';
         if (untrailingslashit($source_url) === untrailingslashit($bundled_url)) {
-            return RTS_PLUGIN_PATH . 'assets/certificate-backplate-v3.jpg';
+            return RTS_PLUGIN_PATH . 'assets/certificate-template.jpg';
         }
 
         // Permit other bundled certificate artwork, including the dedicated
@@ -2329,45 +2391,72 @@ class RTS_Registration {
             return trailingslashit($uploads['basedir']) . ltrim(substr($source_url, strlen($base_url)), '/');
         }
 
+        // Media URLs can retain a previous domain or a different HTTP scheme
+        // after a site migration. Resolve matching upload paths locally while
+        // still ensuring the resulting file remains inside the uploads folder.
+        $source_url_path = wp_parse_url($source_url, PHP_URL_PATH);
+        $base_url_path = wp_parse_url($base_url, PHP_URL_PATH);
+        if (
+            is_string($source_url_path)
+            && is_string($base_url_path)
+            && 0 === strpos($source_url_path, trailingslashit($base_url_path))
+        ) {
+            $relative_path = ltrim(rawurldecode(substr($source_url_path, strlen(trailingslashit($base_url_path)))), '/');
+            $candidate_path = realpath(trailingslashit($uploads['basedir']) . $relative_path);
+            $uploads_path = realpath($uploads['basedir']);
+            if (
+                $candidate_path
+                && $uploads_path
+                && 0 === stripos(
+                    wp_normalize_path($candidate_path),
+                    trailingslashit(wp_normalize_path($uploads_path))
+                )
+            ) {
+                return $candidate_path;
+            }
+        }
+
         return '';
     }
-    
+
     /**
      * Send confirmation email
      */
-    public function send_confirmation_email($email, $data) {
+    public function send_confirmation_email($email, $data)
+    {
         $subject = 'Registration Confirmation - Founding Runner';
         $message = "Hello {$data['first_name']} {$data['last_name']},\n\n";
         $message .= "Thank you for registering as a Founding Runner!\n\n";
-        
+
         if (isset($data['request_cabin_credit']) && $data['request_cabin_credit'] === 'Yes') {
             $message .= "Your Cabin Credit request has been received and is being processed.\n";
             $message .= "You will receive a confirmation once your Cabin Credit is approved.\n\n";
         }
-        
+
         $participant = $this->get_participant_by_email($email);
         if ($participant && $participant->referral_code) {
             $message .= "Your Referral Code: " . $participant->referral_code . "\n\n";
             $message .= "Share your referral code with friends and earn rewards!\n\n";
         }
-        
+
         $message .= "Best regards,\nThe Run The Seas Team";
-        
+
         $headers = rts_mail_headers('text/plain; charset=UTF-8');
-        
+
         return wp_mail($email, $subject, $message, $headers);
     }
-    
+
     /**
      * Send cabin credit notification
      */
-    private function send_cabin_credit_notification($participant_id) {
+    private function send_cabin_credit_notification($participant_id)
+    {
         $participant = $this->get_participant($participant_id);
-        
+
         if (!$participant) {
             return false;
         }
-        
+
         $subject = 'Cabin Credit Request Received - Founding Runner';
         $message = "Hello {$participant->first_name} {$participant->last_name},\n\n";
         $message .= "Your Founding Runner Cabin Credit request has been received.\n";
@@ -2375,16 +2464,17 @@ class RTS_Registration {
         $message .= "Status: Pending Approval\n\n";
         $message .= "You will receive a confirmation once your Cabin Credit is approved.\n\n";
         $message .= "Best regards,\nThe Run The Seas Team";
-        
+
         $headers = rts_mail_headers('text/plain; charset=UTF-8');
-        
+
         return wp_mail($participant->email, $subject, $message, $headers);
-    }    
-    
+    }
+
     /**
      * Email verification handler
      */
-    private function redirect_to_first_passcode_if_required($participant) {
+    private function redirect_to_first_passcode_if_required($participant)
+    {
         $user_id = !empty($participant->user_id) ? absint($participant->user_id) : 0;
         if (
             !$user_id
@@ -2411,14 +2501,15 @@ class RTS_Registration {
         return false;
     }
 
-    public function verify_email_handler() {
+    public function verify_email_handler()
+    {
         if (!isset($_GET['rts_verify_email']) || !isset($_GET['token']) || !isset($_GET['email'])) {
             return;
         }
-        
+
         $email = sanitize_email($_GET['email']);
         $token = sanitize_text_field($_GET['token']);
-        
+
         // Check if already verified to prevent duplicate processing
         $verified_participant = $this->db->get_row(
             $this->db->prepare(
@@ -2428,7 +2519,7 @@ class RTS_Registration {
                 $token
             )
         );
-        
+
         // If already verified, show success message without reprocessing
         if ($verified_participant && (int) $verified_participant->email_verified === 1) {
             $this->redirect_to_first_passcode_if_required($verified_participant);
@@ -2440,7 +2531,7 @@ class RTS_Registration {
             );
             return;
         }
-        
+
         // Find participant by email and token
         $participant = $this->db->get_row(
             $this->db->prepare(
@@ -2450,12 +2541,12 @@ class RTS_Registration {
                 $token
             )
         );
-        
+
         if ($participant) {
             $referrer_notification_id = 0;
             // Use a transaction to prevent race conditions
             $this->db->query('START TRANSACTION');
-            
+
             try {
                 // Verify email - only if not already verified
                 $updated = $this->db->update(
@@ -2471,7 +2562,7 @@ class RTS_Registration {
                         'email_verified' => 0 // Only update if not already verified
                     )
                 );
-                
+
                 // If no rows were updated, it was already verified
                 if ($updated === 0) {
                     $this->db->query('COMMIT');
@@ -2498,7 +2589,7 @@ class RTS_Registration {
                             $participant->id
                         )
                     );
-                    
+
                     // Only process if not already completed
                     if (!$referral_exists) {
                         // Find the pending referral
@@ -2509,7 +2600,7 @@ class RTS_Registration {
                                 $participant->id
                             )
                         );
-                        
+
                         if ($referral_id) {
                             // Update the referral to completed
                             $this->db->update(
@@ -2521,14 +2612,14 @@ class RTS_Registration {
                                 ),
                                 array('id' => $referral_id)
                             );
-                            
+
                             // Add 1K miles to referrer
                             $this->add_captain_miles(
                                 $participant->referred_by,
                                 1000,
                                 'Referral completed: ' . $participant->email
                             );
-                            
+
                             // Update referrer's successful referrals count
                             $this->db->query(
                                 $this->db->prepare(
@@ -2540,10 +2631,10 @@ class RTS_Registration {
                                 )
                             );
                             $referrer_notification_id = (int) $participant->referred_by;
-                            
+
                             // Trigger trophy check for referrer
                             do_action('rts_referral_completed', $participant->referred_by, 1000);
-                            
+
                             error_log('RTS: Referral completed for participant ' . $participant->id . ' by referrer ' . $participant->referred_by);
                         } else {
                             error_log('RTS: No pending referral found for participant ' . $participant->id);
@@ -2552,7 +2643,7 @@ class RTS_Registration {
                         error_log('RTS: Referral already completed for participant ' . $participant->id);
                     }
                 }
-                
+
                 $this->db->query('COMMIT');
 
                 if (!empty($participant->user_id)) {
@@ -2562,7 +2653,7 @@ class RTS_Registration {
                 if ($referrer_notification_id) {
                     $this->send_referral_progress_notification($referrer_notification_id);
                 }
-                
+
                 // Add achievement (check if already exists)
                 $achievement_exists = $this->db->get_var(
                     $this->db->prepare(
@@ -2571,7 +2662,7 @@ class RTS_Registration {
                         $participant->id
                     )
                 );
-                
+
                 if (!$achievement_exists) {
                     $this->add_achievement(
                         $participant->id,
@@ -2580,7 +2671,7 @@ class RTS_Registration {
                         'Your email address has been verified successfully.'
                     );
                 }
-                
+
                 // Log timeline
                 $this->log_timeline(
                     $participant->id,
@@ -2605,17 +2696,16 @@ class RTS_Registration {
                 // random bootstrap password. Continue directly to the branded
                 // one-time passcode creation form instead of the login screen.
                 $this->redirect_to_first_passcode_if_required($participant);
-                
+
                 // Show success message
                 wp_die(
                     '<h1>Email Verified!</h1>
                     <p>Your email has been verified successfully.</p>'
-                    . ($benefits_held_for_review
-                        ? '<p>Your registration needs a short duplicate-response review. Your Cabin Credit and Captain\'s Suite will be activated after a Run The Seas administrator approves it.</p>'
-                        : '<p>Your Captain\'s Suite is active and your $100 Promotional Cruise Credit has been issued.</p><p><a href="/captains-suite">Go to Captain\'s Suite →</a></p>'),
+                        . ($benefits_held_for_review
+                            ? '<p>Your registration needs a short duplicate-response review. Your Cabin Credit and Captain\'s Suite will be activated after a Run The Seas administrator approves it.</p>'
+                            : '<p>Your Captain\'s Suite is active and your $100 Promotional Cruise Credit has been issued.</p><p><a href="/captains-suite">Go to Captain\'s Suite →</a></p>'),
                     'Verification Success'
                 );
-                
             } catch (Exception $e) {
                 $this->db->query('ROLLBACK');
                 error_log('RTS: Error in email verification: ' . $e->getMessage());
@@ -2633,11 +2723,12 @@ class RTS_Registration {
             );
         }
     }
-    
+
     /**
      * Get participant by ID
      */
-    public function get_participant($participant_id) {
+    public function get_participant($participant_id)
+    {
         return $this->db->get_row(
             $this->db->prepare(
                 "SELECT * FROM {$this->db->prefix}rts_participants WHERE id = %d",
@@ -2645,11 +2736,12 @@ class RTS_Registration {
             )
         );
     }
-    
+
     /**
      * Get participant by email
      */
-    public function get_participant_by_email($email) {
+    public function get_participant_by_email($email)
+    {
         return $this->db->get_row(
             $this->db->prepare(
                 "SELECT * FROM {$this->db->prefix}rts_participants WHERE email = %s",
@@ -2659,7 +2751,8 @@ class RTS_Registration {
     }
 
     /** Get the participant linked to a WordPress user ID. */
-    public function get_participant_by_user_id($user_id) {
+    public function get_participant_by_user_id($user_id)
+    {
         $user_id = absint($user_id);
         if (!$user_id) {
             return null;
@@ -2677,7 +2770,8 @@ class RTS_Registration {
      * Resolve a member by their permanent user link before trying email.
      * Email is editable; user_id is the stable account relationship.
      */
-    public function get_participant_for_user($user) {
+    public function get_participant_for_user($user)
+    {
         if (is_numeric($user)) {
             $user = get_userdata(absint($user));
         }
@@ -2696,7 +2790,8 @@ class RTS_Registration {
     }
 
     /** Keep the member's changed email consistent across Run The Seas records. */
-    public function sync_participant_email($participant_id, $old_email, $new_email) {
+    public function sync_participant_email($participant_id, $old_email, $new_email)
+    {
         $old_email = sanitize_email($old_email);
         $new_email = sanitize_email($new_email);
         if (!$participant_id || !$old_email || !$new_email || strtolower($old_email) === strtolower($new_email)) {
@@ -2719,11 +2814,12 @@ class RTS_Registration {
         );
         $this->log_timeline($participant_id, 'email_updated', 'Participant email updated across Run The Seas records');
     }
-    
+
     /**
      * Add achievement
      */
-    public function add_achievement($participant_id, $type, $name, $description) {
+    public function add_achievement($participant_id, $type, $name, $description)
+    {
         $inserted = $this->db->insert(
             $this->db->prefix . 'rts_achievements',
             array(
@@ -2736,16 +2832,17 @@ class RTS_Registration {
                 'created_at' => current_time('mysql')
             )
         );
-        
+
         if ($inserted !== false) {
             error_log("RTS: Added achievement for participant {$participant_id}: {$name}");
         }
     }
-    
+
     /**
      * Add medal
      */
-    public function add_medal($participant_id, $type, $name, $description, $event_name = '', $rank = '') {
+    public function add_medal($participant_id, $type, $name, $description, $event_name = '', $rank = '')
+    {
         $inserted = $this->db->insert(
             $this->db->prefix . 'rts_medals',
             array(
@@ -2761,16 +2858,17 @@ class RTS_Registration {
                 'created_at' => current_time('mysql')
             )
         );
-        
+
         if ($inserted !== false) {
             error_log("RTS: Added medal for participant {$participant_id}: {$name}");
         }
     }
-    
+
     /**
      * Log timeline entry
      */
-    public function log_timeline($participant_id, $activity_type, $description, $data = array()) {
+    public function log_timeline($participant_id, $activity_type, $description, $data = array())
+    {
         $this->db->insert(
             $this->db->prefix . 'rts_timeline',
             array(
@@ -2785,20 +2883,21 @@ class RTS_Registration {
             )
         );
     }
-    
+
     /**
      * Add distance
      */
-    public function add_captain_miles($participant_id, $miles, $reason) {
+    public function add_captain_miles($participant_id, $miles, $reason)
+    {
         $participant = $this->get_participant($participant_id);
-        
+
         if (!$participant) {
             return false;
         }
-        
+
         $new_balance = $participant->captain_miles_balance + $miles;
         $new_total_earned = $participant->total_captain_miles_earned + $miles;
-        
+
         $updated = $this->db->update(
             $this->db->prefix . 'rts_participants',
             array(
@@ -2808,7 +2907,7 @@ class RTS_Registration {
             ),
             array('id' => $participant_id)
         );
-        
+
         if ($updated !== false) {
             $this->log_timeline(
                 $participant_id,
@@ -2822,23 +2921,24 @@ class RTS_Registration {
                     'new_balance' => absint($new_balance),
                 )
             );
-            
+
             // Check for achievements based on miles
             $this->check_miles_achievements($participant_id, $new_balance);
-            
+
             error_log("RTS: Added {$miles} miles to participant {$participant_id}");
             return true;
         }
-        
+
         return false;
     }
-    
+
     /**
      * Check miles achievements
      */
-    private function check_miles_achievements($participant_id, $miles) {
+    private function check_miles_achievements($participant_id, $miles)
+    {
         $milestones = array(100, 500, 1000, 2500, 5000, 10000);
-        
+
         foreach ($milestones as $milestone) {
             if ($miles >= $milestone) {
                 // Check if achievement already exists
@@ -2850,7 +2950,7 @@ class RTS_Registration {
                         $participant_id
                     )
                 );
-                
+
                 if (!$exists) {
                     $this->add_achievement(
                         $participant_id,
@@ -2858,7 +2958,7 @@ class RTS_Registration {
                         rts_format_miles($milestone) . ' milestone!',
                         "Congratulations! You've completed " . rts_format_miles($milestone) . " in the 42.2 km Referral Marathon Challenge!"
                     );
-                    
+
                     // Add medal for major milestones
                     if (in_array($milestone, array(1000, 5000, 10000))) {
                         $this->add_medal(
@@ -2874,24 +2974,25 @@ class RTS_Registration {
             }
         }
     }
-    
+
     /**
      * AJAX: Get participant data
      */
-    public function ajax_get_participant_data() {
+    public function ajax_get_participant_data()
+    {
         if (!isset($_POST['email'])) {
             wp_send_json_error('Email required');
             return;
         }
-        
+
         $email = sanitize_email($_POST['email']);
         $participant = $this->get_participant_by_email($email);
-        
+
         if (!$participant) {
             wp_send_json_error('Participant not found');
             return;
         }
-        
+
         // Get achievements
         $achievements = $this->db->get_results(
             $this->db->prepare(
@@ -2899,7 +3000,7 @@ class RTS_Registration {
                 $participant->id
             )
         );
-        
+
         // Get medals
         $medals = $this->db->get_results(
             $this->db->prepare(
@@ -2907,7 +3008,7 @@ class RTS_Registration {
                 $participant->id
             )
         );
-        
+
         // Get referrals
         $referrals = $this->db->get_results(
             $this->db->prepare(
@@ -2915,7 +3016,7 @@ class RTS_Registration {
                 $participant->id
             )
         );
-        
+
         // Get timeline
         $timeline = $this->db->get_results(
             $this->db->prepare(
@@ -2923,7 +3024,7 @@ class RTS_Registration {
                 $participant->id
             )
         );
-        
+
         wp_send_json_success(array(
             'participant' => $participant,
             'achievements' => $achievements,
@@ -2933,7 +3034,8 @@ class RTS_Registration {
         ));
     }
 
-    public function referral_exists($referrer_id, $email) {
+    public function referral_exists($referrer_id, $email)
+    {
         return $this->db->get_var(
             $this->db->prepare(
                 "SELECT id FROM {$this->db->prefix}rts_referrals 
