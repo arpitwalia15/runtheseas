@@ -429,14 +429,14 @@ class RTS_Trophy {
                 $participant_id,
                 'trophy_earned',
                 $trophy['name'],
-                $trophy['description'] . ' - ' . $new_crew_count . ' crew members!'
+                $trophy['description'] . ' - ' . $new_crew_count . ' verified referrals!'
             );
             
             // Log timeline
             $this->registration->log_timeline(
                 $participant_id,
                 'trophy_earned',
-                "Earned {$trophy['name']} with {$new_crew_count} crew members",
+                "Earned {$trophy['name']} with {$new_crew_count} verified referrals",
                 array(
                     'trophy_id' => $trophy_id,
                     'trophy_key' => $trophy_key,
@@ -760,10 +760,11 @@ class RTS_Trophy {
         $subject = "🏆 You've Earned a New Trophy! - " . $trophy['name'];
         
         $message = "Hello {$participant->first_name} {$participant->last_name},\n\n";
-        $message .= "🏆 Congratulations! You've earned the **" . $trophy['name'] . "**!\n\n";
+        $message .= "🏆 Congratulations,\n\n";
+        $message .= "You've earned the **" . $trophy['name'] . "**\n\n";
         $message .= "**Details:**\n";
         $message .= "• Trophy: " . $trophy['name'] . "\n";
-        $message .= "• Crew Members: " . $crew_members . "\n";
+        $message .= "• Verified referrals: " . $crew_members . "\n";
         if ($requirement) {
             $message .= "• Verified referrals needed: " . $requirement['referrals']
                 . " (" . $requirement['kilometres'] . " km)\n";
@@ -886,7 +887,7 @@ class RTS_Trophy {
                             </div>
                             <h4><?php echo esc_html($def['name'] ?? $trophy->trophy_name); ?></h4>
                             <div class="trophy-details">
-                                <span class="trophy-crew"><?php echo $this->get_crew_members_count($trophy->trophy_key); ?> Crew Members</span>
+                                <span class="trophy-crew"><?php echo $this->get_crew_members_count($trophy->trophy_key); ?> Verified referrals</span>
                             </div>
                             <div class="trophy-date">
                                 Earned: <?php echo date('M j, Y', strtotime($trophy->earned_date)); ?>
@@ -1349,11 +1350,11 @@ class RTS_Trophy {
                             <h2><?php esc_html_e('Race Progress', 'run-the-seas'); ?></h2>
                             <div class="rts-trophy-case__crew-count">
                                 <?php if ($panel_icon_urls['race_progress_icon_image']) : ?><img src="<?php echo esc_url($panel_icon_urls['race_progress_icon_image']); ?>" alt="" loading="lazy" decoding="async"><?php endif; ?>
-                                <span><em><?php esc_html_e('Crew Members', 'run-the-seas'); ?></em><strong><?php echo esc_html($crew_members); ?> / 42</strong></span>
+                                <span><em><?php esc_html_e('Verified referrals', 'run-the-seas'); ?></em><strong><?php echo esc_html($crew_members); ?> / 42</strong></span>
                             </div>
                             <i class="rts-trophy-case__race-meter"><b style="width:<?php echo esc_attr($progress_percent); ?>%"></b></i>
                             <p><?php echo $crew_remaining
-                                ? esc_html(sprintf(_n('%d more crew member to unlock the Marathon Trophy', '%d more crew members to unlock the Marathon Trophy', $crew_remaining, 'run-the-seas'), $crew_remaining))
+                                ? esc_html(sprintf(_n('%d more crew member to unlock the Marathon Trophy', '%d more verified referrals members to unlock the Marathon Trophy', $crew_remaining, 'run-the-seas'), $crew_remaining))
                                 : esc_html__('Marathon Trophy unlocked!', 'run-the-seas'); ?></p>
                             <a href="<?php echo esc_url(home_url('/referral-race/')); ?>"><?php esc_html_e('View the Race', 'run-the-seas'); ?><?php if ($panel_icon_urls['view_race_link_icon_image']) : ?><img src="<?php echo esc_url($panel_icon_urls['view_race_link_icon_image']); ?>" alt="" loading="lazy" decoding="async"><?php else : ?><span aria-hidden="true">&#8599;</span><?php endif; ?></a>
                         </div>
@@ -1502,7 +1503,7 @@ class RTS_Trophy {
                             </h3>
                             
                             <div style="font-size: 12px; color: #999;">
-                                <?php echo $crew_count; ?> Crew Members
+                                <?php echo $crew_count; ?> Verified referrals
                             </div>
                             
                             <?php if ($earned): ?>
@@ -1698,7 +1699,7 @@ class RTS_Trophy {
                         Founding Member #<?php echo $founding_member_number; ?>
                     </p>
                     <p style="margin: 5px 0; font-size: 13px; color: #666;">
-                        <?php echo $crew_count; ?> CREW MEMBERS
+                        <?php echo $crew_count; ?> VERIFIED REFERRALS
                     </p>
                     <p style="margin: 5px 0; font-size: 13px; color: #666;">
                         <?php echo esc_html(rts_format_trophy_miles($trophy_data->miles_required, $trophy_key)); ?> REQUIRED
