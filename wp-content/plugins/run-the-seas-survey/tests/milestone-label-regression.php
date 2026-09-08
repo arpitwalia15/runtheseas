@@ -91,6 +91,104 @@ foreach (array(0, 0.0, '0.0') as $zero) {
     rts_label_check(rts_marathon_challenge_map_distance($zero), '0K', 'zero map label has no decimal');
     rts_label_check(rts_format_miles($zero), '0 km', 'zero descriptive progress has no decimal');
 }
+$track_spots = rts_marathon_challenge_track_spots(
+    array(5000, 10000, 15000, 20000, 21000, 25000, 30000, 35000, 42000),
+    42000,
+    20
+);
+rts_label_check(count($track_spots), 20, 'map is capped at twenty canonical track spots');
+rts_label_check($track_spots[0], 0, 'track spots retain the start');
+rts_label_check(end($track_spots), 42000, 'track spots retain the finish');
+rts_label_check(rts_marathon_challenge_track_spots(range(1000, 41000, 1000), 42000, 2), array(0, 42000), 'minimum spot limit retains start and finish');
+foreach (array(5000, 10000, 15000, 20000, 21000, 25000, 30000, 35000, 42000) as $milestone_distance) {
+    rts_label_check(in_array($milestone_distance, $track_spots, true), true, $milestone_distance . ' trophy reserves a track spot');
+}
+
+$gap_runner = (object) array('id' => 1, 'lap' => array('distance' => 1000), 'progress_completed_at' => 400);
+$exact_runner = (object) array('id' => 2, 'lap' => array('distance' => 5000), 'progress_completed_at' => 200);
+$next_runner = (object) array('id' => 3, 'lap' => array('distance' => 6000), 'progress_completed_at' => 300);
+$marathon_two_runner = (object) array('id' => 4, 'lap' => array('distance' => 4000), 'progress_completed_at' => 100);
+$bucketed = rts_marathon_challenge_bucket_route_groups(
+    array(
+        1 => array(1000 => array($gap_runner), 5000 => array($exact_runner), 6000 => array($next_runner)),
+        2 => array(4000 => array($marathon_two_runner)),
+    ),
+    array(0, 5000, 10000)
+);
+rts_label_check(array_map(static function ($participant) { return $participant->id; }, $bucketed[1][5000]), array(1, 2), 'gap runner rolls into the next spot list');
+rts_label_check($bucketed[1][10000][0]->id, 3, 'runner after a spot rolls forward');
+rts_label_check($bucketed[2][5000][0]->id, 4, 'Marathon 2 keeps its own spot list');
+rts_marathon_challenge_sort_bucket_members($bucketed[1][5000], 5000);
+rts_label_check(array_map(static function ($participant) { return $participant->id; }, $bucketed[1][5000]), array(2, 1), 'exact runner precedes a newer runner rolled forward from a gap');
+$merged_spots = rts_marathon_challenge_merge_spot_marathons($bucketed);
+rts_label_check(count($merged_spots), 2, 'coincident marathon groups produce one physical marker per spot');
+rts_label_check($merged_spots[5000]['marathon'], 2, 'highest marathon supplies the shared marker');
+rts_label_check(array_map(static function ($participant) { return $participant->id; }, $merged_spots[5000]['members']), array(4, 2, 1), 'Marathon 2 runners precede Marathon 1 runners in the shared list');
+$earlier_finisher_with_recent_activity = (object) array(
+    'id' => 5,
+    'progress_completed_at' => 900,
+    'milestone_completed_at' => array(42000 => 100),
+    'milestone_completed_order' => array(42000 => 1),
+);
+$recent_finisher = (object) array(
+    'id' => 6,
+    'progress_completed_at' => 500,
+    'milestone_completed_at' => array(42000 => 200),
+    'milestone_completed_order' => array(42000 => 2),
+);
+$over_finishers = array($earlier_finisher_with_recent_activity, $recent_finisher);
+rts_marathon_challenge_sort_recent($over_finishers, 42000);
+rts_label_check(array_map(static function ($participant) { return $participant->id; }, $over_finishers), array(6, 5), 'over-target card uses the most recent finish crossing rather than later activity');
+$around_participants = array();
+for ($around_index = 0; $around_index <= 10; $around_index++) {
+    $around_participants[] = (object) array(
+        'id' => 100 + $around_index,
+        'total_captain_miles_earned' => $around_index * 1000,
+        'is_current' => 5 === $around_index,
+    );
+}
+$middle_window = rts_marathon_challenge_around_window($around_participants, 105, 4);
+rts_label_check(count($middle_window), 9, 'around-you window contains current user plus four on either side');
+rts_label_check(array_search(105, array_column($middle_window, 'id'), true), 4, 'current user is centred when four users exist on either side');
+$around_participants[5]->is_current = false;
+$around_participants[10]->is_current = true;
+$leader_window = rts_marathon_challenge_around_window($around_participants, 110, 4);
+rts_label_check(count($leader_window), 5, 'around-you leader still sees four participants behind');
+rts_label_check(array_column($leader_window, 'id'), array(110, 109, 108, 107, 106), 'around-you leader is followed by the nearest four participants');
+$first_marathon_finisher = (object) array(
+    'id' => 201,
+    'lap' => array('distance' => 42000, 'marathon' => 1),
+    'progress_completed_at' => 100,
+    'milestone_completed_at' => array(42000 => 100),
+);
+$past_finisher = (object) array(
+    'id' => 202,
+    'lap' => array('distance' => 25000, 'marathon' => 2),
+    'progress_completed_at' => 300,
+);
+$second_marathon_finisher = (object) array(
+    'id' => 203,
+    'lap' => array('distance' => 42000, 'marathon' => 2),
+    'progress_completed_at' => 200,
+    'milestone_completed_at' => array(42000 => 200),
+);
+$current_finish_members = rts_marathon_challenge_current_milestone_members(
+    array($first_marathon_finisher, $past_finisher, $second_marathon_finisher),
+    42000
+);
+rts_label_check(array_column($current_finish_members, 'id'), array(203, 201), 'milestone list contains only users currently at that lap milestone');
+$five_k_band_members = rts_marathon_challenge_current_milestone_members(
+    array(
+        (object) array('id' => 204, 'lap' => array('distance' => 4000), 'milestone_completed_at' => array()),
+        (object) array('id' => 205, 'lap' => array('distance' => 5000), 'progress_completed_at' => 300, 'milestone_completed_at' => array(5000 => 100)),
+        (object) array('id' => 206, 'lap' => array('distance' => 6000), 'progress_completed_at' => 100, 'milestone_completed_at' => array(5000 => 200)),
+        (object) array('id' => 207, 'lap' => array('distance' => 9000), 'progress_completed_at' => 200, 'milestone_completed_at' => array(5000 => 150)),
+        (object) array('id' => 208, 'lap' => array('distance' => 10000), 'milestone_completed_at' => array(5000 => 250)),
+    ),
+    5000,
+    10000
+);
+rts_label_check(array_column($five_k_band_members, 'id'), array(205, 207, 206), 'milestone band lists current members by latest completed progress activity');
 rts_label_check(rts_format_miles(14000), '14 km', 'descriptive progress units');
 rts_label_check(rts_format_miles(21000), '21 km', 'actual progress is not the 21.1K product label');
 rts_label_check(rts_format_miles(42000), '42 km', 'actual progress is not the 42.2K product label');

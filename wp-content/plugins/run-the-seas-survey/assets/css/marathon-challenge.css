@@ -198,6 +198,15 @@
 .rts-mc-marker__distance > b { position: relative; z-index: 1; left: var(--rts-marker-label-x, 0px); top: var(--rts-marker-label-y, 8px); font: inherit; }
 .rts-mc-marker__distance.has-artwork { position: relative; width: 44px; height: 51px; display: grid; place-items: start center; margin-bottom: -6px; padding: 11px 4px 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
 .rts-mc-marker__distance.has-artwork > .rts-mc-position-pin { position: absolute; z-index: 0; inset: 0; width: 100%; height: 100%; display: block; object-fit: contain; pointer-events: none; transition: opacity .15s ease; }
+.rts-mc-marker--trophy-stop { --rts-marker-track-anchor-y: -43px; }
+.rts-mc-marker.is-top-edge { --rts-marker-track-anchor-y: 12px; }
+.rts-mc-marker--milestone-20k.is-top-edge { --rts-marker-offset-x: -42px; --rts-marker-track-anchor-y: 2px; }
+.rts-mc-marker--milestone-21k.is-top-edge { --rts-marker-track-anchor-y: 8px; }
+.rts-mc-marker--trophy-stop .rts-mc-marker__distance.has-artwork { width: 58px; height: 62px; margin-bottom: -4px; padding: 0; overflow: visible; }
+.rts-mc-marker--trophy-stop .rts-mc-marker__distance.has-artwork > .rts-mc-position-pin { object-fit: contain; filter: drop-shadow(0 2px 2px rgba(0, 0, 0, .65)); }
+.rts-mc-marker--trophy-stop .rts-mc-marker__trophy-fallback { position: relative; z-index: 1; display: block; font-size: 42px; line-height: 1; filter: drop-shadow(0 2px 2px rgba(0, 0, 0, .65)); }
+.rts-mc-marker--trophy-stop .rts-mc-marker__trophy-name { position: absolute; z-index: 2; top: -14px; left: 50%; min-width: 96px; max-width: 122px; padding: 2px 4px; transform: translateX(-50%); color: #fff3cf; border: 1px solid var(--mc-gold); border-radius: 3px; background: rgba(0, 10, 18, .94); font-size: clamp(7px, .65vw, 9px); font-weight: 700; line-height: 1.05; text-align: center; white-space: normal; }
+.rts-mc-marker--trophy-stop > button > .rts-mc-marker__distance.has-artwork + .rts-mc-map-avatar { margin-top: -7px; }
 .rts-mc-position-pin--selected { opacity: 0; }
 .rts-mc-marker:hover .rts-mc-marker__distance.has-selected-artwork .rts-mc-position-pin--default,
 .rts-mc-marker:focus-within .rts-mc-marker__distance.has-selected-artwork .rts-mc-position-pin--default,
@@ -223,6 +232,8 @@
 .rts-mc-map-avatar__badge > img { width: 100%; height: 100%; display: block; object-fit: contain; }
 
 .rts-mc-marker--you { z-index: 5; transform: translate(-50%, -50%); transform-origin: 50% 50%; }
+.rts-mc-marker--you.is-top-edge { transform: translate(-50%, 12px); }
+.rts-mc-marker--you.is-upper-arc { transform: translate(-50%, -20px); }
 .rts-mc-marker--you > button::after { display: none; }
 .rts-mc-marker--you .rts-mc-avatar { width: clamp(48px, 4.4vw, 58px) !important; height: clamp(48px, 4.4vw, 58px) !important; border-width: 3px !important; box-shadow: 0 0 0 3px #001522, 0 0 0 5px var(--mc-gold); }
 .rts-mc-current-avatar { position: relative; width: 72px; height: 72px; display: grid; place-items: center; }
@@ -349,6 +360,7 @@
 .rts-mc-milestone .rts-mc-popover { right: calc(100% + 8px); left: auto; top: 0; transform: none; }
 .rts-mc-milestone .rts-mc-popover--group { right: calc(100% + 12px); }
 .rts-mc-over { margin-top: auto; }
+.rts-mc-over .rts-mc-milestone .rts-mc-popover { top: auto; bottom: 0; max-height: min(430px, calc(100vh - 24px)); }
 .rts-mc-over__icon { width: 50px; height: 50px; display: grid; place-items: center; color: var(--mc-gold); border: 1px solid var(--mc-gold); border-radius: 50%; font-size: 25px; }
 .rts-mc-over__icon img { width: 100%; height: 100%; display: block; object-fit: contain; }
 .rts-mc-empty { display: block; padding: 15px 9px; color: #c9b78f; font-size: 12px; text-align: center; }
@@ -369,6 +381,7 @@
     .rts-mc-sidebar--right { grid-row: 3; }
     .rts-mc-motto { display: none; }
     .rts-mc-milestone .rts-mc-popover { right: auto; left: 50%; top: 100%; transform: translateX(-50%); }
+    .rts-mc-over .rts-mc-milestone .rts-mc-popover { top: auto; bottom: 0; }
     .rts-mc-over { margin-top: 0; }
 }
 

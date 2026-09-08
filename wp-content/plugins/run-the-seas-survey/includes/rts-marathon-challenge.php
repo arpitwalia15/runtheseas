@@ -231,6 +231,61 @@ function rts_marathon_challenge_sort_recent(&$participants, $milestone_distance 
     });
 }
 
+/** Return up to four participants ahead and four behind the current participant. */
+function rts_marathon_challenge_around_window($participants, $current_id, $per_side = 4)
+{
+    $participants = array_values((array) $participants);
+    $current_id = absint($current_id);
+    $per_side = max(1, absint($per_side));
+
+    usort($participants, static function ($a, $b) {
+        $a_total = absint($a->total_captain_miles_earned ?? 0);
+        $b_total = absint($b->total_captain_miles_earned ?? 0);
+        if ($a_total !== $b_total) {
+            return $b_total <=> $a_total;
+        }
+
+        return absint($a->id ?? 0) <=> absint($b->id ?? 0);
+    });
+
+    $current_position = null;
+    foreach ($participants as $index => $participant) {
+        if ($current_id === absint($participant->id ?? 0) || !empty($participant->is_current)) {
+            $current_position = $index;
+            break;
+        }
+    }
+    if (null === $current_position) {
+        return array_slice($participants, 0, ($per_side * 2) + 1);
+    }
+
+    $ahead = array_slice($participants, max(0, $current_position - $per_side), min($per_side, $current_position));
+    $current = array_slice($participants, $current_position, 1);
+    $behind = array_slice($participants, $current_position + 1, $per_side);
+
+    return array_merge($ahead, $current, $behind);
+}
+
+/** Return users currently between a milestone and the next milestone. */
+function rts_marathon_challenge_current_milestone_members($participants, $milestone_distance, $next_milestone_distance = null)
+{
+    $milestone_distance = absint($milestone_distance);
+    $next_milestone_distance = null === $next_milestone_distance
+        ? null
+        : absint($next_milestone_distance);
+    $members = array_values(array_filter((array) $participants, static function ($participant) use ($milestone_distance, $next_milestone_distance) {
+        $distance = absint($participant->lap['distance'] ?? 0);
+
+        return $distance >= $milestone_distance
+            && (null === $next_milestone_distance || $distance < $next_milestone_distance);
+    }));
+    // Order the card and its list by each captain's latest completed progress
+    // activity while they remain inside this milestone band.
+    rts_marathon_challenge_sort_recent($members);
+
+    return $members;
+}
+
 /** Format a map/milestone race label. Descriptive progress uses rts_format_miles(). */
 function rts_marathon_challenge_distance($miles)
 {
@@ -446,10 +501,10 @@ function rts_marathon_challenge_position($distance, $target = 42000)
                 17000 => array(0.00, 3.00),
                 18000 => array(0.00, 1.00),
                 19000 => array(0.00, 1.20),
-                20000 => array(0.00, 0.40),
-                21000 => array(0.00, 0.20),
+                20000 => array(0.00, -2.40),
+                21000 => array(0.00, -4.20),
                 22000 => array(0.00, 0.70),
-                23000 => array(0.00, 0.00),
+                23000 => array(0.00, -4.40),
                 24000 => array(0.00, 0.50),
                 25000 => array(0.00, 1.50),
                 26000 => array(0.00, 1.80),
@@ -545,14 +600,14 @@ function rts_marathon_challenge_current_position($distance, $target = 42000)
         15000 => array(27.0, 24.4),
         16000  => array(30.0, 24.4),
         17000  => array(33.0, 24.4),
-        18000  => array(36.0, 24.4),
-        19000  => array(40.0, 24.4),
-        20000 => array(44.0, 22.4),
-        21000 => array(48.0, 22.4),
-        22000 => array(51.0, 22.4),
-        23000  => array(54.0, 20.4),
-        24000  => array(58.0, 20.4),
-        25000  => array(62.0, 20.4),
+        18000  => array(36.0, 18.4),
+        19000  => array(40.0, 17.4),
+        20000 => array(44.0, 17.4),
+        21000 => array(48.0, 17.4),
+        22000 => array(51.0, 17.4),
+        23000  => array(54.0, 17.4),
+        24000  => array(58.0, 17.4),
+        25000  => array(62.0, 17.4),
         26000 => array(65.0, 20.4),
         27000  => array(65.0, 20.4),
         28000  => array(65.0, 20.4),
@@ -588,6 +643,175 @@ function rts_marathon_challenge_current_position($distance, $target = 42000)
         round(max(8, min(92, $x)), 2),
         round(max(10, min(90, $y)), 2),
     );
+}
+
+/**
+ * Return the fixed route locations used by the map.
+ *
+ * Start and every trophy milestone reserve a location first. The remaining
+ * locations are spread across the largest gaps so the complete course stays
+ * represented without rendering a marker for every occupied kilometre.
+ */
+function rts_marathon_challenge_track_spots($milestone_distances, $target = 42000, $limit = 20)
+{
+    $target = rts_normalize_marathon_target($target);
+    $limit = max(2, absint($limit));
+    $required = array(0, $target);
+
+    foreach ((array) $milestone_distances as $distance) {
+        $distance = min($target, absint($distance));
+        if ($distance > 0) {
+            $required[] = $distance;
+        }
+    }
+
+    $selected = array_values(array_unique($required));
+    sort($selected, SORT_NUMERIC);
+
+    // Custom filters can supply more milestones than the map can display.
+    // Preserve the start and finish while sampling the middle requirements.
+    if (count($selected) > $limit) {
+        $middle = array_values(array_filter($selected, static function ($distance) use ($target) {
+            return $distance > 0 && $distance < $target;
+        }));
+        $available = max(0, $limit - 2);
+        if (0 === $available) {
+            $middle = array();
+        } elseif (count($middle) > $available) {
+            $sampled = array();
+            for ($index = 0; $index < $available; $index++) {
+                $source_index = (int) round($index * (count($middle) - 1) / max(1, $available - 1));
+                $sampled[] = $middle[$source_index];
+            }
+            $middle = array_values(array_unique($sampled));
+        }
+        $selected = array_merge(array(0), $middle, array($target));
+    }
+
+    $candidates = range(0, $target, 1000);
+    if (!in_array($target, $candidates, true)) {
+        $candidates[] = $target;
+    }
+
+    while (count($selected) < $limit) {
+        $available = array_values(array_diff($candidates, $selected));
+        if (!$available) {
+            break;
+        }
+
+        $best_distance = null;
+        $best_gap = -1;
+        foreach ($available as $candidate_distance) {
+            $nearest_gap = PHP_INT_MAX;
+            foreach ($selected as $selected_distance) {
+                $nearest_gap = min($nearest_gap, abs($candidate_distance - $selected_distance));
+            }
+            if ($nearest_gap > $best_gap
+                || ($nearest_gap === $best_gap && (null === $best_distance || $candidate_distance < $best_distance))) {
+                $best_gap = $nearest_gap;
+                $best_distance = $candidate_distance;
+            }
+        }
+
+        if (null === $best_distance) {
+            break;
+        }
+        $selected[] = $best_distance;
+    }
+
+    $selected = array_values(array_unique(array_map('absint', $selected)));
+    sort($selected, SORT_NUMERIC);
+
+    return array_slice($selected, 0, $limit);
+}
+
+/** Put runners between displayed locations into the next location's list. */
+function rts_marathon_challenge_bucket_route_groups($groups_by_marathon, $track_spots)
+{
+    $track_spots = array_values(array_unique(array_map('absint', (array) $track_spots)));
+    sort($track_spots, SORT_NUMERIC);
+    if (!$track_spots) {
+        return array();
+    }
+
+    $last_spot = end($track_spots);
+    $bucketed = array();
+    foreach ((array) $groups_by_marathon as $marathon => $distance_groups) {
+        foreach ((array) $distance_groups as $distance => $members) {
+            $distance = absint($distance);
+            $spot = $last_spot;
+            foreach ($track_spots as $candidate) {
+                if ($distance <= $candidate) {
+                    $spot = $candidate;
+                    break;
+                }
+            }
+
+            $marathon = max(1, absint($marathon));
+            if (!isset($bucketed[$marathon][$spot])) {
+                $bucketed[$marathon][$spot] = array();
+            }
+            $bucketed[$marathon][$spot] = array_merge($bucketed[$marathon][$spot], (array) $members);
+        }
+        if (isset($bucketed[$marathon])) {
+            ksort($bucketed[$marathon], SORT_NUMERIC);
+        }
+    }
+
+    ksort($bucketed, SORT_NUMERIC);
+    return $bucketed;
+}
+
+/** Keep runners actually on a displayed spot ahead of runners rolled forward from a gap. */
+function rts_marathon_challenge_sort_bucket_members(&$participants, $spot_distance)
+{
+    $spot_distance = absint($spot_distance);
+    $exact = array();
+    $rolled_forward = array();
+
+    foreach ((array) $participants as $participant) {
+        if (absint($participant->lap['distance'] ?? 0) === $spot_distance) {
+            $exact[] = $participant;
+        } else {
+            $rolled_forward[] = $participant;
+        }
+    }
+
+    rts_marathon_challenge_sort_recent($exact);
+    rts_marathon_challenge_sort_recent($rolled_forward);
+    $participants = array_merge($exact, $rolled_forward);
+}
+
+/** Collapse coincident marathon groups into one marker, highest marathon first. */
+function rts_marathon_challenge_merge_spot_marathons($groups_by_marathon)
+{
+    $by_spot = array();
+    foreach ((array) $groups_by_marathon as $marathon => $distance_groups) {
+        $marathon = max(1, absint($marathon));
+        foreach ((array) $distance_groups as $distance => $members) {
+            if ($members) {
+                $by_spot[absint($distance)][$marathon] = (array) $members;
+            }
+        }
+    }
+
+    $merged = array();
+    foreach ($by_spot as $distance => $marathon_groups) {
+        krsort($marathon_groups, SORT_NUMERIC);
+        $display_marathon = absint(array_key_first($marathon_groups));
+        $members = array();
+        foreach ($marathon_groups as $marathon_members) {
+            $members = array_merge($members, $marathon_members);
+        }
+        $merged[absint($distance)] = array(
+            'marathon' => max(1, $display_marathon),
+            'distance' => absint($distance),
+            'members'  => $members,
+        );
+    }
+
+    ksort($merged, SORT_NUMERIC);
+    return $merged;
 }
 
 /** Select a representative spread while always retaining occupied trophy stops. */
@@ -661,19 +885,27 @@ function rts_marathon_challenge_person_row($participant, $distance, $prefix = ''
 }
 
 /** Render a popup containing everyone represented by a map or milestone group. */
-function rts_marathon_challenge_popup($id, $title, $participants, $distance, $use_total = false, $frame_url = '', $variant = 'compact', $icon_url = '', $right_icon_url = '', $badge_label = '')
+function rts_marathon_challenge_popup($id, $title, $participants, $distance, $use_total = false, $frame_url = '', $variant = 'compact', $icon_url = '', $right_icon_url = '', $badge_label = '', $use_lap_distance = false, $display_limit = null)
 {
     $frame_style = $frame_url
         ? '--rts-mc-popup-frame:url("' . esc_url_raw($frame_url) . '");'
         : '';
     $is_group = 'group' === $variant;
-    $display_limit = $is_group ? 10 : 50;
+    $shows_all_members = null !== $display_limit && 0 === absint($display_limit);
+    if (null === $display_limit) {
+        $display_limit = $is_group ? 10 : 50;
+    } else {
+        $display_limit = absint($display_limit);
+        if (0 === $display_limit) {
+            $display_limit = count($participants);
+        }
+    }
     ?>
     <span class="rts-mc-popover<?php echo $frame_url ? ' has-artwork-frame' : ''; ?><?php echo $is_group ? ' rts-mc-popover--group' : ''; ?>" id="<?php echo esc_attr($id); ?>" role="tooltip"<?php if ($frame_style) : ?> style="<?php echo esc_attr($frame_style); ?>"<?php endif; ?>>
         <?php if ($is_group) : ?>
             <span class="rts-mc-popover__group-head">
                 <span class="rts-mc-popover__group-icon"><?php if ($icon_url) : ?><img src="<?php echo esc_url($icon_url); ?>" alt="" aria-hidden="true"><?php else : ?>🏆<?php endif; ?></span>
-                <span><strong><?php echo esc_html($title); ?></strong><small><?php esc_html_e('Top 10 members', 'run-the-seas'); ?></small></span>
+                <span><strong><?php echo esc_html($title); ?></strong><small><?php $shows_all_members ? esc_html_e('All members', 'run-the-seas') : esc_html_e('Top 10 members', 'run-the-seas'); ?></small></span>
                 <i class="rts-mc-popover__right-icon" aria-hidden="true"><?php if ($right_icon_url) : ?><img src="<?php echo esc_url($right_icon_url); ?>" alt=""><?php else : ?>⚓<?php endif; ?></i>
             </span>
         <?php else : ?>
@@ -686,9 +918,9 @@ function rts_marathon_challenge_popup($id, $title, $participants, $distance, $us
         <span class="rts-mc-popover__list">
             <?php foreach (array_slice($participants, 0, $display_limit) as $participant_index => $participant) : ?>
                 <?php
-                $row_distance = $use_total
-                    ? absint($participant->total_captain_miles_earned ?? 0)
-                    : $distance;
+                $row_distance = $use_lap_distance
+                    ? absint($participant->lap['distance'] ?? 0)
+                    : ($use_total ? absint($participant->total_captain_miles_earned ?? 0) : $distance);
                 rts_marathon_challenge_person_row($participant, $row_distance, '', !empty($participant->is_current), $is_group ? $participant_index + 1 : null);
                 ?>
             <?php endforeach; ?>
@@ -774,8 +1006,13 @@ function rts_marathon_challenge_shortcode($atts)
         . '.rts-mc-marker{transform:translate(calc(-50% + var(--rts-marker-offset-x,0px)),calc(var(--rts-marker-offset-y,0px) + var(--rts-marker-track-anchor-y,0px)))!important;transform-origin:50% 0!important;}'
         . '.rts-mc-marker--route-user{--rts-marker-track-anchor-y:-35px!important;}'
         . '.rts-mc-marker--route-user.rts-mc-marker--artwork-pin{--rts-marker-track-anchor-y:-47px!important;}'
+        . '.rts-mc-marker.is-top-edge{--rts-marker-track-anchor-y:12px!important;}'
+        . '.rts-mc-marker--milestone-20k.is-top-edge{--rts-marker-offset-x:-42px!important;--rts-marker-track-anchor-y:2px!important;}'
+        . '.rts-mc-marker--milestone-21k.is-top-edge{--rts-marker-track-anchor-y:8px!important;}'
         . '.rts-mc-marker.is-before-half-marathon,.rts-mc-marker.is-half-marathon{--rts-marker-nudge-x:0px!important;--rts-marker-nudge-y:0px!important;}'
         . '.rts-mc-marker--you{transform:translate(-50%,-50%)!important;transform-origin:50% 50%!important;}'
+        . '.rts-mc-marker--you.is-top-edge{transform:translate(-50%,12px)!important;}'
+        . '.rts-mc-marker--you.is-upper-arc{transform:translate(-50%,-20px)!important;}'
         . '.rts-mc-marker>.rts-mc-marker__distance,.rts-mc-marker>button>.rts-mc-marker__distance{transform:translateY(-50%)!important;}'
         . '.rts-mc-marker__distance,.rts-mc-marker__badge{position:relative!important;z-index:7!important;}'
         . '.rts-mc-marker__badge{position:absolute!important;}'
@@ -923,44 +1160,26 @@ function rts_marathon_challenge_shortcode($atts)
     }
     $participants = rts_marathon_challenge_add_recency($participants, $timeline_rows, $milestone_distances);
 
-    $top_four = array_slice(array_values(array_filter($participants, function ($participant) {
-        return absint($participant->total_captain_miles_earned ?? 0) > 0;
-    })), 0, 4);
-    $finishers = array_values(array_filter($participants, function ($participant) use ($target) {
-        return absint($participant->total_captain_miles_earned ?? 0) >= $target;
-    }));
-    rts_marathon_challenge_sort_recent($finishers, $target);
+    // Both summary sections represent captains currently at the finish line.
+    // Users who have continued into another marathon appear at their current
+    // position and in the over-target section instead.
+    $finishers = rts_marathon_challenge_current_milestone_members($participants, $target);
     $finishers = array_slice($finishers, 0, 4);
+    $top_four = $finishers;
 
     $around = array();
-    $around_marathon = $is_logged_in ? absint($current_lap['marathon']) : 1;
-    $around_pool = array_values(array_filter($participants, function ($participant) use ($around_marathon) {
-        return absint($participant->lap['marathon'] ?? 1) === $around_marathon;
-    }));
+    $around_pool = array_values($participants);
     if ($is_logged_in) {
-        $by_lap = $around_pool;
-        usort($by_lap, function ($a, $b) {
-            if ($a->lap['distance'] === $b->lap['distance']) {
-                return absint($a->id) <=> absint($b->id);
-            }
-            return $b->lap['distance'] <=> $a->lap['distance'];
-        });
-        $position = 0;
-        foreach ($by_lap as $index => $participant) {
-            if (!empty($participant->is_current)) {
-                $position = $index;
-                break;
-            }
-        }
-        $start = max(0, min(count($by_lap) - 9, $position - 4));
-        $around = array_slice($by_lap, $start, 9);
+        $around = rts_marathon_challenge_around_window($around_pool, $current_id, 4);
     } else {
         $around = $around_pool;
         usort($around, function ($a, $b) {
-            if ($a->lap['distance'] === $b->lap['distance']) {
+            $a_total = absint($a->total_captain_miles_earned ?? 0);
+            $b_total = absint($b->total_captain_miles_earned ?? 0);
+            if ($a_total === $b_total) {
                 return absint($a->id) <=> absint($b->id);
             }
-            return $a->lap['distance'] <=> $b->lap['distance'];
+            return $a_total <=> $b_total;
         });
         $around = array_slice($around, 0, 9);
     }
@@ -994,56 +1213,70 @@ function rts_marathon_challenge_shortcode($atts)
     }
     unset($marathon_groups);
 
+    // The map has at most twenty physical route locations. Milestones always
+    // reserve their own locations; runners between locations roll forward into
+    // the next location's list and remain separated by marathon/lap.
+    $track_spots = rts_marathon_challenge_track_spots($milestone_distances, $target, 20);
+
     // The current captain is rendered once as the larger YOU marker below.
     // Keep everyone else in the normal route groups so peers at the same
     // distance still remain visible and available in their group popup.
-    $route_groups_by_marathon = array();
+    $exact_route_groups_by_marathon = array();
     foreach ($groups_by_marathon as $marathon => $marathon_groups) {
         foreach ($marathon_groups as $distance => $members) {
             $route_members = array_values(array_filter($members, static function ($participant) {
                 return empty($participant->is_current);
             }));
             if ($route_members) {
-                $route_groups_by_marathon[$marathon][$distance] = $route_members;
+                $exact_route_groups_by_marathon[$marathon][$distance] = $route_members;
             }
         }
     }
+    $route_groups_by_marathon = rts_marathon_challenge_bucket_route_groups(
+        $exact_route_groups_by_marathon,
+        $track_spots
+    );
+    foreach ($route_groups_by_marathon as &$marathon_groups) {
+        foreach ($marathon_groups as $spot_distance => &$marathon_group_members) {
+            rts_marathon_challenge_sort_bucket_members($marathon_group_members, $spot_distance);
+        }
+        unset($marathon_group_members);
+    }
+    unset($marathon_groups);
 
-    $zero_members = array_values(array_filter($groups[0] ?? array(), function ($participant) {
-        return empty($participant->is_current);
-    }));
+    $display_route_groups = rts_marathon_challenge_merge_spot_marathons($route_groups_by_marathon);
+
+    $zero_members = $display_route_groups[0]['members'] ?? array();
     $show_zero_start_markers = !$is_logged_in || 0 === absint($current_lap['distance']);
-    $zero_top = $show_zero_start_markers ? array_slice($zero_members, 0, 3) : array();
-    $zero_remaining = $show_zero_start_markers ? array_slice($zero_members, 3) : array();
+    $zero_top = $show_zero_start_markers ? array_slice($zero_members, 0, 1) : array();
     $map_groups = array();
-    foreach ($route_groups_by_marathon as $marathon => $marathon_groups) {
-        foreach ($marathon_groups as $distance => $members) {
-            if (0 === absint($distance)) {
-                continue;
-            }
-            $map_groups[] = array(
-                'marathon' => absint($marathon),
-                'distance' => absint($distance),
-                'members'  => $members,
-            );
+    foreach ($display_route_groups as $distance => $display_group) {
+        if (0 === absint($distance)) {
+            continue;
         }
+        $map_groups[] = $display_group;
     }
-    // Every occupied route point is rendered. Only trophy milestones receive
-    // badge-only fallbacks when no captain is currently at that exact point.
+    // Only occupied canonical route locations are rendered. Empty milestone
+    // locations still show their trophy so all trophy stops remain visible.
     $milestone_groups = array();
-    foreach ($milestones as $milestone) {
+    foreach ($milestones as $milestone_index => $milestone) {
         $distance = absint($milestone['miles']);
-        // Milestone groups represent everyone who has achieved the threshold,
-        // not only captains whose current position is exactly on the marker.
-        $milestone_groups[$distance] = array_values(array_filter($participants, static function ($participant) use ($distance) {
-            return absint($participant->total_captain_miles_earned ?? 0) >= $distance;
-        }));
-        rts_marathon_challenge_sort_recent($milestone_groups[$distance], $distance);
+        $next_distance = isset($milestones[$milestone_index + 1])
+            ? absint($milestones[$milestone_index + 1]['miles'] ?? 0)
+            : null;
+        // A milestone remains active until the captain reaches the next one.
+        $milestone_groups[$distance] = rts_marathon_challenge_current_milestone_members(
+            $participants,
+            $distance,
+            $next_distance
+        );
     }
     $over_target = array_values(array_filter($participants, function ($participant) use ($target) {
         return absint($participant->total_captain_miles_earned ?? 0) > $target;
     }));
-    rts_marathon_challenge_sort_recent($over_target);
+    // The card represents the most recent 42.2K crossing, not the person who
+    // happened to record the most recent activity after already finishing.
+    rts_marathon_challenge_sort_recent($over_target, $target);
 
     $logo_id = absint(get_theme_mod('custom_logo'));
     $logo_url = $logo_id ? wp_get_attachment_image_url($logo_id, 'full') : '';
@@ -1100,9 +1333,11 @@ function rts_marathon_challenge_shortcode($atts)
                             <?php
                             $is_current_row = !empty($participant->is_current);
                             $distance = absint($participant->lap['distance']);
-                            $trend_key = $is_current_row || $distance === absint($current_lap['distance'])
+                            $participant_total = absint($participant->total_captain_miles_earned ?? 0);
+                            $current_total = absint($current->total_captain_miles_earned ?? 0);
+                            $trend_key = $is_current_row || $participant_total === $current_total
                                 ? 'right'
-                                : ($distance > absint($current_lap['distance']) ? 'up' : 'down');
+                                : ($participant_total > $current_total ? 'up' : 'down');
                             $trend_fallback = array('up' => '▲', 'down' => '▼', 'right' => '➜');
                             ?>
                             <span class="rts-mc-around__row<?php echo $is_current_row ? ' is-you' : ''; ?><?php echo $is_current_row && $around_you_current_frame_url ? ' has-artwork-frame' : ''; ?>"><?php if ($is_current_row && $around_you_current_frame_url) : ?><img class="rts-mc-around__row-frame" src="<?php echo esc_url($around_you_current_frame_url); ?>" alt="" aria-hidden="true"><?php endif; ?><i><?php if ($around_you_arrow_urls[$trend_key]) : ?><img src="<?php echo esc_url($around_you_arrow_urls[$trend_key]); ?>" alt="" aria-hidden="true"><?php else : ?><?php echo esc_html($trend_fallback[$trend_key]); ?><?php endif; ?></i><?php echo rts_marathon_challenge_avatar($participant, 42); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?><b><?php echo esc_html($is_current_row ? __('You', 'run-the-seas') : rts_marathon_challenge_name($participant)); ?></b><strong><?php echo esc_html(rts_marathon_challenge_distance($distance)); ?></strong><?php if ($participant->lap['marathon'] > 1) : ?><small>M<?php echo esc_html($participant->lap['marathon']); ?></small><?php endif; ?></span>
@@ -1130,41 +1365,33 @@ function rts_marathon_challenge_shortcode($atts)
                     $milestone_distance = rts_marathon_challenge_milestone_distance($milestone);
                     $milestone_key = sanitize_key($milestone['key'] ?? '');
                     $milestone_label = rts_marathon_challenge_map_distance($milestone_distance);
-                    $milestone_lap_groups = array();
-                    foreach ($route_groups_by_marathon as $group_marathon => $marathon_distance_groups) {
-                        $lap_members = $marathon_distance_groups[$stored_milestone_distance] ?? array();
-                        if ($lap_members) {
-                            $milestone_lap_groups[absint($group_marathon)] = $lap_members;
-                        }
-                    }
-                    $occupied_milestone_marathons = array_keys($milestone_lap_groups);
-                    if (!$milestone_lap_groups) {
-                        $milestone_lap_groups = array(1 => array());
-                    }
+                    $milestone_name = (string) ($milestone['name'] ?? sprintf(__('%s Trophy', 'run-the-seas'), $milestone_label));
+                    $milestone_trophy_image = rts_marathon_challenge_trophy_url($milestone, $design_assets);
+                    $milestone_display_group = $display_route_groups[$stored_milestone_distance] ?? array(
+                        'marathon' => 1,
+                        'members'  => array(),
+                    );
+                    $milestone_marathon = max(1, absint($milestone_display_group['marathon']));
+                    $milestone_members = $milestone_display_group['members'];
                     $is_before_half_marathon = '20k' === $milestone_key;
                     $is_half_marathon = '21k' === $milestone_key;
-                    ?>
-                    <?php foreach ($milestone_lap_groups as $milestone_marathon => $milestone_members) : ?>
-                        <?php
-                        $milestone_point = rts_marathon_challenge_lap_group_position($milestone_distance, $target, $milestone_marathon, $occupied_milestone_marathons);
+                    $milestone_point = rts_marathon_challenge_position($milestone_distance, $target);
                         $milestone_representative = $milestone_members ? $milestone_members[0] : null;
                         $milestone_is_marathon_two = 2 === absint($milestone_marathon);
-                        $milestone_marker_image = $milestone_is_marathon_two ? $marathon2_position_marker_url : $position_marker_url;
-                        $milestone_selected_marker_image = $position_marker_selected_url;
+                        $milestone_marker_image = $milestone_trophy_image;
                         $milestone_popover_id = 'rts-mc-map-milestone-' . sanitize_html_class($milestone_key) . '-m' . absint($milestone_marathon);
-                        $milestone_popup_title = (absint($milestone_marathon) > 1 ? 'M' . absint($milestone_marathon) . ' ' : '') . $milestone_label;
+                        $milestone_popup_title = (absint($milestone_marathon) > 1 ? 'M' . absint($milestone_marathon) . ' — ' : '') . $milestone_name;
                         ?>
-                        <span class="rts-mc-marker rts-mc-marker--milestone rts-mc-marker--lap-<?php echo esc_attr(absint($milestone_marathon)); ?> rts-mc-marker--milestone-<?php echo esc_attr(sanitize_html_class($milestone_key)); ?><?php echo $milestone_members ? ' has-members rts-mc-marker--route-user' : ' rts-mc-marker--milestone-empty'; ?><?php echo $milestone_members && $milestone_marker_image ? ' rts-mc-marker--artwork-pin' : ''; ?><?php echo $milestone_point[0] <= 14 ? ' is-popover-overlap' : ''; ?><?php echo $is_before_half_marathon ? ' is-before-half-marathon' : ''; ?><?php echo $is_half_marathon ? ' is-half-marathon' : ''; ?>" style="--rts-x:<?php echo esc_attr($milestone_point[0]); ?>%;--rts-y:<?php echo esc_attr($milestone_point[1]); ?>%" title="<?php echo esc_attr(sprintf(__('%s milestone', 'run-the-seas'), $milestone_popup_title)); ?>"<?php echo $milestone_members ? ' data-rts-mc-popover' : ''; ?>>
+                        <span class="rts-mc-marker rts-mc-marker--milestone rts-mc-marker--trophy-stop rts-mc-marker--lap-<?php echo esc_attr(absint($milestone_marathon)); ?> rts-mc-marker--milestone-<?php echo esc_attr(sanitize_html_class($milestone_key)); ?><?php echo $milestone_members ? ' has-members rts-mc-marker--route-user' : ' rts-mc-marker--milestone-empty'; ?><?php echo $milestone_members && $milestone_marker_image ? ' rts-mc-marker--artwork-pin' : ''; ?><?php echo $milestone_point[0] <= 14 ? ' is-popover-overlap' : ''; ?><?php echo $milestone_point[1] <= 12 ? ' is-top-edge' : ''; ?><?php echo $is_before_half_marathon ? ' is-before-half-marathon' : ''; ?><?php echo $is_half_marathon ? ' is-half-marathon' : ''; ?>" style="--rts-x:<?php echo esc_attr($milestone_point[0]); ?>%;--rts-y:<?php echo esc_attr($milestone_point[1]); ?>%" title="<?php echo esc_attr($milestone_popup_title); ?>"<?php echo $milestone_members ? ' data-rts-mc-popover' : ''; ?>>
                             <?php if ($milestone_representative) : ?><button type="button" aria-describedby="<?php echo esc_attr($milestone_popover_id); ?>" aria-expanded="false"><?php endif; ?>
-                            <span class="rts-mc-marker__distance<?php echo $milestone_marker_image ? ' has-artwork' : ''; ?><?php echo $milestone_marker_image && $milestone_selected_marker_image ? ' has-selected-artwork' : ''; ?>"><?php if ($milestone_marker_image) : ?><img class="rts-mc-position-pin rts-mc-position-pin--default" src="<?php echo esc_url($milestone_marker_image); ?>" alt="" aria-hidden="true"><?php endif; ?><?php if ($milestone_marker_image && $milestone_selected_marker_image) : ?><img class="rts-mc-position-pin rts-mc-position-pin--selected" src="<?php echo esc_url($milestone_selected_marker_image); ?>" alt="" aria-hidden="true"><?php endif; ?><b><?php echo esc_html($milestone_label); ?></b></span>
+                            <span class="rts-mc-marker__distance has-artwork"><?php if ($milestone_marker_image) : ?><img class="rts-mc-position-pin rts-mc-position-pin--default" src="<?php echo esc_url($milestone_marker_image); ?>" alt="" aria-hidden="true"><?php else : ?><span class="rts-mc-marker__trophy-fallback" aria-hidden="true">🏆</span><?php endif; ?><b class="rts-mc-marker__trophy-name"><?php echo esc_html($milestone_name); ?></b></span>
                             <?php if ($milestone_representative) : ?>
                                 <span class="rts-mc-map-avatar<?php echo $milestone_is_marathon_two && $marathon2_avatar_frame_url ? ' has-artwork-frame' : ''; ?>"><?php echo rts_marathon_challenge_avatar($milestone_representative, 50); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?><?php if ($milestone_is_marathon_two && $marathon2_avatar_frame_url) : ?><img class="rts-mc-map-avatar__frame" src="<?php echo esc_url($marathon2_avatar_frame_url); ?>" alt="" aria-hidden="true"><?php endif; ?><?php if (absint($milestone_marathon) > 1) : ?><span class="rts-mc-map-avatar__badge<?php echo $milestone_is_marathon_two && $marathon2_map_badge_url ? ' has-artwork' : ''; ?>"><?php if ($milestone_is_marathon_two && $marathon2_map_badge_url) : ?><img src="<?php echo esc_url($marathon2_map_badge_url); ?>" alt="M2"><?php else : ?>M<?php echo esc_html(absint($milestone_marathon)); ?><?php endif; ?></span><?php endif; ?></span>
                                 <span class="rts-mc-marker__name"><?php echo esc_html(rts_marathon_challenge_name($milestone_representative)); ?></span>
                             </button>
-                            <?php rts_marathon_challenge_popup($milestone_popover_id, $milestone_popup_title, $milestone_members, $stored_milestone_distance, false, $popup_frame_url, 'compact', $milestone_marker_image, $user_list_header_right_icon_url, $milestone_label); ?>
+                            <?php rts_marathon_challenge_popup($milestone_popover_id, $milestone_popup_title, $milestone_members, $stored_milestone_distance, false, $popup_frame_url, 'compact', $milestone_marker_image, $user_list_header_right_icon_url, $milestone_name, true); ?>
                             <?php endif; ?>
                         </span>
-                    <?php endforeach; ?>
                 <?php endforeach; ?>
 
                 <?php for ($kilometre = 1; $kilometre <= 42; $kilometre++) : ?>
@@ -1172,18 +1399,11 @@ function rts_marathon_challenge_shortcode($atts)
                     <span class="rts-mc-km-tick<?php echo 0 === $kilometre % 5 ? ' is-major' : ''; ?>" style="--rts-x:<?php echo esc_attr($tick_point[0]); ?>%;--rts-y:<?php echo esc_attr($tick_point[1]); ?>%" aria-hidden="true"></span>
                 <?php endfor; ?>
 
-                <?php
-                $zero_positions = array(
-                    array(28.0, 73.5),
-                    array(34.0, 77.0),
-                    array(40.0, 73.5),
-                );
-                ?>
                 <?php foreach ($zero_top as $zero_index => $participant) : ?>
                     <?php
-                    $point = $zero_positions[$zero_index];
+                    $point = array(28.0, 73.5);
                     $popover_id = 'rts-mc-zero-point-' . absint($zero_index);
-                    $has_zero_popup = !empty($zero_remaining);
+                    $has_zero_popup = count($zero_members) > 1;
                     ?>
                     <span class="rts-mc-marker rts-mc-marker--zero-top" style="--rts-x:<?php echo esc_attr($point[0]); ?>%;--rts-y:<?php echo esc_attr($point[1]); ?>%"<?php echo $has_zero_popup ? ' data-rts-mc-popover' : ''; ?>>
                         <button type="button"<?php if ($has_zero_popup) : ?> aria-describedby="<?php echo esc_attr($popover_id); ?>" aria-expanded="false"<?php endif; ?>>
@@ -1191,7 +1411,7 @@ function rts_marathon_challenge_shortcode($atts)
                             <span class="rts-mc-map-avatar"><?php echo rts_marathon_challenge_avatar($participant, 50); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></span>
                             <span class="rts-mc-marker__name"><?php echo esc_html(rts_marathon_challenge_name($participant)); ?></span>
                         </button>
-                        <?php if ($has_zero_popup) : ?><?php rts_marathon_challenge_popup($popover_id, '0K', $zero_remaining, 0, false, $popup_frame_url, 'compact', $position_marker_url, $user_list_header_right_icon_url, '0K'); ?><?php endif; ?>
+                        <?php if ($has_zero_popup) : ?><?php rts_marathon_challenge_popup($popover_id, '0K', $zero_members, 0, false, $popup_frame_url, 'compact', $position_marker_url, $user_list_header_right_icon_url, '0K', true); ?><?php endif; ?>
                     </span>
                 <?php endforeach; ?>
 
@@ -1206,13 +1426,7 @@ function rts_marathon_challenge_shortcode($atts)
                     if (in_array(absint($distance), $milestone_distances, true)) {
                         continue;
                     }
-                    $occupied_marathons = array();
-                    foreach ($route_groups_by_marathon as $occupied_marathon => $marathon_distance_groups) {
-                        if (!empty($marathon_distance_groups[$distance])) {
-                            $occupied_marathons[] = absint($occupied_marathon);
-                        }
-                    }
-                    $point = rts_marathon_challenge_lap_group_position($distance, $target, $group_marathon, $occupied_marathons);
+                    $point = rts_marathon_challenge_position($distance, $target);
                     $representative = $members[0];
                     $representative_marathon = $group_marathon;
                     $is_marathon_two = 2 === $representative_marathon;
@@ -1227,13 +1441,13 @@ function rts_marathon_challenge_shortcode($atts)
                     $popover_id = 'rts-mc-point-' . absint($distance) . '-m' . $representative_marathon;
                     $map_group_title = ($representative_marathon > 1 ? 'M' . $representative_marathon . ' ' : '') . rts_marathon_challenge_map_distance($distance);
                     ?>
-                    <span class="rts-mc-marker rts-mc-marker--route-user<?php echo $marker_image ? ' rts-mc-marker--artwork-pin' : ''; ?> rts-mc-marker--lap-<?php echo esc_attr($representative_marathon); ?><?php echo $point[0] <= 14 ? ' is-popover-overlap' : ''; ?><?php echo $is_before_half_marathon ? ' is-before-half-marathon' : ''; ?><?php echo $is_half_marathon ? ' is-half-marathon' : ''; ?>" style="--rts-x:<?php echo esc_attr($point[0]); ?>%;--rts-y:<?php echo esc_attr($point[1]); ?>%" data-rts-mc-popover>
+                    <span class="rts-mc-marker rts-mc-marker--route-user<?php echo $marker_image ? ' rts-mc-marker--artwork-pin' : ''; ?> rts-mc-marker--lap-<?php echo esc_attr($representative_marathon); ?><?php echo $point[0] <= 14 ? ' is-popover-overlap' : ''; ?><?php echo $point[1] <= 12 ? ' is-top-edge' : ''; ?><?php echo $is_before_half_marathon ? ' is-before-half-marathon' : ''; ?><?php echo $is_half_marathon ? ' is-half-marathon' : ''; ?>" style="--rts-x:<?php echo esc_attr($point[0]); ?>%;--rts-y:<?php echo esc_attr($point[1]); ?>%" data-rts-mc-popover>
                         <button type="button" aria-describedby="<?php echo esc_attr($popover_id); ?>" aria-expanded="false">
                             <span class="rts-mc-marker__distance<?php echo $marker_image ? ' has-artwork' : ''; ?><?php echo $marker_image && $selected_marker_image ? ' has-selected-artwork' : ''; ?>"><?php if ($marker_image) : ?><img class="rts-mc-position-pin rts-mc-position-pin--default" src="<?php echo esc_url($marker_image); ?>" alt="" aria-hidden="true"><?php endif; ?><?php if ($marker_image && $selected_marker_image) : ?><img class="rts-mc-position-pin rts-mc-position-pin--selected" src="<?php echo esc_url($selected_marker_image); ?>" alt="" aria-hidden="true"><?php endif; ?><b><?php echo esc_html(rts_marathon_challenge_map_distance($distance)); ?></b></span>
                             <span class="rts-mc-map-avatar<?php echo $is_marathon_two && $marathon2_avatar_frame_url ? ' has-artwork-frame' : ''; ?>"><?php echo rts_marathon_challenge_avatar($representative, 50); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?><?php if ($is_marathon_two && $marathon2_avatar_frame_url) : ?><img class="rts-mc-map-avatar__frame" src="<?php echo esc_url($marathon2_avatar_frame_url); ?>" alt="" aria-hidden="true"><?php endif; ?><?php if ($representative_marathon > 1) : ?><span class="rts-mc-map-avatar__badge<?php echo $is_marathon_two && $marathon2_map_badge_url ? ' has-artwork' : ''; ?>"><?php if ($is_marathon_two && $marathon2_map_badge_url) : ?><img src="<?php echo esc_url($marathon2_map_badge_url); ?>" alt="M2"><?php else : ?>M<?php echo esc_html($representative_marathon); ?><?php endif; ?></span><?php endif; ?></span>
                             <span class="rts-mc-marker__name"><?php echo esc_html(rts_marathon_challenge_name($representative)); ?></span>
                         </button>
-                        <?php rts_marathon_challenge_popup($popover_id, $map_group_title, $members, $distance, false, $popup_frame_url, 'compact', $marker_image, $user_list_header_right_icon_url, rts_marathon_challenge_map_distance($distance)); ?>
+                        <?php rts_marathon_challenge_popup($popover_id, $map_group_title, $members, $distance, false, $popup_frame_url, 'compact', $marker_image, $user_list_header_right_icon_url, rts_marathon_challenge_map_distance($distance), true); ?>
                     </span>
                 <?php endforeach; ?>
 
@@ -1247,13 +1461,14 @@ function rts_marathon_challenge_shortcode($atts)
                 } else {
                     $you_point = rts_marathon_challenge_current_position($you_distance, $target);
                 }
+                $you_is_upper_arc = !$is_start_state && $you_distance >= 15000 && $you_distance <= 29000;
                 $show_you_popover = !$is_logged_in || $you_distance > 0;
                 $you_marathon = $is_logged_in ? max(1, absint($current_lap['marathon'] ?? 1)) : 1;
                 $you_members = $is_logged_in && $you_distance > 0
                     ? ($groups_by_marathon[$you_marathon][$you_distance] ?? array())
                     : array();
                 ?>
-                <span class="rts-mc-marker rts-mc-marker--you<?php echo $is_start_state ? ' rts-mc-marker--start' : ''; ?><?php echo !$is_logged_in ? ' rts-mc-marker--guest' : ''; ?><?php echo $you_point[0] <= 25 ? ' is-popover-overlap' : ''; ?>" style="--rts-x:<?php echo esc_attr($you_point[0]); ?>%;--rts-y:<?php echo esc_attr($you_point[1]); ?>%"<?php echo $show_you_popover ? ' data-rts-mc-popover' : ''; ?>>
+                <span class="rts-mc-marker rts-mc-marker--you<?php echo $is_start_state ? ' rts-mc-marker--start' : ''; ?><?php echo !$is_logged_in ? ' rts-mc-marker--guest' : ''; ?><?php echo $you_point[0] <= 25 ? ' is-popover-overlap' : ''; ?><?php echo $you_point[1] <= 12 ? ' is-top-edge' : ''; ?><?php echo $you_is_upper_arc ? ' is-upper-arc' : ''; ?>" style="--rts-x:<?php echo esc_attr($you_point[0]); ?>%;--rts-y:<?php echo esc_attr($you_point[1]); ?>%"<?php echo $show_you_popover ? ' data-rts-mc-popover' : ''; ?>>
                     <button type="button"<?php if ($show_you_popover) : ?> aria-describedby="rts-mc-you-point" aria-expanded="false"<?php endif; ?>>
                         <?php if ($is_logged_in) : ?><span class="rts-mc-current-avatar<?php echo $current_user_frame_url ? ' has-artwork-frame' : ''; ?>"><?php echo rts_marathon_challenge_avatar($current, 72); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?><?php if ($current_user_frame_url) : ?><img class="rts-mc-current-avatar__frame" src="<?php echo esc_url($current_user_frame_url); ?>" alt="" aria-hidden="true"><?php endif; ?></span><?php else : ?><span class="rts-mc-guest-avatar"><?php echo rts_marathon_challenge_dummy_avatar(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?><?php if ($asset('guest_avatar_frame_image')) : ?><img class="rts-mc-guest-avatar__frame" src="<?php echo esc_url($asset('guest_avatar_frame_image')); ?>" alt="" aria-hidden="true"><?php endif; ?></span><?php endif; ?>
                         <?php if ($is_logged_in && $current_lap['marathon'] > 1) : ?><span class="rts-mc-marker__badge<?php echo 2 === absint($current_lap['marathon']) && $marathon2_map_badge_url ? ' has-artwork' : ''; ?>"><?php if (2 === absint($current_lap['marathon']) && $marathon2_map_badge_url) : ?><img src="<?php echo esc_url($marathon2_map_badge_url); ?>" alt="M2"><?php else : ?>M<?php echo esc_html($current_lap['marathon']); ?><?php endif; ?></span><?php endif; ?>
@@ -1291,7 +1506,7 @@ function rts_marathon_challenge_shortcode($atts)
                                     <?php if ($representative) : ?><?php echo rts_marathon_challenge_avatar($representative, 42); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?><span><?php echo esc_html(rts_marathon_challenge_name($representative)); ?></span><?php else : ?><span class="rts-mc-milestone__empty-label"><?php esc_html_e('Be the first', 'run-the-seas'); ?></span><?php endif; ?>
                                     <i class="rts-mc-list-toggle<?php echo $asset('list_open_icon_image') || $asset('list_close_icon_image') ? ' has-artwork' : ''; ?>" aria-hidden="true"><span class="rts-mc-list-toggle__open"><?php if ($asset('list_open_icon_image')) : ?><img src="<?php echo esc_url($asset('list_open_icon_image')); ?>" alt=""><?php else : ?>⌄<?php endif; ?></span><span class="rts-mc-list-toggle__close"><?php if ($asset('list_close_icon_image')) : ?><img src="<?php echo esc_url($asset('list_close_icon_image')); ?>" alt=""><?php else : ?>⌃<?php endif; ?></span></i>
                                 </button>
-                                <?php if ($members) : ?><?php rts_marathon_challenge_popup($popover_id, rts_marathon_challenge_distance(rts_marathon_challenge_milestone_distance($milestone)), $members, $distance, false, $popup_frame_url, 'group', $custom_trophy, $milestone_group_header_right_icon_url); ?><?php endif; ?>
+                                <?php if ($members) : ?><?php rts_marathon_challenge_popup($popover_id, rts_marathon_challenge_distance(rts_marathon_challenge_milestone_distance($milestone)), $members, $distance, false, $popup_frame_url, 'group', $custom_trophy, $milestone_group_header_right_icon_url, '', true); ?><?php endif; ?>
                             </span>
                         <?php endforeach; ?>
                     </div>
@@ -1305,7 +1520,7 @@ function rts_marathon_challenge_shortcode($atts)
                         <?php if ($over_target) : ?>
                             <span class="rts-mc-milestone has-members<?php echo $milestone_active_frame_url ? ' has-row-frame' : ''; ?>" data-rts-mc-popover>
                                 <button type="button" aria-describedby="rts-mc-over-list" aria-expanded="false"><?php if ($milestone_active_frame_url) : ?><img class="rts-mc-milestone__row-frame" src="<?php echo esc_url($milestone_active_frame_url); ?>" alt="" aria-hidden="true"><?php endif; ?><span class="rts-mc-over__icon"><?php if ($asset('trophy_over_image')) : ?><img src="<?php echo esc_url($asset('trophy_over_image')); ?>" alt="" aria-hidden="true"><?php else : ?>🏆<?php endif; ?></span><strong><?php echo esc_html(rts_marathon_challenge_distance($over_target[0]->total_captain_miles_earned)); ?></strong><?php echo rts_marathon_challenge_avatar($over_target[0], 42); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?><span><?php echo esc_html(rts_marathon_challenge_name($over_target[0])); ?></span><i class="rts-mc-list-toggle<?php echo $asset('list_open_icon_image') || $asset('list_close_icon_image') ? ' has-artwork' : ''; ?>" aria-hidden="true"><span class="rts-mc-list-toggle__open"><?php if ($asset('list_open_icon_image')) : ?><img src="<?php echo esc_url($asset('list_open_icon_image')); ?>" alt=""><?php else : ?>⌄<?php endif; ?></span><span class="rts-mc-list-toggle__close"><?php if ($asset('list_close_icon_image')) : ?><img src="<?php echo esc_url($asset('list_close_icon_image')); ?>" alt=""><?php else : ?>⌃<?php endif; ?></span></i></button>
-                                <?php rts_marathon_challenge_popup('rts-mc-over-list', sprintf(__('Over %s', 'run-the-seas'), rts_marathon_challenge_distance($target)), $over_target, $target, true, $popup_frame_url); ?>
+                                <?php rts_marathon_challenge_popup('rts-mc-over-list', sprintf(__('Over %s', 'run-the-seas'), rts_marathon_challenge_distance($target)), $over_target, $target, true, $popup_frame_url, 'group', $asset('trophy_over_image'), $milestone_group_header_right_icon_url, '', false, 0); ?>
                             </span>
                         <?php else : ?><em class="rts-mc-empty"><?php esc_html_e('The next voyage awaits its first captain.', 'run-the-seas'); ?></em><?php endif; ?>
                     </div>
