@@ -120,10 +120,11 @@ prototype, not just equivalent:
 - **Super Administrator Dashboard** — real global search across participants, surveys, trophies,
   admins and the audit log (with `esc_like`, so a literal `%` doesn't match everything), plus
   System Health and quick links.
-- **Security Dashboard** — real role distribution and audit log. Failed-login and active-session
-  counts are honestly `n/a` with a note: WordPress has real login but core doesn't track those
-  without a security plugin — not faked.
-- **Backup & System** — manual backup event log (the actual dump is a hosting concern, Appendix F).
+- **Security Dashboard** — real role distribution and audit log, failed-login attempts recorded
+  through WordPress authentication hooks, and a count of unexpired WordPress core sessions.
+  Wordfence is optional for firewall, rate-limiting and 2FA protection.
+- **Backup & System** — starts a real UpdraftPlus files-and-database backup, uses its configured
+  Google Drive destination, and records queued/running/completed/failed status in the RTS history.
 
 ## Batch 3 additions
 

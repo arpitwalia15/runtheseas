@@ -56,12 +56,23 @@ class RTS_DB {
 			last_name VARCHAR(100) NOT NULL DEFAULT '',
 			phone VARCHAR(50) NULL,
 			country VARCHAR(100) NULL,
+			registration_country VARCHAR(100) NULL,
+			detected_country VARCHAR(100) NULL,
+			country_verified TINYINT(1) DEFAULT 0,
+			country_verified_at DATETIME NULL,
+			country_verified_by BIGINT NULL,
 			city VARCHAR(100) NULL,
+			province VARCHAR(100) NULL,
+			registration_province VARCHAR(100) NULL,
+			postal_code VARCHAR(30) NULL,
 			address TEXT NULL,
+			address_2 VARCHAR(255) NULL,
 			date_of_birth DATE NULL,
 			gender VARCHAR(20) NULL,
+			age_range VARCHAR(20) NULL,
 			emergency_contact_name VARCHAR(255) NULL,
 			emergency_contact_phone VARCHAR(50) NULL,
+			marketing_consent TINYINT(1) DEFAULT 0,
 			registration_date DATETIME NULL,
 			email_verified TINYINT(1) DEFAULT 0,
 			email_verification_token VARCHAR(64) NULL,
@@ -102,13 +113,13 @@ class RTS_DB {
 			verification_sent_at DATETIME NULL,
 			verified_at DATETIME NULL,
 			runner_status VARCHAR(20) NULL,
-			province VARCHAR(100) NULL,
-			age_range VARCHAR(20) NULL,
 			travel_party_size INT NULL,
 			household_income_bracket VARCHAR(50) NULL,
 			marketing_source VARCHAR(50) NULL,
 			utm_campaign VARCHAR(100) NULL,
 			account_status VARCHAR(20) DEFAULT 'active',
+			merged_into_participant_id BIGINT UNSIGNED NULL,
+			merged_at DATETIME NULL,
 			wants_cruise_notification TINYINT(1) DEFAULT 0,
 			declined_further_contact TINYINT(1) DEFAULT 0,
 			referred_by_participant_id BIGINT UNSIGNED NULL,
@@ -116,6 +127,7 @@ class RTS_DB {
 			PRIMARY KEY (id),
 			UNIQUE KEY email (email),
 			KEY survey_tracking_id (survey_tracking_id),
+			KEY merged_into_participant_id (merged_into_participant_id),
 			UNIQUE KEY founding_runner_number (founding_runner_number),
 			UNIQUE KEY referral_code (referral_code),
 			UNIQUE KEY unsubscribe_token (unsubscribe_token)
@@ -252,31 +264,22 @@ class RTS_DB {
 			PRIMARY KEY (id)
 		) $charset_collate;" );
 
-		// ===== EMAIL TEMPLATES (Batch 2) — version history is NEVER destroyed =====
+		// ===== EMAIL TEMPLATES =====
 		dbDelta( "CREATE TABLE {$prefix}email_templates (
 			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			template_key VARCHAR(64) NULL,
+			action_key VARCHAR(64) NULL,
 			name VARCHAR(255) NOT NULL,
 			category VARCHAR(30) DEFAULT 'general',
 			subject VARCHAR(255) NOT NULL,
 			html_body LONGTEXT,
 			plain_text_body LONGTEXT,
 			status VARCHAR(20) DEFAULT 'draft',
-			version INT DEFAULT 1,
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			PRIMARY KEY (id)
-		) $charset_collate;" );
-
-		dbDelta( "CREATE TABLE {$prefix}email_template_versions (
-			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-			template_id BIGINT UNSIGNED NOT NULL,
-			version INT NOT NULL,
-			subject VARCHAR(255),
-			html_body LONGTEXT,
-			plain_text_body LONGTEXT,
-			saved_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			PRIMARY KEY (id),
-			KEY template_id (template_id)
+			UNIQUE KEY template_key (template_key),
+			UNIQUE KEY action_key (action_key)
 		) $charset_collate;" );
 
 		// ===== DRAWS (Batch 3 — Draw A / Draw B execution log, seed stored for reproducibility) =====
@@ -317,10 +320,21 @@ class RTS_DB {
 		dbDelta( "CREATE TABLE {$prefix}backups (
 			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
 			triggered_by VARCHAR(100),
-			status VARCHAR(20) DEFAULT 'completed',
+			status VARCHAR(20) DEFAULT 'queued',
+			provider VARCHAR(30) DEFAULT 'updraftplus',
+			provider_job_id VARCHAR(64) NULL,
+			remote_storage VARCHAR(100) NULL,
+			started_at DATETIME NULL,
+			completed_at DATETIME NULL,
+			details TEXT NULL,
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			PRIMARY KEY (id)
+			PRIMARY KEY (id),
+			KEY provider_job (provider, provider_job_id),
+			KEY backup_status (status, created_at)
 		) $charset_collate;" );
+		// Entries created by older releases were event logs only, not verified
+		// backup artifacts. Preserve them without presenting them as completed.
+		$wpdb->query( "UPDATE {$prefix}backups SET status = 'logged_only', provider = 'legacy', details = 'Legacy event only; no backup artifact was verified.' WHERE provider_job_id IS NULL AND status = 'completed' AND completed_at IS NULL" );
 
 		// ===== AD CAMPAIGNS (Batch 5 — UTM attribution) =====
 		dbDelta( "CREATE TABLE {$prefix}campaigns (
@@ -346,14 +360,23 @@ class RTS_DB {
 			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
 			name VARCHAR(255) NOT NULL,
 			template_id BIGINT UNSIGNED NULL,
+			delivery_mode VARCHAR(20) DEFAULT 'automation',
 			trigger_type VARCHAR(40) DEFAULT 'days_after_registration',
 			trigger_days INT DEFAULT 3,
 			audience_filter VARCHAR(30) DEFAULT 'all',
 			category VARCHAR(20) DEFAULT 'general',
+			recipient_include_ids LONGTEXT NULL,
+			recipient_exclude_ids LONGTEXT NULL,
+			exclusion_rules LONGTEXT NULL,
+			scheduled_at DATETIME NULL,
+			sent_at DATETIME NULL,
+			archived_at DATETIME NULL,
 			status VARCHAR(20) DEFAULT 'draft',
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			PRIMARY KEY (id)
 		) $charset_collate;" );
+		self::ensure_email_campaign_columns( "{$prefix}email_campaigns" );
 
 		dbDelta( "CREATE TABLE {$prefix}campaign_sends (
 			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -506,6 +529,33 @@ class RTS_DB {
 			KEY to_email (to_email)
 		) $charset_collate;" );
 
+		// ===== PARTICIPANT ADMIN NOTES (private; never exposed to participant-facing code) =====
+		dbDelta( "CREATE TABLE {$prefix}participant_notes (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			participant_id BIGINT UNSIGNED NOT NULL,
+			admin_user_id BIGINT UNSIGNED NULL,
+			admin_name VARCHAR(255) NOT NULL,
+			note_text TEXT NOT NULL,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			KEY participant_id (participant_id),
+			KEY admin_user_id (admin_user_id)
+		) $charset_collate;" );
+
+		// A participant can own several completed survey records even though the
+		// legacy participants table has only one primary survey_tracking_id.
+		dbDelta( "CREATE TABLE {$prefix}participant_survey_links (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			participant_id BIGINT UNSIGNED NOT NULL,
+			tracking_id BIGINT UNSIGNED NOT NULL,
+			linked_by BIGINT UNSIGNED NULL,
+			linked_by_name VARCHAR(255) NULL,
+			linked_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			UNIQUE KEY tracking_id (tracking_id),
+			KEY participant_id (participant_id)
+		) $charset_collate;" );
+
 		// ===== AUDIT LOG =====
 		dbDelta( "CREATE TABLE {$prefix}audit_log (
 			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -519,8 +569,12 @@ class RTS_DB {
 			notes TEXT,
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			PRIMARY KEY (id),
-			UNIQUE KEY source_record (source_table, source_id)
+			UNIQUE KEY source_record (source_table, source_id),
+			KEY security_events (module, result, created_at)
 		) $charset_collate;" );
+
+		self::ensure_email_template_columns( "{$prefix}email_templates" );
+		self::seed_transactional_email_templates( "{$prefix}email_templates" );
 
 		update_option( 'rts_admin_platform_db_version', RTSAP_DB_VERSION );
 	}
@@ -555,13 +609,24 @@ class RTS_DB {
 			'verification_sent_at' => 'DATETIME NULL',
 			'verified_at' => 'DATETIME NULL',
 			'runner_status' => 'VARCHAR(20) NULL',
+			'registration_country' => 'VARCHAR(100) NULL',
+			'detected_country' => 'VARCHAR(100) NULL',
+			'country_verified' => 'TINYINT(1) DEFAULT 0',
+			'country_verified_at' => 'DATETIME NULL',
+			'country_verified_by' => 'BIGINT NULL',
 			'province' => 'VARCHAR(100) NULL',
+			'registration_province' => 'VARCHAR(100) NULL',
+			'postal_code' => 'VARCHAR(30) NULL',
+			'address_2' => 'VARCHAR(255) NULL',
 			'age_range' => 'VARCHAR(20) NULL',
+			'marketing_consent' => 'TINYINT(1) DEFAULT 0',
 			'travel_party_size' => 'INT NULL',
 			'household_income_bracket' => 'VARCHAR(50) NULL',
 			'marketing_source' => 'VARCHAR(50) NULL',
 			'utm_campaign' => 'VARCHAR(100) NULL',
 			'account_status' => "VARCHAR(20) DEFAULT 'active'",
+			'merged_into_participant_id' => 'BIGINT UNSIGNED NULL',
+			'merged_at' => 'DATETIME NULL',
 			'wants_cruise_notification' => 'TINYINT(1) DEFAULT 0',
 			'declined_further_contact' => 'TINYINT(1) DEFAULT 0',
 			'referred_by_participant_id' => 'BIGINT UNSIGNED NULL',
@@ -569,6 +634,7 @@ class RTS_DB {
 		) );
 		self::add_index( $table, 'founding_runner_number', 'UNIQUE KEY `founding_runner_number` (`founding_runner_number`)' );
 		self::add_index( $table, 'unsubscribe_token', 'UNIQUE KEY `unsubscribe_token` (`unsubscribe_token`)' );
+		self::add_index( $table, 'merged_into_participant_id', 'KEY `merged_into_participant_id` (`merged_into_participant_id`)' );
 	}
 
 	private static function ensure_answer_columns( $table ) {
@@ -590,6 +656,136 @@ class RTS_DB {
 			'fraud_review_status' => "VARCHAR(20) DEFAULT 'clear'",
 		) );
 		self::add_index( $table, 'referring_participant_id', 'KEY `referring_participant_id` (`referring_participant_id`)' );
+	}
+
+	private static function ensure_email_template_columns( $table ) {
+		self::add_columns( $table, array(
+			'template_key' => 'VARCHAR(64) NULL',
+			'action_key'   => 'VARCHAR(64) NULL',
+		) );
+		self::add_index( $table, 'template_key', 'UNIQUE KEY `template_key` (`template_key`)' );
+		self::add_index( $table, 'action_key', 'UNIQUE KEY `action_key` (`action_key`)' );
+	}
+
+	private static function ensure_email_campaign_columns( $table ) {
+		self::add_columns( $table, array(
+			'recipient_include_ids' => 'LONGTEXT NULL',
+			'recipient_exclude_ids' => 'LONGTEXT NULL',
+			'exclusion_rules' => 'LONGTEXT NULL',
+			'archived_at' => 'DATETIME NULL',
+		) );
+	}
+
+	/** Seed editable action templates while preserving every existing template. */
+	private static function seed_transactional_email_templates( $templates_table ) {
+		global $wpdb;
+
+		$defaults = self::default_transactional_email_templates();
+		$content_version = '1.0';
+		$upgrade_empty_defaults = get_option( 'rts_default_email_template_content_version' ) !== $content_version;
+
+		foreach ( $defaults as $default ) {
+			$existing = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM `$templates_table` WHERE template_key = %s", $default['template_key'] ) );
+			if ( $existing ) {
+				if ( $upgrade_empty_defaults && '' === trim( (string) $existing->html_body ) ) {
+					$wpdb->update( $templates_table, array( 'html_body' => $default['html_body'], 'updated_at' => current_time( 'mysql' ) ), array( 'id' => $existing->id ) );
+				}
+				continue;
+			}
+
+			$inserted = $wpdb->insert(
+				$templates_table,
+				array(
+					'template_key' => $default['template_key'],
+					'action_key'   => $default['action_key'],
+					'name'         => $default['name'],
+					'category'     => 'transactional',
+					'subject'      => $default['subject'],
+					'html_body'    => $default['html_body'],
+					'status'       => 'active',
+				)
+			);
+			if ( ! $inserted ) { continue; }
+		}
+
+		update_option( 'rts_default_email_template_content_version', $content_version, false );
+	}
+
+	/** Editable starter content for the three survey-plugin transactional emails. */
+	private static function default_transactional_email_templates() {
+		$password_reset = <<<'HTML'
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#eef2f5;padding:24px 8px;"><tr><td align="center">
+<table role="presentation" width="640" cellspacing="0" cellpadding="0" border="0" style="width:100%;max-width:640px;background:#ffffff;border-collapse:collapse;font-family:Arial,Helvetica,sans-serif;color:#071b3b;">
+<tr><td align="center" style="padding:28px;background:#041c3a;border-bottom:3px solid #d99a1b;color:#ffffff;"><h1 style="margin:0;font-family:Georgia,serif;font-size:30px;color:#f6bd32;">Welcome to Run The Seas!</h1><p style="margin:10px 0 0;font-size:17px;">Your Founding Runner account has been created</p></td></tr>
+<tr><td style="padding:32px;"><h2 style="margin:0 0 18px;font-family:Georgia,serif;color:#a65d12;">Ahoy {full_name},</h2><p>Your account is ready. Set your password to sign in and access your Captain&rsquo;s Suite.</p><p style="padding:18px 0;text-align:center;"><a href="{password_reset_url}" style="display:inline-block;padding:14px 30px;border-radius:6px;background:#e2a11d;color:#071b3b;font-weight:bold;text-decoration:none;">SET YOUR PASSWORD</a></p><p style="font-size:13px;color:#5e6877;">If the button does not work, copy this link:<br><a href="{password_reset_url}" style="color:#a65d12;word-break:break-all;">{password_reset_url}</a></p><p style="font-size:13px;color:#5e6877;">Already set a password? <a href="{login_url}" style="color:#a65d12;">Sign in here</a>.</p><p style="margin-top:24px;"><strong>Account email:</strong> {email}</p></td></tr>
+<tr><td align="center" style="padding:18px;background:#041c3a;color:#d9e3ef;font-size:12px;">Your information is secure. &copy; {site_name}</td></tr>
+</table></td></tr></table>
+HTML;
+
+		$email_verification = <<<'HTML'
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#eef2f5;padding:24px 8px;"><tr><td align="center">
+<table role="presentation" width="760" cellspacing="0" cellpadding="0" border="0" style="width:100%;max-width:760px;background:#ffffff;border-collapse:collapse;font-family:Arial,Helvetica,sans-serif;color:#071b3b;">
+<tr><td align="center" style="padding:27px;background:#041c3a;border-bottom:3px solid #d48618;"><div style="font-family:Georgia,serif;font-size:30px;font-weight:bold;color:#f6bd32;">RUN THE SEAS</div><div style="margin-top:8px;color:#ffffff;">Run. Explore. Celebrate. Belong.</div></td></tr>
+<tr><td style="padding:38px 34px;"><h1 style="margin:0 0 15px;font-family:Georgia,serif;font-size:34px;color:#071b3b;">Your Founding Runner Cruise Credit Is Almost Ready!</h1><h2 style="margin:0 0 20px;font-family:Georgia,serif;color:#a94f12;">Ahoy {full_name},</h2><p>Thank you for helping shape the future of Run The Seas. Please confirm your email address so we can securely issue your Founding Runner benefits.</p><p style="padding:22px 0;text-align:center;"><a href="{verification_url}" style="display:inline-block;padding:16px 34px;border-radius:6px;background:#e2a11d;color:#071b3b;font-size:17px;font-weight:bold;text-decoration:none;">CONFIRM MY EMAIL ADDRESS</a></p><p style="font-size:13px;color:#5e6877;">If the button does not work, copy this secure link:<br><a href="{verification_url}" style="color:#a65d12;word-break:break-all;">{verification_url}</a></p></td></tr>
+<tr><td align="center" style="padding:18px;background:#041c3a;color:#d9e3ef;font-size:12px;">This verification message was sent to {email}. &copy; {site_name}</td></tr>
+</table></td></tr></table>
+HTML;
+
+		$certificate = <<<'HTML'
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#edf1f4;padding:24px 8px;"><tr><td align="center">
+<table role="presentation" width="760" cellspacing="0" cellpadding="0" border="0" style="width:100%;max-width:760px;background:#ffffff;border-collapse:collapse;font-family:Arial,Helvetica,sans-serif;color:#071b3b;">
+<tr><td align="center" style="padding:27px;background:#031b38;border-bottom:3px solid #d99a1b;"><div style="font-family:Georgia,serif;font-size:30px;font-weight:bold;color:#e7a41e;">RUN THE SEAS</div><div style="margin-top:8px;color:#ffffff;">You are officially a Founding Runner</div></td></tr>
+<tr><td style="padding:38px 34px;"><h1 style="margin:0 0 15px;font-family:Georgia,serif;font-size:34px;color:#a65d12;">Congratulations, {first_name}!</h1><p style="font-size:18px;line-height:1.55;">Your personalized Founding Runner certificate and promotional cruise credit are ready.</p><div style="margin:24px 0;padding:20px;border:1px solid #e2c48d;background:#fffaf0;text-align:center;"><div style="font-size:13px;color:#76531b;">FOUNDING RUNNER NUMBER</div><div style="margin-top:7px;font-family:Georgia,serif;font-size:26px;font-weight:bold;color:#071b3b;">{founding_runner_number}</div><div style="margin-top:9px;font-size:13px;">Certificate: {certificate_number}</div></div><p>Your personalized certificate PDF is attached to this email. Download it, print it, and share it.</p><p style="padding:20px 0;text-align:center;"><a href="{captains_suite_url}" style="display:inline-block;padding:15px 30px;border-radius:6px;background:#eaa20f;color:#15110a;font-weight:bold;text-decoration:none;">ENTER THE CAPTAIN&rsquo;S SUITE</a></p><p>We can&rsquo;t wait to welcome you aboard.</p></td></tr>
+<tr><td align="center" style="padding:18px;background:#031b38;color:#d9e3ef;font-size:12px;">Sent to {email}. &copy; {site_name}</td></tr>
+</table></td></tr></table>
+HTML;
+
+		return array(
+			array( 'template_key' => 'default_password_reset', 'action_key' => 'password_reset', 'name' => 'Password Reset', 'subject' => 'Welcome to Run The Seas - Set Your Password', 'html_body' => $password_reset ),
+			array( 'template_key' => 'default_email_verification', 'action_key' => 'email_verification', 'name' => 'Email Verification', 'subject' => 'Confirm Your Email Address | Run The Seas', 'html_body' => $email_verification ),
+			array( 'template_key' => 'default_founding_runner_certificate', 'action_key' => 'founding_runner_certificate', 'name' => 'Founding Runner Certificate', 'subject' => 'Your Run The Seas Founding Runner Certificate', 'html_body' => $certificate ),
+		);
+	}
+
+	/** Import exact editable copies from the survey plugin. */
+	public static function sync_production_transactional_email_templates() {
+		global $wpdb;
+		$content_version = '4.0';
+		if ( get_option( 'rts_production_email_template_content_version' ) === $content_version ) { return; }
+		if ( ! function_exists( 'rts_get_production_transactional_email_templates' ) ) { return; }
+
+		$defaults = rts_get_production_transactional_email_templates();
+		if ( 3 !== count( $defaults ) ) { return; }
+		$templates_table = self::table( 'email_templates' );
+		if ( ! self::table_exists( $templates_table ) ) { return; }
+
+		foreach ( $defaults as $default ) {
+			$template = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM `$templates_table` WHERE template_key = %s", $default['template_key'] ) );
+			if ( $template ) {
+				$wpdb->update(
+					$templates_table,
+					array( 'subject' => $default['subject'], 'html_body' => $default['html_body'], 'updated_at' => current_time( 'mysql' ) ),
+					array( 'id' => $template->id )
+				);
+				continue;
+			}
+
+			$action_in_use = (int) $wpdb->get_var( $wpdb->prepare( "SELECT id FROM `$templates_table` WHERE action_key = %s", $default['action_key'] ) );
+			$wpdb->insert(
+				$templates_table,
+				array(
+					'template_key' => $default['template_key'],
+					'action_key' => $action_in_use ? null : $default['action_key'],
+					'name' => $default['name'],
+					'category' => 'transactional',
+					'subject' => $default['subject'],
+					'html_body' => $default['html_body'],
+					'status' => 'active',
+				)
+			);
+		}
+
+		update_option( 'rts_production_email_template_content_version', $content_version, false );
 	}
 
 	public static function table( $name ) {

@@ -1,13 +1,13 @@
 <?php
 /**
- * Plugin Name: Run The Seas — Admin Platform (all 7 batches — full 35-screen spec)
+ * Plugin Name: Run The Seas — Admin Platform
  * Description: Real, working WordPress-native implementation of the core critical path from the
  *              Run The Seas Admin Platform specification — survey engine with conditional logic,
  *              registration, email verification, Cabin Credit issuance, referral tracking,
  *              trophies, and subscription/unsubscribe management. Built as a WordPress custom
  *              plugin (PHP + $wpdb custom tables + WP REST API), mirroring the same business
  *              rules already proven in the Node.js prototype, so the two can be directly compared.
- * Version: 1.9.3
+ * Version: 1.22.2
  * Author: Run The Seas
  */
 
@@ -17,7 +17,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 define( 'RTSAP_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'RTSAP_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
-define( 'RTSAP_DB_VERSION', '1.9.0' );
+define( 'RTSAP_VERSION', '1.22.2' );
+define( 'RTSAP_DB_VERSION', '1.17.5' );
 
 require_once RTSAP_PLUGIN_DIR . 'includes/class-rts-db.php';
 require_once RTSAP_PLUGIN_DIR . 'includes/class-rts-data-mapper.php';
@@ -45,6 +46,7 @@ require_once RTSAP_PLUGIN_DIR . 'includes/class-rts-admin-menu-5.php';
 require_once RTSAP_PLUGIN_DIR . 'includes/class-rts-admin-menu-6.php';
 require_once RTSAP_PLUGIN_DIR . 'includes/class-rts-admin-menu-7.php';
 require_once RTSAP_PLUGIN_DIR . 'includes/class-rts-shortcodes.php';
+require_once RTSAP_PLUGIN_DIR . 'includes/class-rts-frontend-dashboard.php';
 
 register_activation_hook( __FILE__, array( 'RTS_DB', 'create_tables' ) );
 register_activation_hook( __FILE__, array( 'RTSAP_Data_Mapper', 'sync' ) );
@@ -68,9 +70,16 @@ add_action( 'plugins_loaded', function () {
 	RTS_Admin_Menu_6::init();
 	RTS_Admin_Menu_7::init();
 	RTS_Shortcodes::init();
+	RTSAP_Frontend_Dashboard::init();
 	RTS_Production::init();
 	RTSAP_Data_Mapper::init();
+	RTS_Business_Logic_4::init_security_monitor();
+	RTS_Business_Logic_4::init_backup_integration();
 } );
+
+// Import exact editable copies from the active survey plugin's production
+// transactional-email renderers after both plugins have initialized.
+add_action( 'plugins_loaded', array( 'RTS_DB', 'sync_production_transactional_email_templates' ), 30 );
 
 // Safety net: if the DB version stored in options doesn't match, re-run table creation.
 // This is the WordPress-idiomatic equivalent of the Node prototype's idempotent seed.js —

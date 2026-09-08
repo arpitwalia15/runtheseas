@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 class RTS_Auth {
 
 	const PUBLIC_ROUTE = 'public';
-	const CAPS = array( 'rts_view', 'rts_manage', 'rts_send_bulk', 'rts_manage_admins', 'rts_system', 'rts_content' );
+	const CAPS = array( 'rts_dashboard', 'rts_view', 'rts_manage', 'rts_send_bulk', 'rts_manage_admins', 'rts_system', 'rts_content' );
 
 	private static $registry = array();
 
@@ -37,13 +37,18 @@ class RTS_Auth {
 	const ACTION_CAPS = array(
 		'clone_survey' => 'rts_manage',
 		'survey_status' => 'rts_manage',
+		'participant_status' => 'rts_manage',
+		'participant_edit' => 'rts_manage',
+		'participant_note' => 'rts_manage',
+		'participant_email' => 'rts_manage',
 		'suspend' => 'rts_manage',
 		'reinstate' => 'rts_manage',
 		'merge' => 'rts_manage',
 		'manual_verify' => 'rts_manage',
+		'reset_passcode' => 'rts_manage',
 		'create_template' => 'rts_manage',
 		'update_template' => 'rts_manage',
-		'rollback_template' => 'rts_manage',
+		'assign_template' => 'rts_manage',
 		'defer_credit' => 'rts_manage',
 		'void_credit' => 'rts_manage',
 		'create_trophy' => 'rts_manage',
@@ -58,8 +63,10 @@ class RTS_Auth {
 		'deactivate_admin' => 'rts_manage_admins',
 		'run_backup' => 'rts_system',
 		'ec_create' => 'rts_send_bulk',
+		'ec_save' => 'rts_send_bulk',
 		'ec_status' => 'rts_send_bulk',
 		'ec_trigger' => 'rts_send_bulk',
+		'ec_delete' => 'rts_send_bulk',
 		'ad_create' => 'rts_manage',
 		'dup_review' => 'rts_manage',
 		'reject_ref' => 'rts_manage',

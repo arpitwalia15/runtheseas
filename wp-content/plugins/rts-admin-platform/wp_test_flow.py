@@ -319,12 +319,17 @@ check(jpost("/admins/999999/role", {"role": "rts_administrator"}).get("error") =
 
 print("\n=== 25. BATCH 4 — Backups + Security + Health ===")
 bh0 = len(jget("/backups/history"))
-bk = jpost("/backups/run", {"triggered_by": "curtis"}); check(bk.get("backup_id"), "backup logged")
-check(len(jget("/backups/history")) == bh0 + 1, "backup appears in history")
+bk = jpost("/backups/run", {"triggered_by": "curtis"})
+if bk.get("error"):
+    check(bk["error"] in ("UPDRAFTPLUS_NOT_AVAILABLE", "GOOGLE_DRIVE_NOT_CONFIGURED"), "backup refuses to fake success when UpdraftPlus/Google Drive is unavailable")
+    check(len(jget("/backups/history")) == bh0, "unavailable backup is not added to history")
+else:
+    check(bk.get("backup_id") and bk.get("status") == "queued", "real UpdraftPlus backup queued")
+    check(len(jget("/backups/history")) == bh0 + 1, "queued backup appears in history")
 sec = jget("/security/stats")
-check(sec["failed_logins_24h"] is None and sec["active_sessions"] is None and "auth_note" in sec, "security honestly reports null for metrics WP core doesn't track, with a note")
+check(isinstance(sec["failed_logins_24h"], int) and sec["failed_logins_24h"] >= 0 and isinstance(sec["active_sessions"], int) and sec["active_sessions"] >= 0, "security reports real failed-login and active-session counts")
 check(any(r["role"] in ("administrator","rts_super_admin") for r in sec["role_distribution"]), "role distribution includes a super-admin-tier role")
-check(sec["last_backup"] and str(sec["last_backup"]["id"]) == str(bk["backup_id"]), "security dashboard's last_backup is the one just run  (note: $wpdb returns ids as strings)")
+check(sec["last_backup"] is None or sec["last_backup"]["status"] == "completed", "security dashboard only reports a genuinely completed backup as last backup")
 h = jget("/system/health"); check(h["wp_version"] and h["php_version"], f"health reports WP {h['wp_version']} / PHP {h['php_version']}")
 
 print("\n=== 26. BATCH 5 — Email Campaign Builder: real trigger, never double-sends ===")
@@ -602,7 +607,7 @@ check(status("GET", "/participants", auth=ADMIN2) == 403, "deactivated administr
 
 # Super admin (curtis, WP administrator) — the whole suite above already proves full access; spot-check the three Tier-3 gates open for him:
 check(status("GET", "/admins", auth=AUTH_ADMIN) == 200, "super admin CAN list admins (rts_manage_admins)")
-check(jpost("/backups/run", {"triggered_by":"curtis"}).get("error") is None, "super admin CAN run backup (rts_system)")
+check(status("GET", "/backups/history", auth=AUTH_ADMIN) == 200, "super admin CAN view backup history (backup run gate was exercised above)")
 
 # 43f. Public survey flow still works with NO credentials end-to-end (the thing users actually do).
 qs_anon = jget("/surveys/1/questions", auth=None); check(isinstance(qs_anon, list) and len(qs_anon) >= 5, "anon: questions load")

@@ -23,7 +23,7 @@ class RTS_Admin_Menu_7 {
 		return $h . $fields . '<button class="' . esc_attr( $class ) . '">' . esc_html( $button ) . '</button></form>';
 	}
 	private static function guard( $a ) { if ( ! current_user_can( RTS_Auth::action_cap( $a ) ) || ! isset( $_POST['_rts_nonce'] ) || ! wp_verify_nonce( $_POST['_rts_nonce'], 'rts_' . $a ) ) { wp_die( 'Not allowed.', 'Forbidden', array( 'response' => 403 ) ); } }
-	private static function back( $page, $msg = '', $extra = array() ) { $args = array_merge( array( 'page' => $page ), $extra ); if ( $msg ) { $args['rts_msg'] = rawurlencode( $msg ); } wp_safe_redirect( add_query_arg( $args, admin_url( 'admin.php' ) ) ); exit; }
+	private static function back( $page, $msg = '', $extra = array() ) { $args = $extra; if ( $msg ) { $args['rts_msg'] = rawurlencode( $msg ); } wp_safe_redirect( RTSAP_Frontend_Dashboard::screen_url( $page, $args ) ); exit; }
 	private static function notice() { if ( ! empty( $_GET['rts_msg'] ) ) { $m = rawurldecode( $_GET['rts_msg'] ); $cls = str_starts_with( $m, 'Error' ) ? 'notice-error' : 'notice-success'; echo "<div class=\"notice $cls is-dismissible\"><p>" . esc_html( $m ) . '</p></div>'; } }
 	private static function admin() { $u = wp_get_current_user(); return $u ? $u->user_login : 'admin'; }
 	private static function kpi( $l, $v, $sub = '' ) { return '<div style="background:#fff;border:1px solid #ccd0d4;border-top:3px solid #C9A24B;border-radius:4px;padding:12px 16px;min-width:170px;"><div style="font-size:11px;text-transform:uppercase;color:#666;font-weight:600;">' . esc_html( $l ) . '</div><div style="font-size:24px;font-weight:700;margin-top:4px;color:#0B1420;">' . esc_html( $v ) . '</div>' . ( $sub ? '<div style="font-size:11px;color:#888">' . esc_html( $sub ) . '</div>' : '' ) . '</div>'; }
@@ -35,7 +35,7 @@ class RTS_Admin_Menu_7 {
 		echo '<div class="wrap"><h1>Custom Report Builder</h1>'; self::notice();
 		$src = sanitize_key( $_GET['src'] ?? 'participants' ); if ( ! isset( RTS_Business_Logic_7::SOURCES[ $src ] ) ) { $src = 'participants'; }
 		$fields = RTS_Business_Logic_7::SOURCES[ $src ];
-		echo '<form method="get" action="' . esc_url( admin_url( 'admin.php' ) ) . '"><input type="hidden" name="page" value="rts-report-builder"><label>1. Data source <select name="src" onchange="this.form.submit()">';
+		echo '<form method="get" action="' . esc_url( RTSAP_Frontend_Dashboard::screen_url( 'rts-report-builder' ) ) . '">' . RTSAP_Frontend_Dashboard::screen_field( 'rts-report-builder' ) . '<label>1. Data source <select name="src" onchange="this.form.submit()">';
 		foreach ( array_keys( RTS_Business_Logic_7::SOURCES ) as $s ) { echo '<option value="' . esc_attr( $s ) . '"' . selected( $src, $s, false ) . '>' . esc_html( $s ) . '</option>'; }
 		echo '</select></label></form>';
 		$fchk = ''; foreach ( $fields as $f ) { $fchk .= '<label style="margin-right:12px"><input type="checkbox" name="fields[]" value="' . esc_attr( $f ) . '" checked> ' . esc_html( $f ) . '</label>'; }

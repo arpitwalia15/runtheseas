@@ -53,6 +53,7 @@ class RTS_Production {
 		// Cron
 		add_filter( 'cron_schedules', array( __CLASS__, 'cron_schedules' ) );
 		add_action( 'rts_cron_campaign_triggers', array( __CLASS__, 'cron_campaign_triggers' ) );
+		add_action( 'rts_run_scheduled_campaign', array( __CLASS__, 'run_scheduled_campaign' ) );
 		add_action( 'rts_cron_scheduled_reports', array( __CLASS__, 'cron_scheduled_reports' ) );
 		add_action( 'rts_cron_action_items', array( __CLASS__, 'cron_action_items' ) );
 		add_action( 'rts_cron_fr_sync', array( __CLASS__, 'cron_fr_sync' ) );
@@ -69,7 +70,7 @@ class RTS_Production {
 			if ( ! wp_next_scheduled( $hook ) ) { wp_schedule_event( time() + 60, $rec, $hook ); }
 		}
 	}
-	public static function unschedule_cron() { foreach ( array( 'rts_cron_campaign_triggers', 'rts_cron_scheduled_reports', 'rts_cron_action_items', 'rts_cron_fr_sync' ) as $h ) { wp_clear_scheduled_hook( $h ); } }
+	public static function unschedule_cron() { foreach ( array( 'rts_cron_campaign_triggers', 'rts_run_scheduled_campaign', 'rts_cron_scheduled_reports', 'rts_cron_action_items', 'rts_cron_fr_sync' ) as $h ) { wp_clear_scheduled_hook( $h ); } }
 	public static function cron_schedules( $s ) { $s['rts_every_15_minutes'] = array( 'interval' => 900, 'display' => 'Every 15 minutes (RTS)' ); return $s; }
 
 	// =========================================================================================
@@ -125,7 +126,7 @@ class RTS_Production {
 	public static function handle_offline() {
 		if ( ! current_user_can( 'rts_system' ) || ! isset( $_POST['_rts_nonce'] ) || ! wp_verify_nonce( $_POST['_rts_nonce'], 'rts_offline' ) ) { wp_die( 'Not allowed.', 'Forbidden', array( 'response' => 403 ) ); }
 		if ( 'offline' === ( $_POST['mode'] ?? '' ) ) { self::take_offline( self::who(), sanitize_textarea_field( $_POST['message'] ?? '' ) ); $m = 'Site is now OFFLINE.'; } else { self::restore( self::who() ); $m = 'Site restored.'; }
-		wp_safe_redirect( add_query_arg( array( 'page' => 'rts-backup', 'rts_msg' => rawurlencode( $m ) ), admin_url( 'admin.php' ) ) . '#offline' ); exit;
+		wp_safe_redirect( RTSAP_Frontend_Dashboard::screen_url( 'rts-backup', array( 'rts_msg' => rawurlencode( $m ) ) ) . '#offline' ); exit;
 	}
 
 	// =========================================================================================
@@ -187,6 +188,7 @@ class RTS_Production {
 		foreach ( $wpdb->get_col( "SELECT id FROM " . RTS_DB::table( 'email_campaigns' ) . " WHERE status = 'active'" ) as $id ) { RTS_Business_Logic_5::run_trigger_check( (int) $id, 'cron' ); $n++; }
 		update_option( 'rts_cron_last_campaign_triggers', current_time( 'mysql' ) ); return $n;
 	}
+	public static function run_scheduled_campaign( $campaign_id ) { return RTS_Business_Logic_5::run_trigger_check( absint( $campaign_id ), 'cron' ); }
 	public static function cron_scheduled_reports() {
 		global $wpdb; $n = 0;
 		foreach ( $wpdb->get_results( "SELECT r.*, (SELECT MAX(run_at) FROM " . RTS_DB::table( 'report_runs' ) . " x WHERE x.report_id = r.id) AS last_run FROM " . RTS_DB::table( 'report_definitions' ) . " r WHERE r.schedule_frequency IN ('daily','weekly','monthly')" ) as $r ) {
@@ -250,7 +252,23 @@ class RTS_Production {
 	public static function register_from_form( $fields, $source = 'wp_form' ) {
 		$data = array(
 			'name' => sanitize_text_field( $fields['name'] ?? trim( ( $fields['first_name'] ?? '' ) . ' ' . ( $fields['last_name'] ?? '' ) ) ),
-			'email' => sanitize_email( $fields['email'] ?? '' ), 'country' => sanitize_text_field( $fields['country'] ?? '' ),
+			'email' => sanitize_email( $fields['email'] ?? '' ),
+			'country' => sanitize_text_field( $fields['country'] ?? '' ),
+			'registration_country' => sanitize_text_field( $fields['registration_country'] ?? $fields['country'] ?? '' ),
+			'detected_country' => sanitize_text_field( $fields['detected_country'] ?? '' ),
+			'phone' => sanitize_text_field( $fields['phone'] ?? '' ),
+			'address' => sanitize_textarea_field( $fields['address'] ?? '' ),
+			'address_2' => sanitize_text_field( $fields['address_2'] ?? '' ),
+			'city' => sanitize_text_field( $fields['city'] ?? '' ),
+			'province' => sanitize_text_field( $fields['province'] ?? $fields['state'] ?? '' ),
+			'registration_province' => sanitize_text_field( $fields['registration_province'] ?? $fields['province'] ?? $fields['state'] ?? '' ),
+			'postal_code' => sanitize_text_field( $fields['postal_code'] ?? $fields['zip'] ?? '' ),
+			'date_of_birth' => sanitize_text_field( $fields['date_of_birth'] ?? '' ),
+			'gender' => sanitize_text_field( $fields['gender'] ?? '' ),
+			'age_range' => sanitize_text_field( $fields['age_range'] ?? '' ),
+			'emergency_contact_name' => sanitize_text_field( $fields['emergency_contact_name'] ?? '' ),
+			'emergency_contact_phone' => sanitize_text_field( $fields['emergency_contact_phone'] ?? '' ),
+			'marketing_consent' => ! empty( $fields['marketing_consent'] ) ? 1 : 0,
 			'runner_status' => in_array( $fields['runner_status'] ?? '', array( 'runner', 'non_runner' ), true ) ? $fields['runner_status'] : null,
 			'marketing_source' => sanitize_key( $source ), 'utm_campaign' => sanitize_text_field( $fields['utm_campaign'] ?? '' ), 'referred_by_code' => sanitize_text_field( $fields['ref'] ?? $fields['referred_by_code'] ?? '' ),
 		);
@@ -314,18 +332,18 @@ class RTS_Production {
 		$o['rate_limit_register'] = max( 0, (int) ( $_POST['rate_limit_register'] ?? 100 ) ); $o['rate_limit_verify'] = max( 0, (int) ( $_POST['rate_limit_verify'] ?? 60 ) );
 		$o['offline_message'] = sanitize_textarea_field( $_POST['offline_message'] ?? '' );
 		update_option( self::OPT, $o ); self::audit( self::who(), 'Settings updated', 'Settings', 'email_mode=' . $o['email_mode'] . '; ai=' . ( $o['ai_api_key'] ? 'configured' : 'off' ) );
-		wp_safe_redirect( add_query_arg( array( 'page' => 'rts-settings', 'rts_msg' => rawurlencode( 'Settings saved.' ) ), admin_url( 'admin.php' ) ) ); exit;
+		wp_safe_redirect( RTSAP_Frontend_Dashboard::screen_url( 'rts-settings', array( 'rts_msg' => rawurlencode( 'Settings saved.' ) ) ) ); exit;
 	}
 	public static function handle_fr_import() {
 		if ( ! current_user_can( 'rts_system' ) || ! isset( $_POST['_rts_nonce'] ) || ! wp_verify_nonce( $_POST['_rts_nonce'], 'rts_fr_import' ) ) { wp_die( 'Not allowed.', 'Forbidden', array( 'response' => 403 ) ); }
 		$rows = array();
 		if ( ! empty( $_FILES['csv']['tmp_name'] ) && ( $fh = fopen( $_FILES['csv']['tmp_name'], 'r' ) ) ) { $head = array_map( 'strtolower', array_map( 'trim', (array) fgetcsv( $fh ) ) ); while ( ( $line = fgetcsv( $fh ) ) !== false ) { $rows[] = array_combine( $head, array_pad( $line, count( $head ), '' ) ); } fclose( $fh ); }
 		$r = self::fr_import_rows( $rows, 'main_site_csv', self::who() );
-		wp_safe_redirect( add_query_arg( array( 'page' => 'rts-settings', 'rts_msg' => rawurlencode( "Imported {$r['inserted']} (skipped {$r['skipped']}); {$r['matched_now']} matched to participants." ) ), admin_url( 'admin.php' ) ) ); exit;
+		wp_safe_redirect( RTSAP_Frontend_Dashboard::screen_url( 'rts-settings', array( 'rts_msg' => rawurlencode( "Imported {$r['inserted']} (skipped {$r['skipped']}); {$r['matched_now']} matched to participants." ) ) ) ); exit;
 	}
 	public static function handle_fr_sync() {
 		if ( ! current_user_can( 'rts_system' ) || ! isset( $_POST['_rts_nonce'] ) || ! wp_verify_nonce( $_POST['_rts_nonce'], 'rts_fr_sync' ) ) { wp_die( 'Not allowed.', 'Forbidden', array( 'response' => 403 ) ); }
 		$r = self::fr_sync( self::who() );
-		wp_safe_redirect( add_query_arg( array( 'page' => 'rts-settings', 'rts_msg' => rawurlencode( "Sync: {$r['newly_matched']} newly matched, {$r['unmatched']} still unmatched." ) ), admin_url( 'admin.php' ) ) ); exit;
+		wp_safe_redirect( RTSAP_Frontend_Dashboard::screen_url( 'rts-settings', array( 'rts_msg' => rawurlencode( "Sync: {$r['newly_matched']} newly matched, {$r['unmatched']} still unmatched." ) ) ) ); exit;
 	}
 }

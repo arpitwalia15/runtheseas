@@ -4,6 +4,7 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 class RTS_Business_Logic_4 {
 
 	private static function audit( $u, $a, $m, $n = '' ) { RTS_Business_Logic::log_audit( $u ?: 'admin', $a, $m, 'success', $n ); }
+	private static $updraft_backup_id = 0;
 
 	// ---- The four spec roles, as REAL WordPress roles with REAL capabilities. ----
 	// Unlike the Node prototype (a standalone `admins` table with no login), this hooks into
@@ -16,18 +17,28 @@ class RTS_Business_Logic_4 {
 	// was open and the admin pages were gated by manage_options, but it would have let them read
 	// participant PII once REST became the gate. Corrected here; register_roles() syncs existing roles.
 	const ROLES = array(
-		'rts_super_admin'    => array( 'label' => 'RTS Super Administrator', 'caps' => array( 'rts_view', 'rts_manage', 'rts_send_bulk', 'rts_manage_admins', 'rts_system', 'rts_content' ) ),
-		'rts_administrator'  => array( 'label' => 'RTS Administrator',       'caps' => array( 'rts_view', 'rts_manage', 'rts_send_bulk', 'rts_content' ) ),
-		'rts_content_editor' => array( 'label' => 'RTS Content Editor',      'caps' => array( 'rts_content' ) ),
-		'rts_contributor'    => array( 'label' => 'RTS Contributor',         'caps' => array() ),
+		'rts_super_admin'    => array( 'label' => 'RTS Super Administrator', 'caps' => array( 'rts_dashboard', 'rts_view', 'rts_manage', 'rts_send_bulk', 'rts_manage_admins', 'rts_system', 'rts_content', 'upload_files' ) ),
+		'rts_administrator'  => array( 'label' => 'RTS Administrator',       'caps' => array( 'rts_dashboard', 'rts_view', 'rts_manage', 'rts_send_bulk', 'rts_content', 'upload_files' ) ),
+		'rts_content_editor' => array( 'label' => 'RTS Content Editor',      'caps' => array( 'rts_dashboard', 'rts_content' ) ),
+		'rts_contributor'    => array( 'label' => 'RTS Contributor',         'caps' => array( 'rts_dashboard' ) ),
 	);
 
 	public static function register_roles() {
+		$fluent_caps = array( 'fluentform_dashboard_access', 'fluentform_forms_manager', 'fluentform_entries_viewer' );
+		$media_caps = array( 'upload_files' );
 		foreach ( self::ROLES as $slug => $def ) {
 			$want = array_fill_keys( $def['caps'], true );
 			$role = get_role( $slug );
 			if ( ! $role ) { add_role( $slug, $def['label'], $want + array( 'read' => true ) ); continue; }
 			foreach ( RTS_Auth::CAPS as $c ) { // sync: exactly the defined set, no more
+				if ( isset( $want[ $c ] ) ) { $role->add_cap( $c ); } else { $role->remove_cap( $c ); }
+			}
+			// Survey operations use Fluent Forms' native editor and AJAX APIs.
+			// Only roles holding rts_manage receive those native capabilities.
+			foreach ( $fluent_caps as $c ) {
+				if ( isset( $want['rts_manage'] ) ) { $role->add_cap( $c ); } else { $role->remove_cap( $c ); }
+			}
+			foreach ( $media_caps as $c ) {
 				if ( isset( $want[ $c ] ) ) { $role->add_cap( $c ); } else { $role->remove_cap( $c ); }
 			}
 			$role->add_cap( 'read' );
@@ -88,7 +99,7 @@ class RTS_Business_Logic_4 {
 
 	// ---- Executive Dashboard — expanded Top-20 KPIs ----
 	public static function executive_summary_v2() {
-		global $wpdb; $pt = RTS_DB::table( 'participants' ); $rt = RTS_DB::table( 'referrals' ); $ct = RTS_DB::table( 'cabin_credits' ); $srt = RTS_DB::table( 'survey_responses' );
+		global $wpdb; $pt = RTS_DB::table( 'participants' ); $rt = RTS_DB::table( 'referrals' ); $ct = RTS_DB::table( 'cabin_credits' ); $srt = RTS_DB::table( 'survey_responses' ); $tut = RTS_DB::table( 'trophy_unlocks' );
 		$i = fn( $q ) => (int) $wpdb->get_var( $q );
 		$completed = $i( "SELECT COUNT(*) FROM $srt WHERE status='completed'" ); $started = $i( "SELECT COUNT(*) FROM $srt" );
 		$this_wk = $i( "SELECT COUNT(*) FROM $pt WHERE registered_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)" );
@@ -97,6 +108,10 @@ class RTS_Business_Logic_4 {
 		$total_ref = $i( "SELECT COUNT(*) FROM $rt" ); $ver_ref = $i( "SELECT COUNT(*) FROM $rt WHERE verified=1" );
 		$total_p = $i( "SELECT COUNT(*) FROM $pt" ); $ver_p = $i( "SELECT COUNT(*) FROM $pt WHERE email_verified=1" );
 		$avg_party = $wpdb->get_var( "SELECT AVG(travel_party_size) FROM $pt WHERE travel_party_size IS NOT NULL" );
+		$credits = $i( "SELECT COUNT(*) FROM $ct WHERE status IN ('issued','deferred')" );
+		$daily_completions = $wpdb->get_results( "SELECT DATE(completed_at) AS label, COUNT(*) AS value FROM $srt WHERE status='completed' AND completed_at >= DATE_SUB(CURDATE(), INTERVAL 29 DAY) GROUP BY DATE(completed_at) ORDER BY label ASC" );
+		$weekly_referrals = $wpdb->get_results( "SELECT DATE_FORMAT(COALESCE(verified_at, completed_date, created_at), '%x-W%v') AS label, COUNT(*) AS value FROM $rt WHERE verified=1 AND COALESCE(verified_at, completed_date, created_at) >= DATE_SUB(CURDATE(), INTERVAL 12 WEEK) GROUP BY YEARWEEK(COALESCE(verified_at, completed_date, created_at), 3) ORDER BY YEARWEEK(COALESCE(verified_at, completed_date, created_at), 3) ASC" );
+		$top_referrers = $wpdb->get_results( "SELECT COALESCE(NULLIF(p.name,''), NULLIF(p.email,''), 'Unknown') AS label, COUNT(*) AS value FROM $rt r LEFT JOIN $pt p ON p.id=COALESCE(r.referring_participant_id,r.referrer_id) WHERE r.verified=1 GROUP BY COALESCE(NULLIF(p.name,''), NULLIF(p.email,''), 'Unknown') ORDER BY value DESC LIMIT 5" );
 		return array(
 			'total_surveys_completed' => $completed,
 			'survey_completion_rate' => $started ? round( $completed / $started * 100, 1 ) : 0,
@@ -109,10 +124,18 @@ class RTS_Business_Logic_4 {
 			'avg_travel_party_size' => $avg_party ? round( (float) $avg_party, 1 ) : null,
 			'geographic_distribution' => $wpdb->get_results( "SELECT country, COUNT(*) AS c FROM $pt WHERE country IS NOT NULL GROUP BY country ORDER BY c DESC LIMIT 10" ),
 			'marketing_source_breakdown' => $wpdb->get_results( "SELECT marketing_source, COUNT(*) AS c FROM $pt WHERE marketing_source IS NOT NULL GROUP BY marketing_source ORDER BY c DESC" ),
-			'cabin_credits_issued' => $i( "SELECT COUNT(*) FROM $ct WHERE status IN ('issued','deferred')" ),
+			'cabin_credits_issued' => $credits,
 			'cabin_credit_floor' => 400, 'cabin_credit_target' => 500,
 			'conversion_funnel' => array( 'registered' => $total_p, 'verified' => $ver_p, 'credited' => $i( "SELECT COUNT(*) FROM $ct" ) ),
 			'cost_per_founding_runner' => null, // pending ad-spend integration (Batch 5)
+			'email_verification_rate' => $total_p ? round( $ver_p / $total_p * 100, 1 ) : 0,
+			'notification_interest_total' => $i( "SELECT COUNT(*) FROM $pt WHERE wants_cruise_notification=1" ),
+			'total_trophies_unlocked' => $i( "SELECT COUNT(*) FROM $tut" ),
+			'unique_trophy_holders' => $i( "SELECT COUNT(DISTINCT participant_id) FROM $tut" ),
+			'outstanding_credit_liability' => $credits * 100,
+			'daily_completions' => $daily_completions,
+			'weekly_verified_referrals' => $weekly_referrals,
+			'top_referrers' => $top_referrers,
 		);
 	}
 
@@ -133,17 +156,215 @@ class RTS_Business_Logic_4 {
 	}
 
 	// ---- Backups ----
-	public static function run_backup( $by ) {
-		global $wpdb;
-		$wpdb->insert( RTS_DB::table( 'backups' ), array( 'triggered_by' => $by ?: 'admin', 'status' => 'completed' ) );
-		$id = (int) $wpdb->insert_id; // BEFORE audit()
-		self::audit( $by, 'Backup run manually', 'Backup & System Settings', "backup_id=$id" );
-		return array( 'error' => null, 'backup_id' => $id );
+	public static function init_backup_integration() {
+		add_action( 'rtsap_run_updraft_backup', array( __CLASS__, 'start_updraft_backup' ), 10, 2 );
+		add_filter( 'updraftplus_backup_complete', array( __CLASS__, 'updraft_backup_complete' ) );
+		add_action( 'updraft_backup_resume', array( __CLASS__, 'after_updraft_resume' ), 999, 3 );
 	}
-	public static function backup_history() { global $wpdb; return $wpdb->get_results( "SELECT * FROM " . RTS_DB::table( 'backups' ) . " ORDER BY created_at DESC LIMIT 20" ); }
-	public static function last_backup()    { global $wpdb; return $wpdb->get_row( "SELECT * FROM " . RTS_DB::table( 'backups' ) . " ORDER BY created_at DESC LIMIT 1" ); }
 
-	// ---- Security Dashboard — now partly REAL because WP has real auth ----
+	public static function backup_provider_status() {
+		global $updraftplus;
+		$available = is_object( $updraftplus ) && method_exists( $updraftplus, 'backup_all' ) && class_exists( 'UpdraftPlus_Options' );
+		$services = $available ? UpdraftPlus_Options::get_updraft_option( 'updraft_service' ) : array();
+		$services = is_array( $services ) ? $services : array( $services );
+		$services = array_values( array_filter( $services ) );
+		return array(
+			'available'          => $available,
+			'google_drive_ready' => $available && in_array( 'googledrive', $services, true ),
+			'services'           => $services,
+		);
+	}
+
+	public static function run_backup( $by ) {
+		global $wpdb, $updraftplus;
+		$provider = self::backup_provider_status();
+		if ( ! $provider['available'] ) {
+			return array( 'error' => 'UPDRAFTPLUS_NOT_AVAILABLE', 'message' => 'UpdraftPlus must be installed and active.' );
+		}
+		if ( ! $provider['google_drive_ready'] ) {
+			return array( 'error' => 'GOOGLE_DRIVE_NOT_CONFIGURED', 'message' => 'Select and connect Google Drive in UpdraftPlus settings first.' );
+		}
+
+		$nonce = $updraftplus->backup_time_nonce();
+		$inserted = $wpdb->insert(
+			RTS_DB::table( 'backups' ),
+			array(
+				'triggered_by'    => $by ?: 'admin',
+				'status'          => 'queued',
+				'provider'        => 'updraftplus',
+				'provider_job_id' => $nonce,
+				'remote_storage'  => 'Google Drive',
+			),
+			array( '%s', '%s', '%s', '%s', '%s' )
+		);
+		if ( false === $inserted ) {
+			return array( 'error' => 'BACKUP_LOG_FAILED', 'message' => 'The backup request could not be recorded.' );
+		}
+
+		$id = (int) $wpdb->insert_id;
+		$scheduled = wp_schedule_single_event( time(), 'rtsap_run_updraft_backup', array( $id, $nonce ), true );
+		if ( is_wp_error( $scheduled ) || ! $scheduled ) {
+			$message = is_wp_error( $scheduled ) ? $scheduled->get_error_message() : 'WordPress could not queue the backup job.';
+			self::mark_backup_failed( $id, $message );
+			return array( 'error' => 'BACKUP_QUEUE_FAILED', 'message' => $message, 'backup_id' => $id );
+		}
+
+		self::audit( $by, 'UpdraftPlus backup queued', 'Backup & System Settings', "backup_id=$id; destination=Google Drive; job=$nonce" );
+		if ( function_exists( 'spawn_cron' ) ) { spawn_cron( time() ); }
+		return array( 'error' => null, 'backup_id' => $id, 'status' => 'queued', 'provider_job_id' => $nonce );
+	}
+
+	public static function tag_updraft_job( $jobdata ) {
+		if ( self::$updraft_backup_id ) { array_push( $jobdata, 'rtsap_backup_id', self::$updraft_backup_id ); }
+		return $jobdata;
+	}
+
+	public static function start_updraft_backup( $backup_id, $nonce ) {
+		global $wpdb, $updraftplus;
+		$backup_id = absint( $backup_id );
+		$nonce = sanitize_key( $nonce );
+		if ( ! $backup_id || ! $nonce ) { return; }
+
+		$provider = self::backup_provider_status();
+		if ( ! $provider['available'] || ! $provider['google_drive_ready'] ) {
+			self::mark_backup_failed( $backup_id, 'UpdraftPlus or its Google Drive destination is unavailable.' );
+			return;
+		}
+
+		$wpdb->update(
+			RTS_DB::table( 'backups' ),
+			array( 'status' => 'running', 'started_at' => current_time( 'mysql' ) ),
+			array( 'id' => $backup_id ),
+			array( '%s', '%s' ),
+			array( '%d' )
+		);
+		self::$updraft_backup_id = $backup_id;
+		add_filter( 'updraftplus_initial_jobdata', array( __CLASS__, 'tag_updraft_job' ), 10, 1 );
+
+		try {
+			$result = $updraftplus->backup_all(
+				array(
+					'nocloud'  => false,
+					'use_nonce' => $nonce,
+					'label'     => 'RTS Admin backup #' . $backup_id,
+				)
+			);
+			if ( false === $result ) {
+				self::mark_backup_failed( $backup_id, 'UpdraftPlus could not start the backup. Check its latest log.' );
+			} elseif ( $updraftplus->error_count() > 0 && empty( $updraftplus->newresumption_scheduled ) ) {
+				self::mark_backup_failed( $backup_id, 'UpdraftPlus finished with errors. Check its latest log.' );
+			}
+		} catch ( Throwable $error ) {
+			self::mark_backup_failed( $backup_id, $error->getMessage() );
+		} finally {
+			remove_filter( 'updraftplus_initial_jobdata', array( __CLASS__, 'tag_updraft_job' ), 10 );
+			self::$updraft_backup_id = 0;
+		}
+	}
+
+	public static function updraft_backup_complete( $delete_jobdata ) {
+		global $wpdb, $updraftplus;
+		$backup_id = is_object( $updraftplus ) ? absint( $updraftplus->jobdata_get( 'rtsap_backup_id' ) ) : 0;
+		if ( ! $backup_id ) { return $delete_jobdata; }
+
+		$table = RTS_DB::table( 'backups' );
+		$changed = $wpdb->query( $wpdb->prepare( "UPDATE $table SET status = 'completed', completed_at = %s, details = %s WHERE id = %d AND status <> 'completed'", current_time( 'mysql' ), 'UpdraftPlus completed the backup and remote upload.', $backup_id ) );
+		if ( ! $changed ) { return $delete_jobdata; }
+		$backup = $wpdb->get_row( $wpdb->prepare( 'SELECT triggered_by, provider_job_id FROM ' . RTS_DB::table( 'backups' ) . ' WHERE id = %d', $backup_id ) );
+		self::audit( $backup ? $backup->triggered_by : 'system', 'UpdraftPlus backup completed', 'Backup & System Settings', "backup_id=$backup_id; destination=Google Drive; job=" . ( $backup ? $backup->provider_job_id : '' ) );
+		return $delete_jobdata;
+	}
+
+	public static function after_updraft_resume( $resumption, $nonce, $unused = null ) {
+		global $updraftplus;
+		$jobdata = get_site_option( 'updraft_jobdata_' . sanitize_key( $nonce ), array() );
+		$backup_id = is_array( $jobdata ) ? absint( $jobdata['rtsap_backup_id'] ?? 0 ) : 0;
+		if ( $backup_id && is_object( $updraftplus ) && $updraftplus->error_count() > 0 && empty( $updraftplus->newresumption_scheduled ) ) {
+			self::mark_backup_failed( $backup_id, 'UpdraftPlus finished with errors. Check its latest log.' );
+		}
+	}
+
+	private static function mark_backup_failed( $backup_id, $details ) {
+		global $wpdb;
+		$table = RTS_DB::table( 'backups' );
+		$details = mb_substr( sanitize_text_field( (string) $details ), 0, 1000 );
+		$changed = $wpdb->query( $wpdb->prepare( "UPDATE $table SET status = 'failed', completed_at = %s, details = %s WHERE id = %d AND status NOT IN ('completed', 'failed')", current_time( 'mysql' ), $details, absint( $backup_id ) ) );
+		if ( ! $changed ) { return; }
+		$backup = $wpdb->get_row( $wpdb->prepare( "SELECT triggered_by, provider_job_id FROM $table WHERE id = %d", absint( $backup_id ) ) );
+		RTS_Business_Logic::log_audit( $backup ? $backup->triggered_by : 'system', 'UpdraftPlus backup failed', 'Backup & System Settings', 'failed', "backup_id=" . absint( $backup_id ) . '; job=' . ( $backup ? $backup->provider_job_id : '' ) . '; ' . $details );
+	}
+
+	public static function backup_history() { global $wpdb; return $wpdb->get_results( "SELECT * FROM " . RTS_DB::table( 'backups' ) . " ORDER BY created_at DESC LIMIT 20" ); }
+	public static function last_backup()    { global $wpdb; return $wpdb->get_row( "SELECT * FROM " . RTS_DB::table( 'backups' ) . " WHERE status = 'completed' ORDER BY COALESCE(completed_at, created_at) DESC LIMIT 1" ); }
+
+	// ---- Security Dashboard — WordPress-native authentication metrics ----
+	public static function init_security_monitor() {
+		add_action( 'wp_login_failed', array( __CLASS__, 'record_failed_login' ), 10, 2 );
+		add_action( 'wp_login', array( __CLASS__, 'clear_session_count_cache' ), 10, 0 );
+		add_action( 'wp_logout', array( __CLASS__, 'clear_session_count_cache' ), 10, 0 );
+	}
+
+	/** Record a failed WordPress authentication without retaining passwords or error messages. */
+	public static function record_failed_login( $username, $error = null ) {
+		$codes = is_wp_error( $error ) ? $error->get_error_codes() : array();
+		RTS_Business_Logic::log_audit(
+			mb_substr( sanitize_text_field( (string) $username ), 0, 100 ),
+			'Failed login',
+			'Authentication',
+			'failed',
+			$codes ? 'codes=' . implode( ',', array_map( 'sanitize_key', $codes ) ) : ''
+		);
+		delete_transient( 'rtsap_failed_logins_24h' );
+
+		// Keep useful incident history without allowing brute-force traffic to
+		// grow the shared audit table forever.
+		if ( false === get_transient( 'rtsap_auth_log_pruned' ) ) {
+			set_transient( 'rtsap_auth_log_pruned', 1, DAY_IN_SECONDS );
+			global $wpdb;
+			$table = RTS_DB::table( 'audit_log' );
+			$wpdb->query( "DELETE FROM $table WHERE module = 'Authentication' AND action = 'Failed login' AND created_at < DATE_SUB(NOW(), INTERVAL 30 DAY)" );
+		}
+	}
+
+	public static function clear_session_count_cache() {
+		delete_transient( 'rtsap_active_sessions' );
+	}
+
+	private static function failed_logins_24h() {
+		$cached = get_transient( 'rtsap_failed_logins_24h' );
+		if ( false !== $cached ) { return (int) $cached; }
+
+		global $wpdb;
+		$table = RTS_DB::table( 'audit_log' );
+		$count = (int) $wpdb->get_var( "SELECT COUNT(*) FROM $table WHERE module = 'Authentication' AND action = 'Failed login' AND result = 'failed' AND created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)" );
+		set_transient( 'rtsap_failed_logins_24h', $count, MINUTE_IN_SECONDS );
+		return $count;
+	}
+
+	/** Count unexpired sessions from WordPress core's session-token store. */
+	private static function active_sessions() {
+		$cached = get_transient( 'rtsap_active_sessions' );
+		if ( false !== $cached ) { return (int) $cached; }
+
+		global $wpdb;
+		$stored_sessions = $wpdb->get_col( $wpdb->prepare(
+			"SELECT meta_value FROM {$wpdb->usermeta} WHERE meta_key = %s",
+			'session_tokens'
+		) );
+		$now = time();
+		$count = 0;
+		foreach ( $stored_sessions as $stored ) {
+			$sessions = maybe_unserialize( $stored );
+			if ( ! is_array( $sessions ) ) { continue; }
+			foreach ( $sessions as $session ) {
+				if ( is_array( $session ) && absint( $session['expiration'] ?? 0 ) > $now ) { $count++; }
+			}
+		}
+
+		set_transient( 'rtsap_active_sessions', $count, MINUTE_IN_SECONDS );
+		return $count;
+	}
+
 	public static function security_stats() {
 		global $wpdb;
 		$dist = array();
@@ -153,11 +374,8 @@ class RTS_Business_Logic_4 {
 			'active_admins'     => array_sum( array_column( $dist, 'c' ) ),
 			'last_backup'       => self::last_backup(),
 			'recent_audit_log'  => $wpdb->get_results( "SELECT * FROM " . RTS_DB::table( 'audit_log' ) . " ORDER BY created_at DESC LIMIT 15" ),
-			// Honest: WP has real logins, but core does NOT track failed attempts or active sessions
-			// without a plugin (e.g. Limit Login Attempts). Reported as null rather than faked.
-			'failed_logins_24h' => null,
-			'active_sessions'   => null,
-			'auth_note'         => 'WordPress has real login; failed-attempt and session counts need a security plugin or custom hook — not faked here.',
+			'failed_logins_24h' => self::failed_logins_24h(),
+			'active_sessions'   => self::active_sessions(),
 		);
 	}
 
