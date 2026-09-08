@@ -160,6 +160,29 @@ class RTS_Business_Logic_4 {
 		add_action( 'rtsap_run_updraft_backup', array( __CLASS__, 'start_updraft_backup' ), 10, 2 );
 		add_filter( 'updraftplus_backup_complete', array( __CLASS__, 'updraft_backup_complete' ) );
 		add_action( 'updraft_backup_resume', array( __CLASS__, 'after_updraft_resume' ), 999, 3 );
+		add_action( 'admin_init', array( __CLASS__, 'watch_for_updraft_stop_request' ), 1 );
+	}
+
+	/**
+	 * UpdraftPlus has no public action that fires when its Stop link succeeds.
+	 * Watch its authenticated AJAX request and reconcile after UpdraftPlus has
+	 * created the delete flag and removed the next resume event.
+	 */
+	public static function watch_for_updraft_stop_request() {
+		if ( ! wp_doing_ajax() || 'updraft_ajax' !== sanitize_key( wp_unslash( $_REQUEST['action'] ?? '' ) ) || 'activejobs_delete' !== sanitize_key( wp_unslash( $_REQUEST['subaction'] ?? '' ) ) ) {
+			return;
+		}
+
+		$job_id = sanitize_key( wp_unslash( $_POST['action_data'] ?? '' ) );
+		$nonce = sanitize_text_field( wp_unslash( $_REQUEST['nonce'] ?? '' ) );
+		if ( ! preg_match( '/^[0-9a-f]{12}$/', $job_id ) || ! wp_verify_nonce( $nonce, 'updraftplus-credentialtest-nonce' ) ) {
+			return;
+		}
+		if ( class_exists( 'UpdraftPlus_Options' ) && ! UpdraftPlus_Options::user_can_manage() ) {
+			return;
+		}
+
+		register_shutdown_function( array( __CLASS__, 'reconcile_updraft_job' ), $job_id );
 	}
 
 	public static function backup_provider_status() {
@@ -231,13 +254,8 @@ class RTS_Business_Logic_4 {
 			return;
 		}
 
-		$wpdb->update(
-			RTS_DB::table( 'backups' ),
-			array( 'status' => 'running', 'started_at' => current_time( 'mysql' ) ),
-			array( 'id' => $backup_id ),
-			array( '%s', '%s' ),
-			array( '%d' )
-		);
+		$table = RTS_DB::table( 'backups' );
+		$wpdb->query( $wpdb->prepare( "UPDATE $table SET status = 'running', started_at = NOW() WHERE id = %d", $backup_id ) );
 		self::$updraft_backup_id = $backup_id;
 		add_filter( 'updraftplus_initial_jobdata', array( __CLASS__, 'tag_updraft_job' ), 10, 1 );
 
@@ -268,7 +286,7 @@ class RTS_Business_Logic_4 {
 		if ( ! $backup_id ) { return $delete_jobdata; }
 
 		$table = RTS_DB::table( 'backups' );
-		$changed = $wpdb->query( $wpdb->prepare( "UPDATE $table SET status = 'completed', completed_at = %s, details = %s WHERE id = %d AND status <> 'completed'", current_time( 'mysql' ), 'UpdraftPlus completed the backup and remote upload.', $backup_id ) );
+		$changed = $wpdb->query( $wpdb->prepare( "UPDATE $table SET status = 'completed', completed_at = NOW(), details = %s WHERE id = %d AND status <> 'completed'", 'UpdraftPlus completed the backup and remote upload.', $backup_id ) );
 		if ( ! $changed ) { return $delete_jobdata; }
 		$backup = $wpdb->get_row( $wpdb->prepare( 'SELECT triggered_by, provider_job_id FROM ' . RTS_DB::table( 'backups' ) . ' WHERE id = %d', $backup_id ) );
 		self::audit( $backup ? $backup->triggered_by : 'system', 'UpdraftPlus backup completed', 'Backup & System Settings', "backup_id=$backup_id; destination=Google Drive; job=" . ( $backup ? $backup->provider_job_id : '' ) );
@@ -288,13 +306,59 @@ class RTS_Business_Logic_4 {
 		global $wpdb;
 		$table = RTS_DB::table( 'backups' );
 		$details = mb_substr( sanitize_text_field( (string) $details ), 0, 1000 );
-		$changed = $wpdb->query( $wpdb->prepare( "UPDATE $table SET status = 'failed', completed_at = %s, details = %s WHERE id = %d AND status NOT IN ('completed', 'failed')", current_time( 'mysql' ), $details, absint( $backup_id ) ) );
+		$changed = $wpdb->query( $wpdb->prepare( "UPDATE $table SET status = 'failed', completed_at = NOW(), details = %s WHERE id = %d AND status NOT IN ('completed', 'failed', 'stopped')", $details, absint( $backup_id ) ) );
 		if ( ! $changed ) { return; }
 		$backup = $wpdb->get_row( $wpdb->prepare( "SELECT triggered_by, provider_job_id FROM $table WHERE id = %d", absint( $backup_id ) ) );
 		RTS_Business_Logic::log_audit( $backup ? $backup->triggered_by : 'system', 'UpdraftPlus backup failed', 'Backup & System Settings', 'failed', "backup_id=" . absint( $backup_id ) . '; job=' . ( $backup ? $backup->provider_job_id : '' ) . '; ' . $details );
 	}
 
-	public static function backup_history() { global $wpdb; return $wpdb->get_results( "SELECT * FROM " . RTS_DB::table( 'backups' ) . " ORDER BY created_at DESC LIMIT 20" ); }
+	/** Reconcile an RTS backup row with UpdraftPlus's cancellation markers. */
+	public static function reconcile_updraft_job( $job_id ) {
+		global $wpdb, $updraftplus;
+		$job_id = sanitize_key( (string) $job_id );
+		if ( ! preg_match( '/^[0-9a-f]{12}$/', $job_id ) ) { return; }
+
+		$table = RTS_DB::table( 'backups' );
+		$backup = $wpdb->get_row( $wpdb->prepare( "SELECT id FROM $table WHERE provider = 'updraftplus' AND provider_job_id = %s AND status IN ('queued', 'running') ORDER BY id DESC LIMIT 1", $job_id ) );
+		if ( ! $backup || ! is_object( $updraftplus ) || ! method_exists( $updraftplus, 'backups_dir_location' ) ) { return; }
+
+		$directory = $updraftplus->backups_dir_location();
+		$delete_flag = trailingslashit( $directory ) . 'deleteflag-' . $job_id . '.txt';
+		$log_file = trailingslashit( $directory ) . 'log.' . $job_id . '.txt';
+		if ( file_exists( $delete_flag ) || self::updraft_log_shows_abort( $log_file ) ) {
+			self::mark_backup_stopped( (int) $backup->id, 'Stopped by an administrator in UpdraftPlus.' );
+		}
+	}
+
+	private static function updraft_log_shows_abort( $log_file ) {
+		if ( ! is_readable( $log_file ) ) { return false; }
+		$handle = fopen( $log_file, 'rb' );
+		if ( false === $handle ) { return false; }
+		$size = filesize( $log_file );
+		if ( $size > 131072 ) { fseek( $handle, -131072, SEEK_END ); }
+		$tail = stream_get_contents( $handle );
+		fclose( $handle );
+		return false !== stripos( (string) $tail, 'User request for abort: backup job will be immediately halted' )
+			|| false !== stripos( (string) $tail, 'The backup was aborted by the user' );
+	}
+
+	private static function mark_backup_stopped( $backup_id, $details ) {
+		global $wpdb;
+		$table = RTS_DB::table( 'backups' );
+		$details = mb_substr( sanitize_text_field( (string) $details ), 0, 1000 );
+		$changed = $wpdb->query( $wpdb->prepare( "UPDATE $table SET status = 'stopped', completed_at = NOW(), details = %s WHERE id = %d AND status IN ('queued', 'running')", $details, absint( $backup_id ) ) );
+		if ( ! $changed ) { return; }
+		$backup = $wpdb->get_row( $wpdb->prepare( "SELECT triggered_by, provider_job_id FROM $table WHERE id = %d", absint( $backup_id ) ) );
+		RTS_Business_Logic::log_audit( $backup ? $backup->triggered_by : 'system', 'UpdraftPlus backup stopped', 'Backup & System Settings', 'stopped', "backup_id=" . absint( $backup_id ) . '; job=' . ( $backup ? $backup->provider_job_id : '' ) );
+	}
+
+	private static function reconcile_backup_statuses() {
+		global $wpdb;
+		$jobs = $wpdb->get_col( "SELECT provider_job_id FROM " . RTS_DB::table( 'backups' ) . " WHERE provider = 'updraftplus' AND status IN ('queued', 'running') AND provider_job_id IS NOT NULL" );
+		foreach ( $jobs as $job_id ) { self::reconcile_updraft_job( $job_id ); }
+	}
+
+	public static function backup_history() { global $wpdb; self::reconcile_backup_statuses(); return $wpdb->get_results( "SELECT * FROM " . RTS_DB::table( 'backups' ) . " ORDER BY created_at DESC LIMIT 20" ); }
 	public static function last_backup()    { global $wpdb; return $wpdb->get_row( "SELECT * FROM " . RTS_DB::table( 'backups' ) . " WHERE status = 'completed' ORDER BY COALESCE(completed_at, created_at) DESC LIMIT 1" ); }
 
 	// ---- Security Dashboard — WordPress-native authentication metrics ----

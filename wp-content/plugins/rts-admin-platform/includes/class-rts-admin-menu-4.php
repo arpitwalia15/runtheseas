@@ -162,7 +162,7 @@ class RTS_Admin_Menu_4 {
 				$history
 			)
 		);
-		echo '<p style="color:#666;font-size:12px">Creates a complete UpdraftPlus files-and-database backup and sends it to the configured Google Drive destination. The status changes to Completed only after UpdraftPlus finishes successfully.</p>';
+		echo '<p style="color:#666;font-size:12px">Creates a complete UpdraftPlus files-and-database backup and sends it to the configured Google Drive destination. Completed, Failed and Stopped statuses are synchronized from the UpdraftPlus job.</p>';
 		if ( array_filter( $history, fn( $b ) => in_array( $b->status, array( 'queued', 'running' ), true ) ) ) {
 			echo '<script>window.setTimeout(function(){ window.location.reload(); }, 10000);</script>';
 		}
