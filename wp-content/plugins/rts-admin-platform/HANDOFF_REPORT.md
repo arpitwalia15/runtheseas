@@ -106,7 +106,7 @@ All of these are on **wp-admin → Run The Seas → Settings** (role: Super Admi
 
 ## D. SECURITY / PRODUCTION HARDENING STILL REQUIRED (recommended before public launch)
 
-1. **Login protection** — WordPress core does not limit login attempts or track sessions (the Security Dashboard shows `n/a` for those honestly). Install *Limit Login Attempts Reloaded* or *Wordfence*; enable 2FA for `rts_super_admin` users (e.g., *Two-Factor* plugin).
+1. **Login protection** — the Security Dashboard records failed authentication attempts and counts unexpired WordPress core sessions, but this reporting does not block attacks. Install *Limit Login Attempts Reloaded* or *Wordfence* for rate limiting/firewall protection; enable 2FA for `rts_super_admin` users (e.g., *Two-Factor* plugin).
 2. **WAF / edge** — put the site behind Cloudflare (or equivalent); enable its WAF and rate limiting on `/wp-login.php`, `/xmlrpc.php` (disable XML-RPC if unused) and `/?rest_route=/rts/v1/participants/register`.
 3. **Secrets** — the AI key lives in `wp_options`. If your policy forbids that, define it in `wp-config.php` and add `add_filter('pre_option_rts_settings', ...)` to inject it, or keep it in the host's secret store and hydrate at request time. Restrict DB and `wp-config.php` permissions (`640`, owned by the web user/root).
 4. **REST scope review** — by design 11 routes are public (survey/register/verify/token-subscriptions/one content block). If you want `POST /participants/register` callable **only** from your own forms, keep it public but add a nonce header check in a small mu-plugin, or lower `rate_limit_register`. Everything else already requires `rts_*` caps.

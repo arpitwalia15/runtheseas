@@ -111,8 +111,7 @@ class RTS_Admin_Menu_4 {
 	// ---- Security Dashboard ----
 	public static function render_security() {
 		$s = RTS_Business_Logic_4::security_stats();
-		echo '<div class="wrap"><h1>Security Dashboard</h1><div style="display:flex;gap:12px;flex-wrap:wrap">' . self::kpi( 'Failed logins (24h)', 'n/a', 'needs a security plugin' ) . self::kpi( 'Active sessions', 'n/a', 'needs a security plugin' ) . self::kpi( 'Active administrators', $s['active_admins'] ) . self::kpi( 'Last backup', $s['last_backup'] ? $s['last_backup']->created_at : 'Never run' ) . '</div>';
-		echo '<p style="color:#666;font-size:12px;max-width:800px">' . esc_html( $s['auth_note'] ) . '</p>';
+		echo '<div class="wrap"><h1>Security Dashboard</h1><div style="display:flex;gap:12px;flex-wrap:wrap">' . self::kpi( 'Failed logins (24h)', $s['failed_logins_24h'], 'tracked by RTS' ) . self::kpi( 'Active sessions', $s['active_sessions'], 'unexpired WordPress sessions' ) . self::kpi( 'Active administrators', $s['active_admins'] ) . self::kpi( 'Last backup', $s['last_backup'] ? $s['last_backup']->created_at : 'Never run' ) . '</div>';
 		echo self::section( 'ROLE DISTRIBUTION (real WordPress roles)' ) . self::table( array( 'Role', 'Active count' ), array_map( fn( $r ) => array( $r['role'], $r['c'] ), $s['role_distribution'] ) );
 		echo self::section( 'RECENT AUDIT LOG' ) . '<table class="wp-list-table widefat fixed striped"><thead><tr><th>Time</th><th>User</th><th>Action</th><th>Module</th></tr></thead><tbody>';
 		foreach ( $s['recent_audit_log'] as $a ) { echo '<tr><td>' . esc_html( $a->created_at ) . '</td><td>' . esc_html( $a->user ) . '</td><td>' . esc_html( $a->action ) . '</td><td>' . esc_html( $a->module ) . '</td></tr>'; }

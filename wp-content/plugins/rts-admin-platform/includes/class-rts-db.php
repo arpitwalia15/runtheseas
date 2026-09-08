@@ -558,7 +558,8 @@ class RTS_DB {
 			notes TEXT,
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			PRIMARY KEY (id),
-			UNIQUE KEY source_record (source_table, source_id)
+			UNIQUE KEY source_record (source_table, source_id),
+			KEY security_events (module, result, created_at)
 		) $charset_collate;" );
 
 		self::ensure_email_template_columns( "{$prefix}email_templates" );

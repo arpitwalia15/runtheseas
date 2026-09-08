@@ -165,7 +165,74 @@ class RTS_Business_Logic_4 {
 	public static function backup_history() { global $wpdb; return $wpdb->get_results( "SELECT * FROM " . RTS_DB::table( 'backups' ) . " ORDER BY created_at DESC LIMIT 20" ); }
 	public static function last_backup()    { global $wpdb; return $wpdb->get_row( "SELECT * FROM " . RTS_DB::table( 'backups' ) . " ORDER BY created_at DESC LIMIT 1" ); }
 
-	// ---- Security Dashboard — now partly REAL because WP has real auth ----
+	// ---- Security Dashboard — WordPress-native authentication metrics ----
+	public static function init_security_monitor() {
+		add_action( 'wp_login_failed', array( __CLASS__, 'record_failed_login' ), 10, 2 );
+		add_action( 'wp_login', array( __CLASS__, 'clear_session_count_cache' ), 10, 0 );
+		add_action( 'wp_logout', array( __CLASS__, 'clear_session_count_cache' ), 10, 0 );
+	}
+
+	/** Record a failed WordPress authentication without retaining passwords or error messages. */
+	public static function record_failed_login( $username, $error = null ) {
+		$codes = is_wp_error( $error ) ? $error->get_error_codes() : array();
+		RTS_Business_Logic::log_audit(
+			mb_substr( sanitize_text_field( (string) $username ), 0, 100 ),
+			'Failed login',
+			'Authentication',
+			'failed',
+			$codes ? 'codes=' . implode( ',', array_map( 'sanitize_key', $codes ) ) : ''
+		);
+		delete_transient( 'rtsap_failed_logins_24h' );
+
+		// Keep useful incident history without allowing brute-force traffic to
+		// grow the shared audit table forever.
+		if ( false === get_transient( 'rtsap_auth_log_pruned' ) ) {
+			set_transient( 'rtsap_auth_log_pruned', 1, DAY_IN_SECONDS );
+			global $wpdb;
+			$table = RTS_DB::table( 'audit_log' );
+			$wpdb->query( "DELETE FROM $table WHERE module = 'Authentication' AND action = 'Failed login' AND created_at < DATE_SUB(NOW(), INTERVAL 30 DAY)" );
+		}
+	}
+
+	public static function clear_session_count_cache() {
+		delete_transient( 'rtsap_active_sessions' );
+	}
+
+	private static function failed_logins_24h() {
+		$cached = get_transient( 'rtsap_failed_logins_24h' );
+		if ( false !== $cached ) { return (int) $cached; }
+
+		global $wpdb;
+		$table = RTS_DB::table( 'audit_log' );
+		$count = (int) $wpdb->get_var( "SELECT COUNT(*) FROM $table WHERE module = 'Authentication' AND action = 'Failed login' AND result = 'failed' AND created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)" );
+		set_transient( 'rtsap_failed_logins_24h', $count, MINUTE_IN_SECONDS );
+		return $count;
+	}
+
+	/** Count unexpired sessions from WordPress core's session-token store. */
+	private static function active_sessions() {
+		$cached = get_transient( 'rtsap_active_sessions' );
+		if ( false !== $cached ) { return (int) $cached; }
+
+		global $wpdb;
+		$stored_sessions = $wpdb->get_col( $wpdb->prepare(
+			"SELECT meta_value FROM {$wpdb->usermeta} WHERE meta_key = %s",
+			'session_tokens'
+		) );
+		$now = time();
+		$count = 0;
+		foreach ( $stored_sessions as $stored ) {
+			$sessions = maybe_unserialize( $stored );
+			if ( ! is_array( $sessions ) ) { continue; }
+			foreach ( $sessions as $session ) {
+				if ( is_array( $session ) && absint( $session['expiration'] ?? 0 ) > $now ) { $count++; }
+			}
+		}
+
+		set_transient( 'rtsap_active_sessions', $count, MINUTE_IN_SECONDS );
+		return $count;
+	}
+
 	public static function security_stats() {
 		global $wpdb;
 		$dist = array();
@@ -175,11 +242,8 @@ class RTS_Business_Logic_4 {
 			'active_admins'     => array_sum( array_column( $dist, 'c' ) ),
 			'last_backup'       => self::last_backup(),
 			'recent_audit_log'  => $wpdb->get_results( "SELECT * FROM " . RTS_DB::table( 'audit_log' ) . " ORDER BY created_at DESC LIMIT 15" ),
-			// Honest: WP has real logins, but core does NOT track failed attempts or active sessions
-			// without a plugin (e.g. Limit Login Attempts). Reported as null rather than faked.
-			'failed_logins_24h' => null,
-			'active_sessions'   => null,
-			'auth_note'         => 'WordPress has real login; failed-attempt and session counts need a security plugin or custom hook — not faked here.',
+			'failed_logins_24h' => self::failed_logins_24h(),
+			'active_sessions'   => self::active_sessions(),
 		);
 	}
 

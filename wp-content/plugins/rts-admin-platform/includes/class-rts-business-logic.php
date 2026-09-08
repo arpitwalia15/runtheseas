@@ -7,9 +7,14 @@ class RTS_Business_Logic {
 
 	public static function log_audit( $user, $action, $module, $result = 'success', $notes = '' ) {
 		global $wpdb;
+		$ip_address = '';
+		if ( isset( $_SERVER['REMOTE_ADDR'] ) ) {
+			$candidate = sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) );
+			if ( filter_var( $candidate, FILTER_VALIDATE_IP ) ) { $ip_address = $candidate; }
+		}
 		$wpdb->insert( RTS_DB::table( 'audit_log' ), array(
 			'user' => $user, 'action' => $action, 'module' => $module,
-			'ip_address' => '127.0.0.1', 'result' => $result, 'notes' => $notes,
+			'ip_address' => $ip_address, 'result' => $result, 'notes' => $notes,
 		) );
 	}
 
