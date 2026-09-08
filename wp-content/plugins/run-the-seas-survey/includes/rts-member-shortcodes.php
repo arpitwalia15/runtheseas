@@ -353,19 +353,25 @@ function rts_member_distance_shortcode($atts)
         ? 'captain_miles_balance'
         : 'total_captain_miles_earned';
     $miles = $participant ? max(0, (int) $participant->{$field}) : 0;
-    $value = function_exists('rts_format_miles') ? rts_format_miles($miles) : number_format_i18n($miles);
+    $format = sanitize_key($atts['format']);
+    $is_progress = 'progress' === $format;
+    $milestone_key = in_array($miles, array(21000, 21100), true) ? '21k' : (in_array($miles, array(42000, 42200), true) ? '42k' : '');
+    $value = $is_progress && function_exists('rts_format_trophy_miles')
+        ? rts_format_trophy_miles($miles, $milestone_key)
+        : (function_exists('rts_format_miles') ? rts_format_miles($miles) : number_format_i18n($miles));
     $unit = trim(wp_strip_all_tags($atts['unit']));
 
     $output = '<span class="rts-member-distance__value">' . esc_html($value) . '</span>';
 
-    if ('progress' === sanitize_key($atts['format']) && is_numeric($atts['target'])) {
+    if ($is_progress && is_numeric($atts['target'])) {
         $target = max(0, (int) $atts['target']);
         if (42200 === $target) {
             $target = 42000;
         }
-        $target_value = function_exists('rts_format_trophy_miles') && 42000 === $target
-            ? rts_format_trophy_miles($target, '42k')
-            : (function_exists('rts_format_miles') ? rts_format_miles($target) : number_format_i18n($target));
+        $target_key = in_array($target, array(21000, 21100), true) ? '21k' : (in_array($target, array(42000, 42200), true) ? '42k' : '');
+        $target_value = function_exists('rts_format_trophy_miles')
+            ? rts_format_trophy_miles($target, $target_key)
+            : number_format_i18n($target / 1000) . 'K';
         $output .= ' <span class="rts-member-distance__of">' . esc_html__('of', 'run-the-seas') . '</span> '
             . esc_html($target_value);
     }

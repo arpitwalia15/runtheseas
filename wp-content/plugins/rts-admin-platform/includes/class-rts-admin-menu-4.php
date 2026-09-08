@@ -139,9 +139,38 @@ class RTS_Admin_Menu_4 {
 	public static function render_backup() {
 		echo '<div class="wrap"><h1>Backup, Security &amp; System Settings</h1>'; self::notice();
 		echo RTS_Production::offline_panel_html();
-		echo self::section( 'BACKUPS' ) . '<p>' . self::form( 'run_backup', '', 'Run backup now', array(), 'button button-primary' ) . '</p>';
-		echo self::table( array( 'Triggered by', 'Status', 'When' ), array_map( fn( $b ) => array( $b->triggered_by, $b->status, $b->created_at ), RTS_Business_Logic_4::backup_history() ) );
-		echo '<p style="color:#666;font-size:12px">Logs a backup event; the actual database dump is a hosting-level concern (see handoff report). REST: <code>POST /rts/v1/system/take-offline</code> {"confirm":"OFFLINE"}, <code>POST /rts/v1/system/restore</code>, <code>GET /rts/v1/system/status</code>.</p></div>';
+		$provider = RTS_Business_Logic_4::backup_provider_status();
+		$history = RTS_Business_Logic_4::backup_history();
+		$ready = $provider['available'] && $provider['google_drive_ready'];
+		echo self::section( 'BACKUPS' ) . '<p>';
+		if ( $ready ) {
+			echo self::form( 'run_backup', '', 'Run UpdraftPlus backup now', array(), 'button button-primary', "this.querySelector('button').disabled=true;this.querySelector('button').textContent='Starting…';" );
+		} else {
+			echo '<button class="button button-primary" disabled>Run UpdraftPlus backup now</button> <span style="color:#b32d2e">' . esc_html( $provider['available'] ? 'Connect and select Google Drive in UpdraftPlus settings first.' : 'UpdraftPlus is not active.' ) . '</span>';
+		}
+		echo '</p>';
+		echo self::table(
+			array( 'Triggered by', 'Status', 'Destination', 'Requested', 'Completed' ),
+			array_map(
+				fn( $b ) => array(
+					$b->triggered_by,
+					ucwords( str_replace( '_', ' ', $b->status ) ),
+					$b->remote_storage ?: '—',
+					$b->created_at,
+					$b->completed_at ?: '—',
+				),
+				$history
+			)
+		);
+		echo '<p style="color:#666;font-size:12px">Creates a complete UpdraftPlus files-and-database backup and sends it to the configured Google Drive destination. The status changes to Completed only after UpdraftPlus finishes successfully.</p>';
+		if ( array_filter( $history, fn( $b ) => in_array( $b->status, array( 'queued', 'running' ), true ) ) ) {
+			echo '<script>window.setTimeout(function(){ window.location.reload(); }, 10000);</script>';
+		}
+		echo '</div>';
 	}
-	public static function handle_run_backup() { self::guard( 'run_backup' ); RTS_Business_Logic_4::run_backup( self::admin() ); self::back( 'rts-backup', 'Backup logged.' ); }
+	public static function handle_run_backup() {
+		self::guard( 'run_backup' );
+		$result = RTS_Business_Logic_4::run_backup( self::admin() );
+		self::back( 'rts-backup', $result['error'] ? 'Error: ' . ( $result['message'] ?? $result['error'] ) : 'Backup queued. UpdraftPlus is creating it and will upload it to Google Drive.' );
+	}
 }

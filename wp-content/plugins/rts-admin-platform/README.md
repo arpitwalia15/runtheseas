@@ -123,7 +123,8 @@ prototype, not just equivalent:
 - **Security Dashboard** — real role distribution and audit log, failed-login attempts recorded
   through WordPress authentication hooks, and a count of unexpired WordPress core sessions.
   Wordfence is optional for firewall, rate-limiting and 2FA protection.
-- **Backup & System** — manual backup event log (the actual dump is a hosting concern, Appendix F).
+- **Backup & System** — starts a real UpdraftPlus files-and-database backup, uses its configured
+  Google Drive destination, and records queued/running/completed/failed status in the RTS history.
 
 ## Batch 3 additions
 

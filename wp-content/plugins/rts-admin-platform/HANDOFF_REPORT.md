@@ -98,7 +98,7 @@ All of these are on **wp-admin → Run The Seas → Settings** (role: Super Admi
 
 5. **HTTPS + Application Passwords.** The live site must be HTTPS (it is); remove nothing — app passwords then work natively. Do **not** add `WP_ENVIRONMENT_TYPE=local` on production.
 
-6. **Database backups.** The *Backup & System* page logs backup events; the actual dump is hosting-level. Configure your host's (or UpdraftPlus/BlogVault) scheduled DB+files backup and test a restore once. Optionally call `POST /rts/v1/backups/run` from that job so the RTS log reflects reality.
+6. **Database backups.** The *Backup & System* button starts a real UpdraftPlus database-and-files backup and sends it to the Google Drive destination configured in UpdraftPlus. RTS records the request immediately and marks it complete only when UpdraftPlus reports success. Keep scheduled backups configured in UpdraftPlus as well, and test a restore once.
 
 7. **Create real admin accounts.** Run The Seas → Administrators & Roles → Invite (creates a real WP user with the chosen RTS role; they set a password via the standard WP reset email — which requires Section B.1 email to be live, or set the password manually in Users).
 

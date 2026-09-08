@@ -4,7 +4,7 @@
  * Plugin Name: Run The Seas - Survey
  * Plugin URI: https://runtheseas.com/
  * Description: Advanced survey management with gamification, 42.2K Referral Marathon Challenge
- * Version: 1.2.92
+ * Version: 1.2.93
  * License: GPL v2 or later
  * Text Domain: run-the-seas
  */
@@ -17,7 +17,7 @@ if (!defined('ABSPATH')) {
 // Define plugin constants
 define('RTS_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('RTS_PLUGIN_PATH', plugin_dir_path(__FILE__));
-define('RTS_VERSION', '1.2.92');
+define('RTS_VERSION', '1.2.93');
 define('RTS_MANAGE_CAPABILITY', 'rts_manage_surveys');
 
 /** Keep legacy shortcode settings aligned with the whole-1K unlock model. */

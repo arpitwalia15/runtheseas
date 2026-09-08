@@ -320,10 +320,21 @@ class RTS_DB {
 		dbDelta( "CREATE TABLE {$prefix}backups (
 			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
 			triggered_by VARCHAR(100),
-			status VARCHAR(20) DEFAULT 'completed',
+			status VARCHAR(20) DEFAULT 'queued',
+			provider VARCHAR(30) DEFAULT 'updraftplus',
+			provider_job_id VARCHAR(64) NULL,
+			remote_storage VARCHAR(100) NULL,
+			started_at DATETIME NULL,
+			completed_at DATETIME NULL,
+			details TEXT NULL,
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			PRIMARY KEY (id)
+			PRIMARY KEY (id),
+			KEY provider_job (provider, provider_job_id),
+			KEY backup_status (status, created_at)
 		) $charset_collate;" );
+		// Entries created by older releases were event logs only, not verified
+		// backup artifacts. Preserve them without presenting them as completed.
+		$wpdb->query( "UPDATE {$prefix}backups SET status = 'logged_only', provider = 'legacy', details = 'Legacy event only; no backup artifact was verified.' WHERE provider_job_id IS NULL AND status = 'completed' AND completed_at IS NULL" );
 
 		// ===== AD CAMPAIGNS (Batch 5 — UTM attribution) =====
 		dbDelta( "CREATE TABLE {$prefix}campaigns (

@@ -23,6 +23,7 @@ function __($value, $domain = '') { return $value; }
 function esc_html($value) { return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8'); }
 function esc_attr($value) { return esc_html($value); }
 function esc_html__($value, $domain = '') { return esc_html($value); }
+function wp_strip_all_tags($value) { return strip_tags((string) $value); }
 function shortcode_atts($defaults, $atts, $shortcode = '') { return array_merge($defaults, $atts); }
 // Deliberately use comma decimals: fixed product names must not be localised.
 function number_format_i18n($value, $decimals = 0) { return number_format($value, $decimals, ',', '.'); }
@@ -91,6 +92,12 @@ foreach (array(0, 0.0, '0.0') as $zero) {
     rts_label_check(rts_marathon_challenge_map_distance($zero), '0K', 'zero map label has no decimal');
     rts_label_check(rts_format_miles($zero), '0 km', 'zero descriptive progress has no decimal');
 }
+$rts_test_participant->total_captain_miles_earned = 0;
+rts_label_check(
+    strip_tags(rts_member_distance_shortcode(array('target' => 42200, 'format' => 'progress'))),
+    '0K of 42.2K',
+    'compact marathon status uses matching K units'
+);
 $track_spots = rts_marathon_challenge_track_spots(
     array(5000, 10000, 15000, 20000, 21000, 25000, 30000, 35000, 42000),
     42000,

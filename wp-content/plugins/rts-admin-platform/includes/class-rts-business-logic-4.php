@@ -4,6 +4,7 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 class RTS_Business_Logic_4 {
 
 	private static function audit( $u, $a, $m, $n = '' ) { RTS_Business_Logic::log_audit( $u ?: 'admin', $a, $m, 'success', $n ); }
+	private static $updraft_backup_id = 0;
 
 	// ---- The four spec roles, as REAL WordPress roles with REAL capabilities. ----
 	// Unlike the Node prototype (a standalone `admins` table with no login), this hooks into
@@ -155,15 +156,146 @@ class RTS_Business_Logic_4 {
 	}
 
 	// ---- Backups ----
-	public static function run_backup( $by ) {
-		global $wpdb;
-		$wpdb->insert( RTS_DB::table( 'backups' ), array( 'triggered_by' => $by ?: 'admin', 'status' => 'completed' ) );
-		$id = (int) $wpdb->insert_id; // BEFORE audit()
-		self::audit( $by, 'Backup run manually', 'Backup & System Settings', "backup_id=$id" );
-		return array( 'error' => null, 'backup_id' => $id );
+	public static function init_backup_integration() {
+		add_action( 'rtsap_run_updraft_backup', array( __CLASS__, 'start_updraft_backup' ), 10, 2 );
+		add_filter( 'updraftplus_backup_complete', array( __CLASS__, 'updraft_backup_complete' ) );
+		add_action( 'updraft_backup_resume', array( __CLASS__, 'after_updraft_resume' ), 999, 3 );
 	}
+
+	public static function backup_provider_status() {
+		global $updraftplus;
+		$available = is_object( $updraftplus ) && method_exists( $updraftplus, 'backup_all' ) && class_exists( 'UpdraftPlus_Options' );
+		$services = $available ? UpdraftPlus_Options::get_updraft_option( 'updraft_service' ) : array();
+		$services = is_array( $services ) ? $services : array( $services );
+		$services = array_values( array_filter( $services ) );
+		return array(
+			'available'          => $available,
+			'google_drive_ready' => $available && in_array( 'googledrive', $services, true ),
+			'services'           => $services,
+		);
+	}
+
+	public static function run_backup( $by ) {
+		global $wpdb, $updraftplus;
+		$provider = self::backup_provider_status();
+		if ( ! $provider['available'] ) {
+			return array( 'error' => 'UPDRAFTPLUS_NOT_AVAILABLE', 'message' => 'UpdraftPlus must be installed and active.' );
+		}
+		if ( ! $provider['google_drive_ready'] ) {
+			return array( 'error' => 'GOOGLE_DRIVE_NOT_CONFIGURED', 'message' => 'Select and connect Google Drive in UpdraftPlus settings first.' );
+		}
+
+		$nonce = $updraftplus->backup_time_nonce();
+		$inserted = $wpdb->insert(
+			RTS_DB::table( 'backups' ),
+			array(
+				'triggered_by'    => $by ?: 'admin',
+				'status'          => 'queued',
+				'provider'        => 'updraftplus',
+				'provider_job_id' => $nonce,
+				'remote_storage'  => 'Google Drive',
+			),
+			array( '%s', '%s', '%s', '%s', '%s' )
+		);
+		if ( false === $inserted ) {
+			return array( 'error' => 'BACKUP_LOG_FAILED', 'message' => 'The backup request could not be recorded.' );
+		}
+
+		$id = (int) $wpdb->insert_id;
+		$scheduled = wp_schedule_single_event( time(), 'rtsap_run_updraft_backup', array( $id, $nonce ), true );
+		if ( is_wp_error( $scheduled ) || ! $scheduled ) {
+			$message = is_wp_error( $scheduled ) ? $scheduled->get_error_message() : 'WordPress could not queue the backup job.';
+			self::mark_backup_failed( $id, $message );
+			return array( 'error' => 'BACKUP_QUEUE_FAILED', 'message' => $message, 'backup_id' => $id );
+		}
+
+		self::audit( $by, 'UpdraftPlus backup queued', 'Backup & System Settings', "backup_id=$id; destination=Google Drive; job=$nonce" );
+		if ( function_exists( 'spawn_cron' ) ) { spawn_cron( time() ); }
+		return array( 'error' => null, 'backup_id' => $id, 'status' => 'queued', 'provider_job_id' => $nonce );
+	}
+
+	public static function tag_updraft_job( $jobdata ) {
+		if ( self::$updraft_backup_id ) { array_push( $jobdata, 'rtsap_backup_id', self::$updraft_backup_id ); }
+		return $jobdata;
+	}
+
+	public static function start_updraft_backup( $backup_id, $nonce ) {
+		global $wpdb, $updraftplus;
+		$backup_id = absint( $backup_id );
+		$nonce = sanitize_key( $nonce );
+		if ( ! $backup_id || ! $nonce ) { return; }
+
+		$provider = self::backup_provider_status();
+		if ( ! $provider['available'] || ! $provider['google_drive_ready'] ) {
+			self::mark_backup_failed( $backup_id, 'UpdraftPlus or its Google Drive destination is unavailable.' );
+			return;
+		}
+
+		$wpdb->update(
+			RTS_DB::table( 'backups' ),
+			array( 'status' => 'running', 'started_at' => current_time( 'mysql' ) ),
+			array( 'id' => $backup_id ),
+			array( '%s', '%s' ),
+			array( '%d' )
+		);
+		self::$updraft_backup_id = $backup_id;
+		add_filter( 'updraftplus_initial_jobdata', array( __CLASS__, 'tag_updraft_job' ), 10, 1 );
+
+		try {
+			$result = $updraftplus->backup_all(
+				array(
+					'nocloud'  => false,
+					'use_nonce' => $nonce,
+					'label'     => 'RTS Admin backup #' . $backup_id,
+				)
+			);
+			if ( false === $result ) {
+				self::mark_backup_failed( $backup_id, 'UpdraftPlus could not start the backup. Check its latest log.' );
+			} elseif ( $updraftplus->error_count() > 0 && empty( $updraftplus->newresumption_scheduled ) ) {
+				self::mark_backup_failed( $backup_id, 'UpdraftPlus finished with errors. Check its latest log.' );
+			}
+		} catch ( Throwable $error ) {
+			self::mark_backup_failed( $backup_id, $error->getMessage() );
+		} finally {
+			remove_filter( 'updraftplus_initial_jobdata', array( __CLASS__, 'tag_updraft_job' ), 10 );
+			self::$updraft_backup_id = 0;
+		}
+	}
+
+	public static function updraft_backup_complete( $delete_jobdata ) {
+		global $wpdb, $updraftplus;
+		$backup_id = is_object( $updraftplus ) ? absint( $updraftplus->jobdata_get( 'rtsap_backup_id' ) ) : 0;
+		if ( ! $backup_id ) { return $delete_jobdata; }
+
+		$table = RTS_DB::table( 'backups' );
+		$changed = $wpdb->query( $wpdb->prepare( "UPDATE $table SET status = 'completed', completed_at = %s, details = %s WHERE id = %d AND status <> 'completed'", current_time( 'mysql' ), 'UpdraftPlus completed the backup and remote upload.', $backup_id ) );
+		if ( ! $changed ) { return $delete_jobdata; }
+		$backup = $wpdb->get_row( $wpdb->prepare( 'SELECT triggered_by, provider_job_id FROM ' . RTS_DB::table( 'backups' ) . ' WHERE id = %d', $backup_id ) );
+		self::audit( $backup ? $backup->triggered_by : 'system', 'UpdraftPlus backup completed', 'Backup & System Settings', "backup_id=$backup_id; destination=Google Drive; job=" . ( $backup ? $backup->provider_job_id : '' ) );
+		return $delete_jobdata;
+	}
+
+	public static function after_updraft_resume( $resumption, $nonce, $unused = null ) {
+		global $updraftplus;
+		$jobdata = get_site_option( 'updraft_jobdata_' . sanitize_key( $nonce ), array() );
+		$backup_id = is_array( $jobdata ) ? absint( $jobdata['rtsap_backup_id'] ?? 0 ) : 0;
+		if ( $backup_id && is_object( $updraftplus ) && $updraftplus->error_count() > 0 && empty( $updraftplus->newresumption_scheduled ) ) {
+			self::mark_backup_failed( $backup_id, 'UpdraftPlus finished with errors. Check its latest log.' );
+		}
+	}
+
+	private static function mark_backup_failed( $backup_id, $details ) {
+		global $wpdb;
+		$table = RTS_DB::table( 'backups' );
+		$details = mb_substr( sanitize_text_field( (string) $details ), 0, 1000 );
+		$changed = $wpdb->query( $wpdb->prepare( "UPDATE $table SET status = 'failed', completed_at = %s, details = %s WHERE id = %d AND status NOT IN ('completed', 'failed')", current_time( 'mysql' ), $details, absint( $backup_id ) ) );
+		if ( ! $changed ) { return; }
+		$backup = $wpdb->get_row( $wpdb->prepare( "SELECT triggered_by, provider_job_id FROM $table WHERE id = %d", absint( $backup_id ) ) );
+		RTS_Business_Logic::log_audit( $backup ? $backup->triggered_by : 'system', 'UpdraftPlus backup failed', 'Backup & System Settings', 'failed', "backup_id=" . absint( $backup_id ) . '; job=' . ( $backup ? $backup->provider_job_id : '' ) . '; ' . $details );
+	}
+
 	public static function backup_history() { global $wpdb; return $wpdb->get_results( "SELECT * FROM " . RTS_DB::table( 'backups' ) . " ORDER BY created_at DESC LIMIT 20" ); }
-	public static function last_backup()    { global $wpdb; return $wpdb->get_row( "SELECT * FROM " . RTS_DB::table( 'backups' ) . " ORDER BY created_at DESC LIMIT 1" ); }
+	public static function last_backup()    { global $wpdb; return $wpdb->get_row( "SELECT * FROM " . RTS_DB::table( 'backups' ) . " WHERE status = 'completed' ORDER BY COALESCE(completed_at, created_at) DESC LIMIT 1" ); }
 
 	// ---- Security Dashboard — WordPress-native authentication metrics ----
 	public static function init_security_monitor() {
