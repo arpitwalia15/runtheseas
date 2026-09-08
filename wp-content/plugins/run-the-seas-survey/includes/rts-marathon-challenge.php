@@ -279,9 +279,9 @@ function rts_marathon_challenge_current_milestone_members($participants, $milest
         return $distance >= $milestone_distance
             && (null === $next_milestone_distance || $distance < $next_milestone_distance);
     }));
-    // Order the card and its list by each captain's latest completed progress
-    // activity while they remain inside this milestone band.
-    rts_marathon_challenge_sort_recent($members);
+    // Order the card and its list by when each captain crossed this milestone,
+    // even if they have since progressed farther within the same band.
+    rts_marathon_challenge_sort_recent($members, $milestone_distance);
 
     return $members;
 }

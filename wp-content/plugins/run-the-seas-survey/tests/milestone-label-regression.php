@@ -188,7 +188,7 @@ $five_k_band_members = rts_marathon_challenge_current_milestone_members(
     5000,
     10000
 );
-rts_label_check(array_column($five_k_band_members, 'id'), array(205, 207, 206), 'milestone band lists current members by latest completed progress activity');
+rts_label_check(array_column($five_k_band_members, 'id'), array(206, 207, 205), 'milestone band is ordered by milestone achievement time');
 rts_label_check(rts_format_miles(14000), '14 km', 'descriptive progress units');
 rts_label_check(rts_format_miles(21000), '21 km', 'actual progress is not the 21.1K product label');
 rts_label_check(rts_format_miles(42000), '42 km', 'actual progress is not the 42.2K product label');
