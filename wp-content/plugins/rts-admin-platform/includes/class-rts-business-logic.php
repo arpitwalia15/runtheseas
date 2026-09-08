@@ -7,14 +7,9 @@ class RTS_Business_Logic {
 
 	public static function log_audit( $user, $action, $module, $result = 'success', $notes = '' ) {
 		global $wpdb;
-		$ip_address = '';
-		if ( isset( $_SERVER['REMOTE_ADDR'] ) ) {
-			$candidate = sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) );
-			if ( filter_var( $candidate, FILTER_VALIDATE_IP ) ) { $ip_address = $candidate; }
-		}
 		$wpdb->insert( RTS_DB::table( 'audit_log' ), array(
 			'user' => $user, 'action' => $action, 'module' => $module,
-			'ip_address' => $ip_address, 'result' => $result, 'notes' => $notes,
+			'ip_address' => '127.0.0.1', 'result' => $result, 'notes' => $notes,
 		) );
 	}
 
@@ -46,9 +41,6 @@ class RTS_Business_Logic {
 		$token = self::gen_code( 16 ); // verification token: 16 chars, 32-char alphabet (~1.2e24); /verify is also rate-limited
 		$my_referral_code = 'RTS-' . self::gen_code();
 		$unsub_token = self::gen_code( 16 );
-		$registration_country = $data['registration_country'] ?? $data['country'] ?? null;
-		$detected_country = $data['detected_country'] ?? null;
-		$effective_country = $detected_country ?: $registration_country;
 
 		$wpdb->insert( $table, array(
 			'name' => $data['name'] ?? null,
@@ -62,22 +54,11 @@ class RTS_Business_Logic {
 			'referral_code' => $my_referral_code,
 			'unsubscribe_token' => $unsub_token,
 			'runner_status' => $data['runner_status'] ?? null,
-			'country' => $effective_country,
-			'registration_country' => $registration_country,
-			'detected_country' => $detected_country,
+			'country' => $data['country'] ?? null,
 			'province' => $data['province'] ?? null,
-			'registration_province' => $data['registration_province'] ?? $data['province'] ?? null,
 			'city' => $data['city'] ?? null,
-			'postal_code' => $data['postal_code'] ?? null,
-			'address' => $data['address'] ?? null,
-			'address_2' => $data['address_2'] ?? null,
-			'phone' => $data['phone'] ?? null,
-			'date_of_birth' => $data['date_of_birth'] ?? null,
 			'gender' => $data['gender'] ?? null,
 			'age_range' => $data['age_range'] ?? null,
-			'emergency_contact_name' => $data['emergency_contact_name'] ?? null,
-			'emergency_contact_phone' => $data['emergency_contact_phone'] ?? null,
-			'marketing_consent' => ! empty( $data['marketing_consent'] ) ? 1 : 0,
 			'travel_party_size' => $data['travel_party_size'] ?? null,
 			'household_income_bracket' => $data['household_income_bracket'] ?? null,
 			'marketing_source' => $data['marketing_source'] ?? null,
@@ -286,10 +267,7 @@ class RTS_Business_Logic {
 
 		$elig_sql = "SELECT p.id, p.name, p.email, p.founding_runner_number, p.referral_code, p.unsubscribe_token FROM $ptable p
 			JOIN $stable s ON s.participant_id = p.id AND s.category = %s
-			WHERE p.email_verified = 1
-			AND COALESCE(p.declined_further_contact, 0) = 0
-			AND p.email IS NOT NULL AND p.email != ''
-			AND s.subscribed = 1 $extra_where_sql";
+			WHERE p.email_verified = 1 AND s.subscribed = 1 $extra_where_sql";
 		$params = array_merge( array( $category ), $extra_params );
 		$eligible = $wpdb->get_results( $wpdb->prepare( $elig_sql, ...$params ) );
 
