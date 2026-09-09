@@ -4,7 +4,7 @@
  * Plugin Name: Run The Seas - Survey
  * Plugin URI: https://runtheseas.com/
  * Description: Advanced survey management with gamification, 42.2K Referral Marathon Challenge
- * Version: 1.2.93
+ * Version: 1.3.08
  * License: GPL v2 or later
  * Text Domain: run-the-seas
  */
@@ -17,7 +17,7 @@ if (!defined('ABSPATH')) {
 // Define plugin constants
 define('RTS_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('RTS_PLUGIN_PATH', plugin_dir_path(__FILE__));
-define('RTS_VERSION', '1.2.93');
+define('RTS_VERSION', '1.3.08');
 define('RTS_MANAGE_CAPABILITY', 'rts_manage_surveys');
 
 /** Keep legacy shortcode settings aligned with the whole-1K unlock model. */
@@ -167,6 +167,7 @@ require_once RTS_PLUGIN_PATH . 'includes/rts-dashboard-widgets.php';
 require_once RTS_PLUGIN_PATH . 'includes/rts-survey-shortcodes.php';
 require_once RTS_PLUGIN_PATH . 'includes/rts-marathon-challenge.php';
 require_once RTS_PLUGIN_PATH . 'includes/rts-captains-suite.php';
+require_once RTS_PLUGIN_PATH . 'includes/rts-captains-log.php';
 require_once RTS_PLUGIN_PATH . 'includes/rts-journey-shortcode.php';
 require_once RTS_PLUGIN_PATH . 'includes/rts-user-verification.php';
 require_once RTS_PLUGIN_PATH . 'includes/rts-referrals-trophies.php';

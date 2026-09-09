@@ -2859,3 +2859,37 @@ jQuery(document).ready(function ($) {
       });
   });
 })();
+
+(function () {
+  "use strict";
+
+  var log = document.querySelector(".rts-captains-log[data-messages-per-page]");
+  if (!log || !window.matchMedia || !window.URL) {
+    return;
+  }
+
+  var breakpoint = window.matchMedia("(max-width: 1080px)");
+
+  function syncCaptainLogPageSize() {
+    var desired = breakpoint.matches ? "2" : "5";
+    if (log.getAttribute("data-messages-per-page") === desired) {
+      return;
+    }
+
+    var url = new URL(window.location.href);
+    if ("2" === desired) {
+      url.searchParams.set("rts_log_per_page", "2");
+    } else {
+      url.searchParams.delete("rts_log_per_page");
+    }
+    url.searchParams.delete("rts_log_page");
+    window.location.replace(url.toString());
+  }
+
+  syncCaptainLogPageSize();
+  if (typeof breakpoint.addEventListener === "function") {
+    breakpoint.addEventListener("change", syncCaptainLogPageSize);
+  } else if (typeof breakpoint.addListener === "function") {
+    breakpoint.addListener(syncCaptainLogPageSize);
+  }
+})();

@@ -128,6 +128,15 @@ trait RTS_Frontend_Assets
             true
         );
         $typography_dependencies = array('rts-web-fonts', 'rts-luxury-survey-captains-layout');
+        if ($post && (is_page('captains-log') || has_shortcode($post->post_content, 'rts_captains_log'))) {
+            wp_enqueue_style(
+                'rts-captains-log',
+                RTS_PLUGIN_URL . 'assets/css/captains-log.css',
+                array('rts-captains-suite'),
+                RTS_VERSION . '.' . filemtime(RTS_PLUGIN_PATH . 'assets/css/captains-log.css')
+            );
+            $typography_dependencies[] = 'rts-captains-log';
+        }
         if ($post && (is_page('certificates') || has_shortcode($post->post_content, 'rts_certificate_page') || has_shortcode($post->post_content, 'rts_certificate'))) {
             wp_enqueue_style(
                 'rts-certificate-page',

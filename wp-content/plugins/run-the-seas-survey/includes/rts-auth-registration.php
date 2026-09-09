@@ -187,6 +187,7 @@ function rts_enforce_protected_page_access()
 
     $protected_page_slugs = array(
         'captains-suite',
+        'captains-log',
         'my-qr-code',
         'view-journey',
         'trophy-case',

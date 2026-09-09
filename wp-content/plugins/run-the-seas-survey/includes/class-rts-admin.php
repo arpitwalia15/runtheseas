@@ -17,6 +17,7 @@ class RTS_Admin {
         add_action('admin_post_rts_save_certificate_email_design', array($this, 'save_certificate_email_design'));
         add_action('admin_post_rts_save_journey_design', array($this, 'save_journey_design'));
         add_action('admin_post_rts_save_dashboard_design', array($this, 'save_dashboard_design'));
+        add_action('admin_post_rts_save_captains_log_design', array($this, 'save_captains_log_design'));
         add_action('admin_post_rts_save_marathon_challenge_design', array($this, 'save_marathon_challenge_design'));
         add_action('admin_post_rts_save_trophy_case_design', array($this, 'save_trophy_case_design'));
         add_action('admin_post_rts_save_marathon_one_trophy_case_design', array($this, 'save_marathon_one_trophy_case_design'));
@@ -98,6 +99,15 @@ class RTS_Admin {
             RTS_MANAGE_CAPABILITY,
             'rts-dashboard-design',
             array($this, 'render_dashboard_design_page')
+        );
+
+        add_submenu_page(
+            'rts-survey-management',
+            "Captain's Log Design",
+            "Captain's Log",
+            RTS_MANAGE_CAPABILITY,
+            'rts-captains-log-design',
+            array($this, 'render_captains_log_design_page')
         );
 
         add_submenu_page(
@@ -637,6 +647,138 @@ class RTS_Admin {
 
         update_option('rts_dashboard_design_assets', $assets, false);
         wp_safe_redirect(add_query_arg('rts_dashboard_design', 'saved', admin_url('admin.php?page=rts-dashboard-design')));
+        exit;
+    }
+
+    /** Render the Media Library controls for the Captain's Log artwork. */
+    public function render_captains_log_design_page() {
+        if (!current_user_can(RTS_MANAGE_CAPABILITY)) {
+            wp_die(__('You do not have permission to manage this page.', 'run-the-seas'));
+        }
+
+        $assets = get_option('rts_captains_log_design_assets', array());
+        $assets = is_array($assets) ? $assets : array();
+        $fields = array(
+            'background_image' => array(
+                'Complete background image',
+                'Full-page scene behind the Captain’s Log book. For best results, upload a wide image.'
+            ),
+            'button_image' => array(
+                "Captain's Log button",
+                "Complete button artwork used for the Back to Captain’s Suite link at the bottom."
+            ),
+            'messages_left_art_image' => array(
+                'Messages left art',
+                'Transparent ornament displayed to the left of the Messages heading.'
+            ),
+            'messages_right_art_image' => array(
+                'Messages right art',
+                'Transparent ornament displayed to the right of the Messages heading.'
+            ),
+            'logo_image' => array(
+                'Logo',
+                'Logo or crest displayed above the Captain’s Log title.'
+            ),
+            'message_center_left_art_image' => array(
+                'Message Center left art',
+                'Transparent ornament displayed to the left of the Message Center text.'
+            ),
+            'message_center_right_art_image' => array(
+                'Message Center right art',
+                'Transparent ornament displayed to the right of the Message Center text.'
+            ),
+            'message_center_below_art_image' => array(
+                'Message Center below art',
+                'Centered ornament displayed below the Message Center heading.'
+            ),
+            'column_center_art_image' => array(
+                'Column center art',
+                'Vertical artwork displayed between the message list and selected message columns.'
+            ),
+            'message_below_art_image' => array(
+                'Message divider art',
+                'Decorative horizontal artwork displayed between the message rows in the left column.'
+            ),
+            'selected_message_art_image' => array(
+                'Selected message art',
+                'Complete frame/background artwork used behind the selected row in the message list.'
+            ),
+        );
+
+        wp_enqueue_media();
+        ?>
+        <div class="wrap">
+            <h1><?php esc_html_e("Captain's Log Design", 'run-the-seas'); ?></h1>
+            <p><?php esc_html_e('Upload each artwork piece separately. Empty fields use the built-in Captain’s Log styling.', 'run-the-seas'); ?></p>
+            <p><strong><?php esc_html_e('Shortcode:', 'run-the-seas'); ?></strong> <code>[rts_captains_log]</code></p>
+            <?php if (isset($_GET['rts_captains_log_design']) && 'saved' === sanitize_key(wp_unslash($_GET['rts_captains_log_design']))) : ?>
+                <div class="notice notice-success is-dismissible"><p><?php esc_html_e('Captain’s Log artwork saved.', 'run-the-seas'); ?></p></div>
+            <?php endif; ?>
+            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+                <input type="hidden" name="action" value="rts_save_captains_log_design">
+                <?php wp_nonce_field('rts_save_captains_log_design'); ?>
+                <table class="form-table" role="presentation"><tbody>
+                    <?php foreach ($fields as $key => $field) : ?>
+                        <tr>
+                            <th scope="row"><label for="rts-captains-log-<?php echo esc_attr($key); ?>"><?php echo esc_html($field[0]); ?></label></th>
+                            <td>
+                                <input id="rts-captains-log-<?php echo esc_attr($key); ?>" class="regular-text" type="url" name="rts_captains_log_design_assets[<?php echo esc_attr($key); ?>]" value="<?php echo esc_attr($assets[$key] ?? ''); ?>" placeholder="https://">
+                                <button type="button" class="button rts-select-captains-log-asset" data-target="rts-captains-log-<?php echo esc_attr($key); ?>"><?php esc_html_e('Select from Media Library', 'run-the-seas'); ?></button>
+                                <p class="description"><?php echo esc_html($field[1]); ?></p>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                    <tr>
+                        <th scope="row"><label for="rts-captains-log-header-top-spacing"><?php esc_html_e('Header top spacing (px)', 'run-the-seas'); ?></label></th>
+                        <td>
+                            <input id="rts-captains-log-header-top-spacing" class="small-text" type="number" min="0" max="160" step="1" name="rts_captains_log_design_assets[header_top_spacing]" value="<?php echo esc_attr(isset($assets['header_top_spacing']) ? absint($assets['header_top_spacing']) : 40); ?>">
+                            <p class="description"><?php esc_html_e('Distance from the top of the complete background to the Captain’s Log header. Recommended starting value: 40.', 'run-the-seas'); ?></p>
+                        </td>
+                    </tr>
+                </tbody></table>
+                <?php submit_button(__("Save Captain's Log Design", 'run-the-seas')); ?>
+            </form>
+        </div>
+        <script>
+        document.addEventListener('click', function (event) {
+            var button = event.target.closest('.rts-select-captains-log-asset');
+            if (!button || !window.wp || !wp.media) return;
+            event.preventDefault();
+            var target = document.getElementById(button.getAttribute('data-target'));
+            var frame = wp.media({ title: "Select Captain's Log image", library: { type: 'image' }, multiple: false });
+            frame.on('select', function () { target.value = frame.state().get('selection').first().toJSON().url; });
+            frame.open();
+        });
+        </script>
+        <?php
+    }
+
+    /** Save Captain's Log artwork after capability and nonce checks. */
+    public function save_captains_log_design() {
+        if (!current_user_can(RTS_MANAGE_CAPABILITY)) {
+            wp_die(__('You do not have permission to manage this page.', 'run-the-seas'));
+        }
+
+        check_admin_referer('rts_save_captains_log_design');
+        $input = isset($_POST['rts_captains_log_design_assets']) && is_array($_POST['rts_captains_log_design_assets'])
+            ? wp_unslash($_POST['rts_captains_log_design_assets'])
+            : array();
+        $assets = array();
+        foreach (array(
+            'background_image', 'button_image', 'messages_left_art_image',
+            'messages_right_art_image', 'logo_image', 'message_center_left_art_image',
+            'message_center_right_art_image', 'message_center_below_art_image',
+            'column_center_art_image', 'message_below_art_image',
+            'selected_message_art_image',
+        ) as $key) {
+            $assets[$key] = isset($input[$key]) ? esc_url_raw(trim((string) $input[$key])) : '';
+        }
+        $assets['header_top_spacing'] = isset($input['header_top_spacing'])
+            ? min(160, absint($input['header_top_spacing']))
+            : 40;
+
+        update_option('rts_captains_log_design_assets', $assets, false);
+        wp_safe_redirect(add_query_arg('rts_captains_log_design', 'saved', admin_url('admin.php?page=rts-captains-log-design')));
         exit;
     }
 
