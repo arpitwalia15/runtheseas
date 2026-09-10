@@ -822,6 +822,27 @@ class RTS_Admin {
         );
     }
 
+    /** Shared artwork used by the interactive single-trophy page. */
+    private function single_trophy_design_fields() {
+        return array(
+            'single_background_image' => array(__('Single trophy page background', 'run-the-seas'), __('Full-width dark/navy background behind the trophy viewer.', 'run-the-seas')),
+            'single_title_left_art_image' => array(__('Title left artwork', 'run-the-seas'), __('Transparent flourish displayed to the left of “Marathon Trophy”.', 'run-the-seas')),
+            'single_title_right_art_image' => array(__('Title right artwork', 'run-the-seas'), __('Transparent flourish displayed to the right of “Marathon Trophy”.', 'run-the-seas')),
+            'single_subheading_bottom_art_image' => array(__('Subtitle bottom artwork', 'run-the-seas'), __('Wide ornament displayed directly below the milestone and marathon subtitle.', 'run-the-seas')),
+            'single_details_frame_image' => array(__('Details panel frame', 'run-the-seas'), __('Transparent frame surrounding the member and achievement details.', 'run-the-seas')),
+            'single_details_icon_image' => array(__('Details panel top icon', 'run-the-seas'), __('Transparent anchor or crest displayed at the top of the details panel.', 'run-the-seas')),
+            'single_referrals_icon_image' => array(__('Verified referrals icon', 'run-the-seas'), __('Transparent icon shown beside the member’s verified-referral total.', 'run-the-seas')),
+            'single_calendar_icon_image' => array(__('Unlocked date icon', 'run-the-seas'), __('Transparent calendar icon shown beside the unlock date.', 'run-the-seas')),
+            'single_stage_image' => array(__('Trophy stage / pedestal artwork', 'run-the-seas'), __('Transparent or full-width artwork behind the model and its live nameplate.', 'run-the-seas')),
+            'single_trophy_view_frame_image' => array(__('Trophy view frame artwork', 'run-the-seas'), __('Portrait frame placed behind the GLB in each right-side front, right, back, and left camera view.', 'run-the-seas')),
+            'single_previous_button_image' => array(__('Rotate left button artwork', 'run-the-seas'), __('Complete artwork for the button that rotates the current GLB to the left.', 'run-the-seas')),
+            'single_next_button_image' => array(__('Rotate right button artwork', 'run-the-seas'), __('Complete artwork for the button that rotates the current GLB to the right.', 'run-the-seas')),
+            'single_close_button_image' => array(__('Close button artwork', 'run-the-seas'), __('Optional transparent artwork for the top-right close button.', 'run-the-seas')),
+            'single_return_button_image' => array(__('Return button artwork', 'run-the-seas'), __('Optional complete background/frame for the Return to Trophy Case button.', 'run-the-seas')),
+            'single_share_button_image' => array(__('Share button artwork', 'run-the-seas'), __('Optional complete background/frame for the Share Trophy button.', 'run-the-seas')),
+        );
+    }
+
     /** Render paired locked/unlocked Media Library controls for the trophy case. */
     public function render_trophy_case_design_page() {
         $this->render_trophy_case_design_editor(false);
@@ -963,12 +984,36 @@ class RTS_Admin {
                     </tr>
                     <?php endforeach; ?>
                 </tbody></table>
+                <h2 class="title" style="margin-top:32px;"><?php esc_html_e('Interactive Single Trophy Page', 'run-the-seas'); ?></h2>
+                <p><?php esc_html_e('These shared assets style the existing [rts_single_trophy] page. Empty fields use the built-in navy and gold design.', 'run-the-seas'); ?></p>
+                <table class="form-table" role="presentation"><tbody>
+                    <?php foreach ($this->single_trophy_design_fields() as $single_key => $single_field) :
+                        $single_input_id = 'rts-trophy-case-' . sanitize_html_class($single_key);
+                    ?>
+                    <tr>
+                        <th scope="row"><label for="<?php echo esc_attr($single_input_id); ?>"><?php echo esc_html($single_field[0]); ?></label></th>
+                        <td>
+                            <input id="<?php echo esc_attr($single_input_id); ?>" class="regular-text" type="url" name="<?php echo esc_attr($field_name); ?>[<?php echo esc_attr($single_key); ?>]" value="<?php echo esc_attr($assets[$single_key] ?? ''); ?>" placeholder="https://">
+                            <button type="button" class="button rts-select-trophy-case-asset" data-target="<?php echo esc_attr($single_input_id); ?>" data-kind="image"><?php esc_html_e('Select image', 'run-the-seas'); ?></button>
+                            <p class="description"><?php echo esc_html($single_field[1]); ?></p>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                    <tr>
+                        <th scope="row"><label for="rts-trophy-case-single-rotation-step"><?php esc_html_e('Arrow rotation step', 'run-the-seas'); ?></label></th>
+                        <td>
+                            <input id="rts-trophy-case-single-rotation-step" class="small-text" type="number" min="15" max="90" step="5" name="<?php echo esc_attr($field_name); ?>[single_rotation_step]" value="<?php echo esc_attr(isset($assets['single_rotation_step']) ? absint($assets['single_rotation_step']) : 45); ?>"> °
+                            <p class="description"><?php esc_html_e('Each left/right arrow click rotates the GLB horizontally by this angle. The right-side camera presets remain Front, Right, Back, and Left.', 'run-the-seas'); ?></p>
+                        </td>
+                    </tr>
+                </tbody></table>
                 <table class="widefat striped" role="presentation">
-                    <thead><tr><th><?php esc_html_e('Trophy', 'run-the-seas'); ?></th><th><?php esc_html_e('Unlocked artwork', 'run-the-seas'); ?></th><th><?php esc_html_e('Locked + glass artwork', 'run-the-seas'); ?></th></tr></thead>
+                    <thead><tr><th><?php esc_html_e('Trophy', 'run-the-seas'); ?></th><th><?php esc_html_e('Unlocked artwork / GLB poster', 'run-the-seas'); ?></th><th><?php esc_html_e('Locked + glass artwork', 'run-the-seas'); ?></th><th><?php esc_html_e('Unlocked GLB model', 'run-the-seas'); ?></th></tr></thead>
                     <tbody>
                     <?php foreach ($trophies as $prefix => $label) :
                         $unlocked_key = $prefix . '_unlocked_image';
                         $locked_key = $prefix . '_locked_image';
+                        $glb_key = $prefix . '_unlocked_glb';
                         ?>
                         <tr>
                             <th scope="row" style="width:180px"><?php echo esc_html($label); ?></th>
@@ -979,6 +1024,11 @@ class RTS_Admin {
                             <td>
                                 <input id="rts-trophy-case-<?php echo esc_attr($locked_key); ?>" class="regular-text" type="url" name="<?php echo esc_attr($field_name); ?>[<?php echo esc_attr($locked_key); ?>]" value="<?php echo esc_attr($assets[$locked_key] ?? ''); ?>" placeholder="https://">
                                 <button type="button" class="button rts-select-trophy-case-asset" data-target="rts-trophy-case-<?php echo esc_attr($locked_key); ?>"><?php esc_html_e('Select image', 'run-the-seas'); ?></button>
+                            </td>
+                            <td>
+                                <input id="rts-trophy-case-<?php echo esc_attr($glb_key); ?>" class="regular-text" type="url" name="<?php echo esc_attr($field_name); ?>[<?php echo esc_attr($glb_key); ?>]" value="<?php echo esc_attr($assets[$glb_key] ?? ''); ?>" placeholder="https://…/trophy.glb">
+                                <button type="button" class="button rts-select-trophy-case-asset" data-target="rts-trophy-case-<?php echo esc_attr($glb_key); ?>" data-kind="glb"><?php esc_html_e('Select GLB', 'run-the-seas'); ?></button>
+                                <p class="description"><?php esc_html_e('Displayed only after this trophy has been unlocked.', 'run-the-seas'); ?></p>
                             </td>
                         </tr>
                     <?php endforeach; ?>
@@ -993,8 +1043,18 @@ class RTS_Admin {
             if (!button || !window.wp || !wp.media) return;
             event.preventDefault();
             var target = document.getElementById(button.getAttribute('data-target'));
-            var frame = wp.media({ title: 'Select trophy artwork', library: { type: 'image' }, multiple: false });
-            frame.on('select', function () { target.value = frame.state().get('selection').first().toJSON().url; });
+            var kind = button.getAttribute('data-kind') || 'image';
+            var options = { title: kind === 'glb' ? 'Select GLB trophy model' : 'Select trophy artwork', multiple: false };
+            if (kind !== 'glb') options.library = { type: 'image' };
+            var frame = wp.media(options);
+            frame.on('select', function () {
+                var attachment = frame.state().get('selection').first().toJSON();
+                if (kind === 'glb' && !/\.glb(?:\?.*)?$/i.test(attachment.url || '')) {
+                    window.alert('Please select a .glb model.');
+                    return;
+                }
+                target.value = attachment.url;
+            });
             frame.open();
         });
         </script>
@@ -1036,11 +1096,18 @@ class RTS_Admin {
             'milestone_right_ornament_image' => isset($input['milestone_right_ornament_image']) ? esc_url_raw(trim((string) $input['milestone_right_ornament_image'])) : '',
         );
         foreach (array_keys($this->trophy_case_design_trophies()) as $prefix) {
-            foreach (array('unlocked_image', 'locked_image') as $state) {
+            foreach (array('unlocked_image', 'locked_image', 'unlocked_glb') as $state) {
                 $key = $prefix . '_' . $state;
                 $assets[$key] = isset($input[$key]) ? esc_url_raw(trim((string) $input[$key])) : '';
             }
         }
+
+        foreach (array_keys($this->single_trophy_design_fields()) as $key) {
+            $assets[$key] = isset($input[$key]) ? esc_url_raw(trim((string) $input[$key])) : '';
+        }
+        $assets['single_rotation_step'] = isset($input['single_rotation_step'])
+            ? min(90, max(15, absint($input['single_rotation_step'])))
+            : 45;
 
         $icon_keys = $is_marathon_one
             ? array_keys($this->trophy_case_design_icons())

@@ -137,6 +137,29 @@ trait RTS_Frontend_Assets
             );
             $typography_dependencies[] = 'rts-captains-log';
         }
+        if ($post && (is_page('single-trophy') || has_shortcode($post->post_content, 'rts_single_trophy'))) {
+            wp_enqueue_style(
+                'rts-single-trophy',
+                RTS_PLUGIN_URL . 'assets/css/single-trophy.css',
+                array('rts-captains-suite'),
+                RTS_VERSION . '.' . filemtime(RTS_PLUGIN_PATH . 'assets/css/single-trophy.css')
+            );
+            wp_enqueue_script(
+                'rts-model-viewer',
+                'https://ajax.googleapis.com/ajax/libs/model-viewer/4.3.1/model-viewer.min.js',
+                array(),
+                '4.3.1',
+                true
+            );
+            wp_enqueue_script(
+                'rts-single-trophy',
+                RTS_PLUGIN_URL . 'assets/js/single-trophy.js',
+                array(),
+                RTS_VERSION . '.' . filemtime(RTS_PLUGIN_PATH . 'assets/js/single-trophy.js'),
+                true
+            );
+            $typography_dependencies[] = 'rts-single-trophy';
+        }
         if ($post && (is_page('certificates') || has_shortcode($post->post_content, 'rts_certificate_page') || has_shortcode($post->post_content, 'rts_certificate'))) {
             wp_enqueue_style(
                 'rts-certificate-page',

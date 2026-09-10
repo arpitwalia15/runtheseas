@@ -1598,6 +1598,216 @@ class RTS_Trophy {
      */
     public function render_single_trophy($atts) {
         if (!is_user_logged_in()) {
+            return '<p>Please <a href="' . esc_url(rts_get_member_login_url(get_permalink())) . '">login</a> to view this trophy.</p>';
+        }
+
+        $user = wp_get_current_user();
+        $participant = $this->registration->get_participant_for_user($user);
+        if (!$participant) {
+            return '<p>Please complete your registration.</p>';
+        }
+
+        $earned_records = array();
+        foreach ($this->get_user_trophies($participant->id) as $earned_record) {
+            $earned_key = sanitize_key((string) ($earned_record->trophy_key ?? ''));
+            if (in_array($earned_key, array('founder', 'founding-runner-trophy'), true)) {
+                $earned_key = 'founding-runner';
+            }
+            if ($earned_key && isset($this->trophy_definitions[$earned_key])) {
+                $earned_records[$earned_key] = $earned_record;
+            }
+        }
+
+        $trophy_key = isset($_GET['trophy']) ? sanitize_key(wp_unslash($_GET['trophy'])) : '';
+        if (in_array($trophy_key, array('founder', 'founding-runner-trophy'), true)) {
+            $trophy_key = 'founding-runner';
+        }
+        if (!$trophy_key && $earned_records) {
+            $record_keys = array_keys($earned_records);
+            $trophy_key = end($record_keys);
+        }
+
+        $trophy_case_url = rts_get_member_page_url(str_starts_with($trophy_key, 'm2-') ? 'trophy-case' : 'trophy-case-m1');
+        if (!$trophy_key || !isset($this->trophy_definitions[$trophy_key])) {
+            return '<p>Trophy not found. <a href="' . esc_url($trophy_case_url) . '">← Back to Trophy Case</a></p>';
+        }
+        if (!isset($earned_records[$trophy_key])) {
+            return '<p>You haven\'t earned this trophy yet. <a href="' . esc_url($trophy_case_url) . '">← Back to Trophy Case</a></p>';
+        }
+
+        $is_marathon_two = str_starts_with($trophy_key, 'm2-');
+        $option_name = $is_marathon_two
+            ? 'rts_trophy_case_design_assets'
+            : 'rts_marathon_one_trophy_case_design_assets';
+        $design_assets = get_option($option_name, array());
+        $design_assets = is_array($design_assets) ? $design_assets : array();
+        $trophy_def = $this->trophy_definitions[$trophy_key];
+        $trophy_data = $earned_records[$trophy_key];
+        $milestone_key = preg_replace('/^m2-/', '', $trophy_key);
+        $asset_prefix = str_replace('-', '_', $milestone_key);
+        $model_url = !empty($design_assets[$asset_prefix . '_unlocked_glb'])
+            ? esc_url_raw($design_assets[$asset_prefix . '_unlocked_glb'])
+            : '';
+        $poster_url = $this->get_trophy_image_url($trophy_key, 'unlocked');
+
+        $member_name = trim((string) $participant->first_name . ' ' . (string) $participant->last_name);
+        $member_name = $member_name ?: $user->display_name;
+        $founding_runner_number = str_pad((string) absint($participant->id), 3, '0', STR_PAD_LEFT);
+        $verified_referrals = absint($participant->successful_referrals ?? 0);
+        $single_day_stats = $this->get_trophy_record_day_stats($participant, $earned_records, $trophy_key);
+        $earned_date = !empty($trophy_data->earned_date)
+            ? date_i18n(get_option('date_format'), strtotime($trophy_data->earned_date))
+            : '';
+        $milestone_label = rts_format_trophy_miles($trophy_def['miles_required'], $trophy_key);
+        $marathon_label = $is_marathon_two
+            ? __('Founding Runner Marathon 2', 'run-the-seas')
+            : __('Founding Runner Marathon', 'run-the-seas');
+        $rotation_step = isset($design_assets['single_rotation_step'])
+            ? min(90, max(15, absint($design_assets['single_rotation_step'])))
+            : 45;
+        $view_angles = array(
+            array('angle' => 0, 'label' => __('Front', 'run-the-seas')),
+            array('angle' => 90, 'label' => __('Right side', 'run-the-seas')),
+            array('angle' => 180, 'label' => __('Back', 'run-the-seas')),
+            array('angle' => 270, 'label' => __('Left side', 'run-the-seas')),
+        );
+        $plaque_hotspots = array(
+            0 => array('position' => '0m 0.105m 0.109m', 'normal' => '0m 0m 1m'),
+            90 => array('position' => '0.109m 0.105m 0m', 'normal' => '1m 0m 0m'),
+            180 => array('position' => '0m 0.105m -0.109m', 'normal' => '0m 0m -1m'),
+            270 => array('position' => '-0.109m 0.105m 0m', 'normal' => '-1m 0m 0m'),
+        );
+
+        $asset_url = static function ($key) use ($design_assets) {
+            return !empty($design_assets[$key]) ? esc_url($design_assets[$key]) : '';
+        };
+        $background_url = $asset_url('single_background_image');
+        $details_frame_url = $asset_url('single_details_frame_image');
+        $subheading_art_url = $asset_url('single_subheading_bottom_art_image');
+        $view_frame_url = $asset_url('single_trophy_view_frame_image');
+        $scene_style = $background_url ? '--rts-single-trophy-background:url("' . $background_url . '");' : '';
+        $button_style = static function ($url) {
+            return $url ? '--rts-single-button-art:url("' . $url . '");' : '';
+        };
+
+        ob_start();
+        ?>
+        <section class="rts-single-trophy" style="<?php echo esc_attr($scene_style); ?>" data-rts-single-trophy>
+            <header class="rts-single-trophy__header">
+                <span class="rts-single-trophy__title-art is-left" aria-hidden="true"><?php if ($asset_url('single_title_left_art_image')) : ?><img src="<?php echo $asset_url('single_title_left_art_image'); ?>" alt=""><?php endif; ?></span>
+                <div>
+                    <h1><?php esc_html_e('Marathon Trophy', 'run-the-seas'); ?></h1>
+                    <p><?php echo esc_html($milestone_label); ?> <span aria-hidden="true">—</span> <?php echo esc_html($marathon_label); ?></p>
+                    <?php if ($subheading_art_url) : ?><img class="rts-single-trophy__subheading-art" src="<?php echo $subheading_art_url; ?>" alt="" aria-hidden="true"><?php endif; ?>
+                </div>
+                <span class="rts-single-trophy__title-art is-right" aria-hidden="true"><?php if ($asset_url('single_title_right_art_image')) : ?><img src="<?php echo $asset_url('single_title_right_art_image'); ?>" alt=""><?php endif; ?></span>
+            </header>
+
+            <a class="rts-single-trophy__close<?php echo $asset_url('single_close_button_image') ? ' has-custom-art' : ''; ?>" href="<?php echo esc_url($trophy_case_url); ?>" aria-label="<?php esc_attr_e('Return to Trophy Case', 'run-the-seas'); ?>">
+                <?php if ($asset_url('single_close_button_image')) : ?><img src="<?php echo $asset_url('single_close_button_image'); ?>" alt=""><?php else : ?><span aria-hidden="true">×</span><?php endif; ?>
+            </a>
+
+            <div class="rts-single-trophy__layout">
+                <aside class="rts-single-trophy__details<?php echo $details_frame_url ? ' has-custom-frame' : ''; ?>">
+                    <?php if ($details_frame_url) : ?><img class="rts-single-trophy__details-frame" src="<?php echo $details_frame_url; ?>" alt="" aria-hidden="true"><?php endif; ?>
+                    <div class="rts-single-trophy__details-content">
+                        <?php if (!$details_frame_url) : ?>
+                        <div class="rts-single-trophy__details-icon" aria-hidden="true">
+                            <?php if ($asset_url('single_details_icon_image')) : ?><img src="<?php echo $asset_url('single_details_icon_image'); ?>" alt=""><?php else : ?>⚓<?php endif; ?>
+                        </div>
+                        <?php endif; ?>
+                        <h2><?php esc_html_e('Marathon Trophy', 'run-the-seas'); ?></h2>
+                        <strong><?php echo esc_html($milestone_label); ?></strong>
+                        <p class="rts-single-trophy__marathon-name"><?php echo esc_html($marathon_label); ?></p>
+                        <?php if (!$details_frame_url) : ?><span class="rts-single-trophy__rule" aria-hidden="true"></span><?php endif; ?>
+                        <h3><?php echo esc_html($member_name); ?></h3>
+                        <p><?php echo esc_html(sprintf(__('Founding Runner #%s', 'run-the-seas'), $founding_runner_number)); ?></p>
+                        <div class="rts-single-trophy__referrals">
+                            <?php if ($asset_url('single_referrals_icon_image')) : ?><img src="<?php echo $asset_url('single_referrals_icon_image'); ?>" alt="" aria-hidden="true"><?php else : ?><span aria-hidden="true">♟</span><?php endif; ?>
+                            <strong><?php echo esc_html(number_format_i18n($verified_referrals)); ?></strong>
+                            <span><?php esc_html_e('Verified Referrals', 'run-the-seas'); ?></span>
+                        </div>
+                        <dl class="rts-single-trophy__stats">
+                            <div><dt><?php esc_html_e('Split Days', 'run-the-seas'); ?></dt><dd><?php echo esc_html(absint($single_day_stats['split_days'])); ?></dd></div>
+                            <div><dt><?php esc_html_e('Total Days', 'run-the-seas'); ?></dt><dd><?php echo esc_html(absint($single_day_stats['total_days'])); ?></dd></div>
+                        </dl>
+                        <?php if ($earned_date) : ?>
+                        <div class="rts-single-trophy__unlocked">
+                            <?php if ($asset_url('single_calendar_icon_image')) : ?><img src="<?php echo $asset_url('single_calendar_icon_image'); ?>" alt="" aria-hidden="true"><?php else : ?><span aria-hidden="true">▦</span><?php endif; ?>
+                            <span><b><?php esc_html_e('Unlocked', 'run-the-seas'); ?></b><?php echo esc_html($earned_date); ?></span>
+                        </div>
+                        <?php endif; ?>
+                        <blockquote><?php esc_html_e('“Every mile. Every achievement. Every victory. Your voyage. Your legacy.”', 'run-the-seas'); ?></blockquote>
+                    </div>
+                </aside>
+
+                <div class="rts-single-trophy__viewer" data-rotation-step="<?php echo esc_attr($rotation_step); ?>">
+                    <div class="rts-single-trophy__model-stage<?php echo $model_url ? ' has-model' : ''; ?>">
+                        <?php if ($asset_url('single_stage_image')) : ?><img class="rts-single-trophy__stage-art" src="<?php echo $asset_url('single_stage_image'); ?>" alt="" aria-hidden="true"><?php endif; ?>
+                        <?php if ($model_url) : ?>
+                            <model-viewer class="rts-single-trophy__model" data-rts-main-model src="<?php echo esc_url($model_url); ?>"<?php echo $poster_url ? ' poster="' . esc_url($poster_url) . '"' : ''; ?> alt="<?php echo esc_attr(sprintf(__('%s earned by %s', 'run-the-seas'), $trophy_def['name'], $member_name)); ?>" camera-controls camera-orbit="0deg 75deg auto" min-camera-orbit="auto 75deg auto" max-camera-orbit="auto 75deg auto" interpolation-decay="100" disable-pan touch-action="pan-y" interaction-prompt="none" shadow-intensity="1.2" exposure="1.05" loading="eager">
+                                <?php foreach ($plaque_hotspots as $plaque_angle => $hotspot) : ?>
+                                <span class="rts-single-trophy__plaque-anchor<?php echo 0 === $plaque_angle ? ' is-current' : ''; ?>" slot="hotspot-plaque-<?php echo esc_attr($plaque_angle); ?>" data-position="<?php echo esc_attr($hotspot['position']); ?>" data-normal="<?php echo esc_attr($hotspot['normal']); ?>" data-rts-main-plaque-angle="<?php echo esc_attr($plaque_angle); ?>">
+                                    <span class="rts-single-trophy__plaque-hotspot">
+                                        <b><?php esc_html_e('Marathon', 'run-the-seas'); ?><span><?php echo esc_html($milestone_label); ?> <?php esc_html_e('Trophy', 'run-the-seas'); ?></span></b>
+                                        <strong><?php echo esc_html($member_name); ?></strong>
+                                        <span><?php echo esc_html(sprintf(__('Founding Runner #%s', 'run-the-seas'), $founding_runner_number)); ?></span>
+                                        <span><?php echo esc_html(sprintf(_n('%s verified referral', '%s verified referrals', $verified_referrals, 'run-the-seas'), number_format_i18n($verified_referrals))); ?></span>
+                                        <small><?php echo esc_html(sprintf(__('Split Days %1$d · Total Days %2$d', 'run-the-seas'), absint($single_day_stats['split_days']), absint($single_day_stats['total_days']))); ?></small>
+                                    </span>
+                                </span>
+                                <?php endforeach; ?>
+                            </model-viewer>
+                        <?php endif; ?>
+                        <?php if ($poster_url) : ?><img class="rts-single-trophy__model-fallback" src="<?php echo esc_url($poster_url); ?>" alt="<?php echo esc_attr($trophy_def['name']); ?>"><?php endif; ?>
+                        <?php if (!$model_url && !$poster_url) : ?><div class="rts-single-trophy__empty-model" aria-hidden="true">🏆</div><?php endif; ?>
+                    </div>
+
+                    <?php if ($model_url) : ?>
+                    <button class="rts-single-trophy__arrow is-previous<?php echo $asset_url('single_previous_button_image') ? ' has-custom-art' : ''; ?>" type="button" data-rts-rotate="previous" aria-label="<?php echo esc_attr(sprintf(__('Rotate trophy %d degrees left', 'run-the-seas'), $rotation_step)); ?>">
+                        <?php if ($asset_url('single_previous_button_image')) : ?><img src="<?php echo $asset_url('single_previous_button_image'); ?>" alt=""><?php else : ?><span aria-hidden="true">‹</span><?php endif; ?>
+                    </button>
+                    <button class="rts-single-trophy__arrow is-next<?php echo $asset_url('single_next_button_image') ? ' has-custom-art' : ''; ?>" type="button" data-rts-rotate="next" aria-label="<?php echo esc_attr(sprintf(__('Rotate trophy %d degrees right', 'run-the-seas'), $rotation_step)); ?>">
+                        <?php if ($asset_url('single_next_button_image')) : ?><img src="<?php echo $asset_url('single_next_button_image'); ?>" alt=""><?php else : ?><span aria-hidden="true">›</span><?php endif; ?>
+                    </button>
+                    <?php endif; ?>
+                    <p class="rts-single-trophy__interaction"><span aria-hidden="true">☝</span> <?php esc_html_e('Drag to rotate · Scroll to zoom', 'run-the-seas'); ?></p>
+                </div>
+
+                <div class="rts-single-trophy__rail" role="group" aria-label="<?php esc_attr_e('Trophy camera views', 'run-the-seas'); ?>">
+                    <?php if ($model_url) : foreach ($view_angles as $view_index => $view) : ?>
+                    <button class="rts-single-trophy__thumbnail<?php echo 0 === $view_index ? ' is-current' : ''; ?><?php echo $view_frame_url ? ' has-custom-frame' : ''; ?>" type="button" data-rts-model-angle="<?php echo esc_attr($view['angle']); ?>" aria-label="<?php echo esc_attr(sprintf(__('Show %s view of trophy', 'run-the-seas'), $view['label'])); ?>" aria-pressed="<?php echo 0 === $view_index ? 'true' : 'false'; ?>">
+                        <?php if ($view_frame_url) : ?><img class="rts-single-trophy__thumbnail-frame" src="<?php echo $view_frame_url; ?>" alt="" aria-hidden="true"><?php endif; ?>
+                        <model-viewer src="<?php echo esc_url($model_url); ?>" camera-orbit="<?php echo esc_attr($view['angle']); ?>deg 75deg auto" interaction-prompt="none" disable-pan disable-zoom touch-action="none" loading="lazy" alt="">
+                            <span class="rts-single-trophy__plaque-anchor is-current" slot="hotspot-plaque" data-position="<?php echo esc_attr($plaque_hotspots[$view['angle']]['position']); ?>" data-normal="<?php echo esc_attr($plaque_hotspots[$view['angle']]['normal']); ?>" aria-hidden="true">
+                                <span class="rts-single-trophy__plaque-hotspot">
+                                    <b><?php esc_html_e('Marathon', 'run-the-seas'); ?><span><?php echo esc_html($milestone_label); ?> <?php esc_html_e('Trophy', 'run-the-seas'); ?></span></b>
+                                    <strong><?php echo esc_html($member_name); ?></strong>
+                                    <span><?php echo esc_html(sprintf(__('Founding Runner #%s', 'run-the-seas'), $founding_runner_number)); ?></span>
+                                    <small><?php echo esc_html(sprintf(_n('%s verified referral', '%s verified referrals', $verified_referrals, 'run-the-seas'), number_format_i18n($verified_referrals))); ?></small>
+                                </span>
+                            </span>
+                        </model-viewer>
+                    </button>
+                    <?php endforeach; elseif ($poster_url) : ?>
+                    <span class="rts-single-trophy__thumbnail is-current"><img src="<?php echo esc_url($poster_url); ?>" alt="<?php echo esc_attr($trophy_def['name']); ?>"></span>
+                    <?php endif; ?>
+                </div>
+            </div>
+
+            <footer class="rts-single-trophy__actions">
+                <a class="<?php echo $asset_url('single_return_button_image') ? 'has-custom-art' : ''; ?>" href="<?php echo esc_url($trophy_case_url); ?>" style="<?php echo esc_attr($button_style($asset_url('single_return_button_image'))); ?>"><?php if ($asset_url('single_return_button_image')) : ?><span class="rts-single-trophy__sr-only"><?php esc_html_e('Return to Trophy Case', 'run-the-seas'); ?></span><?php else : ?><span aria-hidden="true">‹</span> <?php esc_html_e('Return to Trophy Case', 'run-the-seas'); ?><?php endif; ?></a>
+                <button class="<?php echo $asset_url('single_share_button_image') ? 'has-custom-art' : ''; ?>" type="button" data-rts-share style="<?php echo esc_attr($button_style($asset_url('single_share_button_image'))); ?>" data-share-title="<?php echo esc_attr(sprintf(__('I earned the %s', 'run-the-seas'), $trophy_def['name'])); ?>" data-share-text="<?php echo esc_attr(sprintf(__('I unlocked the %1$s in the %2$s.', 'run-the-seas'), $milestone_label, $marathon_label)); ?>"><?php if ($asset_url('single_share_button_image')) : ?><span class="rts-single-trophy__sr-only"><?php esc_html_e('Share Trophy', 'run-the-seas'); ?></span><?php else : ?><span aria-hidden="true">↗</span> <?php esc_html_e('Share Trophy', 'run-the-seas'); ?><?php endif; ?></button>
+                <output class="rts-single-trophy__share-status" data-rts-share-status aria-live="polite"></output>
+            </footer>
+        </section>
+        <?php
+        return ob_get_clean();
+    }
+
+    /** Retained only as a reference for pre-1.3.09 markup. */
+    private function render_single_trophy_legacy($atts) {
+        if (!is_user_logged_in()) {
             return '<p>Please <a href="' . rts_get_member_login_url(get_permalink()) . '">login</a> to view this trophy.</p>';
         }
         

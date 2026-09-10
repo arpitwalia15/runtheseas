@@ -192,6 +192,7 @@ function rts_enforce_protected_page_access()
         'view-journey',
         'trophy-case',
         'trophy-case-m1',
+        'single-trophy',
         'certificates',
         'run-the-seas-admin',
     );

@@ -1,0 +1,94 @@
+/*
+Theme Name: BuddyX Child
+Theme URI: https://wbcomdesigns.com/downloads/buddyx-theme/
+Template: buddyx
+Author: wbcomdesigns,vapvarun
+Author URI: https://github.com/vapvarun/buddyx
+Description: BuddyX is an editorial-grade WordPress theme with a designer pattern library - 27 plug-and-play block patterns (hero, about, services, testimonials, pricing, FAQ, CTA, footer, query) composed from core blocks only. Self-hosted Inter and Newsreader fonts, fluid 8-step type scale, semantic color tokens (base / contrast / accent / surface) with WCAG AA contrast, Light and Editorial style variations, and full BuddyPress / WooCommerce / LearnDash compatibility. Hybrid FSE: classic templates plus theme.json design tokens editable in Site Editor. Lightweight, responsive, RTL- and translation-ready, accessibility-audited (WCAG 2.1 AA).
+Tags: one-column,two-columns,left-sidebar,right-sidebar,footer-widgets,blog,translation-ready,buddypress,custom-colors,featured-images,full-width-template,theme-options,e-commerce
+Version: 5.1.5.1785850279
+Updated: 2026-08-04 13:31:19
+
+*/
+
+#rts-registration-form .rts-form-group option{
+	color: #000;
+}
+
+.bn-app__rail .bn-rail__logo img{
+    max-height: unset;
+}
+
+/**/
+rts-wordmark {
+    width: min(62vw, 900px);
+    height: auto;
+    display: block;
+    filter: drop-shadow(3px 8px 7px rgba(8,18,42,0.75));
+  }
+
+  .rts-slogan {
+    margin-top: 2.2vh;
+    font-weight: 800;
+    font-size: clamp(1.05rem, 2.6vw, 2rem);
+    letter-spacing: 0.06em;
+    text-align: center;
+    color: #f7d476;
+    text-shadow: 0 1px 0 #8a5f12, 0 2px 2px rgba(30,20,5,0.9), 2px 4px 6px rgba(8,18,42,0.65);
+  }
+
+  .rts-medals {
+    margin-top: auto;
+    width: 100%;
+    max-width: 1400px;
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    gap: 2.5vw;
+    flex-wrap: wrap;
+  }
+
+  .rts-medal {
+    flex: 1 1 200px;
+    max-width: 320px;
+    text-decoration: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    transition: transform .25s ease;
+  }
+  .rts-medal:hover { transform: translateY(-8px); }
+
+  .rts-medal img {
+    width: 100%;
+    height: auto;
+    display: block;
+    filter: drop-shadow(0 10px 14px rgba(8,18,42,0.55));
+  }
+
+  .rts-label {
+    margin-top: 1.4vh;
+    text-align: center;
+  }
+  .rts-label .main {
+    font-weight: 800;
+    font-size: clamp(1.3rem, 2.2vw, 1.9rem);
+    line-height: 1.12;
+    color: #f7d476;
+    text-shadow: 0 1px 0 #8a5f12, 0 2px 2px rgba(30,20,5,0.9), 2px 4px 6px rgba(8,18,42,0.65);
+  }
+  .rts-label .sub {
+    font-weight: 700;
+    font-size: clamp(0.78rem, 1.15vw, 1rem);
+    letter-spacing: 0.08em;
+    margin-top: 0.35em;
+    color: #f7d476;
+    text-shadow: 0 1px 0 #8a5f12, 0 2px 2px rgba(30,20,5,0.9), 2px 4px 6px rgba(8,18,42,0.65);
+  }
+
+  @media (max-width: 760px) {
+    .rts-hero { min-height: unset; padding-bottom: 6vh; }
+    .rts-wordmark { width: 88vw; }
+    .rts-medals { margin-top: 4vh; gap: 4vw; }
+    .rts-medal { flex: 1 1 40%; max-width: 44%; }
+  }

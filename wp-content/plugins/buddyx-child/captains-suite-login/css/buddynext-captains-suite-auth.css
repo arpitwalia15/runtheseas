@@ -1,0 +1,804 @@
+/*
+ * Captain's Suite skin for BuddyNext's auth hub.
+ *
+ * The left image remains controlled in BuddyNext > Settings > Registration,
+ * using the standard Login & Sign-up Panel image field. This stylesheet only
+ * changes presentation; BuddyNext continues to render and secure the forms.
+ */
+
+body.rts-captains-suite-auth .bn-auth-page,
+body.rts-captains-suite-auth .bn-auth-shell {
+    background: #020b12;
+}
+
+/*
+ * BuddyX wraps page output in #page > .container. Relax only that immediate
+ * auth wrapper; never reset shared #content, #primary or .site-main elements.
+ */
+body.rts-captains-suite-auth {
+    overflow-x: hidden;
+    background: #020b12;
+}
+
+body.rts-captains-suite-auth #page.site > .container {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: none !important;
+    margin-right: 0;
+    margin-left: 0;
+    padding-right: 0 !important;
+    padding-left: 0 !important;
+}
+
+/* The Captain's Suite screen is a focused sign-in surface, not a site page. */
+body.rts-captains-suite-auth .site-header-wrapper,
+body.rts-captains-suite-auth #masthead,
+body.rts-captains-suite-auth .site-header,
+body.rts-captains-suite-auth .buddyx-mobile-header,
+body.rts-captains-suite-auth header.elementor-location-header,
+body.rts-captains-suite-auth #colophon,
+body.rts-captains-suite-auth footer.elementor-location-footer {
+    display: none !important;
+}
+
+body.bn-hub-auth .bn-auth-shell {
+    min-height: max(720px, 100vh);
+    box-shadow: 0 28px 80px rgba(0, 0, 0, 0.55);
+}
+
+body.bn-hub-auth .bn-auth-aside {
+    flex-basis: 64%;
+    padding: 0;
+    background-image: var(--bn-auth-aside-image);
+    background-position: center center;
+    /* Keep the Media Library artwork whole instead of cropping it with cover. */
+    background-size: cover;
+    background-repeat: no-repeat;
+    background-color: #020b12;
+}
+
+body.bn-hub-auth .bn-auth-aside__inner {
+    display: none;
+}
+
+body.bn-hub-auth .bn-auth-shell .bn-auth-card {
+    position: relative;
+    flex: 0 0 36%;
+    min-width: 440px;
+    overflow: hidden;
+    color: #f7ead0;
+    background:
+        radial-gradient(circle at 50% -10%, rgba(168, 104, 18, 0.22), transparent 34%),
+        linear-gradient(135deg, #020b12 0%, #07131d 52%, #01080f 100%);
+}
+
+body.bn-hub-auth .bn-auth-shell .bn-auth-card::before {
+    position: absolute;
+    z-index: 0;
+    inset: 26px;
+    content: '';
+    pointer-events: none;
+    border: 1px solid var(--rts-captains-frame-border, #c88725);
+    background-image: var(--rts-captains-frame-image, none);
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: 100% 100%;
+    box-shadow: var(--rts-captains-frame-shadow, inset 0 0 0 4px rgba(2, 11, 18, 0.94), inset 0 0 0 5px rgba(207, 145, 43, 0.38), 0 0 0 1px rgba(236, 177, 67, 0.16));
+}
+
+body.bn-hub-auth .bn-auth-shell .bn-auth-card::after {
+    position: absolute;
+    z-index: 0;
+    inset: 36px;
+    content: '';
+    pointer-events: none;
+    border: 1px solid var(--rts-captains-frame-inner-border, rgba(202, 135, 34, 0.16));
+    box-shadow: var(--rts-captains-frame-inner-shadow, 10px 10px 0 -9px #df9c31, -10px -10px 0 -9px #df9c31, 10px -10px 0 -9px #df9c31, -10px 10px 0 -9px #df9c31);
+}
+
+body.bn-hub-auth .bn-auth-shell .bn-auth-body {
+    position: relative;
+    z-index: 1;
+    max-width: 450px;
+    padding: 50px;
+}
+
+body.bn-hub-auth .bn-auth-alt {
+    margin: 20px 0 0;
+    text-align: center;
+}
+
+body.bn-hub-auth .bn-auth-alt .bn-auth-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 180px;
+    padding: 12px 24px;
+    border: 1px solid #df9c31;
+    border-radius: 4px;
+    background: transparent;
+    color: #df9c31;
+    font-family: Arial, sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.2;
+    text-decoration: none;
+    transition: all 0.25s ease;
+    box-sizing: border-box;
+}
+
+body.bn-hub-auth .bn-auth-alt .bn-auth-link:hover {
+    background: #df9c31;
+    color: #07131d;
+    border-color: #df9c31;
+}
+
+body.bn-hub-auth .bn-auth-formlogo {
+    display: block;
+    margin: 0 auto 10px;
+    text-align: center;
+}
+
+body.bn-hub-auth .bn-auth-formlogo::after {
+    display: block;
+    width: min(280px, 100%);
+    height: 22px;
+    margin: 18px auto 0;
+    content: '';
+    background-image:
+        var(--rts-captains-divider-image, none),
+        var(--rts-captains-divider-logo-left, linear-gradient(#c88725, #c88725)),
+        var(--rts-captains-divider-logo-right, linear-gradient(#c88725, #c88725)),
+        var(--rts-captains-divider-logo-mark, radial-gradient(ellipse at center, transparent 0 4px, #df9c31 4px 5px, transparent 5px));
+    background-position: center, left center, right center, center;
+    background-repeat: no-repeat;
+    background-size: 100% 100%, calc(50% - 16px) 1px, calc(50% - 16px) 1px, auto;
+}
+
+body.bn-hub-auth .bn-auth-formlogo img {
+    /* max-width: 255px;
+    max-height: 92px; */
+    max-width: 300px;
+    max-height: 169px;
+    margin: 0 auto;
+    filter: sepia(0.45) saturate(1.25) drop-shadow(0 3px 10px rgba(0, 0, 0, 0.75));
+}
+
+
+
+body.bn-hub-auth .bn-auth-card[data-variant='login'] .bn-auth-title {
+    margin: 0 0 10px;
+    padding-bottom: 40px;
+    color: transparent;
+    background-image:
+        var(--rts-captains-divider-image, none),
+        var(--rts-captains-divider-title-line, linear-gradient(#c88725, #c88725)),
+        var(--rts-captains-divider-title-mark, radial-gradient(ellipse at center bottom, transparent 0 5px, #df9c31 5px 6px, transparent 6px));
+    background-position: center bottom, center bottom, center bottom;
+    background-repeat: no-repeat;
+    background-size: min(280px, 100%) 22px, min(280px, 100%) 1px, auto;
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 0;
+    line-height: 1;
+    text-align: center;
+}
+.bn-auth-title, .bn-auth-sub, .bn-auth-title{
+	color:#BC7D32!important;
+}
+
+.bn-auth-foot {
+    display: none;
+}
+
+
+body.bn-hub-auth .bn-auth-card[data-variant='login'] .bn-auth-title::before , .bn-auth-title{
+    display: block;
+    content: "CAPTAIN'S SUITE";
+    color: #BC7D32;
+    font-size: 35px;
+    font-weight: 500;
+    letter-spacing: 0.055em;
+}
+
+.page-id-0 .bn-auth-title{
+	    font-size: 30px!important;
+	text-align:center!important;
+}
+
+body.bn-hub-auth .bn-auth-card[data-variant='login'] .bn-auth-title::after {
+    display: block;
+    margin-top: 10px;
+    content: 'PRIVATE ACCESS';
+    color: #BC7D32;
+    font-family: Arial, sans-serif;
+    font-size: 16px;
+    font-weight: 300;
+    letter-spacing: 0.22em;
+}
+
+body.bn-hub-auth .bn-auth-card[data-variant='login'] .bn-auth-sub {
+    max-width: 260px;
+    margin: 0 auto 25px;
+    color: transparent;
+    font-size: 0;
+    line-height: 1.55;
+    text-align: center;
+}
+
+body.bn-hub-auth .bn-auth-card[data-variant='login'] .bn-auth-sub::before {
+    content: 'Welcome back, Captain.\A Please sign in to access your suite.';
+    white-space: pre-line;
+    color: #f7ead0;
+    font-family: Arial, sans-serif;
+    font-size: 1rem;
+}
+
+.bn-auth-sub{
+	    color: #f7ead0!important;
+    font-family: Arial, sans-serif;
+    font-size: 1rem;
+	text-align:center!important;
+}
+
+
+body.bn-hub-auth .bn-auth-card .bn-auth-form {
+    gap: 20px;
+}
+
+body.bn-hub-auth .bn-auth-card .bn-auth-label {
+    color: #e0a443;
+    font-family: Arial, sans-serif;
+    font-size: 0.76rem;
+    font-weight: 700;
+    letter-spacing: 0.075em;
+    text-transform: uppercase;
+}
+
+body.bn-hub-auth .bn-auth-card[data-variant='login'] label[for='bn-login-user'],
+body.bn-hub-auth .bn-auth-card[data-variant='login'] label[for='bn-login-password'] {
+    color: transparent;
+    font-size: 0;
+}
+
+body.bn-hub-auth .bn-auth-card[data-variant='login'] label[for='bn-login-user']::after {
+    content: "CAPTAIN'S SUITE LOGIN";
+}
+
+body.bn-hub-auth .bn-auth-card[data-variant='login'] label[for='bn-login-password']::after {
+    content: "CAPTAIN'S SUITE PASSCODE";
+}
+
+body.bn-hub-auth .bn-auth-card[data-variant='login'] label[for='bn-login-user']::after,
+body.bn-hub-auth .bn-auth-card[data-variant='login'] label[for='bn-login-password']::after {
+    color: #e0a443;
+    font-family: Arial, sans-serif;
+    font-size: 0.76rem;
+    font-weight: 700;
+    letter-spacing: 0.075em;
+}
+
+body.bn-hub-auth .bn-auth-card .bn-input {
+    min-height: 56px;
+    padding-left: 58px;
+    color: #fff8e9!important;
+	font-size:16px!important;
+    border: 1px solid rgba(201, 135, 37, 0.68);
+    border-radius: 6px !important;
+    background-color: rgba(0, 6, 11, 0.66) !important;
+    box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.45);
+}
+
+body.bn-hub-auth .bn-auth-card .bn-input::placeholder {
+    color: rgba(247, 234, 208, 0.88)!important;
+    opacity: 1;
+}
+
+/* The icons and divider are CSS/SVG so the fields remain sharp at every size. */
+body.bn-hub-auth .bn-auth-card #bn-login-user, input#bn-reset-login {
+    background-image:
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23e0a443' stroke-width='1.5'%3E%3Ccircle cx='12' cy='8' r='4'/%3E%3Cpath d='M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8'/%3E%3C/svg%3E"),
+        linear-gradient(to right, transparent 47px, rgba(224, 164, 67, 0.38) 47px, rgba(224, 164, 67, 0.38) 48px, transparent 48px);
+    background-repeat: no-repeat, no-repeat;
+    background-position: 16px center, 0 0;
+    background-size: 22px 22px, 100% 100%;
+}
+
+body.bn-hub-auth .bn-auth-card #bn-login-password {
+    background-image:
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23e0a443' stroke-width='1.5'%3E%3Crect x='5' y='10' width='14' height='11' rx='2'/%3E%3Cpath d='M8 10V7a4 4 0 0 1 8 0v3M12 14v3'/%3E%3C/svg%3E"),
+        linear-gradient(to right, transparent 47px, rgba(224, 164, 67, 0.38) 47px, rgba(224, 164, 67, 0.38) 48px, transparent 48px);
+    background-repeat: no-repeat, no-repeat;
+    background-position: 16px center, 0 0;
+    background-size: 22px 22px, 100% 100%;
+}
+
+body.bn-hub-auth .bn-auth-card[data-variant='login'] .bn-btn[data-variant='primary'] {
+    border-color: var(--rts-captains-button-border, #f1be60);
+    background-image: var(--rts-captains-button-image, linear-gradient(135deg, #a95d10 0%, #f3be5e 48%, #b76d18 100%));
+    box-shadow: var(--rts-captains-button-shadow, inset 0 1px 0 rgba(255, 255, 255, 0.55), 0 10px 24px rgba(0, 0, 0, 0.35));
+}
+
+/* The request-reset form has its own artwork so the Access Suite image can
+   never appear behind the Send Reset Link label. The set-new-password form
+   keeps the normal generated gold button. */
+body.bn-hub-auth .bn-auth-card[data-variant='reset'] .bn-auth-form[data-wp-on--submit='actions.requestReset'] .bn-btn[data-variant='primary'] {
+    border-color: var(--rts-captains-reset-button-border, #f1be60);
+    background-image: var(--rts-captains-reset-button-image, linear-gradient(135deg, #a95d10 0%, #f3be5e 48%, #b76d18 100%));
+    box-shadow: var(--rts-captains-reset-button-shadow, inset 0 1px 0 rgba(255, 255, 255, 0.55), 0 10px 24px rgba(0, 0, 0, 0.35));
+    color: var(--rts-captains-reset-button-text-color, #170c03);
+}
+
+.bn-auth .bn-auth-body .bn-auth-panel[data-active] {
+    text-align: center;
+}
+
+body.bn-hub-auth .bn-auth-card .bn-input:focus {
+    border-color: #f2bd5b;
+    box-shadow: 0 0 0 3px rgba(220, 153, 44, 0.16), inset 0 0 18px rgba(0, 0, 0, 0.45);
+}
+.bn-auth-pw__toggle{
+	color:#fff!important;
+}
+.bn-auth-foot{
+	margin-top:10px;
+}
+body.bn-hub-auth .bn-auth-card .bn-auth-check,
+body.bn-hub-auth .bn-auth-card .bn-auth-link,
+body.bn-hub-auth .bn-auth-card .bn-auth-foot,
+body.bn-hub-auth .bn-auth-card .bn-auth-alt {
+    color: #f7ead0;
+}
+
+body.bn-hub-auth .bn-auth-card .bn-auth-link,
+body.bn-hub-auth .bn-auth-card .bn-auth-foot a,
+body.bn-hub-auth .bn-auth-card .bn-auth-alt a {
+    color: #e0a443;
+}
+
+body.bn-hub-auth .bn-auth-card .bn-btn[data-variant='primary'] {
+    min-height: 62px;
+    margin-top: 0px;
+    color: #170c03;
+    border: 1px solid #f1be60;
+    border-radius: 8px;
+    background-color: #d48e2c;
+    background-image: linear-gradient(135deg, #a95d10 0%, #f3be5e 48%, #b76d18 100%);
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: cover;
+     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), 0 10px 24px rgba(0, 0, 0, 0.35);
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 1.25rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+body.bn-hub-auth .bn-auth-card .bn-btn[data-variant='primary']:hover {
+    filter: brightness(1.1);
+    transform: translateY(-1px);
+}
+
+body.bn-hub-auth .bn-auth-card[data-variant='login'] .bn-btn[data-variant='primary'] span {
+    color: transparent;
+    font-size: 0;
+}
+
+body.bn-hub-auth .bn-auth-card[data-variant='login'] .bn-btn[data-variant='primary'] span:first-child::before {
+    content: 'Access Suite';
+    color: #170c03;
+    font-size: 1.25rem;
+    visibility: var(--rts-captains-button-label-visibility, visible);
+}
+
+body.bn-hub-auth .bn-auth-card[data-variant='login'] .bn-btn[data-variant='primary'] .bn-icon {
+    display: none;
+}
+
+body.bn-hub-auth .bn-auth-card[data-variant='login'] .bn-btn[data-variant='primary']::before {
+    display: inline-block;
+    width: 27px;
+    height: 27px;
+    margin-right: 14px;
+    vertical-align: -6px;
+    content: '';
+    visibility: var(--rts-captains-button-label-visibility, visible);
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' fill='none' stroke='%23261806' stroke-width='1.5'%3E%3Ccircle cx='16' cy='16' r='5'/%3E%3Cpath d='M16 2v9m0 10v9M2 16h9m10 0h9M6.1 6.1l6.4 6.4m7 7 6.4 6.4M25.9 6.1l-6.4 6.4m-7 7-6.4 6.4'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+body.bn-hub-auth .bn-auth-card[data-variant="login"] .bn-auth-message {
+    display: block;
+    padding-top: 78px;
+    color: rgb(247, 234, 208);
+    font-family: Arial, sans-serif;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    text-align: center;
+    margin: 10px auto 0;
+    position: relative;
+}
+
+body.bn-hub-auth .bn-auth-card[data-variant="login"] .bn-auth-message::before {
+    content: "";
+    position: absolute;
+    top: 8px;
+    left: 0;
+    width: 100%;
+    height: 59px;
+    background-image:
+        var(--rts-captains-footer-divider-image, none),
+        var(--rts-captains-footer-anchor, url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36' fill='none' stroke='%23df9c31' stroke-width='1.5'%3E%3Cpath d='M18 3v24m0-19c-3 0-5 2-5 5m5-5c3 0 5 2 5 5M8 19c0 6 4.5 10 10 10s10-4 10-10M4 19h8m12 0h8M13 31h10'/%3E%3C/svg%3E")),
+        var(--rts-captains-footer-left, linear-gradient(#c88725, #c88725)),
+        var(--rts-captains-footer-right, linear-gradient(#c88725, #c88725));
+    background-repeat: no-repeat;
+    background-size:
+        min(324px, 100%) 59px,
+        28px 28px,
+        calc(50% - 24px) 1px,
+        calc(50% - 24px) 1px;
+    background-position:
+        center 0,
+        center 1px,
+        left 12px,
+        right 12px;
+}
+
+body.bn-hub-auth .bn-auth-card[data-variant="login"] .bn-auth-message .highlight {
+    color: #df9c31;
+}
+
+
+.bn-auth-field.bn-auth-field--check {
+    display: flex;
+    flex-direction: row;
+}
+.bn-auth-form input{
+	color:#fff!imoportant;
+}
+
+
+@media (max-width: 1080px) {
+    body.bn-hub-auth .bn-auth-aside {
+        flex-basis: 56%;
+    }
+
+    body.bn-hub-auth .bn-auth-shell .bn-auth-card {
+        flex-basis: 44%;
+        min-width: 400px;
+    }
+
+    body.bn-hub-auth .bn-auth-shell .bn-auth-body {
+        padding-inline: 42px;
+    }
+}
+
+@media (max-width: 860px) {
+    body.bn-hub-auth .bn-auth-shell {
+        min-height: 100vh;
+    }
+
+    body.bn-hub-auth .bn-auth-shell .bn-auth-card {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    body.bn-hub-auth .bn-auth-shell .bn-auth-body {
+        max-width: 460px;
+        padding: 64px 42px;
+    }
+}
+
+@media (max-width: 480px) {
+    body.bn-hub-auth .bn-auth-shell .bn-auth-card::before {
+        inset: 14px;
+    }
+
+    body.bn-hub-auth .bn-auth-shell .bn-auth-card::after {
+        inset: 22px;
+    }
+
+    body.bn-hub-auth .bn-auth-shell .bn-auth-body {
+        padding: 48px 32px;
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* =========================================================
+   CAPTAIN'S SUITE - SHOW LEFT IMAGE ON ALL DEVICES
+   ========================================================= */
+
+/* Desktop / large screens */
+body.bn-hub-auth .bn-auth-shell {
+    display: flex !important;
+    flex-direction: row !important;
+    width: 100% !important;
+    min-height: 100vh;
+}
+
+body.bn-hub-auth .bn-auth-aside {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+
+    flex: 0 0 64% !important;
+    width: 64% !important;
+    min-width: 0 !important;
+
+    min-height: 100vh !important;
+
+    background-image: var(--bn-auth-aside-image) !important;
+    background-position: center center !important;
+    background-repeat: no-repeat !important;
+    background-size: cover !important;
+
+    position: relative !important;
+    overflow: hidden !important;
+}
+
+body.bn-hub-auth .bn-auth-aside__inner {
+    display: none !important;
+}
+
+
+/* =========================================================
+   TABLET
+   ========================================================= */
+
+@media (max-width: 1080px) {
+
+    body.bn-hub-auth .bn-auth-shell {
+        display: flex !important;
+        flex-direction: row !important;
+        min-height: 100vh !important;
+    }
+
+    body.bn-hub-auth .bn-auth-aside {
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+
+        flex: 0 0 52% !important;
+        width: 52% !important;
+        min-width: 0 !important;
+        min-height: 100vh !important;
+
+        background-image: var(--bn-auth-aside-image) !important;
+        background-position: center center !important;
+        background-size: cover !important;
+        background-repeat: no-repeat !important;
+    }
+
+    body.bn-hub-auth .bn-auth-shell .bn-auth-card {
+        flex: 0 0 48% !important;
+        width: 48% !important;
+        min-width: 0 !important;
+    }
+
+    body.bn-hub-auth .bn-auth-shell .bn-auth-body {
+        max-width: 100% !important;
+        padding: 42px 32px !important;
+    }
+}
+
+
+/* =========================================================
+   MOBILE
+   Image stays visible ABOVE the login form
+   ========================================================= */
+/* =========================================================
+   MOBILE - LOGIN FIRST, IMAGE AT BOTTOM
+   ========================================================= */
+
+@media (max-width: 860px) {
+
+    body.bn-hub-auth .bn-auth-shell {
+        display: flex !important;
+        flex-direction: column !important;
+        width: 100% !important;
+        min-height: 100vh !important;
+    }
+
+    /* Login card FIRST */
+    body.bn-hub-auth .bn-auth-shell .bn-auth-card {
+        display: block !important;
+        order: 1 !important;
+
+        width: 100% !important;
+        min-width: 0 !important;
+        flex: 0 0 auto !important;
+    }
+
+    body.bn-hub-auth .bn-auth-shell .bn-auth-body {
+        width: 100% !important;
+        max-width: 520px !important;
+        margin: 0 auto !important;
+        padding: 48px 32px !important;
+    }
+
+    /* Left image AFTER the login form */
+    body.bn-hub-auth .bn-auth-shell .bn-auth-aside {
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+
+        order: 2 !important;
+
+        position: relative !important;
+
+        width: 100% !important;
+        min-width: 100% !important;
+
+        height: 350px !important;
+        min-height: 350px !important;
+
+        flex: 0 0 350px !important;
+
+        padding: 0 !important;
+
+        background-image: var(--bn-auth-aside-image) !important;
+        background-position: center center !important;
+        background-repeat: no-repeat !important;
+        background-size: cover !important;
+
+        overflow: hidden !important;
+    }
+
+    body.bn-hub-auth .bn-auth-aside__inner {
+        display: none !important;
+    }
+}
+
+
+/* =========================================================
+   SMALL MOBILE
+   ========================================================= */
+
+@media (max-width: 600px) {
+
+    body.bn-hub-auth .bn-auth-shell .bn-auth-body {
+        padding: 40px 24px !important;
+    }
+
+    body.bn-hub-auth .bn-auth-shell .bn-auth-aside {
+        width: 100% !important;
+        min-width: 100% !important;
+
+        height: 300px !important;
+        min-height: 300px !important;
+
+        flex: 0 0 300px !important;
+
+        background-position: center center !important;
+        background-size: cover !important;
+    }
+}
+
+
+/* =========================================================
+   VERY SMALL PHONES
+   ========================================================= */
+
+@media (max-width: 400px) {
+
+    body.bn-hub-auth .bn-auth-shell .bn-auth-body {
+        padding: 34px 20px !important;
+    }
+
+    body.bn-hub-auth .bn-auth-shell .bn-auth-aside {
+        height: 250px !important;
+        min-height: 250px !important;
+        flex: 0 0 250px !important;
+
+        background-position: center center !important;
+        background-size: cover !important;
+    }
+}
+
+/* =========================================================
+   EMBEDDED HOMEPAGE LOGIN SHORTCODE
+   Keeps the same auth design inside normal page-builder content.
+   ========================================================= */
+.rts-captains-suite-login-embed,
+.rts-captains-suite-login-embed .bn-app,
+.rts-captains-suite-login-embed .bn-auth-page {
+    width: 100%;
+    max-width: none;
+}
+
+body.bn-hub-auth .rts-captains-suite-login-embed .bn-auth-page {
+    min-height: 0;
+    background: transparent;
+}
+
+body.bn-hub-auth .rts-captains-suite-login-embed .bn-auth-shell {
+    min-height: 720px !important;
+    border-radius: 8px;
+}
+
+body.bn-hub-auth .rts-captains-suite-login-embed .bn-auth-aside {
+    min-height: 720px !important;
+}
+
+.rts-captains-suite-member {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 520px;
+    margin: 0 auto;
+    padding: 48px 42px;
+    border: 1px solid #c88725;
+    border-radius: 8px;
+    background:
+        radial-gradient(circle at 50% -10%, rgba(168, 104, 18, 0.22), transparent 34%),
+        linear-gradient(135deg, #020b12 0%, #07131d 52%, #01080f 100%);
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.4);
+    text-align: center;
+}
+
+.rts-captains-suite-member__name {
+    margin: 22px 0 10px 0;    
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: clamp(22px, 3vw, 30px);
+    line-height: 1.25;    
+    color: #BC7D32;
+    font-size: 25px;
+    font-weight: 500;    
+    letter-spacing: 0.055em;
+    text-align: center;
+}
+
+body.bn-hub-auth .rts-captains-suite-login-embed--logged-in .bn-auth-sub.rts-captains-suite-logged-in-message {
+    max-width: 330px;
+    color: #c9d3e0;
+    font-size: 15px;
+    line-height: 1.55;
+}
+
+body.bn-hub-auth .rts-captains-suite-login-embed--logged-in .bn-auth-sub.rts-captains-suite-logged-in-message::before {
+    display: none;
+    content: none;
+}
+
+@media (max-width: 860px) {
+    body.bn-hub-auth .rts-captains-suite-login-embed .bn-auth-shell {
+        min-height: 0 !important;
+    }
+
+    body.bn-hub-auth .rts-captains-suite-login-embed .bn-auth-aside {
+        min-height: 350px !important;
+    }
+}
+
+@media (max-width: 600px) {
+    .rts-captains-suite-member {
+        padding: 36px 24px;
+    }
+}
+
+

@@ -4,7 +4,7 @@
  * Plugin Name: Run The Seas - Survey
  * Plugin URI: https://runtheseas.com/
  * Description: Advanced survey management with gamification, 42.2K Referral Marathon Challenge
- * Version: 1.3.08
+ * Version: 1.3.12
  * License: GPL v2 or later
  * Text Domain: run-the-seas
  */
@@ -17,8 +17,50 @@ if (!defined('ABSPATH')) {
 // Define plugin constants
 define('RTS_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('RTS_PLUGIN_PATH', plugin_dir_path(__FILE__));
-define('RTS_VERSION', '1.3.08');
+define('RTS_VERSION', '1.3.12');
 define('RTS_MANAGE_CAPABILITY', 'rts_manage_surveys');
+
+/** Permit administrators to upload validated binary glTF trophy models. */
+function rts_allow_glb_upload_mime($mimes)
+{
+    $mimes['glb'] = 'model/gltf-binary';
+    return $mimes;
+}
+add_filter('upload_mimes', 'rts_allow_glb_upload_mime');
+
+/** Confirm that a .glb upload has the binary glTF magic header before accepting it. */
+function rts_validate_glb_upload($data, $file, $filename, $mimes, $real_mime)
+{
+    if ('glb' !== strtolower((string) pathinfo($filename, PATHINFO_EXTENSION)) || !is_readable($file)) {
+        return $data;
+    }
+
+    $handle = fopen($file, 'rb');
+    $magic = $handle ? fread($handle, 4) : '';
+    if ($handle) {
+        fclose($handle);
+    }
+
+    if ('glTF' === $magic) {
+        $data['ext'] = 'glb';
+        $data['type'] = 'model/gltf-binary';
+        $data['proper_filename'] = $filename;
+    }
+
+    return $data;
+}
+add_filter('wp_check_filetype_and_ext', 'rts_validate_glb_upload', 10, 5);
+
+/** Load Google's model-viewer as an ES module on the single-trophy screen. */
+function rts_model_viewer_script_tag($tag, $handle, $src)
+{
+    if ('rts-model-viewer' !== $handle) {
+        return $tag;
+    }
+
+    return '<script type="module" src="' . esc_url($src) . '"></script>' . "\n";
+}
+add_filter('script_loader_tag', 'rts_model_viewer_script_tag', 10, 3);
 
 /** Keep legacy shortcode settings aligned with the whole-1K unlock model. */
 function rts_normalize_marathon_target($target)
