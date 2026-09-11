@@ -158,7 +158,7 @@
 
 .rts-single-trophy__layout {
     display: grid;
-    grid-template-columns: minmax(255px, 20vw) minmax(480px, 1fr) clamp(105px, 7vw, 132px);
+    grid-template-columns: minmax(255px, 20vw) minmax(480px, 1fr) minmax(255px, 20vw);
     align-items: center;
     gap: clamp(12px, 1.5vw, 28px);
     min-height: 0;
@@ -169,7 +169,7 @@
     position: relative;
     z-index: 3;
     width: 100%;
-    max-width: 350px;
+    max-width: 370px;
     min-height: 570px;
     margin-inline: auto;
     border: 1px solid rgba(217, 154, 43, .72);
@@ -202,7 +202,7 @@
 
 .rts-single-trophy__details.has-custom-frame .rts-single-trophy__details-content {
     min-height: 100%;
-    padding: 15% 9% 7%;
+    padding: 31% 9% 7%;
 }
 
 .rts-single-trophy__details-content {
@@ -245,19 +245,22 @@
 
 .rts-single-trophy__details h2 {
     margin: 0;
-    font-size: clamp(24px, 2vw, 34px);
+    color: #ffd878;
+    font-size: clamp(24px, 2vw, 28px);
     line-height: 1;
     text-transform: uppercase;
 }
 
 .rts-single-trophy__details-content > strong {
-    margin-top: 4px;
-    font-size: 28px;
+    margin-top: 0px;
+    color: #ffe7a4;
+    font-size: 23px;
 }
 
 .rts-single-trophy__marathon-name {
-    margin: 3px 0 0 !important;
-    font-size: 16px;
+    margin: -5px 0 0 !important;
+    color: #efc36e !important;
+    font-size: 15px;
     text-transform: uppercase;
 }
 
@@ -269,6 +272,7 @@
 
 .rts-single-trophy__details h3 {
     margin: 0;
+    color: #fff0bd;
     font-size: clamp(24px, 2vw, 34px);
     line-height: 1.05;
     text-transform: uppercase;
@@ -277,7 +281,11 @@
 
 .rts-single-trophy__details.has-custom-frame h3 {
     margin-top: 25px;
-    font-size: clamp(21px, 1.75vw, 30px);
+    font-size: clamp(19px, 1.75vw, 18px);
+}
+
+.blockquote-single-trophy p {
+    margin: 0;
 }
 
 .rts-single-trophy__details h3 + p {
@@ -286,9 +294,7 @@
 }
 
 .rts-single-trophy__referrals {
-    display: grid;
-    grid-template-columns: 36px auto;
-    grid-template-rows: auto auto;
+    display: flex;    
     align-items: center;
     justify-content: center;
     gap: 0 10px;
@@ -330,6 +336,7 @@
 }
 
 .rts-single-trophy__stats dt {
+    color: #efc36e;
     font: 600 12px/1.1 "Inter Tight", Arial, sans-serif;
     letter-spacing: .08em;
     text-transform: uppercase;
@@ -337,6 +344,7 @@
 
 .rts-single-trophy__stats dd {
     margin: 5px 0 0;
+    color: #ffe7a4;
     font-size: 36px;
     line-height: 1;
 }
@@ -364,6 +372,7 @@
 }
 
 .rts-single-trophy__unlocked b {
+    color: #ffd878;
     font: 700 11px/1.2 "Inter Tight", Arial, sans-serif;
     letter-spacing: .1em;
 }
@@ -396,19 +405,6 @@
     min-width: 0;
 }
 
-.rts-single-trophy__model-stage::after {
-    content: "";
-    position: absolute;
-    z-index: -1;
-    bottom: 5%;
-    width: 78%;
-    height: 22%;
-    border: 1px solid rgba(217, 154, 43, .55);
-    border-radius: 50%;
-    background: radial-gradient(ellipse, rgba(225, 155, 44, .34), rgba(6, 14, 21, .94) 58%, #01050a 72%);
-    box-shadow: 0 14px 50px #000, inset 0 4px 13px rgba(255, 191, 74, .2);
-}
-
 .rts-single-trophy__stage-art {
     position: absolute;
     z-index: -1;
@@ -424,15 +420,36 @@
     position: absolute;
     inset: 0;
     width: 100%;
-    height: calc(100% - 74px);
+    height: 100%;
 }
 
 .rts-single-trophy__model {
-    z-index: 1;
+    z-index: 6;
+    overflow: hidden;
     background: transparent;
     opacity: 0;
     transition: opacity .25s ease;
-    --poster-color: transparent;
+    touch-action: none;
+    cursor: grab;
+}
+
+@media (min-width: 981px) {
+    .rts-single-trophy__model {
+        --rts-trophy-header-overlap: clamp(150px, 12vw, 215px);
+        --rts-trophy-base-overlap: clamp(90px, 7vw, 125px);
+        top: calc(var(--rts-trophy-header-overlap) * -1);
+        height: calc(100% + var(--rts-trophy-header-overlap) + var(--rts-trophy-base-overlap));
+    }
+}
+
+.rts-single-trophy__model:active {
+    cursor: grabbing;
+}
+
+.rts-single-trophy__three-canvas canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
 }
 
 .rts-single-trophy__model-stage.is-model-loaded .rts-single-trophy__model {
@@ -458,72 +475,12 @@
     font-size: min(30vw, 320px);
 }
 
-.rts-single-trophy__plaque-anchor {
-    display: block;
-    width: 0;
-    height: 0;
-    visibility: hidden;
-    opacity: 0;
-    pointer-events: none;
-}
-
-.rts-single-trophy__plaque-anchor.is-current {
-    visibility: visible;
-    opacity: 1;
-}
-
-.rts-single-trophy__plaque-hotspot {
-    position: absolute;
-    z-index: 3;
-    top: 0;
-    left: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    width: 210px;
-    min-height: 0;
-    margin: 0;
-    padding: 2px 5px;
-    border: 0;
-    color: #f5d58c;
-    background: transparent;
-    box-shadow: none;
-    font: 600 8px/1.08 "Inter Tight", Arial, sans-serif;
-    text-align: center;
-    text-shadow: 0 1px 2px #000, 0 0 5px #000;
-    text-transform: uppercase;
-    transform: translate(-50%, -50%);
-    pointer-events: none;
-}
-
-.rts-single-trophy__plaque-hotspot b {
-    display: flex;
-    flex-direction: column;
-    font-size: 16px;
-    line-height: 1;
-}
-
-.rts-single-trophy__plaque-hotspot strong {
-    max-width: 100%;
-    margin-top: 2px;
-    font-size: 12px;
-    line-height: 1;
-    overflow-wrap: anywhere;
-}
-
-.rts-single-trophy__plaque-hotspot > span,
-.rts-single-trophy__plaque-hotspot small {
-    position: static;
-    padding: 0;
-    color: inherit;
-    background: transparent;
-    font: inherit;
-    text-align: inherit;
-}
-
 .rts-single-trophy__arrow {
     position: absolute;
-    z-index: 5;
+    /* The WebGL surface extends beyond the model stage to preserve the full
+       pedestal. Keep navigation above that transparent canvas so clicks reach
+       the buttons instead of starting a trophy drag. */
+    z-index: 8;
     top: 49%;
     display: grid;
     width: 66px;
@@ -539,6 +496,7 @@
     transform: translateY(-50%);
     transition: transform .2s ease, background-color .2s ease;
     cursor: pointer;
+    pointer-events: auto;
 }
 
 .rts-single-trophy__arrow:hover,
@@ -561,7 +519,7 @@
 
 .rts-single-trophy__interaction {
     position: absolute;
-    z-index: 5;
+    z-index: 7;
     bottom: 0;
     left: 50%;
     margin: 0;
@@ -577,13 +535,14 @@
     z-index: 4;
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    align-self: stretch;
-    max-height: 700px;
+    gap: 10px;
+    align-self: start;
+    justify-self: end;
+    width: clamp(155px, 10vw, 190px);
+    max-height: none;
     padding: 4px 7px 4px 2px;
-    overflow: auto;
-    scrollbar-color: var(--rts-trophy-gold) rgba(0, 0, 0, .35);
-    scrollbar-width: thin;
+    overflow: visible;
+    transform: translateY(clamp(-55px, -3vw, -32px));
 }
 
 .rts-single-trophy__thumbnail {
@@ -606,7 +565,7 @@
 .rts-single-trophy__thumbnail.has-custom-frame {
     flex: 0 0 auto;
     width: 100%;
-    aspect-ratio: 1145 / 1374;
+    aspect-ratio: 1.15 / 1;
     border: 0;
     background: transparent;
 }
@@ -641,36 +600,20 @@
     pointer-events: none;
 }
 
-.rts-single-trophy__thumbnail model-viewer {
+.rts-single-trophy__thumbnail .rts-single-trophy__three-canvas {
     position: relative;
     z-index: 1;
     display: block;
     width: 88%;
     height: 88%;
     background: transparent;
-    --poster-color: transparent;
     pointer-events: none;
 }
 
-.rts-single-trophy__thumbnail:not(.has-custom-frame) model-viewer,
+.rts-single-trophy__thumbnail:not(.has-custom-frame) .rts-single-trophy__three-canvas,
 .rts-single-trophy__thumbnail:not(.has-custom-frame) > img:not(.rts-single-trophy__thumbnail-frame) {
     width: 100%;
     height: 100%;
-}
-
-.rts-single-trophy__thumbnail .rts-single-trophy__plaque-hotspot {
-    z-index: 2;
-    width: 48px;
-    padding: 0;
-    font-size: 2.3px;
-    line-height: 1;
-    text-shadow: 0 1px 1px #000;
-}
-
-.rts-single-trophy__thumbnail .rts-single-trophy__plaque-hotspot b,
-.rts-single-trophy__thumbnail .rts-single-trophy__plaque-hotspot strong {
-    margin-top: 0;
-    font-size: 3px;
 }
 
 .rts-single-trophy__actions {
@@ -679,7 +622,8 @@
     align-items: center;
     justify-content: center;
     gap: 22px;
-    padding-top: 12px;
+    margin-top: -4px;
+    padding-top: 0;
 }
 
 .rts-single-trophy__actions > a,
@@ -710,6 +654,10 @@
     border: 0;
     background-color: transparent;
     box-shadow: none;
+    /* Uploaded button artwork has a dark rectangular canvas around its gold
+       frame. Screen blending makes that dark canvas behave like transparency
+       while retaining the frame and lettering over the pedestal. */
+    mix-blend-mode: screen;
 }
 
 .rts-single-trophy__actions > a.has-custom-art {
@@ -766,7 +714,7 @@
     }
 
     .rts-single-trophy__layout {
-        grid-template-columns: 270px minmax(430px, 1fr) 112px;
+        grid-template-columns: 250px minmax(390px, 1fr) 250px;
         gap: 10px;
     }
 
@@ -779,12 +727,14 @@
         min-height: 550px;
     }
 
-    .rts-single-trophy__plaque-hotspot {
-        width: 185px;
+    .rts-single-trophy__rail {
+        width: 145px;
+        transform: translateY(-28px);
     }
+
 }
 
-@media (max-width: 900px) {
+@media (max-width: 980px) {
     .rts-single-trophy {
         display: block;
         min-height: 100svh;
@@ -855,6 +805,8 @@
         max-height: none;
         padding: 4px 2px 10px;
         overflow-x: auto;
+        overflow-y: hidden;
+        transform: none;
     }
 
     .rts-single-trophy__thumbnail {
@@ -866,6 +818,7 @@
         flex: 0 0 120px;
         width: 120px;
         height: auto;
+        aspect-ratio: 1.15 / 1;
     }
 
     .rts-single-trophy__thumbnail:hover,
@@ -875,6 +828,7 @@
 
     .rts-single-trophy__actions {
         flex-wrap: wrap;
+        margin-top: 0;
         padding-top: 22px;
     }
 }
@@ -895,12 +849,7 @@
     .rts-single-trophy__model,
     .rts-single-trophy__model-fallback,
     .rts-single-trophy__empty-model {
-        height: calc(100% - 96px);
-    }
-
-    .rts-single-trophy__plaque-hotspot {
-        width: 160px;
-        padding-inline: 4px;
+        height: 100%;
     }
 
     .rts-single-trophy__arrow {

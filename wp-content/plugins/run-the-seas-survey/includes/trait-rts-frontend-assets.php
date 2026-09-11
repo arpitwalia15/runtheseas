@@ -145,17 +145,10 @@ trait RTS_Frontend_Assets
                 RTS_VERSION . '.' . filemtime(RTS_PLUGIN_PATH . 'assets/css/single-trophy.css')
             );
             wp_enqueue_script(
-                'rts-model-viewer',
-                'https://ajax.googleapis.com/ajax/libs/model-viewer/4.3.1/model-viewer.min.js',
-                array(),
-                '4.3.1',
-                true
-            );
-            wp_enqueue_script(
                 'rts-single-trophy',
-                RTS_PLUGIN_URL . 'assets/js/single-trophy.js',
+                RTS_PLUGIN_URL . 'assets/js/single-trophy-three-surface.js',
                 array(),
-                RTS_VERSION . '.' . filemtime(RTS_PLUGIN_PATH . 'assets/js/single-trophy.js'),
+                RTS_VERSION . '.' . filemtime(RTS_PLUGIN_PATH . 'assets/js/single-trophy-three-surface.js'),
                 true
             );
             $typography_dependencies[] = 'rts-single-trophy';

@@ -9,6 +9,9 @@ class RTS_Trophy {
     private $registration;
     private $trophy_definitions = array();
     private $suppress_notifications = false;
+    private $legacy_consent_cutoff_loaded = false;
+    private $legacy_consent_cutoff = '';
+    private $completed_referrals_by_participant = array();
     
     public function __construct() {
         global $wpdb;
@@ -189,7 +192,7 @@ class RTS_Trophy {
         $participant = $this->registration->get_participant($participant_id);
         if (
             !$participant ||
-            empty($participant->age_consent_confirmed_at) ||
+            !$this->has_completed_trophy_registration($participant) ||
             !$this->has_completed_survey($participant)
         ) {
             return;
@@ -226,7 +229,7 @@ class RTS_Trophy {
         $participant = $this->registration->get_participant($participant_id);
         if (
             !$participant ||
-            empty($participant->age_consent_confirmed_at) ||
+            !$this->has_completed_trophy_registration($participant) ||
             !$this->has_completed_survey($participant)
         ) {
             return;
@@ -261,19 +264,16 @@ class RTS_Trophy {
         if (
             !$participant ||
             (int) $participant->email_verified !== 1 ||
-            empty($participant->age_consent_confirmed_at) ||
+            !$this->has_completed_trophy_registration($participant) ||
             !$this->has_completed_survey($participant)
         ) {
             return;
         }
 
-        // Registration includes the required age/legal confirmation. The
-        // Founding Runner trophy is awarded as soon as that registration's
-        // email address is verified; it does not require .
-        if (
-            !empty($participant->age_consent_confirmed_at) &&
-            !$this->has_trophy($participant_id, 'founding-runner')
-        ) {
+        // Current registration includes the required age/legal confirmation;
+        // legacy registration is recognised by has_completed_trophy_registration().
+        // The Founding Runner trophy is awarded when email is verified.
+        if (!$this->has_trophy($participant_id, 'founding-runner')) {
             $this->earn_trophy($participant_id, 'founding-runner');
         }
         
@@ -306,7 +306,7 @@ class RTS_Trophy {
         if (
             !$participant ||
             (int) $participant->email_verified !== 1 ||
-            empty($participant->age_consent_confirmed_at) ||
+            !$this->has_completed_trophy_registration($participant) ||
             !$this->has_completed_survey($participant)
         ) {
             return 0;
@@ -317,10 +317,24 @@ class RTS_Trophy {
         $before = count($this->get_user_trophies($participant->id));
 
         try {
-            if (!$this->has_trophy($participant->id, 'founding-runner')) {
-                $this->earn_trophy($participant->id, 'founding-runner');
+            $total_miles = max(0, (int) $participant->total_captain_miles_earned);
+            foreach ($this->get_trophy_milestone_order() as $key) {
+                if (
+                    !isset($this->trophy_definitions[$key]) ||
+                    $total_miles < (int) $this->trophy_definitions[$key]['miles_required'] ||
+                    $this->has_trophy($participant->id, $key)
+                ) {
+                    continue;
+                }
+
+                $this->earn_trophy(
+                    $participant->id,
+                    $key,
+                    $this->get_historical_trophy_earned_date($participant, $key)
+                );
             }
-            $this->check_trophy_eligibility($participant->id);
+
+            $this->repair_trophy_record_dates_and_stats($participant);
         } finally {
             $this->suppress_notifications = $previous_suppression;
         }
@@ -330,14 +344,16 @@ class RTS_Trophy {
 
     /** Run the new eligibility model once for records created by older versions. */
     public function maybe_reconcile_historical_trophies() {
-        $migration_version = '3';
+        $migration_version = '4';
         if (get_option('rts_trophy_reconciliation_version') === $migration_version) {
             return;
         }
 
         $participant_ids = $this->db->get_col(
             "SELECT id FROM {$this->db->prefix}rts_participants
-             WHERE email_verified = 1 AND age_consent_confirmed_at IS NOT NULL"
+             WHERE email_verified = 1
+               AND registration_date IS NOT NULL
+               AND registration_date != '0000-00-00 00:00:00'"
         );
         foreach ((array) $participant_ids as $participant_id) {
             $this->reconcile_participant_trophies($participant_id, false);
@@ -364,7 +380,7 @@ class RTS_Trophy {
     /**
      * Earn a trophy
      */
-    public function earn_trophy($participant_id, $trophy_key) {
+    public function earn_trophy($participant_id, $trophy_key, $earned_date = '') {
         if (!isset($this->trophy_definitions[$trophy_key])) {
             return false;
         }
@@ -376,10 +392,10 @@ class RTS_Trophy {
             return false;
         }
 
-        // No trophy can be unlocked unless both registration consent and email
-        // verification have been recorded for this participant.
+        // New participants require recorded registration consent. Verified
+        // legacy registrations are handled by the shared compatibility check.
         if (
-            empty($participant->age_consent_confirmed_at) ||
+            !$this->has_completed_trophy_registration($participant) ||
             (int) $participant->email_verified !== 1 ||
             !$this->has_completed_survey($participant)
         ) {
@@ -391,9 +407,11 @@ class RTS_Trophy {
             return false;
         }
         
+        $earned_date = $this->normalise_trophy_date($earned_date) ?: current_time('mysql');
+
         // Calculate split days (days from previous trophy or registration)
-        $split_days = $this->calculate_split_days($participant_id, $trophy_key);
-        $total_days = $this->calculate_total_days($participant_id, $trophy_key);
+        $split_days = $this->calculate_split_days($participant_id, $trophy_key, $earned_date);
+        $total_days = $this->calculate_total_days($participant_id, $trophy_key, $earned_date);
         
         // Get actual crew members count (after this user earns it, it will be count + 1)
         // First get current count, then we'll add 1 for this user
@@ -411,13 +429,13 @@ class RTS_Trophy {
                 'trophy_key' => $trophy_key,
                 'trophy_rank' => $trophy['rank'],
                 'trophy_image_url' => $trophy['image_url'],
-                'earned_date' => current_time('mysql'),
+                'earned_date' => $earned_date,
                 'split_days' => $split_days,
                 'total_days' => $total_days,
                 'crew_members' => $new_crew_count,
                 'miles_required' => $trophy['miles_required'],
                 'is_displayed' => 1,
-                'created_at' => current_time('mysql')
+                'created_at' => $earned_date
             )
         );
         
@@ -498,7 +516,7 @@ class RTS_Trophy {
         $participant = $this->registration->get_participant($participant_id);
         if (
             !$participant ||
-            empty($participant->age_consent_confirmed_at) ||
+            !$this->has_completed_trophy_registration($participant) ||
             (int) $participant->email_verified !== 1 ||
             !$this->has_completed_survey($participant)
         ) {
@@ -558,7 +576,8 @@ class RTS_Trophy {
      * Calculate split days (days since previous trophy)
      * If no previous trophy, returns 0
      */
-    private function calculate_split_days($participant_id, $trophy_key) {
+    private function calculate_split_days($participant_id, $trophy_key, $earned_date = '') {
+        $earned_date = $this->normalise_trophy_date($earned_date) ?: current_time('mysql');
         $trophy_order = $this->get_trophy_milestone_order();
         $current_index = array_search($trophy_key, $trophy_order);
         
@@ -583,7 +602,7 @@ class RTS_Trophy {
             );
             
             if ($previous_trophy) {
-                return $this->days_between_trophy_dates($previous_trophy->earned_date, current_time('mysql'));
+                return $this->days_between_trophy_dates($previous_trophy->earned_date, $earned_date);
             }
         }
         
@@ -592,7 +611,7 @@ class RTS_Trophy {
         $participant = $this->registration->get_participant($participant_id);
         $journey_start = $this->get_trophy_journey_start_date($participant);
         if ($journey_start) {
-            return $this->days_between_trophy_dates($journey_start, current_time('mysql'));
+            return $this->days_between_trophy_dates($journey_start, $earned_date);
         }
         
         return 0;
@@ -601,11 +620,12 @@ class RTS_Trophy {
     /**
      * Calculate total days since registration
      */
-    private function calculate_total_days($participant_id, $trophy_key) {
+    private function calculate_total_days($participant_id, $trophy_key, $earned_date = '') {
+        $earned_date = $this->normalise_trophy_date($earned_date) ?: current_time('mysql');
         $participant = $this->registration->get_participant($participant_id);
         $journey_start = $this->get_trophy_journey_start_date($participant);
         if ($journey_start) {
-            return $this->days_between_trophy_dates($journey_start, current_time('mysql'));
+            return $this->days_between_trophy_dates($journey_start, $earned_date);
         }
         return 0;
     }
@@ -666,6 +686,134 @@ class RTS_Trophy {
         }
 
         return false;
+    }
+
+    /**
+     * New registrations must carry explicit age/legal consent. Participants
+     * saved by older plugin versions predate that field, so their existing
+     * registration date is the legacy completion record. Do not fabricate an
+     * age-consent timestamp for those accounts.
+     */
+    private function has_completed_trophy_registration($participant) {
+        if (!$participant || empty($participant->registration_date)) {
+            return false;
+        }
+
+        if (!empty($participant->age_consent_confirmed_at)) {
+            return true;
+        }
+
+        // The first consented registration marks when the mandatory field was
+        // deployed on this installation. Only null records older than that
+        // boundary are grandfathered; a later malformed registration remains
+        // ineligible and must not bypass the current consent requirement.
+        if (!$this->legacy_consent_cutoff_loaded) {
+            $this->legacy_consent_cutoff = (string) $this->db->get_var(
+                "SELECT MIN(registration_date)
+                 FROM {$this->db->prefix}rts_participants
+                 WHERE age_consent_confirmed_at IS NOT NULL
+                   AND age_consent_confirmed_at != ''
+                   AND registration_date IS NOT NULL"
+            );
+            $this->legacy_consent_cutoff_loaded = true;
+        }
+
+        $registration_date = $this->normalise_trophy_date($participant->registration_date);
+        $cutoff_date = $this->normalise_trophy_date($this->legacy_consent_cutoff);
+
+        return $registration_date && (!$cutoff_date || $registration_date < $cutoff_date);
+    }
+
+    /** Return a valid MySQL date string without changing the represented time. */
+    private function normalise_trophy_date($date) {
+        if (!$date || '0000-00-00 00:00:00' === $date) {
+            return '';
+        }
+
+        $timestamp = strtotime((string) $date);
+        return false === $timestamp ? '' : date('Y-m-d H:i:s', $timestamp);
+    }
+
+    /** Infer when a historical milestone was crossed from completed referrals. */
+    private function get_historical_trophy_earned_date($participant, $trophy_key) {
+        $journey_start = $this->get_trophy_journey_start_date($participant);
+        $required_miles = isset($this->trophy_definitions[$trophy_key])
+            ? max(0, (int) $this->trophy_definitions[$trophy_key]['miles_required'])
+            : 0;
+
+        if (0 === $required_miles) {
+            return $journey_start;
+        }
+
+        $participant_id = absint($participant->id);
+        if (!array_key_exists($participant_id, $this->completed_referrals_by_participant)) {
+            $this->completed_referrals_by_participant[$participant_id] = (array) $this->db->get_results(
+                $this->db->prepare(
+                    "SELECT bonus_earned, completed_date
+                     FROM {$this->db->prefix}rts_referrals
+                     WHERE referrer_id = %d
+                       AND status = 'completed'
+                       AND completed_date IS NOT NULL
+                     ORDER BY completed_date ASC, id ASC",
+                    $participant_id
+                )
+            );
+        }
+        $referrals = $this->completed_referrals_by_participant[$participant_id];
+        $earned_miles = 0;
+        foreach ((array) $referrals as $referral) {
+            // Old completed rows may predate bonus_earned but each verified
+            // referral still represented one kilometre in this marathon.
+            $earned_miles += max(1000, (int) ($referral->bonus_earned ?? 0));
+            if ($earned_miles >= $required_miles) {
+                return $this->normalise_trophy_date($referral->completed_date);
+            }
+        }
+
+        return '';
+    }
+
+    /** Repair legacy award dates and persist their recalculated day columns. */
+    private function repair_trophy_record_dates_and_stats($participant) {
+        $records = array();
+        foreach ($this->get_user_trophies($participant->id) as $record) {
+            $key = sanitize_key((string) ($record->trophy_key ?? ''));
+            if (in_array($key, array('founder', 'founding-runner-trophy'), true)) {
+                $key = 'founding-runner';
+            }
+            if (!$key) {
+                continue;
+            }
+
+            $inferred_date = $this->get_historical_trophy_earned_date($participant, $key);
+            if ($inferred_date) {
+                $record->earned_date = $inferred_date;
+                $this->db->update(
+                    $this->db->prefix . 'rts_user_trophies',
+                    array('earned_date' => $inferred_date),
+                    array('id' => absint($record->id)),
+                    array('%s'),
+                    array('%d')
+                );
+            }
+            $records[$key] = $record;
+        }
+
+        foreach ($records as $key => $record) {
+            $stats = $this->get_trophy_record_day_stats($participant, $records, $key);
+            $record->split_days = absint($stats['split_days']);
+            $record->total_days = absint($stats['total_days']);
+            $this->db->update(
+                $this->db->prefix . 'rts_user_trophies',
+                array(
+                    'split_days' => $record->split_days,
+                    'total_days' => $record->total_days,
+                ),
+                array('id' => absint($record->id)),
+                array('%d', '%d'),
+                array('%d')
+            );
+        }
     }
 
     /** The journey starts only after both registration and email verification. */
@@ -1075,7 +1223,7 @@ class RTS_Trophy {
         $case_style = implode(';', $case_style_parts) . ($case_style_parts ? ';' : '');
         $total_miles = intval($participant->total_captain_miles_earned);
         $email_verified = (int) $participant->email_verified === 1;
-        $registration_complete = !empty($participant->registration_date) && !empty($participant->age_consent_confirmed_at);
+        $registration_complete = $this->has_completed_trophy_registration($participant);
         $trophy_unlock_eligible = $email_verified && $registration_complete;
         $marathon_base_miles = $is_marathon_one ? 0 : 42000;
         $marathon_progress_miles = max(0, $total_miles - $marathon_base_miles);
@@ -1248,7 +1396,7 @@ class RTS_Trophy {
                         $total_days = absint($day_stats['total_days']);
                     ?>
                         <article class="<?php echo esc_attr($item_classes); ?>">
-                            <?php if ($earned && !$is_founding) : ?>
+                            <?php if ($earned) : ?>
                                 <a class="rts-trophy-case__display" href="<?php echo esc_url($single_url); ?>" aria-label="<?php echo esc_attr(sprintf(__('View %s', 'run-the-seas'), $trophy['name'])); ?>">
                             <?php else : ?>
                                 <div class="rts-trophy-case__display">
@@ -1261,7 +1409,7 @@ class RTS_Trophy {
                                     <span class="rts-trophy-case__glass" aria-hidden="true"></span>
                                     <span class="rts-trophy-case__lock<?php echo $lock_icon_url ? ' has-image' : ''; ?>" aria-hidden="true"><?php if ($lock_icon_url) : ?><img src="<?php echo esc_url($lock_icon_url); ?>" alt="" loading="lazy" decoding="async"><?php else : ?><i></i><?php endif; ?></span>
                                 <?php endif; ?>
-                            <?php if ($earned && !$is_founding) : ?>
+                            <?php if ($earned) : ?>
                                 </a>
                             <?php else : ?>
                                 </div>
@@ -1671,13 +1819,6 @@ class RTS_Trophy {
             array('angle' => 180, 'label' => __('Back', 'run-the-seas')),
             array('angle' => 270, 'label' => __('Left side', 'run-the-seas')),
         );
-        $plaque_hotspots = array(
-            0 => array('position' => '0m 0.105m 0.109m', 'normal' => '0m 0m 1m'),
-            90 => array('position' => '0.109m 0.105m 0m', 'normal' => '1m 0m 0m'),
-            180 => array('position' => '0m 0.105m -0.109m', 'normal' => '0m 0m -1m'),
-            270 => array('position' => '-0.109m 0.105m 0m', 'normal' => '-1m 0m 0m'),
-        );
-
         $asset_url = static function ($key) use ($design_assets) {
             return !empty($design_assets[$key]) ? esc_url($design_assets[$key]) : '';
         };
@@ -1692,7 +1833,17 @@ class RTS_Trophy {
 
         ob_start();
         ?>
-        <section class="rts-single-trophy" style="<?php echo esc_attr($scene_style); ?>" data-rts-single-trophy>
+        <section class="rts-single-trophy" style="<?php echo esc_attr($scene_style); ?>" data-rts-single-trophy
+            data-plaque-heading="<?php esc_attr_e('Marathon', 'run-the-seas'); ?>"
+            data-plaque-milestone="<?php echo esc_attr($milestone_label . ' ' . __('Trophy', 'run-the-seas')); ?>"
+            data-plaque-member="<?php echo esc_attr($member_name); ?>"
+            data-plaque-runner="<?php echo esc_attr(sprintf(__('Founding Runner #%s', 'run-the-seas'), $founding_runner_number)); ?>"
+            data-plaque-referrals="<?php echo esc_attr(sprintf(_n('%s verified referral', '%s verified referrals', $verified_referrals, 'run-the-seas'), number_format_i18n($verified_referrals))); ?>"
+            data-plaque-split-label="<?php esc_attr_e('Split Days', 'run-the-seas'); ?>"
+            data-plaque-split-days="<?php echo esc_attr(absint($single_day_stats['split_days'])); ?>"
+            data-plaque-total-label="<?php esc_attr_e('Total Days', 'run-the-seas'); ?>"
+            data-plaque-total-days="<?php echo esc_attr(absint($single_day_stats['total_days'])); ?>"
+            data-plaque-days="<?php echo esc_attr(sprintf(__('Split Days %1$d · Total Days %2$d', 'run-the-seas'), absint($single_day_stats['split_days']), absint($single_day_stats['total_days']))); ?>">
             <header class="rts-single-trophy__header">
                 <span class="rts-single-trophy__title-art is-left" aria-hidden="true"><?php if ($asset_url('single_title_left_art_image')) : ?><img src="<?php echo $asset_url('single_title_left_art_image'); ?>" alt=""><?php endif; ?></span>
                 <div>
@@ -1737,7 +1888,11 @@ class RTS_Trophy {
                             <span><b><?php esc_html_e('Unlocked', 'run-the-seas'); ?></b><?php echo esc_html($earned_date); ?></span>
                         </div>
                         <?php endif; ?>
-                        <blockquote><?php esc_html_e('“Every mile. Every achievement. Every victory. Your voyage. Your legacy.”', 'run-the-seas'); ?></blockquote>
+                        <div class="blockquote-single-trophy">
+                            <p><?php esc_html_e('“Every mile. Every achievement.', 'run-the-seas'); ?></p>
+                            <p><?php esc_html_e('Every victory', 'run-the-seas'); ?></p>
+                            <p><?php esc_html_e('Your voyage. Your legacy.”', 'run-the-seas'); ?></p>
+                        </div>
                     </div>
                 </aside>
 
@@ -1745,19 +1900,7 @@ class RTS_Trophy {
                     <div class="rts-single-trophy__model-stage<?php echo $model_url ? ' has-model' : ''; ?>">
                         <?php if ($asset_url('single_stage_image')) : ?><img class="rts-single-trophy__stage-art" src="<?php echo $asset_url('single_stage_image'); ?>" alt="" aria-hidden="true"><?php endif; ?>
                         <?php if ($model_url) : ?>
-                            <model-viewer class="rts-single-trophy__model" data-rts-main-model src="<?php echo esc_url($model_url); ?>"<?php echo $poster_url ? ' poster="' . esc_url($poster_url) . '"' : ''; ?> alt="<?php echo esc_attr(sprintf(__('%s earned by %s', 'run-the-seas'), $trophy_def['name'], $member_name)); ?>" camera-controls camera-orbit="0deg 75deg auto" min-camera-orbit="auto 75deg auto" max-camera-orbit="auto 75deg auto" interpolation-decay="100" disable-pan touch-action="pan-y" interaction-prompt="none" shadow-intensity="1.2" exposure="1.05" loading="eager">
-                                <?php foreach ($plaque_hotspots as $plaque_angle => $hotspot) : ?>
-                                <span class="rts-single-trophy__plaque-anchor<?php echo 0 === $plaque_angle ? ' is-current' : ''; ?>" slot="hotspot-plaque-<?php echo esc_attr($plaque_angle); ?>" data-position="<?php echo esc_attr($hotspot['position']); ?>" data-normal="<?php echo esc_attr($hotspot['normal']); ?>" data-rts-main-plaque-angle="<?php echo esc_attr($plaque_angle); ?>">
-                                    <span class="rts-single-trophy__plaque-hotspot">
-                                        <b><?php esc_html_e('Marathon', 'run-the-seas'); ?><span><?php echo esc_html($milestone_label); ?> <?php esc_html_e('Trophy', 'run-the-seas'); ?></span></b>
-                                        <strong><?php echo esc_html($member_name); ?></strong>
-                                        <span><?php echo esc_html(sprintf(__('Founding Runner #%s', 'run-the-seas'), $founding_runner_number)); ?></span>
-                                        <span><?php echo esc_html(sprintf(_n('%s verified referral', '%s verified referrals', $verified_referrals, 'run-the-seas'), number_format_i18n($verified_referrals))); ?></span>
-                                        <small><?php echo esc_html(sprintf(__('Split Days %1$d · Total Days %2$d', 'run-the-seas'), absint($single_day_stats['split_days']), absint($single_day_stats['total_days']))); ?></small>
-                                    </span>
-                                </span>
-                                <?php endforeach; ?>
-                            </model-viewer>
+                            <div class="rts-single-trophy__model rts-single-trophy__three-canvas" data-rts-main-model data-model-url="<?php echo esc_url($model_url); ?>" role="img" aria-label="<?php echo esc_attr(sprintf(__('%s earned by %s', 'run-the-seas'), $trophy_def['name'], $member_name)); ?>"></div>
                         <?php endif; ?>
                         <?php if ($poster_url) : ?><img class="rts-single-trophy__model-fallback" src="<?php echo esc_url($poster_url); ?>" alt="<?php echo esc_attr($trophy_def['name']); ?>"><?php endif; ?>
                         <?php if (!$model_url && !$poster_url) : ?><div class="rts-single-trophy__empty-model" aria-hidden="true">🏆</div><?php endif; ?>
@@ -1778,16 +1921,7 @@ class RTS_Trophy {
                     <?php if ($model_url) : foreach ($view_angles as $view_index => $view) : ?>
                     <button class="rts-single-trophy__thumbnail<?php echo 0 === $view_index ? ' is-current' : ''; ?><?php echo $view_frame_url ? ' has-custom-frame' : ''; ?>" type="button" data-rts-model-angle="<?php echo esc_attr($view['angle']); ?>" aria-label="<?php echo esc_attr(sprintf(__('Show %s view of trophy', 'run-the-seas'), $view['label'])); ?>" aria-pressed="<?php echo 0 === $view_index ? 'true' : 'false'; ?>">
                         <?php if ($view_frame_url) : ?><img class="rts-single-trophy__thumbnail-frame" src="<?php echo $view_frame_url; ?>" alt="" aria-hidden="true"><?php endif; ?>
-                        <model-viewer src="<?php echo esc_url($model_url); ?>" camera-orbit="<?php echo esc_attr($view['angle']); ?>deg 75deg auto" interaction-prompt="none" disable-pan disable-zoom touch-action="none" loading="lazy" alt="">
-                            <span class="rts-single-trophy__plaque-anchor is-current" slot="hotspot-plaque" data-position="<?php echo esc_attr($plaque_hotspots[$view['angle']]['position']); ?>" data-normal="<?php echo esc_attr($plaque_hotspots[$view['angle']]['normal']); ?>" aria-hidden="true">
-                                <span class="rts-single-trophy__plaque-hotspot">
-                                    <b><?php esc_html_e('Marathon', 'run-the-seas'); ?><span><?php echo esc_html($milestone_label); ?> <?php esc_html_e('Trophy', 'run-the-seas'); ?></span></b>
-                                    <strong><?php echo esc_html($member_name); ?></strong>
-                                    <span><?php echo esc_html(sprintf(__('Founding Runner #%s', 'run-the-seas'), $founding_runner_number)); ?></span>
-                                    <small><?php echo esc_html(sprintf(_n('%s verified referral', '%s verified referrals', $verified_referrals, 'run-the-seas'), number_format_i18n($verified_referrals))); ?></small>
-                                </span>
-                            </span>
-                        </model-viewer>
+                        <div class="rts-single-trophy__three-canvas" data-rts-thumbnail-model data-model-url="<?php echo esc_url($model_url); ?>" data-model-angle="<?php echo esc_attr($view['angle']); ?>" aria-hidden="true"></div>
                     </button>
                     <?php endforeach; elseif ($poster_url) : ?>
                     <span class="rts-single-trophy__thumbnail is-current"><img src="<?php echo esc_url($poster_url); ?>" alt="<?php echo esc_attr($trophy_def['name']); ?>"></span>

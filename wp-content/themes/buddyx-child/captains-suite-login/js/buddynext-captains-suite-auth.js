@@ -13,7 +13,7 @@
         }
 
         if (username && !username.getAttribute('placeholder')) {
-            username.setAttribute('placeholder', 'Enter your login');
+            username.setAttribute('placeholder', 'Enter your email');
         }
 
         if (password && !password.getAttribute('placeholder')) {
